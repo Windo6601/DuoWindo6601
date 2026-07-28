@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db, googleProvider, handleFirestoreError, OperationType } from './firebase';
 import { AppScreen, Exercise, UserProgress, Course, WordToken, LeaderboardEntry, SubscriptionTier, RoleplayMessage } from './types';
@@ -427,15 +427,15 @@ export default function App() {
           const userRef = doc(db, 'users', fUser.uid);
           const docSnap = await getDoc(userRef);
           if (docSnap.exists()) {
-            // Load user profile from Firebase
-            const cloudUser = docSnap.data() as UserProgress;
-            setUser(cloudUser);
+            // Load user profile from Firebase and exclude timestamps from local state
+            const { createdAt, updatedAt, ...cloudUser } = docSnap.data() as any;
+            setUser(cloudUser as UserProgress);
           } else {
             // Document doesn't exist, create it from local user
             const newUserProfile = {
               ...user,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp()
             };
             await setDoc(userRef, newUserProfile);
           }
@@ -460,7 +460,7 @@ export default function App() {
           const userRef = doc(db, 'users', firebaseUser.uid);
           await setDoc(userRef, {
             ...user,
-            updatedAt: new Date().toISOString()
+            updatedAt: serverTimestamp()
           }, { merge: true });
         } catch (err) {
           console.error("Error updating profile in Firestore:", err);
