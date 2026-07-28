@@ -1,0 +1,38 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User progress and settings stored securely",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "The user's display name" },
+        "avatarColor": { "type": "string", "description": "The background color of the avatar" },
+        "energy": { "type": "integer", "description": "Current energy level" },
+        "hearts": { "type": "integer", "description": "Current hearts count" },
+        "subscription": { "type": "string", "enum": ["free", "super", "max"], "description": "Active subscription plan" },
+        "streak": { "type": "integer", "description": "Current active streak in days" },
+        "gems": { "type": "integer", "description": "Current balance of gems" },
+        "xp": { "type": "integer", "description": "Total user XP" },
+        "currentUnit": { "type": "integer", "description": "Current lesson unit" },
+        "completedLessons": { "type": "array", "description": "List of completed lesson IDs" },
+        "mistakes": { "type": "array", "description": "List of active mistakes to review" },
+        "learnedWords": { "type": "array", "description": "List of words successfully learned" },
+        "achievements": { "type": "array", "description": "List of unlocked achievements" },
+        "language": { "type": "string", "enum": ["ru", "en", "de", "fr", "es", "ja", "zh"], "description": "Interface language" },
+        "country": { "type": "string", "description": "User's country" },
+        "preferredVoice": { "type": "string", "description": "Voice used for TTS" },
+        "voiceProvider": { "type": "string", "enum": ["gemini", "google", "yandex", "system"], "description": "Selected TTS provider" },
+        "chessStats": { "type": "object", "description": "Chess puzzle statistics" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Profile creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Profile last update timestamp" }
+      },
+      "required": ["name", "energy", "hearts", "subscription", "streak", "gems", "xp", "language", "country"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "The user profile document containing progress, settings, and stats"
+    }
+  }
+}

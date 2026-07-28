@@ -1,0 +1,8 @@
+{
+  "name": "DuoWindo6601",
+  "description": "A gamified language learning app featuring an interactive mascot, learning path, and AI-generated translation exercises.",
+  "requestFramePermissions": [
+    "microphone",
+    "camera"
+  ]
+}

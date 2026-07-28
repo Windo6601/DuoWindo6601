@@ -1,0 +1,67 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. User Profile rules
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow delete: if isOwner(userId);
+
+      allow create: if isOwner(userId) 
+        && isValidId(userId) 
+        && isValidUserProfile(incoming()) 
+        && incoming().createdAt == request.time 
+        && incoming().updatedAt == request.time;
+
+      allow update: if isOwner(userId) 
+        && isValidUserProfile(incoming()) 
+        && incoming().createdAt == existing().createdAt 
+        && incoming().updatedAt == request.time;
+    }
+
+    // --- HELPER FUNCTIONS ---
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidUserProfile(data) {
+      return data.name is string && data.name.size() <= 100
+        && data.avatarColor is string && data.avatarColor.size() <= 50
+        && data.energy is int && data.energy >= 0 && data.energy <= 10000
+        && data.hearts is int && data.hearts >= 0 && data.hearts <= 1000
+        && data.subscription is string && (data.subscription == 'free' || data.subscription == 'super' || data.subscription == 'max')
+        && data.streak is int && data.streak >= 0
+        && data.gems is int && data.gems >= 0
+        && data.xp is int && data.xp >= 0
+        && data.currentUnit is int && data.currentUnit >= 1
+        && data.completedLessons is list
+        && data.mistakes is list
+        && data.learnedWords is list
+        && data.achievements is list
+        && data.language is string && data.language.size() <= 5
+        && data.country is string && data.country.size() <= 100;
+    }
+  }
+}
