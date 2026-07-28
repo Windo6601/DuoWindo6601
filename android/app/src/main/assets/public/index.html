@@ -1,0 +1,114 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>DuoWindo6601</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['"DIN Next Rounded"', 'Nunito', 'sans-serif'],
+              din: ['"DIN Next Rounded"', 'Nunito', 'sans-serif'],
+              feather: ['"Feather"', 'sans-serif'],
+            },
+            colors: {
+              duo: {
+                dark: '#131F24',
+                card: '#202F36',
+                green: '#58CC02',
+                greenDark: '#58A700', // For border-b
+                blue: '#1CB0F6',
+                blueDark: '#1899D6',
+                gray: '#E5E5E5',
+                grayDark: '#AFAFAF',
+                red: '#FF4B4B',
+                yellow: '#FFC800',
+                yellowDark: '#D6A600',
+                orange: '#FF9600'
+              }
+            },
+            keyframes: {
+              float: {
+                '0%, 100%': { transform: 'translateY(0px)' },
+                '50%': { transform: 'translateY(-10px)' },
+              }
+            },
+            animation: {
+              'float': 'float 3s ease-in-out infinite',
+              'spin-slow': 'spin 8s linear infinite',
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      /* Duolingo DIN Next Rounded Typeface */
+      @font-face {
+        font-family: 'DIN Next Rounded';
+        src: url('https://db.onlinewebfonts.com/t/643d46383389279075778b8770d18d4f.woff2') format('woff2');
+        font-weight: 700;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'DIN Next Rounded';
+        src: url('https://db.onlinewebfonts.com/t/20e8b15d2a6a12c44431e77e2017367c.woff2') format('woff2');
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+      }
+      /* Feather Bold (Icon/Display font) */
+      @font-face {
+        font-family: 'Feather';
+        src: url('https://db.onlinewebfonts.com/t/0628292f75a0694e22e6b72049e390c2.woff2') format('woff2');
+        font-weight: 700;
+        font-style: normal;
+        font-display: swap;
+      }
+
+      body {
+        background-color: #131F24;
+        color: white;
+        overscroll-behavior: none;
+        font-family: "DIN Next Rounded", "Nunito", sans-serif;
+      }
+      /* Custom scrollbar hiding */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      
+      /* Standard bold styling for the custom fonts */
+      .font-black {
+        font-weight: 800;
+      }
+      .font-bold {
+        font-weight: 700;
+      }
+    </style>
+
+<link rel="stylesheet" href="/index.css">
+  <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
+    "react": "https://aistudiocdn.com/react@^19.2.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/"
+  }
+}
+</script>
+  <script type="module" crossorigin src="/assets/index-Bwgf_D6Y.js"></script>
+</head>
+  <body>
+    <div id="root"></div>
+</body>
+</html>

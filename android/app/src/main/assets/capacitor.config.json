@@ -1,0 +1,8 @@
+{
+	"appId": "com.duowindo6601.app",
+	"appName": "DuoWindo6601",
+	"webDir": "dist",
+	"server": {
+		"androidScheme": "https"
+	}
+}
