@@ -1,4 +1,4 @@
-name: DuoWindo6601
+name: Build APK
 
 on:
   push:
