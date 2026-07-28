@@ -4,6 +4,17 @@
 
 ---
 
+## 🐙 Репозиторий GitHub и автоматическая сборка APK
+
+Проект **DuoWindo6601** доступен на GitHub:
+👉 **[https://github.com/Windo6601/DuoWindo6601](https://github.com/Windo6601/DuoWindo6601)**
+
+Автоматическая онлайн-сборка Debug APK настроена через GitHub Actions:
+- **Файл воркфлоу:** `.github/workflows/build.yml`
+- **Процесс:** Каждый `push` в ветку `main` автоматически запускает сборку APK в облаке GitHub Actions без необходимости устанавливать Android Studio локально.
+
+---
+
 ## 🛠️ Системные требования
 1. **Node.js** (версии 18 или новее)
 2. **Android Studio** (с установленным Android SDK и виртуальным устройством/эмулятором)

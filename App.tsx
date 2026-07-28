@@ -1559,7 +1559,7 @@ export default function App() {
           {screen === AppScreen.PATH && (
             <div className="flex flex-col items-center py-10 animate-in fade-in slide-in-from-bottom-5">
               {!androidDismissed && (
-                  <div className="w-full max-w-md bg-gradient-to-r from-emerald-600 to-teal-600 border-2 border-b-8 border-emerald-800 rounded-[2.5rem] p-6 mb-8 shadow-2xl relative animate-in zoom-in duration-300">
+                  <div className="w-full max-w-md bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-700 border-2 border-b-8 border-emerald-900 rounded-[2.5rem] p-6 mb-8 shadow-2xl relative animate-in zoom-in duration-300">
                       {/* Close button */}
                       <button 
                           onClick={() => {
@@ -1573,14 +1573,26 @@ export default function App() {
                       </button>
                       
                       <div className="flex items-start space-x-4">
-                          <div className="bg-white/20 p-3 rounded-full mt-1">
+                          <div className="bg-white/20 p-3 rounded-full mt-1 flex-shrink-0">
                               <svg className="w-8 h-8 text-white fill-current" viewBox="0 0 24 24">
-                                  <path d="M16.621 2.52a1.326 1.326 0 0 0-1.077 1.096l-.59 3.19C13.882 6.3 12.872 6.131 12 6.131c-.872 0-1.882.169-2.954.675l-.59-3.19A1.325 1.325 0 0 0 7.38 2.52a1.327 1.327 0 0 0-1.097 1.076l-.59 3.19C2.791 8.784.82 12.247.82 15.688c0 3.731 2.296 6.84 5.485 7.91l.83 2-.39 2.08a.663.663 0 0 0 .524.773a.658.658 0 0 0 .77-.525l.43-2.31c.884.225 1.954.341 3.53.341s2.646-.116 3.53-.341l.43 2.31a.658.658 0 0 0 .77.525a.663.663 0 0 0 .524-.773l-.39-2.08l.83-2c3.189-1.07 5.485-4.179 5.485-7.91c0-3.441-1.971-6.904-4.872-8.902l-.59-3.19a1.327 1.327 0 0 0-1.097-1.076zM7.5 13.5a1.5 1.5 0 1 1 0 3a1.5 1.5 0 0 1 0-3zm9 0a1.5 1.5 0 1 1 0 3a1.5 1.5 0 0 1 0-3z"/>
+                                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
                               </svg>
                           </div>
                           <div className="flex-1 pr-6">
-                              <h3 className="font-din font-black text-xl text-white tracking-widest uppercase mb-1">{t('androidAlertTitle')}</h3>
-                              <p className="font-din font-bold text-sm text-emerald-100 leading-tight mb-4">{t('androidAlertDesc')}</p>
+                              <span className="inline-block bg-yellow-400 text-black text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider mb-2">GitHub Release</span>
+                              <h3 className="font-din font-black text-xl text-white tracking-widest uppercase mb-1">DuoWindo6601 уже доступен на GitHub</h3>
+                              <p className="font-din font-bold text-xs text-emerald-100 leading-normal mb-3">
+                                  Автоматическая сборка Android APK запущена через <code className="bg-black/30 px-1 py-0.5 rounded font-mono text-[11px] text-yellow-300">.github/workflows/build.yml</code>.
+                              </p>
+
+                              <a 
+                                  href="https://github.com/Windo6601/DuoWindo6601" 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="font-din font-black text-xs uppercase tracking-widest bg-white hover:bg-gray-100 text-gray-950 hover:scale-[1.03] active:scale-95 px-4 py-2.5 rounded-xl border-b-4 border-gray-300 transition-all shadow-md text-center flex items-center justify-center space-x-2 mb-3"
+                              >
+                                  <span>🐙 GitHub Repository (DuoWindo6601)</span>
+                              </a>
                               
                               <div className="flex flex-col sm:flex-row flex-wrap gap-2">
                                   <button 
@@ -1588,7 +1600,7 @@ export default function App() {
                                           playSound('select');
                                           setShowAndroidModal(true);
                                       }}
-                                      className="font-din font-black text-xs uppercase tracking-widest bg-emerald-700 hover:bg-emerald-800 text-white hover:scale-[1.03] active:scale-95 px-4 py-2.5 rounded-xl border-b-4 border-emerald-950 transition-all shadow-md text-center flex-1"
+                                      className="font-din font-black text-xs uppercase tracking-widest bg-emerald-700 hover:bg-emerald-800 text-white hover:scale-[1.03] active:scale-95 px-3 py-2 rounded-xl border-b-4 border-emerald-950 transition-all shadow-md text-center flex-1"
                                   >
                                       {t('androidAlertBtn')}
                                   </button>
@@ -1599,20 +1611,9 @@ export default function App() {
                                           setSimulatorMode('android');
                                           setSimNotify("Вы завели симулятор в режиме Android!");
                                       }}
-                                      className="font-din font-black text-xs uppercase tracking-widest bg-yellow-400 hover:bg-yellow-500 text-gray-950 hover:scale-[1.03] active:scale-95 px-4 py-2.5 rounded-xl border-b-4 border-yellow-700 transition-all shadow-md text-center flex items-center justify-center space-x-1 flex-1"
+                                      className="font-din font-black text-xs uppercase tracking-widest bg-yellow-400 hover:bg-yellow-500 text-gray-950 hover:scale-[1.03] active:scale-95 px-3 py-2 rounded-xl border-b-4 border-yellow-700 transition-all shadow-md text-center flex items-center justify-center space-x-1 flex-1"
                                   >
                                       <span>🤖 Тест Android</span>
-                                  </button>
-
-                                  <button 
-                                      onClick={() => {
-                                          playSound('success');
-                                          setSimulatorMode('ios');
-                                          setSimNotify("Вы завели симулятор в режиме iOS!");
-                                      }}
-                                      className="font-din font-black text-xs uppercase tracking-widest bg-sky-400 hover:bg-sky-500 text-gray-950 hover:scale-[1.03] active:scale-95 px-4 py-2.5 rounded-xl border-b-4 border-sky-700 transition-all shadow-md text-center flex items-center justify-center space-x-1 flex-1"
-                                  >
-                                      <span>🍎 Тест iOS</span>
                                   </button>
                               </div>
                           </div>
@@ -2280,6 +2281,26 @@ export default function App() {
                   
                   {/* Scrollable Content */}
                   <div className="flex-1 overflow-y-auto no-scrollbar space-y-6 text-gray-200 pr-2">
+                      <div className="bg-gradient-to-r from-indigo-900/60 to-purple-900/60 border-2 border-indigo-500/50 p-4 rounded-2xl shadow-lg">
+                          <h4 className="text-yellow-400 font-black text-xs uppercase tracking-widest mb-1 flex items-center">
+                              <span className="mr-2 text-base">🐙</span> DuoWindo6601 уже доступен на GitHub
+                          </h4>
+                          <p className="text-xs text-gray-200 font-bold leading-relaxed mb-3">
+                              Автоматическая сборка Android APK настроена через GitHub Actions. Файл воркфлоу:
+                              <br />
+                              <code className="text-yellow-300 font-mono text-[11px] bg-black/40 px-1.5 py-0.5 rounded inline-block mt-1">.github/workflows/build.yml</code>
+                          </p>
+                          <a 
+                              href="https://github.com/Windo6601/DuoWindo6601"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center space-x-2 bg-white hover:bg-gray-100 text-gray-900 font-black text-xs px-4 py-2.5 rounded-xl border-b-4 border-gray-300 transition-all uppercase tracking-wider shadow-md"
+                          >
+                              <span>Открыть GitHub Репозиторий</span>
+                              <span>↗</span>
+                          </a>
+                      </div>
+
                       <div>
                           <h4 className="text-emerald-400 font-black text-xs uppercase tracking-widest mb-2">📋 Требования / Requirements</h4>
                           <ul className="list-disc pl-5 font-bold text-sm space-y-1 text-gray-300">
