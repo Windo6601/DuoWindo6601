@@ -2,9 +2,9 @@ plugins {
     id("com.android.application")
 }
 
-val compileSdkVersion = rootProject.extra["compileSdkVersion"] as Int
-val minSdkVersion = rootProject.extra["minSdkVersion"] as Int
-val targetSdkVersion = rootProject.extra["targetSdkVersion"] as Int
+val localCompileSdkVersion = rootProject.extra["compileSdkVersion"] as Int
+val localMinSdkVersion = rootProject.extra["minSdkVersion"] as Int
+val localTargetSdkVersion = rootProject.extra["targetSdkVersion"] as Int
 val androidxAppCompatVersion = rootProject.extra["androidxAppCompatVersion"] as String
 val androidxCoordinatorLayoutVersion = rootProject.extra["androidxCoordinatorLayoutVersion"] as String
 val coreSplashScreenVersion = rootProject.extra["coreSplashScreenVersion"] as String
@@ -14,11 +14,11 @@ val androidxEspressoCoreVersion = rootProject.extra["androidxEspressoCoreVersion
 
 android {
     namespace = "com.duowindo6601.app"
-    compileSdk = compileSdkVersion
+    compileSdk = localCompileSdkVersion
     defaultConfig {
         applicationId = "com.duowindo6601.app"
-        minSdk = minSdkVersion
-        targetSdk = targetSdkVersion
+        minSdk = localMinSdkVersion
+        targetSdk = localTargetSdkVersion
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
