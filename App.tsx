@@ -361,6 +361,26 @@ const TRANSLATIONS: Record<string, any> = {
   // ... other langs kept simplified as in previous turns for brevity, but functional ...
 };
 
+// Helper to recursively strip undefined properties from Firestore payloads
+const sanitizeForFirestore = (data: any): any => {
+  if (data === null || data === undefined) return null;
+  if (typeof data !== 'object') return data;
+  if (Array.isArray(data)) return data.map(sanitizeForFirestore);
+  
+  // Preserve Firestore FieldValues (like serverTimestamp()) or objects with custom constructors/methods
+  if (data.constructor?.name === 'FieldValue' || (data as any)._methodName || typeof (data as any).toMillis === 'function') {
+    return data;
+  }
+
+  const cleaned: Record<string, any> = {};
+  for (const [key, val] of Object.entries(data)) {
+    if (val !== undefined) {
+      cleaned[key] = sanitizeForFirestore(val);
+    }
+  }
+  return cleaned;
+};
+
 export default function App() {
   const [screen, setScreen] = useState<AppScreen>(AppScreen.PATH);
   const [offlineMode, setOfflineMode] = useState(false);
@@ -437,7 +457,7 @@ export default function App() {
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp()
             };
-            await setDoc(userRef, newUserProfile);
+            await setDoc(userRef, sanitizeForFirestore(newUserProfile));
           }
           initialSyncComplete.current = true;
           setSimNotify("Успешный вход в облако Duowindo!");
@@ -458,10 +478,10 @@ export default function App() {
       if (firebaseUser && initialSyncComplete.current) {
         try {
           const userRef = doc(db, 'users', firebaseUser.uid);
-          await setDoc(userRef, {
+          await setDoc(userRef, sanitizeForFirestore({
             ...user,
             updatedAt: serverTimestamp()
-          }, { merge: true });
+          }), { merge: true });
         } catch (err) {
           console.error("Error updating profile in Firestore:", err);
           handleFirestoreError(err, OperationType.UPDATE, `users/${firebaseUser.uid}`);
@@ -596,10 +616,10 @@ export default function App() {
     if (firebaseUser) {
       try {
         const userRef = doc(db, 'users', firebaseUser.uid);
-        await setDoc(userRef, {
+        await setDoc(userRef, sanitizeForFirestore({
           ...updatedUser,
           updatedAt: serverTimestamp()
-        }, { merge: true });
+        }), { merge: true });
       } catch (err) {
         console.error("Error saving updated profile to Firestore:", err);
       }
