@@ -1874,7 +1874,7 @@ export default function App() {
           {screen === AppScreen.PROFILE && (
              <div className="flex flex-col items-center space-y-10 py-10 animate-in fade-in relative">
                 <button onClick={() => { playSound('click'); setScreen(AppScreen.SETTINGS); }} className="absolute top-0 right-0 p-3 bg-duo-card rounded-xl border-2 border-gray-700 hover:bg-gray-800 transition-colors"><GearIcon className="w-8 h-8 text-gray-400" /></button>
-                <div onClick={() => { playSound('click'); setShowAvatarEditModal(true); }} className={`w-48 h-48 rounded-[3.5rem] ${user.avatarColor} border-8 border-gray-800 flex items-center justify-center text-7xl font-bold shadow-2xl relative overflow-hidden group font-feather cursor-pointer`}>
+                <div onClick={() => { playSound('click'); setEditName(user.name); setEditUsername(user.username || ""); setShowAvatarEditModal(true); }} className={`w-48 h-48 rounded-[3.5rem] ${user.avatarColor} border-8 border-gray-800 flex items-center justify-center text-7xl font-bold shadow-2xl relative overflow-hidden group font-feather cursor-pointer`}>
                     <span className="group-hover:scale-110 transition-transform">{user.name[0]}</span>
                     <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <PenIcon className="w-10 h-10 text-white" />
@@ -1887,7 +1887,7 @@ export default function App() {
                         {user.subscription === 'max' && <span className="ml-3 px-3 py-1 bg-black border border-duo-blue rounded-lg text-xs font-black text-duo-blue">MAX</span>}
                     </h2>
                     <p className="text-gray-400 font-bold text-sm mt-1">@{user.username || 'duouser6601'}</p>
-                    <button onClick={() => { playSound('click'); setShowAvatarEditModal(true); }} className="mt-3 px-4 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl font-bold text-xs uppercase tracking-wider transition-all">Редактировать профиль</button>
+                    <button onClick={() => { playSound('click'); setEditName(user.name); setEditUsername(user.username || ""); setShowAvatarEditModal(true); }} className="mt-3 px-4 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl font-bold text-xs uppercase tracking-wider transition-all">Редактировать профиль</button>
                 </div>
                 <div className="grid grid-cols-2 gap-6 w-full max-w-md">
                    <div className="bg-duo-card p-8 rounded-3xl border-2 border-gray-800 text-center"><p className="text-xs text-gray-500 font-bold mb-2 uppercase tracking-widest">{t('streakDays')}</p><p className="text-4xl font-bold text-duo-red">{user.streak}</p></div>
