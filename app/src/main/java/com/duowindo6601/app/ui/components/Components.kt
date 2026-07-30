@@ -223,8 +223,8 @@ fun rememberSpeaker(localeTag: String): (String) -> Unit {
         onDispose {
             engineState.value = null
             try {
-                engine.stop()
-                engine.shutdown()
+                engine?.stop()
+                engine?.shutdown()
             } catch (_: Exception) {
             }
         }

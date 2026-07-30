@@ -43,7 +43,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.duowindo6601.app.data.Courses
 import com.duowindo6601.app.data.UserProgress
-import com.duowindo6601.app.ui.components.DuoButton
 import com.duowindo6601.app.ui.components.StatPill
 import com.duowindo6601.app.ui.theme.DuoColors
 import com.duowindo6601.app.vm.GameViewModel
