@@ -51,7 +51,35 @@ app/build/outputs/apk/debug/app-debug.apk
 ```
 
 GitHub Actions (`.github/workflows/build.yml`) also builds the APK on every push
-and publishes it as a downloadable artifact.
+to `main` and publishes it as a downloadable artifact. If you want CI builds on
+every branch and on demand, replace the workflow with:
+
+```yaml
+name: Build APK
+
+on:
+  push:
+    branches: [ main, 'arena/**' ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+      - run: chmod +x gradlew && ./gradlew assembleDebug --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: duowindo6601-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+```
 
 ## 📁 Project structure
 
