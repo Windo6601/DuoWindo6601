@@ -6,7 +6,11 @@
       "type": "object",
       "properties": {
         "name": { "type": "string", "description": "The user's display name" },
+        "username": { "type": "string", "description": "The user's unique handle" },
         "avatarColor": { "type": "string", "description": "The background color of the avatar" },
+        "avatarImage": { "type": "string", "description": "Base64 avatar image string" },
+        "avatarUrl": { "type": "string", "description": "Avatar image URL" },
+        "avatarIcon": { "type": "string", "description": "Avatar emoji or icon" },
         "energy": { "type": "integer", "description": "Current energy level" },
         "hearts": { "type": "integer", "description": "Current hearts count" },
         "subscription": { "type": "string", "enum": ["free", "super", "max"], "description": "Active subscription plan" },

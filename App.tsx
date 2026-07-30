@@ -3,7 +3,6 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db, googleProvider, handleFirestoreError, OperationType } from './firebase';
-import { Capacitor } from '@capacitor/core';
 import { AppScreen, Exercise, UserProgress, Course, WordToken, LeaderboardEntry, SubscriptionTier, RoleplayMessage } from './types';
 import { Chess, Square } from 'chess.js';
 import { generateExercise, checkAnswerWithAI, speakText, startRoleplay, replyToRoleplay, generateIllusion, generateDrawing, checkDrawing, getFallbackExercise, getChessMove, getChessChatReply, translateText, getMistakeExplanation, generateIshihara, generateInterviewQuestion, getInterviewHint, generateReading } from './services/geminiService';
@@ -478,32 +477,6 @@ export default function App() {
     playSound('click');
     setLoading(true);
     try {
-      if (Capacitor.isNativePlatform()) {
-        // Native platforms do not support signInWithPopup/signInWithRedirect in standard webviews.
-        // Simulate/mock successful native login to avoid "auth/network-request-failed" crashes.
-        setTimeout(() => {
-          const mockFirebaseUser = {
-            uid: "mock-native-user-6601",
-            displayName: "Игрок на Android",
-            email: "mobile.student@duowindo6601.app",
-            emailVerified: true,
-            isAnonymous: false,
-            providerData: [{ providerId: "google.com", email: "mobile.student@duowindo6601.app" }]
-          };
-          setFirebaseUser(mockFirebaseUser as any);
-          setUser(prev => ({
-            ...prev,
-            name: "Игрок на Android",
-            xp: prev.xp + 50
-          }));
-          initialSyncComplete.current = true;
-          setSimNotify("Вы вошли в систему на мобильном устройстве!");
-          setToast("Успешный вход (Мобильный профиль)");
-          setLoading(false);
-        }, 1000);
-        return;
-      }
-
       await signInWithPopup(auth, googleProvider);
     } catch (err: any) {
       console.error("Error signing in with Google:", err);
@@ -518,9 +491,7 @@ export default function App() {
         setToast("Ошибка входа: " + (err instanceof Error ? err.message : String(err)));
       }
     } finally {
-      if (!Capacitor.isNativePlatform()) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   };
 
@@ -565,6 +536,78 @@ export default function App() {
   const [simTriggerDismissed, setSimTriggerDismissed] = useState(() => {
     return localStorage.getItem('duo_sim_trigger_dismissed') === 'true';
   });
+
+  // Profile Editor Modal states & handlers
+  const [showEditProfileModal, setShowEditProfileModal] = useState<boolean>(false);
+  const [editName, setEditName] = useState<string>('');
+  const [editUsername, setEditUsername] = useState<string>('');
+  const [editAvatarColor, setEditAvatarColor] = useState<string>('bg-duo-blue');
+  const [editAvatarUrl, setEditAvatarUrl] = useState<string>('');
+  const [editAvatarIcon, setEditAvatarIcon] = useState<string>('');
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
+
+  const openEditProfile = () => {
+    playSound('click');
+    setEditName(user.name || '');
+    setEditUsername(user.username || '');
+    setEditAvatarColor(user.avatarColor || 'bg-duo-blue');
+    setEditAvatarUrl(user.avatarUrl || user.avatarImage || '');
+    setEditAvatarIcon(user.avatarIcon || '');
+    setShowEditProfileModal(true);
+  };
+
+  const handleAvatarFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setToast("Размер файла не должен превышать 5 МБ");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === 'string') {
+        setEditAvatarUrl(reader.result);
+        setToast("Фото загружено! Нажмите 'Сохранить', чтобы применить.");
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!editName.trim()) {
+      setToast("Имя не может быть пустым");
+      return;
+    }
+    playSound('success');
+    const cleanUsername = editUsername.trim().replace(/^@/, '');
+    const updatedUser: UserProgress = {
+      ...user,
+      name: editName.trim(),
+      username: cleanUsername ? cleanUsername : undefined,
+      avatarColor: editAvatarColor,
+      avatarUrl: editAvatarUrl || undefined,
+      avatarImage: editAvatarUrl || undefined,
+      avatarIcon: editAvatarIcon || undefined,
+    };
+    
+    setUser(updatedUser);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUser));
+    
+    if (firebaseUser) {
+      try {
+        const userRef = doc(db, 'users', firebaseUser.uid);
+        await setDoc(userRef, {
+          ...updatedUser,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      } catch (err) {
+        console.error("Error saving updated profile to Firestore:", err);
+      }
+    }
+    
+    setToast("Профиль успешно сохранен! ✨");
+    setShowEditProfileModal(false);
+  };
 
   // Mobile simulator gesture, notification and sensor effects
   useEffect(() => {
@@ -1117,13 +1160,19 @@ export default function App() {
   ];
 
   const renderAppLayout = () => {
+    const isNativeApp = typeof window !== 'undefined' && (
+      !!(window as any).Capacitor?.isNativePlatform?.() || 
+      !!(window as any).Capacitor?.platform
+    );
+    const isSimulatingMobile = simulatorMode !== 'none' || isNativeApp;
+
     return (
       <div className={simulatorMode === 'none' 
         ? "bg-duo-dark min-h-screen text-white flex flex-col lg:flex-row font-din selection:bg-duo-blue/30 overflow-x-hidden w-full"
         : "w-full h-full text-white flex flex-col font-din selection:bg-duo-blue/30 overflow-y-auto no-scrollbar relative bg-duo-dark"
       }>
       {/* SIDEBAR */}
-      <aside className="hidden lg:flex flex-col w-64 fixed left-0 h-full border-r border-gray-800 p-6 z-50 bg-duo-dark">
+      <aside className={isSimulatingMobile ? "hidden" : "hidden lg:flex flex-col w-64 fixed left-0 h-full border-r border-gray-800 p-6 z-50 bg-duo-dark"}>
         <h1 className="text-3xl font-black text-duo-green mb-10 italic tracking-tighter font-din">DUOWINDO</h1>
         <nav className="space-y-2">
           {NAV_ITEMS.map(item => (
@@ -1134,7 +1183,7 @@ export default function App() {
         </nav>
       </aside>
 
-      <main className="flex-1 lg:ml-64 relative pb-28 lg:pb-0 min-h-screen">
+      <main className={isSimulatingMobile ? "flex-1 relative pb-28 min-h-screen w-full" : "flex-1 lg:ml-64 relative pb-28 lg:pb-0 min-h-screen"}>
         {/* HEADER */}
         {screen !== AppScreen.LESSON && screen !== AppScreen.VIDEO_CALL && (
           <header className="sticky top-0 z-40 bg-duo-dark/95 backdrop-blur-md p-4 border-b border-gray-800 flex flex-col space-y-4 shadow-xl">
@@ -1192,7 +1241,33 @@ export default function App() {
             <div className="fixed inset-0 z-[100] bg-duo-dark overflow-y-auto">
                 <div className="p-4 md:p-10 max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-5">
                     <button onClick={() => { playSound('click'); setScreen(AppScreen.PROFILE); }} className="mb-6 text-gray-500 hover:text-white flex items-center font-bold"><CloseIcon className="w-8 h-8 mr-2"/> {t('back')}</button>
-                    <h2 className="text-4xl font-black mb-10">{t('settings')}</h2>
+                    <h2 className="text-4xl font-black mb-8">{t('settings')}</h2>
+                    
+                    {/* PROFILE SUMMARY & EDIT TRIGGER */}
+                    <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                            <div className={`w-14 h-14 rounded-2xl ${user.avatarColor || 'bg-duo-blue'} flex items-center justify-center text-2xl font-bold overflow-hidden border-2 border-gray-700 shadow-md`}>
+                                {user.avatarUrl || user.avatarImage ? (
+                                    <img src={user.avatarUrl || user.avatarImage} alt={user.name} className="w-full h-full object-cover" />
+                                ) : user.avatarIcon ? (
+                                    <span>{user.avatarIcon}</span>
+                                ) : (
+                                    <span>{user.name ? user.name[0].toUpperCase() : 'U'}</span>
+                                )}
+                            </div>
+                            <div>
+                                <h4 className="font-black text-lg text-white flex items-center gap-2">
+                                    <span>{user.name}</span>
+                                </h4>
+                                <p className="text-xs text-gray-400 font-bold">{user.username ? `@${user.username}` : (user.language === 'ru' ? 'Юзернейм не указан' : 'No handle set')}</p>
+                            </div>
+                        </div>
+                        <button onClick={openEditProfile} className="px-4 py-2.5 bg-duo-blue hover:brightness-110 text-white rounded-2xl font-black text-xs uppercase tracking-wider border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all shadow-md flex items-center space-x-1.5">
+                            <PenIcon className="w-4 h-4" />
+                            <span>{user.language === 'ru' ? 'Изменить' : 'Edit'}</span>
+                        </button>
+                    </div>
+
                     <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl"><h3 className="text-xl font-bold mb-4 text-white uppercase tracking-widest">{t('apiStatus')}</h3><div className="flex items-center justify-between"><div className="flex items-center space-x-3"><div className={`w-4 h-4 rounded-full ${offlineMode ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div><span className={`font-bold text-lg ${offlineMode ? 'text-red-400' : 'text-green-400'}`}>{offlineMode ? t('limitReached') : t('online')}</span></div><button onClick={() => { playSound('click'); checkApiStatus(); }} className="px-4 py-2 bg-gray-700 rounded-xl font-bold text-sm hover:bg-gray-600 transition-all border-b-4 border-gray-800 active:border-b-0 active:translate-y-1">{t('checkConnection')}</button></div></div>
                     <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl">
                     <h3 className="text-xl font-bold mb-4 text-white uppercase tracking-widest">{t('language')}</h3>
@@ -1862,13 +1937,45 @@ export default function App() {
           )}
 
           {screen === AppScreen.PROFILE && (
-             <div className="flex flex-col items-center space-y-10 py-10 animate-in fade-in relative">
-                <button onClick={() => { playSound('click'); setScreen(AppScreen.SETTINGS); }} className="absolute top-0 right-0 p-3 bg-duo-card rounded-xl border-2 border-gray-700 hover:bg-gray-800 transition-colors"><GearIcon className="w-8 h-8 text-gray-400" /></button>
-                <div className="w-48 h-48 rounded-[3.5rem] bg-duo-blue border-8 border-gray-800 flex items-center justify-center text-7xl font-bold shadow-2xl relative overflow-hidden group font-feather"><span className="group-hover:scale-110 transition-transform">{user.name[0]}</span><div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><CameraIcon className="w-10 h-10 text-white" /></div></div>
-                <h2 className="text-4xl font-bold tracking-tight uppercase flex items-center">{user.name} {user.subscription === 'super' && <span className="ml-3 px-3 py-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg text-xs font-black text-white">SUPER</span>}{user.subscription === 'max' && <span className="ml-3 px-3 py-1 bg-black border border-duo-blue rounded-lg text-xs font-black text-duo-blue">MAX</span>}</h2>
+             <div className="flex flex-col items-center space-y-8 py-10 animate-in fade-in relative max-w-xl mx-auto w-full px-4">
+                <button onClick={() => { playSound('click'); setScreen(AppScreen.SETTINGS); }} className="absolute top-0 right-4 p-3 bg-duo-card rounded-2xl border-2 border-gray-700 hover:bg-gray-800 transition-colors shadow-lg"><GearIcon className="w-7 h-7 text-gray-400" /></button>
+                
+                {/* AVATAR INTERACTIVE DISPLAY */}
+                <div onClick={openEditProfile} className="relative group cursor-pointer mt-2">
+                   <div className={`w-40 h-40 md:w-48 md:h-48 rounded-[3rem] ${user.avatarColor || 'bg-duo-blue'} border-8 border-gray-800 flex items-center justify-center text-7xl font-bold shadow-2xl relative overflow-hidden font-feather transition-transform group-hover:scale-105`}>
+                      {user.avatarUrl || user.avatarImage ? (
+                         <img src={user.avatarUrl || user.avatarImage} alt={user.name} className="w-full h-full object-cover" />
+                      ) : user.avatarIcon ? (
+                         <span className="text-7xl">{user.avatarIcon}</span>
+                      ) : (
+                         <span>{user.name ? user.name[0].toUpperCase() : 'U'}</span>
+                      )}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white">
+                         <CameraIcon className="w-10 h-10 mb-1" />
+                         <span className="text-xs font-black uppercase tracking-wider">Изменить</span>
+                      </div>
+                   </div>
+                </div>
+
+                {/* NAME & USERNAME DISPLAY */}
+                <div className="text-center space-y-1">
+                   <h2 className="text-3xl md:text-4xl font-black tracking-tight uppercase flex items-center justify-center gap-2">
+                      <span>{user.name}</span>
+                      {user.subscription === 'super' && <span className="px-3 py-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg text-xs font-black text-white">SUPER</span>}
+                      {user.subscription === 'max' && <span className="px-3 py-1 bg-black border border-duo-blue rounded-lg text-xs font-black text-duo-blue">MAX</span>}
+                   </h2>
+                   <p className="text-gray-400 font-bold text-sm md:text-base">
+                      {user.username ? `@${user.username}` : (user.language === 'ru' ? 'Юзернейм не установлен' : 'No username set')}
+                   </p>
+                   <button onClick={openEditProfile} className="mt-3 px-6 py-2.5 bg-duo-blue hover:brightness-110 text-white rounded-2xl font-black text-xs uppercase tracking-wider border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all flex items-center space-x-2 mx-auto shadow-lg">
+                      <PenIcon className="w-4 h-4" />
+                      <span>{user.language === 'ru' ? 'Редактировать профиль' : 'Edit Profile'}</span>
+                   </button>
+                </div>
+
                 <div className="grid grid-cols-2 gap-6 w-full max-w-md">
-                   <div className="bg-duo-card p-8 rounded-3xl border-2 border-gray-800 text-center"><p className="text-xs text-gray-500 font-bold mb-2 uppercase tracking-widest">{t('streakDays')}</p><p className="text-4xl font-bold text-duo-red">{user.streak}</p></div>
-                   <div className="bg-duo-card p-8 rounded-3xl border-2 border-gray-800 text-center"><p className="text-xs text-gray-500 font-bold mb-2 uppercase tracking-widest">{t('totalXP')}</p><p className="text-4xl font-bold text-duo-yellow">{user.xp}</p></div>
+                   <div className="bg-duo-card p-6 md:p-8 rounded-3xl border-2 border-gray-800 text-center shadow-xl"><p className="text-xs text-gray-500 font-bold mb-2 uppercase tracking-widest">{t('streakDays')}</p><p className="text-4xl font-bold text-duo-red">{user.streak}</p></div>
+                   <div className="bg-duo-card p-6 md:p-8 rounded-3xl border-2 border-gray-800 text-center shadow-xl"><p className="text-xs text-gray-500 font-bold mb-2 uppercase tracking-widest">{t('totalXP')}</p><p className="text-4xl font-bold text-duo-yellow">{user.xp}</p></div>
                 </div>
 
                 {/* Cloud Sync Auth Block */}
@@ -1921,11 +2028,185 @@ export default function App() {
       </main>
 
       {/* MOBILE NAV */}
-      <nav className="lg:hidden fixed bottom-0 left-0 w-full bg-duo-dark/95 backdrop-blur-xl border-t border-gray-800 p-5 flex justify-around z-50 pb-8">
+      <nav className={isSimulatingMobile
+        ? "fixed bottom-0 left-0 w-full bg-duo-dark/95 backdrop-blur-xl border-t border-gray-800 p-3 sm:p-4 flex justify-around z-50 pb-6 shadow-2xl"
+        : "lg:hidden fixed bottom-0 left-0 w-full bg-duo-dark/95 backdrop-blur-xl border-t border-gray-800 p-3 sm:p-4 flex justify-around z-50 pb-6 shadow-2xl"
+      }>
         {NAV_ITEMS.map(item => (
           <button key={item.screen} onClick={() => handleNavigation(item.screen)} className={`transition-all duration-300 ${screen === item.screen ? 'text-duo-blue scale-125 -translate-y-2' : 'text-gray-500'}`}><item.icon className="w-8 h-8" /></button>
         ))}
       </nav>
+
+      {/* EDIT PROFILE MODAL */}
+      {showEditProfileModal && (
+        <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
+          <div className="bg-duo-dark border-2 border-gray-700 rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl space-y-6 text-white my-8 relative">
+            <button 
+              onClick={() => { playSound('click'); setShowEditProfileModal(false); }} 
+              className="absolute top-5 right-5 text-gray-400 hover:text-white p-2 rounded-xl bg-gray-800 transition-colors"
+            >
+              <CloseIcon className="w-6 h-6"/>
+            </button>
+
+            <h2 className="text-2xl md:text-3xl font-black uppercase tracking-wider text-white">
+              {user.language === 'ru' ? 'Редактировать профиль' : 'Edit Profile'}
+            </h2>
+
+            {/* AVATAR PREVIEW & EDIT SECTION */}
+            <div className="flex flex-col items-center space-y-4 pt-2">
+              <div className="relative group">
+                <div className={`w-32 h-32 md:w-36 md:h-36 rounded-[2.5rem] ${editAvatarColor || 'bg-duo-blue'} border-4 border-gray-700 flex items-center justify-center text-5xl font-bold overflow-hidden shadow-xl`}>
+                  {editAvatarUrl ? (
+                    <img src={editAvatarUrl} alt="Avatar Preview" className="w-full h-full object-cover" />
+                  ) : editAvatarIcon ? (
+                    <span className="text-6xl">{editAvatarIcon}</span>
+                  ) : (
+                    <span className="text-6xl">{editName ? editName[0].toUpperCase() : 'U'}</span>
+                  )}
+                </div>
+                <button 
+                  onClick={() => avatarFileInputRef.current?.click()}
+                  className="absolute -bottom-2 -right-2 p-3 bg-duo-blue hover:brightness-110 text-white rounded-2xl border-2 border-gray-900 shadow-lg active:scale-95 transition-transform"
+                  title="Загрузить фото"
+                >
+                  <CameraIcon className="w-5 h-5" />
+                </button>
+                <input 
+                  type="file" 
+                  ref={avatarFileInputRef} 
+                  onChange={handleAvatarFileUpload} 
+                  accept="image/*" 
+                  className="hidden" 
+                />
+              </div>
+
+              {/* FILE UPLOAD & URL CONTROLS */}
+              <div className="flex flex-wrap justify-center gap-2 w-full pt-1">
+                <button 
+                  onClick={() => avatarFileInputRef.current?.click()} 
+                  className="px-3 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl text-xs font-bold transition-all flex items-center space-x-1"
+                >
+                  <span>📷 Загрузить фото</span>
+                </button>
+                {editAvatarUrl && (
+                  <button 
+                    onClick={() => { setEditAvatarUrl(''); setToast("Фото сброшено"); }} 
+                    className="px-3 py-2 bg-red-900/40 hover:bg-red-800/60 text-red-300 border border-red-700 rounded-xl text-xs font-bold transition-all"
+                  >
+                    <span>🗑️ Удалить фото</span>
+                  </button>
+                )}
+              </div>
+
+              {/* OR IMAGE URL INPUT */}
+              <div className="w-full space-y-1">
+                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                  {user.language === 'ru' ? 'Ссылка на фото (URL)' : 'Avatar Image URL'}
+                </label>
+                <input 
+                  type="text" 
+                  value={editAvatarUrl.startsWith('data:') ? '' : editAvatarUrl} 
+                  onChange={(e) => setEditAvatarUrl(e.target.value)}
+                  placeholder="https://example.com/avatar.jpg"
+                  className="w-full bg-gray-800 border-2 border-gray-700 focus:border-duo-blue text-white rounded-2xl px-4 py-2.5 text-xs font-bold focus:outline-none transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* COLOR SELECTOR */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">
+                {user.language === 'ru' ? 'Цвет фона аватарки' : 'Avatar Color'}
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: 'Синий', color: 'bg-duo-blue' },
+                  { label: 'Зеленый', color: 'bg-duo-green' },
+                  { label: 'Фиолетовый', color: 'bg-purple-600' },
+                  { label: 'Красный', color: 'bg-rose-600' },
+                  { label: 'Желтый', color: 'bg-amber-500' },
+                  { label: 'Индиго', color: 'bg-indigo-600' },
+                  { label: 'Бирюзовый', color: 'bg-teal-600' },
+                  { label: 'Темный', color: 'bg-slate-700' },
+                ].map(c => (
+                  <button 
+                    key={c.color}
+                    onClick={() => setEditAvatarColor(c.color)}
+                    className={`w-8 h-8 rounded-full ${c.color} border-2 transition-all ${editAvatarColor === c.color ? 'border-white scale-125 ring-2 ring-duo-blue' : 'border-transparent opacity-70 hover:opacity-100'}`}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* EMOJI / ICON SELECTOR */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">
+                {user.language === 'ru' ? 'Значок / Иконка' : 'Avatar Icon / Emoji'}
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {['', '🦉', '👑', '🚀', '⚡', '🏆', '♟️', '🎨', '🌟', '🦊', '🐯', '🔥', '🎓'].map(icon => (
+                  <button 
+                    key={icon || 'none'}
+                    onClick={() => setEditAvatarIcon(icon)}
+                    className={`w-9 h-9 rounded-xl bg-gray-800 border-2 transition-all flex items-center justify-center text-lg ${editAvatarIcon === icon ? 'border-duo-blue bg-duo-blue/20 scale-110' : 'border-gray-700 hover:border-gray-500'}`}
+                  >
+                    {icon || 'Aa'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* NAME INPUT */}
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">
+                {user.language === 'ru' ? 'Имя' : 'Display Name'}
+              </label>
+              <input 
+                type="text" 
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder={user.language === 'ru' ? 'Ваше имя' : 'Your name'}
+                maxLength={50}
+                className="w-full bg-gray-800 border-2 border-gray-700 focus:border-duo-blue text-white rounded-2xl px-4 py-3 text-sm font-bold focus:outline-none transition-colors"
+              />
+            </div>
+
+            {/* USERNAME INPUT */}
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">
+                {user.language === 'ru' ? 'Имя пользователя (@username)' : 'Username (@handle)'}
+              </label>
+              <div className="relative">
+                <span className="absolute left-4 top-3.5 text-gray-400 font-black">@</span>
+                <input 
+                  type="text" 
+                  value={editUsername}
+                  onChange={(e) => setEditUsername(e.target.value.replace(/[^a-zA-Z0-9_\.]/g, ''))}
+                  placeholder="anatolij81"
+                  maxLength={30}
+                  className="w-full bg-gray-800 border-2 border-gray-700 focus:border-duo-blue text-white rounded-2xl pl-9 pr-4 py-3 text-sm font-bold focus:outline-none transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* BUTTONS */}
+            <div className="pt-4 flex items-center space-x-3">
+              <button 
+                onClick={() => { playSound('click'); setShowEditProfileModal(false); }}
+                className="flex-1 py-3.5 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded-2xl border-b-4 border-gray-900 active:border-b-0 active:translate-y-1 transition-all uppercase text-xs"
+              >
+                {user.language === 'ru' ? 'Отмена' : 'Cancel'}
+              </button>
+              <button 
+                onClick={handleSaveProfile}
+                className="flex-1 py-3.5 bg-duo-green hover:brightness-110 text-white font-black rounded-2xl border-b-4 border-duo-greenDark active:border-b-0 active:translate-y-1 transition-all uppercase text-xs shadow-lg"
+              >
+                {user.language === 'ru' ? 'Сохранить' : 'Save Profile'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* AD OVERLAY */}
       {showAd && (

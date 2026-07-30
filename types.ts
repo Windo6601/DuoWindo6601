@@ -91,8 +91,11 @@ export type SubscriptionTier = 'free' | 'super' | 'max';
 
 export interface UserProgress {
   name: string;
+  username?: string;
   avatarColor: string;
   avatarImage?: string; 
+  avatarUrl?: string;
+  avatarIcon?: string;
   energy: number; 
   hearts: number;
   subscription: SubscriptionTier;

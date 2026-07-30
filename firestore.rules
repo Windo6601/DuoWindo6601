@@ -48,6 +48,10 @@ service cloud.firestore {
 
     function isValidUserProfile(data) {
       return data.name is string && data.name.size() <= 100
+        && (!('username' in data) || (data.username is string && data.username.size() <= 100))
+        && (!('avatarUrl' in data) || (data.avatarUrl is string && data.avatarUrl.size() <= 2000))
+        && (!('avatarImage' in data) || (data.avatarImage is string && data.avatarImage.size() <= 1000000))
+        && (!('avatarIcon' in data) || (data.avatarIcon is string && data.avatarIcon.size() <= 50))
         && data.avatarColor is string && data.avatarColor.size() <= 50
         && data.energy is int && data.energy >= 0 && data.energy <= 10000
         && data.hearts is int && data.hearts >= 0 && data.hearts <= 1000

@@ -1,25 +1,29 @@
-name: Build APK
+name: Android CI
 
 on:
   push:
     branches:
       - main
+      - master
   pull_request:
     branches:
       - main
+      - master
+  workflow_dispatch:
 
 jobs:
   build:
+    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout source
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: 'npm'
 
       - name: Install dependencies
@@ -28,8 +32,8 @@ jobs:
       - name: Build web application
         run: npm run build
 
-      - name: Sync with Capacitor
-        run: npx cap sync
+      - name: Sync Capacitor Android
+        run: npx cap sync android
 
       - name: Download clean Gradle Wrapper JARs
         run: |
@@ -38,11 +42,11 @@ jobs:
           mkdir -p android/gradle/wrapper
           curl -Lo android/gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.14.3/gradle/wrapper/gradle-wrapper.jar
 
-      - name: Set up JDK 21
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: 17
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -53,15 +57,18 @@ jobs:
           validate-wrappers: false
 
       - name: Make gradlew executable
-        run: chmod +x gradlew
-        working-directory: android
+        run: |
+          chmod +x gradlew
+          chmod +x android/gradlew
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug --stacktrace
-        working-directory: android
 
-      - name: Upload APK
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
