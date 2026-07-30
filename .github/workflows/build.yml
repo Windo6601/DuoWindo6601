@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build:
@@ -12,6 +15,21 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web application
+        run: npm run build
+
+      - name: Sync with Capacitor
+        run: npx cap sync
 
       - name: Download clean Gradle Wrapper JARs
         run: |
@@ -36,12 +54,14 @@ jobs:
 
       - name: Make gradlew executable
         run: chmod +x gradlew
+        working-directory: android
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug --stacktrace
+        working-directory: android
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
