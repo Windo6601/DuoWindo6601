@@ -1,9 +1,17 @@
-include(":app")
-
-val cordovaPluginsDir = file("./capacitor-cordova-android-plugins")
-if (cordovaPluginsDir.exists()) {
-    include(":capacitor-cordova-android-plugins")
-    project(":capacitor-cordova-android-plugins").projectDir = cordovaPluginsDir
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
 }
 
-apply(from = "capacitor.settings.gradle")
+rootProject.name = "DuoWindo6601"
+include(":app")

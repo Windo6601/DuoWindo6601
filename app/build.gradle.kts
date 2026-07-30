@@ -1,70 +1,57 @@
 plugins {
     id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
-
-val localCompileSdkVersion = rootProject.extra["compileSdkVersion"] as Int
-val localMinSdkVersion = rootProject.extra["minSdkVersion"] as Int
-val localTargetSdkVersion = rootProject.extra["targetSdkVersion"] as Int
-val androidxAppCompatVersion = rootProject.extra["androidxAppCompatVersion"] as String
-val androidxCoordinatorLayoutVersion = rootProject.extra["androidxCoordinatorLayoutVersion"] as String
-val coreSplashScreenVersion = rootProject.extra["coreSplashScreenVersion"] as String
-val junitVersion = rootProject.extra["junitVersion"] as String
-val androidxJunitVersion = rootProject.extra["androidxJunitVersion"] as String
-val androidxEspressoCoreVersion = rootProject.extra["androidxEspressoCoreVersion"] as String
 
 android {
     namespace = "com.duowindo6601.app"
-    compileSdk = localCompileSdkVersion
+    compileSdk = 34
+
     defaultConfig {
         applicationId = "com.duowindo6601.app"
-        minSdk = localMinSdkVersion
-        targetSdk = localTargetSdkVersion
+        minSdk = 23
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        aaptOptions {
-             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
-             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
-            ignoreAssetsPattern = "!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~"
-        }
     }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
-        debug {
-        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        compose = true
     }
 }
 
-repositories {
-    flatDir {
-        dirs("../capacitor-cordova-android-plugins/src/main/libs", "libs")
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
 dependencies {
-    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
-    implementation("androidx.appcompat:appcompat:$androidxAppCompatVersion")
-    implementation("androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion")
-    implementation("androidx.core:core-splashscreen:$coreSplashScreenVersion")
-    implementation(project(":capacitor-android"))
-    testImplementation("junit:junit:$junitVersion")
-    androidTestImplementation("androidx.test.ext:junit:$androidxJunitVersion")
-    androidTestImplementation("androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion")
-    if (project.findProject(":capacitor-cordova-android-plugins") != null) {
-        implementation(project(":capacitor-cordova-android-plugins"))
-    }
-}
+    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.activity:activity-compose:1.9.2")
+    implementation(platform("androidx.compose:compose-bom:2024.09.03"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-graphics")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-core")
 
-apply(from = "capacitor.build.gradle")
-
-try {
-    val servicesJSON = file("google-services.json")
-    if (servicesJSON.exists() && servicesJSON.readText().isNotEmpty()) {
-        apply(plugin = "com.google.gms.google-services")
-    }
-} catch (e: Exception) {
-    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+    debugImplementation("androidx.compose.ui:ui-tooling")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
