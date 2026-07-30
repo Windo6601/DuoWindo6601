@@ -387,7 +387,7 @@ export default function App() {
   const [user, setUser] = useState<UserProgress>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     return saved ? JSON.parse(saved) : { 
-      name: "Ученик 6601", avatarColor: "bg-duo-blue", 
+      name: "Ученик 6601", username: "duouser6601", avatarColor: "bg-duo-blue",
       energy: 25, 
       hearts: 0, 
       streak: 12, gems: 350, xp: 850, currentUnit: 1, 
@@ -431,6 +431,8 @@ export default function App() {
             // Load user profile from Firebase and exclude timestamps from local state
             const { createdAt, updatedAt, ...cloudUser } = docSnap.data() as any;
             setUser(cloudUser as UserProgress);
+            setEditName(cloudUser.name || "");
+            setEditUsername(cloudUser.username || "");
           } else {
             // Document doesn't exist, create it from local user
             const newUserProfile = {
@@ -439,6 +441,8 @@ export default function App() {
               updatedAt: serverTimestamp()
             };
             await setDoc(userRef, newUserProfile);
+            setEditName(user.name);
+            setEditUsername(user.username || "");
           }
           initialSyncComplete.current = true;
           setSimNotify("Успешный вход в облако Duowindo!");
@@ -448,6 +452,8 @@ export default function App() {
         }
       } else {
         initialSyncComplete.current = false;
+        setEditName(user.name);
+        setEditUsername(user.username || "");
       }
     });
     return () => unsubscribe();
@@ -494,6 +500,7 @@ export default function App() {
           setUser(prev => ({
             ...prev,
             name: "Игрок на Android",
+            username: "androiduser6601",
             xp: prev.xp + 50
           }));
           initialSyncComplete.current = true;
@@ -556,6 +563,9 @@ export default function App() {
   const [showExplanationModal, setShowExplanationModal] = useState(false);
 
   const [showAndroidModal, setShowAndroidModal] = useState(false);
+  const [showAvatarEditModal, setShowAvatarEditModal] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editUsername, setEditUsername] = useState("");
   const [androidDismissed, setAndroidDismissed] = useState(() => {
     return localStorage.getItem('duo_android_dismissed') === 'true';
   });
@@ -1640,7 +1650,7 @@ export default function App() {
                                           setSimulatorMode('android');
                                           setSimNotify("Вы завели симулятор в режиме Android!");
                                       }}
-                                      className="font-din font-black text-xs uppercase tracking-widest bg-yellow-400 hover:bg-yellow-500 text-gray-950 hover:scale-[1.03] active:scale-95 px-3 py-2 rounded-xl border-b-4 border-yellow-700 transition-all shadow-md text-center flex items-center justify-center space-x-1 flex-1"
+                                      className="font-din font-black text-xs uppercase tracking-widest bg-yellow-400 hover:bg-yellow-500 text-gray-950 hover:scale-[1.03] active:scale-95 px-3 py-2 rounded-xl border-b-4 border-yellow-700 transition-all shadow-md text-center hidden lg:flex items-center justify-center space-x-1 flex-1"
                                   >
                                       <span>🤖 Тест Android</span>
                                   </button>
@@ -1864,8 +1874,21 @@ export default function App() {
           {screen === AppScreen.PROFILE && (
              <div className="flex flex-col items-center space-y-10 py-10 animate-in fade-in relative">
                 <button onClick={() => { playSound('click'); setScreen(AppScreen.SETTINGS); }} className="absolute top-0 right-0 p-3 bg-duo-card rounded-xl border-2 border-gray-700 hover:bg-gray-800 transition-colors"><GearIcon className="w-8 h-8 text-gray-400" /></button>
-                <div className="w-48 h-48 rounded-[3.5rem] bg-duo-blue border-8 border-gray-800 flex items-center justify-center text-7xl font-bold shadow-2xl relative overflow-hidden group font-feather"><span className="group-hover:scale-110 transition-transform">{user.name[0]}</span><div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><CameraIcon className="w-10 h-10 text-white" /></div></div>
-                <h2 className="text-4xl font-bold tracking-tight uppercase flex items-center">{user.name} {user.subscription === 'super' && <span className="ml-3 px-3 py-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg text-xs font-black text-white">SUPER</span>}{user.subscription === 'max' && <span className="ml-3 px-3 py-1 bg-black border border-duo-blue rounded-lg text-xs font-black text-duo-blue">MAX</span>}</h2>
+                <div onClick={() => { playSound('click'); setShowAvatarEditModal(true); }} className={`w-48 h-48 rounded-[3.5rem] ${user.avatarColor} border-8 border-gray-800 flex items-center justify-center text-7xl font-bold shadow-2xl relative overflow-hidden group font-feather cursor-pointer`}>
+                    <span className="group-hover:scale-110 transition-transform">{user.name[0]}</span>
+                    <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <PenIcon className="w-10 h-10 text-white" />
+                    </div>
+                </div>
+                <div className="text-center">
+                    <h2 className="text-4xl font-black tracking-tight uppercase flex items-center justify-center">
+                        {user.name}
+                        {user.subscription === 'super' && <span className="ml-3 px-3 py-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg text-xs font-black text-white">SUPER</span>}
+                        {user.subscription === 'max' && <span className="ml-3 px-3 py-1 bg-black border border-duo-blue rounded-lg text-xs font-black text-duo-blue">MAX</span>}
+                    </h2>
+                    <p className="text-gray-400 font-bold text-sm mt-1">@{user.username || 'duouser6601'}</p>
+                    <button onClick={() => { playSound('click'); setShowAvatarEditModal(true); }} className="mt-3 px-4 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl font-bold text-xs uppercase tracking-wider transition-all">Редактировать профиль</button>
+                </div>
                 <div className="grid grid-cols-2 gap-6 w-full max-w-md">
                    <div className="bg-duo-card p-8 rounded-3xl border-2 border-gray-800 text-center"><p className="text-xs text-gray-500 font-bold mb-2 uppercase tracking-widest">{t('streakDays')}</p><p className="text-4xl font-bold text-duo-red">{user.streak}</p></div>
                    <div className="bg-duo-card p-8 rounded-3xl border-2 border-gray-800 text-center"><p className="text-xs text-gray-500 font-bold mb-2 uppercase tracking-widest">{t('totalXP')}</p><p className="text-4xl font-bold text-duo-yellow">{user.xp}</p></div>
@@ -2285,6 +2308,83 @@ export default function App() {
              </div>
            )}
         </div>
+      )}
+
+      {/* EDIT AVATAR / PROFILE MODAL */}
+      {showAvatarEditModal && (
+          <div className="fixed inset-0 z-[260] bg-black/80 flex flex-col justify-end md:justify-center p-0 md:p-6 animate-in fade-in" onClick={() => setShowAvatarEditModal(false)}>
+              <div className="bg-duo-card border-t-4 border-duo-blue md:border-4 md:rounded-3xl rounded-t-[3rem] p-6 md:p-8 max-w-md w-full mx-auto animate-in slide-in-from-bottom-full md:slide-in-from-bottom-10 max-h-[95vh] flex flex-col shadow-2xl cursor-default" onClick={e => e.stopPropagation()}>
+                  <div className="w-16 h-1.5 bg-gray-700 rounded-full mx-auto mb-6 cursor-pointer md:hidden" onClick={() => setShowAvatarEditModal(false)}></div>
+                  <h3 className="text-2xl font-black text-duo-blue uppercase tracking-widest mb-6 border-b border-gray-800 pb-4">Редактирование профиля</h3>
+
+                  <div className="flex-1 overflow-y-auto no-scrollbar space-y-6 text-gray-200 pr-1">
+                      {/* Name input */}
+                      <div className="space-y-2">
+                          <label className="text-gray-400 text-xs font-black uppercase tracking-widest block">Имя (Display Name)</label>
+                          <input
+                              type="text"
+                              value={editName}
+                              onChange={(e) => setEditName(e.target.value)}
+                              placeholder="Ваше имя..."
+                              className="w-full bg-gray-800 border-2 border-gray-700 rounded-xl px-4 py-2.5 font-bold text-white focus:outline-none focus:border-duo-blue transition-colors"
+                          />
+                      </div>
+
+                      {/* Username input */}
+                      <div className="space-y-2">
+                          <label className="text-gray-400 text-xs font-black uppercase tracking-widest block">Имя пользователя (Username)</label>
+                          <input
+                              type="text"
+                              value={editUsername}
+                              onChange={(e) => setEditUsername(e.target.value)}
+                              placeholder="username..."
+                              className="w-full bg-gray-800 border-2 border-gray-700 rounded-xl px-4 py-2.5 font-bold text-white focus:outline-none focus:border-duo-blue transition-colors"
+                          />
+                      </div>
+
+                      {/* Avatar colors selection */}
+                      <div className="space-y-3">
+                          <label className="text-gray-400 text-xs font-black uppercase tracking-widest block">Цвет Аватарки / Background</label>
+                          <div className="grid grid-cols-4 gap-3">
+                              {COLORS.map((bgClass, idx) => (
+                                  <button
+                                      key={idx}
+                                      onClick={() => {
+                                          playSound('select');
+                                          setUser(prev => ({ ...prev, avatarColor: bgClass }));
+                                      }}
+                                      className={`w-12 h-12 rounded-2xl ${bgClass} border-4 transition-transform active:scale-95 ${user.avatarColor === bgClass ? 'border-white scale-110 shadow-lg' : 'border-transparent hover:scale-105'}`}
+                                  />
+                              ))}
+                          </div>
+                      </div>
+                  </div>
+
+                  <div className="mt-8 flex space-x-3">
+                      <button
+                          onClick={() => {
+                              playSound('success');
+                              setUser(prev => ({
+                                  ...prev,
+                                  name: editName.trim() ? editName.trim() : prev.name,
+                                  username: editUsername.trim() ? editUsername.trim().toLowerCase().replace(/[^a-z0-9_]/g, '') : prev.username
+                              }));
+                              setShowAvatarEditModal(false);
+                              setToast("Профиль успешно обновлен!");
+                          }}
+                          className="flex-1 py-4 bg-duo-green border-b-4 border-duo-greenDark rounded-2xl font-black text-white uppercase tracking-widest active:border-b-0 active:translate-y-1 transition-all"
+                      >
+                          Сохранить
+                      </button>
+                      <button
+                          onClick={() => setShowAvatarEditModal(false)}
+                          className="py-4 px-6 bg-gray-800 border-b-4 border-gray-900 rounded-2xl font-black text-gray-400 uppercase tracking-widest active:border-b-0 active:translate-y-1 transition-all"
+                      >
+                          Отмена
+                      </button>
+                  </div>
+              </div>
+          </div>
       )}
 
       {/* ANDROID INSTRUCTIONS MODAL */}
@@ -2909,7 +3009,7 @@ return (
 
     {/* PERSISTENT FLOATING QUICK TRIGGER BUTTON */}
     {simulatorMode === 'none' && !simTriggerDismissed && (
-      <div className="fixed bottom-24 right-6 lg:bottom-12 lg:right-12 z-[200] flex items-center">
+      <div className="fixed bottom-24 right-6 lg:bottom-12 lg:right-12 z-[200] hidden lg:flex items-center">
         <button 
           id="trigger-sim-toggle"
           onClick={() => { playSound('click'); setSimulatorMode('android'); }}
