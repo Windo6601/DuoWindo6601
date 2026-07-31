@@ -57,6 +57,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           validate-wrappers: false
+          build-root-directory: android
 
       - name: Make gradlew executable
         run: |
@@ -64,6 +65,7 @@ jobs:
           chmod +x android/gradlew
 
       - name: Build Debug APK
+        working-directory: android
         run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK Artifact
