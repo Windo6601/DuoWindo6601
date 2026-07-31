@@ -2725,6 +2725,17 @@ export default function App() {
                           </div>
                       </div>
 
+                      <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-2xl">
+                          <h4 className="text-amber-400 font-black text-xs uppercase tracking-widest mb-2">⚠️ Play Защита: "Приложение заблокировано"</h4>
+                          <p className="text-xs text-gray-300 font-bold leading-normal mb-2">
+                              Поскольку собранный APK-файл является отладочным (Debug APK), Google Play Защита может показать предупреждение. Это нормально для тестовых сборок!
+                          </p>
+                          <div className="text-xs text-gray-400 font-bold space-y-1.5">
+                              <p><span className="text-amber-400 font-black">1.</span> Нажмите кнопку <strong className="text-white">"Подробнее"</strong> (More details) в окне предупреждения.</p>
+                              <p><span className="text-amber-400 font-black">2.</span> Нажмите появившуюся кнопку <strong className="text-white">"Всё равно установить"</strong> (Install anyway).</p>
+                          </div>
+                      </div>
+
                       <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl">
                           <h4 className="text-emerald-400 font-black text-xs uppercase tracking-widest mb-1">⚡ Горячая перезагрузка / Live Reload</h4>
                           <p className="text-xs text-emerald-100 font-bold leading-normal">
