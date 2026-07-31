@@ -507,6 +507,8 @@ export default function App() {
         errMsg.includes('popup-blocked')
       ) {
         setToast("Окно авторизации было закрыто или заблокировано. Пожалуйста, разрешите всплывающие окна или откройте в новой вкладке.");
+      } else if (errMsg.includes('auth/unauthorized-domain') || errMsg.includes('unauthorized-domain')) {
+        setShowAuthDomainModal(true);
       } else {
         setToast("Ошибка входа: " + (err instanceof Error ? err.message : String(err)));
       }
@@ -547,6 +549,7 @@ export default function App() {
   const [showExplanationModal, setShowExplanationModal] = useState(false);
 
   const [showAndroidModal, setShowAndroidModal] = useState(false);
+  const [showAuthDomainModal, setShowAuthDomainModal] = useState(false);
   const [androidDismissed, setAndroidDismissed] = useState(() => {
     return localStorage.getItem('duo_android_dismissed') === 'true';
   });
@@ -2585,6 +2588,52 @@ export default function App() {
                 </div>
              </div>
            )}
+        </div>
+      )}
+
+      {/* AUTH DOMAIN INSTRUCTIONS MODAL */}
+      {showAuthDomainModal && (
+        <div className="fixed inset-0 z-[260] bg-black/80 flex flex-col justify-end md:justify-center p-0 md:p-6 animate-in fade-in" onClick={() => setShowAuthDomainModal(false)}>
+          <div className="bg-duo-card border-t-4 border-red-500 md:border-4 md:rounded-3xl rounded-t-[3rem] p-6 md:p-8 max-w-xl w-full mx-auto animate-in slide-in-from-bottom-full md:slide-in-from-bottom-10 max-h-[90vh] flex flex-col shadow-2xl cursor-default" onClick={e => e.stopPropagation()}>
+            <div className="w-16 h-1.5 bg-gray-700 rounded-full mx-auto mb-6 cursor-pointer md:hidden" onClick={() => setShowAuthDomainModal(false)}></div>
+            <div className="flex items-center space-x-4 mb-6 border-b border-gray-800 pb-4 flex-shrink-0">
+              <div className="bg-red-500/20 p-3 rounded-2xl">
+                <svg className="w-8 h-8 text-red-400 fill-none stroke-current" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-2xl font-black text-red-400 uppercase tracking-widest">Домен не авторизован</h3>
+                <p className="text-gray-400 font-bold text-xs">Firebase Authentication Config</p>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 text-gray-200 pr-2">
+              <p className="text-sm font-bold leading-normal text-gray-300">
+                Для работы авторизации Google в мобильном приложении Android необходимо добавить <code className="bg-black/40 px-1.5 py-0.5 rounded text-yellow-300 font-mono text-xs">localhost</code> в список разрешенных доменов в панели управления Firebase.
+              </p>
+              <div className="bg-gray-800/60 border border-gray-700 p-4 rounded-2xl">
+                <h4 className="text-yellow-400 font-black text-xs uppercase tracking-widest mb-2">Шаги для исправления:</h4>
+                <ol className="list-decimal pl-5 font-bold text-xs space-y-2 text-gray-300">
+                  <li>Откройте Firebase Console (console.firebase.google.com).</li>
+                  <li>Перейдите в раздел <strong>Authentication</strong>.</li>
+                  <li>Откройте вкладку <strong>Settings</strong> (Настройки) в верхней панели.</li>
+                  <li>В левом меню выберите пункт <strong>Authorized domains</strong> (Разрешенные домены).</li>
+                  <li>Нажмите кнопку <strong>Add domain</strong> (Добавить домен).</li>
+                  <li>Введите в поле ввода: <code className="bg-black/50 px-1.5 py-0.5 rounded text-emerald-400 font-mono">localhost</code></li>
+                  <li>Нажмите <strong>Add</strong> для сохранения.</li>
+                </ol>
+              </div>
+              <p className="text-xs text-gray-400 font-medium leading-normal">
+                После добавления домена в Firebase повторите попытку входа. Приложение начнет авторизовывать пользователей без ошибок!
+              </p>
+            </div>
+            <button
+              onClick={() => setShowAuthDomainModal(false)}
+              className="w-full mt-6 py-4 bg-red-600 border-b-4 border-red-800 rounded-2xl font-black text-white uppercase tracking-widest active:border-b-0 active:translate-y-1 transition-all"
+            >
+              Закрыть
+            </button>
+          </div>
         </div>
       )}
 
