@@ -1171,7 +1171,22 @@ export default function App() {
     <ChessPieceIcon type="n" color="b" className={className} />
   );
 
-  const NAV_ITEMS = [
+  const isNativeApp = typeof window !== 'undefined' && (
+    !!(window as any).Capacitor?.isNativePlatform?.() ||
+    !!(window as any).Capacitor?.platform
+  );
+
+  const isMobileBrowser = typeof window !== 'undefined' && window.innerWidth < 1024;
+
+  const isMenuLimited = (isMobileBrowser || simulatorMode !== 'none') && !isNativeApp;
+
+  const NAV_ITEMS = isMenuLimited ? [
+    { screen: AppScreen.PATH, icon: HomeIcon, label: t('home') },
+    { screen: AppScreen.CHESS_MATCH, icon: ChessNavIcon, label: t('playChess') },
+    { screen: AppScreen.PRACTICE, icon: DumbbellIcon, label: t('practice') },
+    { screen: AppScreen.SHOP, icon: ChestIcon, label: t('shop') },
+    { screen: AppScreen.PROFILE, icon: UserIcon, label: t('profile') }
+  ] : [
     { screen: AppScreen.PATH, icon: HomeIcon, label: t('home') },
     { screen: AppScreen.CHESS_MATCH, icon: ChessNavIcon, label: t('playChess') },
     { screen: AppScreen.PRACTICE, icon: DumbbellIcon, label: t('practice') },
@@ -1183,10 +1198,6 @@ export default function App() {
   ];
 
   const renderAppLayout = () => {
-    const isNativeApp = typeof window !== 'undefined' && (
-      !!(window as any).Capacitor?.isNativePlatform?.() || 
-      !!(window as any).Capacitor?.platform
-    );
     const isSimulatingMobile = simulatorMode !== 'none' || isNativeApp;
 
     return (
