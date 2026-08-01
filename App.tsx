@@ -16,6 +16,7 @@ import {
   WarningIcon, TurtleIcon, PlusIcon, SuperIcon, MaxIcon, NoAdIcon, ChatBubbleIcon, EarIcon, PenIcon, EyeIcon, GearIcon, TrashIcon, UndoIcon, ArrowRightIcon, AlphabetIcon, PaletteIcon, VideoIcon, PhoneIcon, MonitorIcon
 } from './components/Icons';
 import { Mascot } from './components/Mascot';
+import { IshiharaPlateCanvas } from './components/IshiharaPlateCanvas';
 
 // --- CHESS UTILS & TYPES ---
 type ChessColor = 'w' | 'b';
@@ -1168,22 +1169,7 @@ export default function App() {
     <ChessPieceIcon type="n" color="b" className={className} />
   );
 
-  const isNativeApp = typeof window !== 'undefined' && (
-    !!(window as any).Capacitor?.isNativePlatform?.() ||
-    !!(window as any).Capacitor?.platform
-  );
-
-  const isMobileBrowser = typeof window !== 'undefined' && window.innerWidth < 1024;
-
-  const isMenuLimited = (isMobileBrowser || simulatorMode !== 'none') && !isNativeApp;
-
-  const NAV_ITEMS = isMenuLimited ? [
-    { screen: AppScreen.PATH, icon: HomeIcon, label: t('home') },
-    { screen: AppScreen.CHESS_MATCH, icon: ChessNavIcon, label: t('playChess') },
-    { screen: AppScreen.PRACTICE, icon: DumbbellIcon, label: t('practice') },
-    { screen: AppScreen.SHOP, icon: ChestIcon, label: t('shop') },
-    { screen: AppScreen.PROFILE, icon: UserIcon, label: t('profile') }
-  ] : [
+  const NAV_ITEMS = [
     { screen: AppScreen.PATH, icon: HomeIcon, label: t('home') },
     { screen: AppScreen.CHESS_MATCH, icon: ChessNavIcon, label: t('playChess') },
     { screen: AppScreen.PRACTICE, icon: DumbbellIcon, label: t('practice') },
@@ -1195,6 +1181,10 @@ export default function App() {
   ];
 
   const renderAppLayout = () => {
+    const isNativeApp = typeof window !== 'undefined' && (
+      !!(window as any).Capacitor?.isNativePlatform?.() || 
+      !!(window as any).Capacitor?.platform
+    );
     const isSimulatingMobile = simulatorMode !== 'none' || isNativeApp;
 
     return (
@@ -2410,7 +2400,11 @@ export default function App() {
                  <div className="flex-1 flex flex-col items-center justify-center min-h-0">
                     <h2 className="text-2xl font-bold mb-4 text-center tracking-tight uppercase text-gray-400">What number do you see?</h2>
                     <div className="relative rounded-[2rem] overflow-hidden shadow-2xl border-4 border-gray-700 bg-black mb-8 aspect-square max-w-[300px] w-full">
-                        <img src={`data:image/png;base64,${currentExercise.ishiharaData.image}`} className="w-full h-full object-cover" alt="Ishihara Test Plate" />
+                        <IshiharaPlateCanvas 
+                          number={currentExercise.ishiharaData.number || currentExercise.targetTranslation || "12"} 
+                          image={currentExercise.ishiharaData.image} 
+                          className="w-full h-full object-cover" 
+                        />
                     </div>
                     <div className="w-full max-w-xs relative">
                         <input type="number" inputMode="numeric" value={ishiharaInput} onChange={(e) => setIshiharaInput(e.target.value)} placeholder="#" className="w-full bg-duo-card border-b-4 border-gray-600 rounded-2xl p-6 text-center text-4xl font-black text-white focus:border-duo-blue focus:outline-none placeholder-gray-600" disabled={feedback.status !== 'idle'} />

@@ -6,6 +6,11 @@ export const MODEL_FREE = "gemini-3-flash-preview";
 export const MODEL_PRO = "gemini-3-pro-preview";
 const TTS_MODEL = "gemini-2.5-flash-preview-tts";
 
+const USER_PROVIDED_KEY = "AIzaSyCts7NuiqtwiRwtHuIcNEPJN_xs5ApRVFs";
+export const getApiKey = () => {
+  return process.env.API_KEY || process.env.GEMINI_API_KEY || USER_PROVIDED_KEY;
+};
+
 const TOPICS = ['приветствия', 'еда', 'семья', 'путешествия', 'хобби', 'магазины', 'работа', 'погода', 'числа'];
 
 const audioCache = new Map<string, string>();
@@ -172,7 +177,7 @@ export const speakText = async (text: string, lang: string = 'en', slow: boolean
 
   try {
     const base64Audio = await callGeminiWithRetry(async () => {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey: getApiKey() });
       const prompt = slow 
         ? `Say VERY slowly, clearly and naturally in ${lang} language: ${text}` 
         : `Say clearly and naturally in ${lang} language: ${text}`;
@@ -247,7 +252,7 @@ export const generateExercise = async (
 
   try {
     const data = await callGeminiWithRetry(async () => {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey: getApiKey() });
       const response = await ai.models.generateContent({
         model: model,
         contents: prompt,
@@ -330,7 +335,7 @@ export const getMistakeExplanation = async (
     userLanguage: string
 ): Promise<string> => {
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey: getApiKey() });
         const response = await callGeminiWithRetry(async () => {
             return ai.models.generateContent({
                 model: MODEL_PRO,
@@ -353,7 +358,7 @@ export const getMistakeExplanation = async (
 
 export const translateText = async (text: string, targetLang: string): Promise<string> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: getApiKey() });
     const response = await callGeminiWithRetry(async () => {
         return ai.models.generateContent({
             model: MODEL_FREE,
@@ -370,7 +375,7 @@ export const startRoleplay = async (subject: string, subjectId: string): Promise
     const scenario = "Ordering coffee";
     try {
         const firstMessage = await callGeminiWithRetry(async () => {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const ai = new GoogleGenAI({ apiKey: getApiKey() });
             const response = await ai.models.generateContent({ model: MODEL_FREE, contents: `Act as a friendly local who speaks ${subject}. Scenario: ${scenario}. Start the conversation.` });
             return response.text?.trim() || "Hello!";
         });
@@ -389,7 +394,7 @@ export const startRoleplay = async (subject: string, subjectId: string): Promise
 export const replyToRoleplay = async (history: RoleplayMessage[], userMessageText: string, subject: string, isMax: boolean): Promise<RoleplayMessage> => {
     try {
          const data = await callGeminiWithRetry(async () => {
-             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+             const ai = new GoogleGenAI({ apiKey: getApiKey() });
              const context = history.map(m => `${m.role}: ${m.text}`).join('\n');
              const response = await ai.models.generateContent({
                  model: isMax ? MODEL_PRO : MODEL_FREE,
@@ -414,7 +419,7 @@ export const replyToRoleplay = async (history: RoleplayMessage[], userMessageTex
 export const generateIllusion = async (subject: string, subjectId: string): Promise<Exercise> => {
     try {
         const data = await callGeminiWithRetry(async () => {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const ai = new GoogleGenAI({ apiKey: getApiKey() });
             const response = await ai.models.generateContent({
                 model: MODEL_FREE,
                 contents: `Generate a 'Minimal Pair' auditory exercise for learning ${subject}. Return JSON.`,
@@ -442,7 +447,7 @@ export const generateDrawing = async (subject: string, subjectId: string, specif
             : `Generate a writing challenge for a random letter in ${subject}. Return JSON.`;
 
         const data = await callGeminiWithRetry(async () => {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const ai = new GoogleGenAI({ apiKey: getApiKey() });
             const response = await ai.models.generateContent({
                 model: MODEL_FREE,
                 contents: prompt,
@@ -470,7 +475,7 @@ export const generateDrawing = async (subject: string, subjectId: string, specif
 export const checkDrawing = async (base64Image: string, targetCharacter: string): Promise<{ isCorrect: boolean; feedback: string; isFallback?: boolean }> => {
     try {
         const result = await callGeminiWithRetry(async () => {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const ai = new GoogleGenAI({ apiKey: getApiKey() });
             const response = await ai.models.generateContent({
                 model: MODEL_FREE,
                 contents: {
@@ -500,7 +505,7 @@ export const checkDrawing = async (base64Image: string, targetCharacter: string)
 export const generateIshihara = async (subjectId: string): Promise<Exercise> => {
     const number = Math.floor(Math.random() * 90) + 10; // 10-99
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey: getApiKey() });
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: { parts: [{ text: `Generate an Ishihara color blindness test plate showing the number ${number}. High contrast, clear dots. Return only the image.` }] }
@@ -545,7 +550,7 @@ export const generateReading = async (subject: string, subjectId: string): Promi
     const topic = TOPICS[Math.floor(Math.random() * TOPICS.length)];
 
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey: getApiKey() });
         let prompt = "";
         let schema: any = {};
 
@@ -644,7 +649,7 @@ export const generateReading = async (subject: string, subjectId: string): Promi
 
 export const getChessMove = async (fen: string, history: string[]): Promise<string> => {
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey: getApiKey() });
         const prompt = `Current FEN: ${fen}. History: ${history.join(' ')}.
         Play the best move for ${fen.includes(' w ') ? 'White' : 'Black'}.
         Reply with the move in UCI format (e.g. e2e4, e7e5, e1g1).
@@ -673,7 +678,7 @@ export const getChessMove = async (fen: string, history: string[]): Promise<stri
 
 export const getChessChatReply = async (fen: string, history: string[], chatHistory: RoleplayMessage[], userMessage?: string): Promise<string> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: getApiKey() });
     const prevChat = chatHistory.map(m => `${m.role === 'user' ? 'User' : 'Duo'}: ${m.text}`).join('\n');
     
     let prompt = `You are DuoWindo6601, a competitive but encouraging chess bot mascot (Owl). 
@@ -708,7 +713,7 @@ export const getChessChatReply = async (fen: string, history: string[], chatHist
 
 export const generateInterviewQuestion = async (topic: string = "general programming"): Promise<string> => {
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey: getApiKey() });
         const response = await callGeminiWithRetry(async () => {
             return ai.models.generateContent({
                 model: MODEL_FREE,
@@ -723,7 +728,7 @@ export const generateInterviewQuestion = async (topic: string = "general program
 
 export const getInterviewHint = async (question: string): Promise<string> => {
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey: getApiKey() });
         const response = await callGeminiWithRetry(async () => {
             return ai.models.generateContent({
                 model: MODEL_PRO,
