@@ -507,8 +507,6 @@ export default function App() {
         errMsg.includes('popup-blocked')
       ) {
         setToast("Окно авторизации было закрыто или заблокировано. Пожалуйста, разрешите всплывающие окна или откройте в новой вкладке.");
-      } else if (errMsg.includes('auth/unauthorized-domain') || errMsg.includes('unauthorized-domain')) {
-        setShowAuthDomainModal(true);
       } else {
         setToast("Ошибка входа: " + (err instanceof Error ? err.message : String(err)));
       }
@@ -549,7 +547,6 @@ export default function App() {
   const [showExplanationModal, setShowExplanationModal] = useState(false);
 
   const [showAndroidModal, setShowAndroidModal] = useState(false);
-  const [showAuthDomainModal, setShowAuthDomainModal] = useState(false);
   const [androidDismissed, setAndroidDismissed] = useState(() => {
     return localStorage.getItem('duo_android_dismissed') === 'true';
   });
@@ -1289,6 +1286,27 @@ export default function App() {
                             <PenIcon className="w-4 h-4" />
                             <span>{user.language === 'ru' ? 'Изменить' : 'Edit'}</span>
                         </button>
+                    </div>
+
+                    {/* MOBILE SIMULATOR TEST BENCH (PC ONLY) */}
+                    <div className="hidden lg:block bg-duo-card border-2 border-emerald-600/60 rounded-3xl p-6 mb-6 shadow-xl">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-xl font-black text-emerald-400 uppercase tracking-widest flex items-center space-x-2">
+                                    <span>📱</span>
+                                    <span>{user.language === 'ru' ? 'Тест-стенд Мобильный Симулятор' : 'Mobile Simulator Test Bench'}</span>
+                                </h3>
+                                <p className="text-xs text-gray-400 font-bold mt-1">
+                                    {user.language === 'ru' ? 'Интерактивный эмулятор iOS и Android для проверки адаптивности на ПК.' : 'Interactive iOS & Android emulator for testing layouts on PC.'}
+                                </p>
+                            </div>
+                            <button 
+                                onClick={() => { playSound('click'); setSimulatorMode('android'); setScreen(AppScreen.PATH); }}
+                                className="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all shadow-md"
+                            >
+                                {user.language === 'ru' ? 'Запустить стенд' : 'Launch Simulator'}
+                            </button>
+                        </div>
                     </div>
 
                     <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl"><h3 className="text-xl font-bold mb-4 text-white uppercase tracking-widest">{t('apiStatus')}</h3><div className="flex items-center justify-between"><div className="flex items-center space-x-3"><div className={`w-4 h-4 rounded-full ${offlineMode ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div><span className={`font-bold text-lg ${offlineMode ? 'text-red-400' : 'text-green-400'}`}>{offlineMode ? t('limitReached') : t('online')}</span></div><button onClick={() => { playSound('click'); checkApiStatus(); }} className="px-4 py-2 bg-gray-700 rounded-xl font-bold text-sm hover:bg-gray-600 transition-all border-b-4 border-gray-800 active:border-b-0 active:translate-y-1">{t('checkConnection')}</button></div></div>
@@ -2591,52 +2609,6 @@ export default function App() {
         </div>
       )}
 
-      {/* AUTH DOMAIN INSTRUCTIONS MODAL */}
-      {showAuthDomainModal && (
-        <div className="fixed inset-0 z-[260] bg-black/80 flex flex-col justify-end md:justify-center p-0 md:p-6 animate-in fade-in" onClick={() => setShowAuthDomainModal(false)}>
-          <div className="bg-duo-card border-t-4 border-red-500 md:border-4 md:rounded-3xl rounded-t-[3rem] p-6 md:p-8 max-w-xl w-full mx-auto animate-in slide-in-from-bottom-full md:slide-in-from-bottom-10 max-h-[90vh] flex flex-col shadow-2xl cursor-default" onClick={e => e.stopPropagation()}>
-            <div className="w-16 h-1.5 bg-gray-700 rounded-full mx-auto mb-6 cursor-pointer md:hidden" onClick={() => setShowAuthDomainModal(false)}></div>
-            <div className="flex items-center space-x-4 mb-6 border-b border-gray-800 pb-4 flex-shrink-0">
-              <div className="bg-red-500/20 p-3 rounded-2xl">
-                <svg className="w-8 h-8 text-red-400 fill-none stroke-current" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <div className="min-w-0">
-                <h3 className="text-2xl font-black text-red-400 uppercase tracking-widest">Домен не авторизован</h3>
-                <p className="text-gray-400 font-bold text-xs">Firebase Authentication Config</p>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 text-gray-200 pr-2">
-              <p className="text-sm font-bold leading-normal text-gray-300">
-                Для работы авторизации Google в мобильном приложении Android необходимо добавить <code className="bg-black/40 px-1.5 py-0.5 rounded text-yellow-300 font-mono text-xs">localhost</code> в список разрешенных доменов в панели управления Firebase.
-              </p>
-              <div className="bg-gray-800/60 border border-gray-700 p-4 rounded-2xl">
-                <h4 className="text-yellow-400 font-black text-xs uppercase tracking-widest mb-2">Шаги для исправления:</h4>
-                <ol className="list-decimal pl-5 font-bold text-xs space-y-2 text-gray-300">
-                  <li>Откройте Firebase Console (console.firebase.google.com).</li>
-                  <li>Перейдите в раздел <strong>Authentication</strong>.</li>
-                  <li>Откройте вкладку <strong>Settings</strong> (Настройки) в верхней панели.</li>
-                  <li>В левом меню выберите пункт <strong>Authorized domains</strong> (Разрешенные домены).</li>
-                  <li>Нажмите кнопку <strong>Add domain</strong> (Добавить домен).</li>
-                  <li>Введите в поле ввода: <code className="bg-black/50 px-1.5 py-0.5 rounded text-emerald-400 font-mono">localhost</code></li>
-                  <li>Нажмите <strong>Add</strong> для сохранения.</li>
-                </ol>
-              </div>
-              <p className="text-xs text-gray-400 font-medium leading-normal">
-                После добавления домена в Firebase повторите попытку входа. Приложение начнет авторизовывать пользователей без ошибок!
-              </p>
-            </div>
-            <button
-              onClick={() => setShowAuthDomainModal(false)}
-              className="w-full mt-6 py-4 bg-red-600 border-b-4 border-red-800 rounded-2xl font-black text-white uppercase tracking-widest active:border-b-0 active:translate-y-1 transition-all"
-            >
-              Закрыть
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* ANDROID INSTRUCTIONS MODAL */}
       {showAndroidModal && (
           <div className="fixed inset-0 z-[260] bg-black/80 flex flex-col justify-end md:justify-center p-0 md:p-6 animate-in fade-in" onClick={() => setShowAndroidModal(false)}>
@@ -2722,17 +2694,6 @@ export default function App() {
 {`<uses-permission android:name="android.permission.INTERNET" />
 <uses-permission android:name="android.permission.RECORD_AUDIO" />
 <uses-permission android:name="android.permission.CAMERA" />`}
-                          </div>
-                      </div>
-
-                      <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-2xl">
-                          <h4 className="text-amber-400 font-black text-xs uppercase tracking-widest mb-2">⚠️ Play Защита: "Приложение заблокировано"</h4>
-                          <p className="text-xs text-gray-300 font-bold leading-normal mb-2">
-                              Поскольку собранный APK-файл является отладочным (Debug APK), Google Play Защита может показать предупреждение. Это нормально для тестовых сборок!
-                          </p>
-                          <div className="text-xs text-gray-400 font-bold space-y-1.5">
-                              <p><span className="text-amber-400 font-black">1.</span> Нажмите кнопку <strong className="text-white">"Подробнее"</strong> (More details) в окне предупреждения.</p>
-                              <p><span className="text-amber-400 font-black">2.</span> Нажмите появившуюся кнопку <strong className="text-white">"Всё равно установить"</strong> (Install anyway).</p>
                           </div>
                       </div>
 
@@ -3268,19 +3229,24 @@ return (
       </div>
     )}
 
-    {/* PERSISTENT FLOATING QUICK TRIGGER BUTTON */}
+    {/* PERSISTENT FLOATING QUICK TRIGGER BUTTON (DESKTOP PC ONLY) */}
     {simulatorMode === 'none' && !simTriggerDismissed && (
-      <div className="fixed bottom-24 right-6 lg:bottom-12 lg:right-12 z-[200] flex items-center">
+      <div className="hidden lg:flex fixed bottom-12 right-12 z-[200] items-center">
         <button 
           id="trigger-sim-toggle"
           onClick={() => { playSound('click'); setSimulatorMode('android'); }}
           className="bg-gradient-to-tr from-emerald-500 to-teal-500 hover:scale-[1.03] active:scale-95 transition-all text-white font-black p-4 pr-10 rounded-full shadow-[0_10px_30px_rgba(16,185,129,0.3)] border-2 border-b-4 border-emerald-700 flex items-center space-x-2 text-xs tracking-widest uppercase font-din relative cursor-pointer"
-          title="Запустить тест симулятор iOS / Android"
+          title="Интерактивный тест-стенд iOS и Android (Доступен на ПК)"
         >
           <span className="text-xl animate-bounce">📱</span>
-          <span className="font-din font-extrabold text-[11px] text-white">
-            Тест-Симулятор
-          </span>
+          <div className="flex flex-col text-left">
+            <span className="font-din font-extrabold text-[11px] text-white">
+              Тест-Симулятор (ПК)
+            </span>
+            <span className="text-[9px] text-emerald-100 font-bold">
+              iOS & Android Стенд
+            </span>
+          </div>
         </button>
         
         {/* Direct X close/dismiss button on the floating widget */}
