@@ -2694,9 +2694,9 @@ export default function App() {
                       <div>
                           <h4 className="text-emerald-400 font-black text-xs uppercase tracking-widest mb-2">📋 Требования / Requirements</h4>
                           <ul className="list-disc pl-5 font-bold text-sm space-y-1 text-gray-300">
-                              <li>Node.js (18+)</li>
+                              <li>Node.js (22+)</li>
                               <li>Android Studio & Android SDK</li>
-                              <li>JDK 17</li>
+                              <li>JDK 21</li>
                           </ul>
                       </div>
 
