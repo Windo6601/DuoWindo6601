@@ -526,15 +526,16 @@ export const generateIshihara = async (subjectId: string): Promise<Exercise> => 
     } catch (e) {
         // Fallback for when image generation fails or limit reached
         console.error("Ishihara generation failed:", e);
+        const fallbackSvgBase64 = "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMyMCI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNDgiIGZpbGw9IiNmNWVlZGMiLz48Y2lyY2xlIGN4PSIyMCIgY3k9IjMwIiByPSIzIiBmaWxsPSIjODhiMDRiIi8+PGNpcmNsZSBjeD0iMzAiIGN5PSIyMCIgcj0iNCIgZmlsbD0iIzRmOGExMCIvPjxjaXJjbGUgY3g9IjQ1IiBjeT0iMTUiIHI9IjIiIGZpbGw9IiNhM2MxYWQiLz48Y2lyY2xlIGN4PSI2MCIgY3k9IjE4IiByPSIzLjUiIGZpbGw9IiM4ZmJjOGYiLz48Y2lyY2xlIGN4PSI3NSIgY3k9IjI1IiByPSIzIiBmaWxsPSIjMmU4YjU3Ii8+PGNpcmNsZSBjeD0iODIiIGN5PSI0MCIgcj0iNCIgZmlsbD0iIzNjYjM3MSIvPjxjaXJjbGUgY3g9IjgwIiBjeT0iNjAiIHI9IjIuNSIgZmlsbD0iIzY2Y2RhYSIvPjxjaXJjbGUgY3g9IjcwIiBjeT0iNzUiIHI9IjQiIGZpbGw9IiM4ZmJjOGYiLz48Y2lyY2xlIGN4PSI1NSIgY3k9IjgyIiByPSIzIiBmaWxsPSIjOWFjZDMyIi8+PGNpcmNsZSBjeD0iMzUiIGN5PSI4MCIgcj0iMy51IiBmaWxsPSIjNTU2YjJmIi8+PGNpcmNsZSBjeD0iMjAiIGN5PSI3MCIgcj0iMyIgZmlsbD0iIzZiOGUyMyIvPjxjaXJjbGUgY3g9IjE1IiBjeT0iNTAiIHI9IjQiIGZpbGw9IiMyMjgYMjIiLz48Y2lyY2xlIGN4PSI0MiIgY3k9IjM1IiByPSIzLjUiIGZpbGw9IiNmZjZiNmIiLz48Y2lyY2xlIGN4PSI0MiIgY3k9IjUwIiByPSIzLjUiIGZpbGw9IiNmZjQ3NTciLz48Y2lyY2xlIGN4PSI0MiIgY3k9IjY1IiByPSIzLjUiIGZpbGw9IiNmZjZiNmIiLz48Y2lyY2xlIGN4PSI1OCIgY3k9IjMyIiByPSIzLjUiIGZpbGw9IiNlZTUyNTMiLz48Y2lyY2xlIGN4PSI2NCIgY3k9IjQyIiByPSIzLjUiIGZpbGw9IiNmZjQ3NTciLz48Y2lyY2xlIGN4PSI1OCIgY3k9IjUwIiByPSIzLjUiIGZpbGw9IiNlZTUyNTMiLz48Y2lyY2xlIGN4PSI1MiIgY3k9IjU4IiByPSIzLjUiIGZpbGw9IiNmZjZiNmIiLz48Y2lyY2xlIGN4PSI2NCIgY3k9IjY1IiByPSIzLjUiIGZpbGw9IiNmZjQ3NTciLz4gPC9zdmc+";
         return {
              id: 'fallback-ishihara',
              type: 'ishihara',
-             originalSentence: "Error",
-             targetTranslation: "0",
+             originalSentence: "Ishihara Test",
+             targetTranslation: "12",
              wordBank: [],
              isFallback: true,
-             ishiharaData: { image: "", number: "0" } 
-        }
+             ishiharaData: { image: fallbackSvgBase64, number: "12" }
+        };
     }
 }
 
