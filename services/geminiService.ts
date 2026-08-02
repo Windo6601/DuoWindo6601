@@ -534,7 +534,7 @@ export const generateIshihara = async (subjectId: string): Promise<Exercise> => 
              targetTranslation: "12",
              wordBank: [],
              isFallback: true,
-             ishiharaData: { image: fallbackSvgBase64, number: "12" }
+             ishiharaData: { image: "data:image/svg+xml;base64," + fallbackSvgBase64, number: "12" }
         };
     }
 }
