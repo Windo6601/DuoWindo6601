@@ -845,7 +845,7 @@ export default function App() {
         stream.getTracks().forEach(track => track.stop());
       }
     };
-  }, [screen, videoCameraOn, videoSelfViewOpen]);
+  }, [screen, videoCameraOn, videoSelfViewOpen, isRoleplayVideoCall, currentExercise?.type]);
 
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(user)); }, [user]);
   useEffect(() => { localStorage.setItem('duo_course_id_6601', currentCourse.id); }, [currentCourse]);

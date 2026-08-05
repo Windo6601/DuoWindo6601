@@ -11,7 +11,8 @@
     "lint": "tsc --noEmit",
     "cap:add-android": "cap add android",
     "cap:sync": "cap sync",
-    "cap:open-android": "cap open android"
+    "cap:open-android": "cap open android",
+    "prebuild": "node -e \"const [major] = process.versions.node.split('.'); if (Number(major) < 22) { console.error('\\x1b[31m%s\\x1b[0m', '\u26a0\ufe0f \u041e\u0428\u0418\u0411\u041a\u0410: Capacitor CLI v8 \u0442\u0440\u0435\u0431\u0443\u0435\u0442 NodeJS >= 22.0.0! \u041f\u043e\u0436\u0430\u043b\u0443\u0439\u0441\u0442\u0430, \u043e\u0431\u043d\u043e\u0432\u0438\u0442\u0435 Node.js (\u0432\u044b\u043f\u043e\u043b\u043d\u0438\u0442\u0435: nvm install 22 && nvm use 22)'); process.exit(1); }\""
   },
   "dependencies": {
     "@capacitor/android": "^8.3.4",
@@ -28,5 +29,8 @@
     "@vitejs/plugin-react": "^5.0.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
   }
 }
