@@ -277,6 +277,27 @@ const COUNTRIES = [
 
 const STORAGE_KEY = 'duowindo6601_v26_chess_fix';
 
+const hasArabicCharacters = (text: string) => /[\u0600-\u06FF]/.test(text);
+
+const formatText = (text: string) => {
+  if (!text) return "";
+  if (hasArabicCharacters(text)) {
+    return "\u202e" + text;
+  }
+  return text;
+};
+
+const getArabicStyle = (text: string) => {
+  if (hasArabicCharacters(text)) {
+    return {
+      direction: 'rtl' as const,
+      textAlign: 'right' as const,
+      fontFamily: "'Scheherazade New', 'Noto Naskh Arabic', 'Amiri', 'Cairo', sans-serif"
+    };
+  }
+  return {};
+};
+
 const TRANSLATIONS: Record<string, any> = {
   // ... (keeping translations concise for brevity, assume existing ones are here)
   ru: {
@@ -549,6 +570,7 @@ export default function App() {
   const [showExplanationModal, setShowExplanationModal] = useState(false);
 
   const [showAndroidModal, setShowAndroidModal] = useState(false);
+  const [isRoleplayVideoCall, setIsRoleplayVideoCall] = useState(false);
   const [showAuthDomainModal, setShowAuthDomainModal] = useState(false);
   const [androidDismissed, setAndroidDismissed] = useState(() => {
     return localStorage.getItem('duo_android_dismissed') === 'true';
@@ -799,7 +821,8 @@ export default function App() {
   useEffect(() => {
     let stream: MediaStream | null = null;
     const startCamera = async () => {
-      if (screen === AppScreen.VIDEO_CALL && videoCameraOn) {
+      const isRoleplayVideo = screen === AppScreen.LESSON && currentExercise?.type === 'roleplay' && isRoleplayVideoCall;
+      if ((screen === AppScreen.VIDEO_CALL || isRoleplayVideo) && videoCameraOn) {
         try {
           stream = await navigator.mediaDevices.getUserMedia({ video: true });
           if (videoRef.current) {
@@ -812,7 +835,8 @@ export default function App() {
       }
     };
 
-    if (screen === AppScreen.VIDEO_CALL && videoSelfViewOpen) {
+    const isRoleplayVideoOpen = screen === AppScreen.LESSON && currentExercise?.type === 'roleplay' && isRoleplayVideoCall;
+    if ((screen === AppScreen.VIDEO_CALL || isRoleplayVideoOpen) && videoSelfViewOpen) {
         startCamera();
     }
 
@@ -1160,7 +1184,7 @@ export default function App() {
   const checkIllusionAnswer = async (selectedOption: 'A' | 'B') => { if (!currentExercise || !currentExercise.illusionData) return; setLoading(true); try { const isCorrect = currentExercise.illusionData.correctOption === selectedOption; if (isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: currentExercise.illusionData.explanation }); setUser(u => ({ ...u, xp: u.xp + 20 })); } else { playSound('wrong'); const correctText = currentExercise.illusionData.correctOption === 'A' ? currentExercise.illusionData.optionA : currentExercise.illusionData.optionB; setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${correctText}. ${currentExercise.illusionData.explanation}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } finally { setLoading(false); } };
   const checkDrawingAnswer = async () => { if (!currentExercise || !currentExercise.drawingData || !canvasRef.current) return; playSound('click'); setLoading(true); try { const imageBase64 = canvasRef.current.toDataURL('image/png').split(',')[1]; const result = await checkDrawing(imageBase64, currentExercise.drawingData.character); if (result.isFallback && !offlineMode) setShowLimitModal(true); if (result.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: result.feedback }); setUser(u => ({ ...u, xp: u.xp + 20 })); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: result.feedback }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } catch (e) { console.error(e); } finally { setLoading(false); } };
   const checkAnswer = async (spokenText?: string) => { if (!currentExercise) return; if (isRecording) { setIsRecording(false); if (recognitionRef.current) recognitionRef.current.stop(); if (timerRef.current) clearTimeout(timerRef.current); } if (!spokenText && currentExercise.type !== 'ishihara') playSound('click'); if (currentExercise.type === 'ishihara') { const correct = currentExercise.targetTranslation; const userAnswer = ishiharaInput.trim(); if (userAnswer === correct) { playSound('correct'); setFeedback({ status: 'correct', message: "Correct! You have good color vision for this plate." }); setUser(u => ({ ...u, xp: u.xp + 15 })); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `Incorrect. The number was ${correct}.` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } return; } if (currentExercise.type === 'reading') { setLoading(true); if (currentExercise.readingData?.mode === 'write') { const ans = readingInput; const res = await checkAnswerWithAI(currentCourse.localName, ans, currentExercise.readingData.prompt || "Write something relevant", user.subscription === 'max'); if (res.isFallback && !offlineMode) setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + 20, gems: u.gems + 5 })); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: res.feedback }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } setLoading(false); return; } else { let tempText = currentExercise.readingData!.text; const blanksCount = (tempText.match(/___/g) || []).length; if (selectedWordIds.length !== blanksCount) { setToast("Fill all blanks!"); setLoading(false); return; } const correctWords = currentExercise.readingData!.blanks?.map(b => b.word) || []; const userWords = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text); const isCorrect = correctWords.every((w, i) => w.toLowerCase() === userWords[i]?.toLowerCase()); if (isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: "Perfect!" }); setUser(u => ({ ...u, xp: u.xp + 20 })); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `Correct: ${currentExercise.targetTranslation}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } setLoading(false); return; } } setLoading(true); try { let ans = ""; if (typeof spokenText === 'string') ans = spokenText; else if (currentExercise.type === 'speech') { if (transcriptRef.current.trim()) ans = transcriptRef.current; else if (!recognitionRef.current) ans = currentExercise.originalSentence; else { setLoading(false); setToast(t('t_speech_empty')); return; } } else ans = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text).join(' '); const correctAnswer = currentExercise.type === 'speech' ? currentExercise.originalSentence : currentExercise.targetTranslation; const res = await checkAnswerWithAI(currentCourse.localName, ans, correctAnswer, user.subscription === 'max'); if (res.isFallback && !offlineMode) setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + 20, gems: u.gems + 5 })); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${correctAnswer}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } catch (e) { console.error(e); setToast("Ошибка проверки"); } finally { setLoading(false); } };
-  const handleContinueAfterLesson = () => { playSound('click'); if (user.subscription === 'free' && Math.random() > 0.5) setShowAd(true); else setScreen(AppScreen.PATH); setFeedback({ status: 'idle', message: '' }); setCurrentExercise(null); setExplanation(null); setShowExplanationModal(false); }
+  const handleContinueAfterLesson = () => { playSound('click'); setIsRoleplayVideoCall(false); if (user.subscription === 'free' && Math.random() > 0.5) setShowAd(true); else setScreen(AppScreen.PATH); setFeedback({ status: 'idle', message: '' }); setCurrentExercise(null); setExplanation(null); setShowExplanationModal(false); }
   const handleSkip = () => { playSound('click'); setToast(t('t_skip')); handleContinueAfterLesson(); };
   const toggleRecording = () => { playSound('click'); if (isRecording) { setIsRecording(false); if (recognitionRef.current) recognitionRef.current.stop(); if (timerRef.current) clearTimeout(timerRef.current); if (currentExercise?.type === 'roleplay') setTimeout(() => { if (transcriptRef.current) handleRoleplaySend(transcriptRef.current); }, 500); else if (!recognitionRef.current) checkAnswer(currentExercise?.originalSentence); else setTimeout(() => checkAnswer(), 200); } else { transcriptRef.current = ""; setIsRecording(true); if (recognitionRef.current) try { recognitionRef.current.start(); } catch (e) { console.error("Rec start error", e); setIsRecording(false); } else timerRef.current = setTimeout(() => { setIsRecording(false); if (currentExercise?.type === 'roleplay') handleRoleplaySend("Hello friend!"); else checkAnswer(currentExercise?.originalSentence); }, 3000); } };
   const upgradeSubscription = (tier: SubscriptionTier) => { playSound('success'); setUser(u => ({ ...u, subscription: tier, energy: 25 })); setToast(tier === 'super' ? t('t_welcome_super') : t('t_welcome_max')); setScreen(AppScreen.PATH); };
@@ -2280,7 +2304,21 @@ export default function App() {
                ) : currentExercise.type !== 'roleplay' ? (
                   <div className="flex-1 mx-4 md:mx-6 h-4 md:h-5 bg-gray-800 rounded-full overflow-hidden relative shadow-inner"><div className="absolute inset-0 bg-gradient-to-r from-yellow-400 to-green-500 transition-all duration-1000" style={{ width: feedback.status === 'idle' ? '30%' : '100%' }}></div></div>
                ) : (
-                  <div className="flex-1 text-center font-bold text-gray-400 uppercase tracking-widest text-xs md:text-sm truncate px-2">Roleplay: {currentExercise.originalSentence}</div>
+                  <div className="flex-1 flex items-center justify-center space-x-3">
+                     <span className="font-bold text-gray-400 uppercase tracking-widest text-xs md:text-sm truncate">Roleplay: {currentExercise.originalSentence}</span>
+                     <button
+                         type="button"
+                         onClick={() => {
+                             playSound('click');
+                             setIsRoleplayVideoCall(!isRoleplayVideoCall);
+                         }}
+                         className={`p-2 rounded-xl border-2 transition-all flex items-center space-x-1.5 ${isRoleplayVideoCall ? 'bg-red-600 border-red-500 text-white' : 'bg-gray-800 border-gray-700 text-duo-blue hover:bg-gray-700'}`}
+                         title="Видеозвонок / Video Call"
+                     >
+                         <VideoIcon className="w-4 h-4" />
+                         <span className="text-[10px] font-black uppercase tracking-wider">{isRoleplayVideoCall ? 'Чат' : 'Видео'}</span>
+                     </button>
+                  </div>
                )}
                {currentExercise.type !== 'chess' ? (
                    <div className="flex items-center space-x-2 text-yellow-400 font-bold text-xl md:text-2xl">{user.subscription !== 'free' ? <InfiniteEnergyIcon className="w-6 h-6 md:w-8 md:h-8 text-yellow-400"/> : <><LightningIcon className="w-5 h-5 md:w-7 md:h-7" /> <span>{user.energy}</span></>}</div>
@@ -2468,14 +2506,134 @@ export default function App() {
                     </div>
                  </div>
              ) : currentExercise.type === 'roleplay' && currentExercise.roleplayData ? (
-                 <div className="flex-1 flex flex-col relative overflow-hidden min-h-0">
+                 isRoleplayVideoCall ? (
+                     /* ROLEPLAY VIDEO CALL VIEW */
+                     <div className="flex-1 flex flex-col relative overflow-hidden bg-[#121212] rounded-[2.5rem] border-2 border-gray-800">
+                         {/* Header */}
+                         <div className="flex items-center justify-between p-4 bg-black/40 backdrop-blur-md absolute top-0 w-full z-10 rounded-t-[2.5rem]">
+                             <div className="flex items-center space-x-3">
+                                 <div className="p-2 bg-purple-600 rounded-xl animate-pulse"><VideoIcon className="w-5 h-5 text-white"/></div>
+                                 <h3 className="font-bold text-white tracking-widest uppercase text-xs">AI Video Call: {currentExercise.originalSentence}</h3>
+                             </div>
+                             <span className="text-red-500 animate-pulse text-xs font-black uppercase tracking-widest">LIVE</span>
+                         </div>
+
+                         {/* Mascot caller */}
+                         <div className="flex-1 relative flex flex-col items-center justify-center p-6 pb-20">
+                             <Mascot emotion="happy" className="w-48 h-48 md:w-64 md:h-64 mb-6 animate-float" variant={currentCourse.mascotVariant} />
+
+                             {/* Transcription / Subtitles */}
+                             {currentExercise.roleplayData.messages.length > 0 && (
+                                 <div className="max-w-lg w-full px-4 text-center mt-4">
+                                     {(() => {
+                                         const lastMsg = [...currentExercise.roleplayData.messages].reverse().find(m => m.role === 'model');
+                                         if (!lastMsg) return null;
+                                         const isAr = hasArabicCharacters(lastMsg.text);
+                                         return (
+                                             <div
+                                                 className="p-4 bg-black/60 backdrop-blur-md rounded-2xl border border-gray-800 shadow-xl inline-block max-w-full"
+                                                 style={isAr ? { direction: 'rtl', textAlign: 'right', fontFamily: "'Scheherazade New', 'Noto Naskh Arabic', sans-serif" } : {}}
+                                             >
+                                                 <p className="text-sm md:text-base font-bold text-white">
+                                                     {isAr ? "\u202e" + lastMsg.text : lastMsg.text}
+                                                 </p>
+                                             </div>
+                                         );
+                                     })()}
+                                 </div>
+                             )}
+                         </div>
+
+                         {/* Self PIP View */}
+                         {videoSelfViewOpen && (
+                             <div className="absolute bottom-24 right-4 w-28 h-40 md:w-36 md:h-48 bg-gray-900 rounded-2xl border-2 border-gray-700 overflow-hidden shadow-2xl z-30 group">
+                                 {videoCameraOn ? (
+                                     <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover transform scale-x-[-1]" />
+                                 ) : (
+                                     <div className="w-full h-full flex items-center justify-center bg-gray-800">
+                                         <UserIcon className="w-10 h-10 text-gray-600" />
+                                     </div>
+                                 )}
+                                 <button
+                                     type="button"
+                                     onClick={() => setVideoSelfViewOpen(false)}
+                                     className="absolute top-2 right-2 p-1 bg-black/60 hover:bg-red-500 rounded-full text-white opacity-0 group-hover:opacity-100 transition-all z-40"
+                                 >
+                                     <CloseIcon className="w-3 h-3" />
+                                 </button>
+                             </div>
+                         )}
+
+                         {/* Controls bar */}
+                         <div className="p-4 bg-black/40 backdrop-blur-md flex justify-center items-center space-x-4 absolute bottom-0 w-full z-40 rounded-b-[2.5rem]">
+                             <button type="button" onClick={() => setVideoMicOn(!videoMicOn)} className={`p-3 rounded-full transition-all ${videoMicOn ? 'bg-gray-800 hover:bg-gray-700 text-white' : 'bg-red-500 text-white'}`}>
+                                 {videoMicOn ? <MicIcon className="w-5 h-5"/> : <div className="w-5 h-5 relative"><div className="absolute inset-0 border-l-2 border-white transform rotate-45 left-1/2"></div><MicIcon/></div>}
+                             </button>
+
+                             <button type="button" onClick={() => setVideoCameraOn(!videoCameraOn)} className={`p-3 rounded-full transition-all ${videoCameraOn ? 'bg-gray-800 hover:bg-gray-700 text-white' : 'bg-red-500 text-white'}`}>
+                                 <VideoIcon className="w-5 h-5"/>
+                             </button>
+
+                             <button type="button" onClick={() => setVideoSelfViewOpen(!videoSelfViewOpen)} className={`p-3 rounded-full transition-all ${videoSelfViewOpen ? 'bg-gray-800 hover:bg-gray-700 text-white' : 'bg-gray-900 text-gray-500 border border-gray-800'}`}>
+                                 {videoSelfViewOpen ? <EyeIcon className="w-5 h-5"/> : <div className="w-5 h-5 relative"><div className="absolute inset-0 border-l-2 border-gray-500 transform rotate-45 left-1/2"></div><EyeIcon/></div>}
+                             </button>
+
+                             <div className="w-px h-8 bg-gray-800"></div>
+
+                             <button
+                                 type="button"
+                                 onClick={toggleRecording}
+                                 className={`p-3 rounded-full transition-all ${isRecording ? 'bg-red-500 animate-pulse text-white' : 'bg-duo-blue hover:brightness-110 text-white'}`}
+                                 title={isRecording ? "Слушаю..." : "Говорить / Speak"}
+                             >
+                                 <MicIcon className="w-5 h-5" />
+                             </button>
+
+                             <button
+                                 type="button"
+                                 onClick={() => { playSound('click'); setIsRoleplayVideoCall(false); }}
+                                 className="p-3 rounded-full bg-red-600 hover:bg-red-500 text-white transition-all transform hover:scale-110"
+                                 title="Завершить видеозвонок / End Video"
+                             >
+                                 <PhoneIcon className="w-5 h-5 transform rotate-135"/>
+                             </button>
+                         </div>
+                     </div>
+                 ) : (
+                     <div className="flex-1 flex flex-col relative overflow-hidden min-h-0">
                      <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 md:space-y-6 pb-24 px-2">
-                        {currentExercise.roleplayData.messages.map((msg, i) => (
-                           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2`}>
-                               {msg.role === 'model' && <div onClick={() => speakText(msg.text, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-duo-blue flex-shrink-0 mr-3 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"><VolumeIcon className="w-4 h-4 md:w-5 md:h-5 text-white" /></div>}
-                               <div className="max-w-[85%] flex flex-col"><div className={`p-3 md:p-4 rounded-2xl text-sm md:text-lg font-bold ${msg.role === 'user' ? 'bg-duo-blue text-white rounded-br-none' : 'bg-gray-800 text-white rounded-bl-none border-2 border-gray-700'}`}>{msg.text}</div>{msg.correction && <div className="mt-2 bg-black border border-duo-blue/50 p-2 md:p-3 rounded-xl text-xs md:text-sm flex items-start space-x-2 animate-in fade-in"><MaxIcon className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" /><div className="text-gray-300"><span className="text-duo-blue font-black uppercase text-[10px]">Correction: </span>{msg.correction}</div></div>}</div>
-                           </div>
-                        ))}
+                        {currentExercise.roleplayData.messages.map((msg, i) => {
+                           const isAr = hasArabicCharacters(msg.text);
+                           return (
+                             <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} ${isAr ? 'flex-row-reverse' : ''} animate-in slide-in-from-bottom-2`}>
+                               {msg.role === 'model' && (
+                                 <div
+                                   onClick={() => speakText(msg.text, currentCourse.id, false, user.preferredVoice, user.voiceProvider)}
+                                   className={`w-8 h-8 md:w-10 md:h-10 rounded-full bg-duo-blue flex-shrink-0 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform ${isAr ? 'ml-3' : 'mr-3'}`}
+                                 >
+                                   <VolumeIcon className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                                 </div>
+                               )}
+                               <div className="max-w-[85%] flex flex-col items-stretch">
+                                 <div
+                                   className={`p-3 md:p-4 rounded-2xl text-sm md:text-lg font-bold ${msg.role === 'user' ? 'bg-duo-blue text-white rounded-br-none' : 'bg-gray-800 text-white rounded-bl-none border-2 border-gray-700'}`}
+                                   style={getArabicStyle(msg.text)}
+                                 >
+                                   {formatText(msg.text)}
+                                 </div>
+                                 {msg.correction && (
+                                   <div className="mt-2 bg-black border border-duo-blue/50 p-2 md:p-3 rounded-xl text-xs md:text-sm flex items-start space-x-2 animate-in fade-in">
+                                     <MaxIcon className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                                     <div className="text-gray-300">
+                                       <span className="text-duo-blue font-black uppercase text-[10px]">Correction: </span>
+                                       {formatText(msg.correction)}
+                                     </div>
+                                   </div>
+                                 )}
+                               </div>
+                             </div>
+                           );
+                        })}
                         <div ref={chatBottomRef} />
                      </div>
                       <div className="w-full bg-duo-card border-t-2 border-gray-800 p-2 md:p-3 mt-auto">
@@ -2503,6 +2661,7 @@ export default function App() {
                             onChange={(e) => setRoleplayInput(e.target.value)}
                             placeholder={isRecording ? (user.language === 'ru' ? 'Слушаю вашу речь...' : 'Listening to speech...') : (user.language === 'ru' ? 'Напишите сообщение...' : 'Type a message...')}
                             className="flex-1 bg-gray-900 border-2 border-gray-700 rounded-2xl px-4 py-2.5 text-white text-sm md:text-base font-bold focus:outline-none focus:border-duo-blue transition-colors"
+                            style={currentCourse.id === 'ar' ? { direction: 'rtl', textAlign: 'right', fontFamily: "'Scheherazade New', 'Noto Naskh Arabic', sans-serif" } : {}}
                           />
 
                           <button 
@@ -2521,6 +2680,7 @@ export default function App() {
                         )}
                       </div>
                  </div>
+                 )
              ) : (
                  <div className="flex-1 overflow-y-auto no-scrollbar min-h-0">
                    <h2 className="text-2xl md:text-3xl font-bold mb-6 md:mb-10 text-center sm:text-left tracking-tight px-2">{currentExercise.type === 'listening' ? t('whatHeard') : currentExercise.type === 'speech' ? t('speakForDuo') : t('readPractice')}</h2>
