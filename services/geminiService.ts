@@ -743,3 +743,46 @@ export const getInterviewHint = async (question: string): Promise<string> => {
         return "Network error. No hint.";
     }
 };
+
+export const generateVideoCallRoleplayResponse = async (
+    topic: string,
+    history: RoleplayMessage[],
+    userText: string,
+    language: string
+): Promise<{ text: string; correction?: string }> => {
+    try {
+        const ai = new GoogleGenAI({ apiKey: getApiKey() });
+        const context = history.map(m => `${m.role === 'user' ? 'User' : 'DuoWindo6601'}: ${m.text}`).join('\n');
+        const prompt = `You are DuoWindo6601, an AI language tutor in a LIVE interactive Video Call with a student learning ${language}. 
+Current topic/scenario: "${topic}".
+Recent conversation:
+${context}
+User said during video call: "${userText}"
+
+Reply naturally, warmly, and concisely as DuoWindo6601 (1-2 sentences max for spoken video call).
+If user made a language/grammar mistake, provide a very brief friendly correction.
+Return JSON with { "text": "...", "correction": "..." }`;
+
+        const response = await callGeminiWithRetry(async () => {
+            return ai.models.generateContent({
+                model: MODEL_FREE,
+                contents: prompt,
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: Type.OBJECT,
+                        properties: {
+                            text: { type: Type.STRING },
+                            correction: { type: Type.STRING }
+                        },
+                        required: ["text"]
+                    }
+                }
+            });
+        });
+        const data = JSON.parse(response.text || '{}');
+        return { text: data.text || "That sounds great! Tell me more.", correction: data.correction };
+    } catch (e) {
+        return { text: "That sounds interesting! What else would you like to discuss?" };
+    }
+};

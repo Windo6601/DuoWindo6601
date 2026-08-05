@@ -5,7 +5,7 @@ import { signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } fr
 import { auth, db, googleProvider, handleFirestoreError, OperationType } from './firebase';
 import { AppScreen, Exercise, UserProgress, Course, WordToken, LeaderboardEntry, SubscriptionTier, RoleplayMessage } from './types';
 import { Chess, Square } from 'chess.js';
-import { generateExercise, checkAnswerWithAI, speakText, startRoleplay, replyToRoleplay, generateIllusion, generateDrawing, checkDrawing, getFallbackExercise, getChessMove, getChessChatReply, translateText, getMistakeExplanation, generateIshihara, generateInterviewQuestion, getInterviewHint, generateReading } from './services/geminiService';
+import { generateExercise, checkAnswerWithAI, speakText, startRoleplay, replyToRoleplay, generateIllusion, generateDrawing, checkDrawing, getFallbackExercise, getChessMove, getChessChatReply, translateText, getMistakeExplanation, generateIshihara, generateInterviewQuestion, getInterviewHint, generateReading, generateVideoCallRoleplayResponse } from './services/geminiService';
 
 import { playSound } from './services/audioService';
 import { 
@@ -766,10 +766,13 @@ export default function App() {
   // VIDEO CALL STATE
   const [videoCameraOn, setVideoCameraOn] = useState(true);
   const [videoMicOn, setVideoMicOn] = useState(true);
-  const [videoSmartMode, setVideoSmartMode] = useState(false);
+  const [videoSmartMode, setVideoSmartMode] = useState(true);
   const [videoQuestion, setVideoQuestion] = useState("");
   const [videoHint, setVideoHint] = useState("");
   const [videoSelfViewOpen, setVideoSelfViewOpen] = useState(true);
+  const [videoTopic, setVideoTopic] = useState<string>("Заказ в кафе");
+  const [videoCallHistory, setVideoCallHistory] = useState<RoleplayMessage[]>([]);
+  const [videoInputText, setVideoInputText] = useState("");
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const recognitionRef = useRef<any>(null);
@@ -899,23 +902,66 @@ export default function App() {
   }, [currentExercise?.roleplayData?.messages]);
 
   // ... (Video, Speech, Draw handlers same as before) ...
-  const startVideoInterview = async () => {
+  const startVideoCall = async (topic: string = "Заказ в кафе") => {
+      playSound('click');
       setLoading(true);
+      setVideoTopic(topic);
       setVideoHint("");
-      setVideoQuestion("Connecting...");
+      setVideoInputText("");
+      setScreen(AppScreen.VIDEO_CALL);
+
+      const initialGreeting = user.language === 'en'
+        ? `Hello! I'm DuoWindo6601. Welcome to our video call! Let's talk about "${topic}". How are you doing today?`
+        : `Привет! Я DuoWindo6601. Рад приветствовать тебя на нашем видеозвонке! Давай пообщаемся на тему: "${topic}". Как твои дела сегодня?`;
+
+      setVideoQuestion(initialGreeting);
+      const initialHistory: RoleplayMessage[] = [{ role: 'model', text: initialGreeting }];
+      setVideoCallHistory(initialHistory);
+
+      speakText(initialGreeting, currentCourse.id, false, user.preferredVoice, user.voiceProvider);
+
+      if (videoSmartMode) {
+          try {
+              const hint = await getInterviewHint(`Topic: ${topic}. How should I reply to the greeting?`);
+              setVideoHint(hint);
+          } catch (e) {}
+      }
+      setLoading(false);
+  };
+
+  const handleVideoCallSend = async (text: string) => {
+      if (!text.trim() || loading) return;
+      playSound('click');
+      setLoading(true);
+      setVideoInputText("");
+
+      const userMsg: RoleplayMessage = { role: 'user', text };
+      const updatedHistory = [...videoCallHistory, userMsg];
+      setVideoCallHistory(updatedHistory);
+
       try {
-          const question = await generateInterviewQuestion("Web Development & HTTP");
-          setVideoQuestion(question);
-          speakText(question, 'en', false, 'Puck', 'gemini');
+          const res = await generateVideoCallRoleplayResponse(videoTopic, updatedHistory, text, currentCourse.localName);
+          const aiMsg: RoleplayMessage = { role: 'model', text: res.text, correction: res.correction };
+          const finalHistory = [...updatedHistory, aiMsg];
+          setVideoCallHistory(finalHistory);
+          setVideoQuestion(res.text);
+
+          speakText(res.text, currentCourse.id, false, user.preferredVoice, user.voiceProvider);
+          setUser(u => ({ ...u, xp: u.xp + 15 }));
+
           if (videoSmartMode) {
-              const hint = await getInterviewHint(question);
+              const hint = await getInterviewHint(`Topic: ${videoTopic}. Question: "${res.text}". What are good ways to reply?`);
               setVideoHint(hint);
           }
       } catch (e) {
-          setVideoQuestion("Connection Error");
+          console.error(e);
       } finally {
           setLoading(false);
       }
+  };
+
+  const startVideoInterview = async () => {
+      startVideoCall("Собеседование на работу");
   };
 
   useEffect(() => {
@@ -934,7 +980,13 @@ export default function App() {
                     const finalTrans = event.results[i][0].transcript;
                     transcriptRef.current = finalTrans;
                     setIsRecording(false);
-                    if (currentExercise?.type === 'roleplay') handleRoleplaySend(finalTrans); else checkAnswer(finalTrans);
+                    if (currentExercise?.type === 'roleplay') {
+                        handleRoleplaySend(finalTrans);
+                    } else if (screen === AppScreen.VIDEO_CALL) {
+                        handleVideoCallSend(finalTrans);
+                    } else {
+                        checkAnswer(finalTrans);
+                    }
                     return;
                 } else interim += event.results[i][0].transcript;
             }
@@ -1160,7 +1212,7 @@ export default function App() {
   const checkAnswer = async (spokenText?: string) => { if (!currentExercise) return; if (isRecording) { setIsRecording(false); if (recognitionRef.current) recognitionRef.current.stop(); if (timerRef.current) clearTimeout(timerRef.current); } if (!spokenText && currentExercise.type !== 'ishihara') playSound('click'); if (currentExercise.type === 'ishihara') { const correct = currentExercise.targetTranslation; const userAnswer = ishiharaInput.trim(); if (userAnswer === correct) { playSound('correct'); setFeedback({ status: 'correct', message: "Correct! You have good color vision for this plate." }); setUser(u => ({ ...u, xp: u.xp + 15 })); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `Incorrect. The number was ${correct}.` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } return; } if (currentExercise.type === 'reading') { setLoading(true); if (currentExercise.readingData?.mode === 'write') { const ans = readingInput; const res = await checkAnswerWithAI(currentCourse.localName, ans, currentExercise.readingData.prompt || "Write something relevant", user.subscription === 'max'); if (res.isFallback && !offlineMode) setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + 20, gems: u.gems + 5 })); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: res.feedback }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } setLoading(false); return; } else { let tempText = currentExercise.readingData!.text; const blanksCount = (tempText.match(/___/g) || []).length; if (selectedWordIds.length !== blanksCount) { setToast("Fill all blanks!"); setLoading(false); return; } const correctWords = currentExercise.readingData!.blanks?.map(b => b.word) || []; const userWords = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text); const isCorrect = correctWords.every((w, i) => w.toLowerCase() === userWords[i]?.toLowerCase()); if (isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: "Perfect!" }); setUser(u => ({ ...u, xp: u.xp + 20 })); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `Correct: ${currentExercise.targetTranslation}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } setLoading(false); return; } } setLoading(true); try { let ans = ""; if (typeof spokenText === 'string') ans = spokenText; else if (currentExercise.type === 'speech') { if (transcriptRef.current.trim()) ans = transcriptRef.current; else if (!recognitionRef.current) ans = currentExercise.originalSentence; else { setLoading(false); setToast(t('t_speech_empty')); return; } } else ans = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text).join(' '); const correctAnswer = currentExercise.type === 'speech' ? currentExercise.originalSentence : currentExercise.targetTranslation; const res = await checkAnswerWithAI(currentCourse.localName, ans, correctAnswer, user.subscription === 'max'); if (res.isFallback && !offlineMode) setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + 20, gems: u.gems + 5 })); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${correctAnswer}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } catch (e) { console.error(e); setToast("Ошибка проверки"); } finally { setLoading(false); } };
   const handleContinueAfterLesson = () => { playSound('click'); if (user.subscription === 'free' && Math.random() > 0.5) setShowAd(true); else setScreen(AppScreen.PATH); setFeedback({ status: 'idle', message: '' }); setCurrentExercise(null); setExplanation(null); setShowExplanationModal(false); }
   const handleSkip = () => { playSound('click'); setToast(t('t_skip')); handleContinueAfterLesson(); };
-  const toggleRecording = () => { playSound('click'); if (isRecording) { setIsRecording(false); if (recognitionRef.current) recognitionRef.current.stop(); if (timerRef.current) clearTimeout(timerRef.current); if (currentExercise?.type === 'roleplay') setTimeout(() => { if (transcriptRef.current) handleRoleplaySend(transcriptRef.current); }, 500); else if (!recognitionRef.current) checkAnswer(currentExercise?.originalSentence); else setTimeout(() => checkAnswer(), 200); } else { transcriptRef.current = ""; setIsRecording(true); if (recognitionRef.current) try { recognitionRef.current.start(); } catch (e) { console.error("Rec start error", e); setIsRecording(false); } else timerRef.current = setTimeout(() => { setIsRecording(false); if (currentExercise?.type === 'roleplay') handleRoleplaySend("Hello friend!"); else checkAnswer(currentExercise?.originalSentence); }, 3000); } };
+  const toggleRecording = () => { playSound('click'); if (isRecording) { setIsRecording(false); if (recognitionRef.current) recognitionRef.current.stop(); if (timerRef.current) clearTimeout(timerRef.current); if (currentExercise?.type === 'roleplay') setTimeout(() => { if (transcriptRef.current) handleRoleplaySend(transcriptRef.current); }, 500); else if (screen === AppScreen.VIDEO_CALL) setTimeout(() => { if (transcriptRef.current) handleVideoCallSend(transcriptRef.current); }, 500); else if (!recognitionRef.current) checkAnswer(currentExercise?.originalSentence); else setTimeout(() => checkAnswer(), 200); } else { transcriptRef.current = ""; setIsRecording(true); if (recognitionRef.current) try { recognitionRef.current.start(); } catch (e) { console.error("Rec start error", e); setIsRecording(false); } else timerRef.current = setTimeout(() => { setIsRecording(false); if (currentExercise?.type === 'roleplay') handleRoleplaySend("Hello friend!"); else if (screen === AppScreen.VIDEO_CALL) handleVideoCallSend("Hello DuoWindo6601!"); else checkAnswer(currentExercise?.originalSentence); }, 3000); } };
   const upgradeSubscription = (tier: SubscriptionTier) => { playSound('success'); setUser(u => ({ ...u, subscription: tier, energy: 25 })); setToast(tier === 'super' ? t('t_welcome_super') : t('t_welcome_max')); setScreen(AppScreen.PATH); };
   const cancelSubscription = () => { playSound('click'); setUser(u => ({ ...u, subscription: 'free', energy: 25 })); setToast(t('t_sub_cancel')); };
   const handleNavigation = (s: AppScreen) => { playSound('select'); setScreen(s); };
@@ -1620,81 +1672,224 @@ export default function App() {
             </div>
         )}
 
-        {/* --- VIDEO CALL SCREEN --- */}
+        {/* --- VIDEO CALL SCREEN DUOWINDO6601 --- */}
         {screen === AppScreen.VIDEO_CALL && (
-            <div className="fixed inset-0 z-[100] bg-[#1a1a1a] flex flex-col animate-in fade-in">
-                {/* Header */}
-                <div className="flex items-center justify-between p-4 bg-black/40 backdrop-blur-md absolute top-0 w-full z-10">
+            <div className="fixed inset-0 z-[100] bg-[#121212] flex flex-col animate-in fade-in select-none">
+                {/* Header Bar */}
+                <div className="flex items-center justify-between p-4 bg-black/60 backdrop-blur-xl absolute top-0 w-full z-20 border-b border-white/10">
                     <div className="flex items-center space-x-3">
-                       <div className="p-2 bg-purple-600 rounded-xl"><VideoIcon className="w-6 h-6 text-white"/></div>
-                       <h3 className="font-bold text-white tracking-widest uppercase text-sm md:text-base">Interview Practice: {videoQuestion.substring(0, 20)}...</h3>
+                        <button 
+                            onClick={() => { playSound('click'); setScreen(AppScreen.PRACTICE); }}
+                            className="p-2 bg-white/10 hover:bg-white/20 rounded-xl text-white transition-all active:scale-95"
+                            title="Назад"
+                        >
+                            <CloseIcon className="w-5 h-5"/>
+                        </button>
+                        <div className="p-2 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl shadow-lg">
+                            <VideoIcon className="w-6 h-6 text-white"/>
+                        </div>
+                        <div>
+                            <h3 className="font-black text-white text-base md:text-lg flex items-center space-x-2">
+                                <span>Видеозвонок DuoWindo6601</span>
+                                <span className="bg-yellow-400 text-black text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider hidden sm:inline">AI Partner</span>
+                            </h3>
+                            <p className="text-xs text-purple-300 font-bold flex items-center space-x-2">
+                                <span>Тема:</span>
+                                <span className="text-white bg-purple-900/80 px-2 py-0.5 rounded border border-purple-500/30">{videoTopic}</span>
+                            </p>
+                        </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                        <span className="text-red-500 animate-pulse text-xs font-black uppercase tracking-widest">LIVE</span>
+
+                    <div className="flex items-center space-x-3">
+                        {/* Topic Selector Menu */}
+                        <div className="hidden md:flex items-center space-x-1.5 bg-white/5 p-1 rounded-2xl border border-white/10">
+                            {[
+                                { name: '☕ Кафе', topic: 'Заказ в кафе' },
+                                { name: '💼 Собеседование', topic: 'Собеседование на работу' },
+                                { name: '✈️ Аэропорт', topic: 'В аэропорту и регистрация' },
+                                { name: '💬 Беседа', topic: 'Свободная беседа о жизни' }
+                            ].map(item => (
+                                <button
+                                    key={item.name}
+                                    onClick={() => startVideoCall(item.topic)}
+                                    className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${videoTopic === item.topic ? 'bg-duo-blue text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
+                                >
+                                    {item.name}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="flex items-center space-x-2 bg-red-950/80 border border-red-500/40 px-3 py-1.5 rounded-full shadow-inner">
+                            <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-ping"></span>
+                            <span className="text-red-400 text-xs font-black uppercase tracking-widest">LIVE</span>
+                        </div>
                     </div>
                 </div>
 
-                {/* Main View (Interviewer) */}
-                <div className="flex-1 relative flex items-center justify-center bg-[#121212]">
-                    <div className="text-center opacity-80">
-                        <Mascot emotion="neutral" className="w-48 h-48 md:w-64 md:h-64 mb-6" variant="default" />
-                        <p className="text-gray-500 font-bold uppercase tracking-widest">{t('interviewer')}</p>
+                {/* Main Call View Area */}
+                <div className="flex-1 relative flex flex-col items-center justify-center p-4 pt-20 pb-32 overflow-hidden bg-gradient-to-b from-[#18181f] via-[#121212] to-[#0a0a0f]">
+                    {/* Background Subtle Pulsing Aura */}
+                    <div className="absolute w-[500px] h-[500px] bg-purple-600/10 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
+
+                    {/* DuoWindo6601 Mascot Stream */}
+                    <div className="relative z-10 flex flex-col items-center my-auto transition-all transform scale-100">
+                        <div className="relative mb-6">
+                            {/* Speaking Wave Ripple Ring */}
+                            {loading && (
+                                <div className="absolute -inset-8 bg-purple-500/20 rounded-full blur-xl animate-ping"></div>
+                            )}
+                            <div className="relative p-6 bg-gradient-to-b from-purple-900/40 to-black/60 rounded-full border-2 border-purple-500/30 shadow-[0_0_50px_rgba(147,51,234,0.3)]">
+                                <Mascot 
+                                    emotion={loading ? "happy" : isRecording ? "surprised" : "neutral"} 
+                                    className="w-48 h-48 md:w-64 md:h-64 filter drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)]" 
+                                    variant={currentCourse.mascotVariant || 'default'} 
+                                />
+                            </div>
+                            <span className="absolute bottom-2 right-2 bg-green-500 text-black text-[10px] font-black uppercase px-2 py-0.5 rounded-full border-2 border-black flex items-center space-x-1 shadow-lg">
+                                <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                                <span>ONLINE</span>
+                            </span>
+                        </div>
+
+                        {/* Speech Subtitles & Latest Reply Card */}
+                        <div className="w-full max-w-xl bg-black/70 backdrop-blur-xl border border-white/15 p-5 md:p-6 rounded-3xl shadow-2xl relative text-center animate-in slide-in-from-bottom-3">
+                            <p className="text-purple-300 text-xs font-black uppercase tracking-widest mb-2 flex items-center justify-center space-x-2">
+                                <span>DuoWindo6601 говорит:</span>
+                                {videoQuestion && (
+                                    <button 
+                                        onClick={() => speakText(videoQuestion, currentCourse.id, false, user.preferredVoice, user.voiceProvider)}
+                                        className="p-1 bg-purple-600/30 hover:bg-purple-600/60 text-purple-200 rounded-lg transition-transform active:scale-95"
+                                        title="Повторить озвучку"
+                                    >
+                                        <VolumeIcon className="w-4 h-4"/>
+                                    </button>
+                                )}
+                            </p>
+                            <h4 className="text-white text-base md:text-xl font-bold leading-relaxed">
+                                {videoQuestion || "Начните разговор! Нажмите микрофон или напишите сообщение."}
+                            </h4>
+
+                            {loading && (
+                                <div className="mt-3 flex items-center justify-center space-x-2 text-xs text-purple-400 font-bold animate-pulse">
+                                    <ActivityIcon className="w-4 h-4 animate-spin" />
+                                    <span>DuoWindo6601 генерирует ответ...</span>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                    
-                    {/* Copilot Overlay */}
+
+                    {/* AI Copilot Overlay */}
                     {videoSmartMode && videoHint && (
-                        <div className="absolute top-20 right-4 md:right-10 bg-indigo-900/90 backdrop-blur-xl border border-indigo-500/50 p-6 rounded-2xl shadow-2xl max-w-sm w-full animate-in slide-in-from-right-10 z-20">
-                            <h4 className="text-indigo-300 font-black uppercase text-xs tracking-widest mb-3 flex items-center"><MonitorIcon className="w-4 h-4 mr-2"/> AI Copilot Hint</h4>
-                            <div className="text-white text-sm font-bold leading-relaxed whitespace-pre-wrap">{videoHint}</div>
+                        <div className="absolute top-24 right-4 md:right-8 bg-indigo-950/90 backdrop-blur-2xl border border-indigo-500/40 p-5 rounded-3xl shadow-2xl max-w-xs md:max-w-sm w-full animate-in slide-in-from-right-8 z-30">
+                            <div className="flex items-center justify-between mb-2 pb-2 border-b border-indigo-500/30">
+                                <h4 className="text-indigo-300 font-black uppercase text-xs tracking-widest flex items-center">
+                                    <MonitorIcon className="w-4 h-4 mr-1.5 text-indigo-400"/> AI Copilot
+                                </h4>
+                                <button onClick={() => setVideoSmartMode(false)} className="text-indigo-400 hover:text-white text-xs font-bold">×</button>
+                            </div>
+                            <div className="text-indigo-100 text-xs md:text-sm font-bold leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto pr-1">
+                                {videoHint}
+                            </div>
                         </div>
                     )}
                 </div>
 
-                {/* Self View (PIP) */}
+                {/* Self View (PIP Camera Stream) */}
                 {videoSelfViewOpen && (
-                    <div className="absolute bottom-24 right-4 w-32 h-48 md:w-48 md:h-64 bg-gray-900 rounded-2xl border-2 border-gray-700 overflow-hidden shadow-2xl z-30 group">
+                    <div className="absolute bottom-28 right-4 w-32 h-44 md:w-44 md:h-56 bg-gray-900 rounded-3xl border-2 border-purple-500/40 overflow-hidden shadow-2xl z-40 group transition-all">
                         {videoCameraOn ? (
                             <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover transform scale-x-[-1]" />
                         ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-gray-800">
-                                <UserIcon className="w-12 h-12 text-gray-600" />
+                            <div className="w-full h-full flex flex-col items-center justify-center bg-gray-800/90 p-2 text-center">
+                                <UserIcon className="w-10 h-10 text-gray-500 mb-1" />
+                                <span className="text-[10px] text-gray-400 font-bold">Камера выключена</span>
                             </div>
                         )}
-                        <div className="absolute bottom-2 left-2 text-[10px] font-bold bg-black/50 px-2 py-1 rounded text-white">{t('self')}</div>
+                        <div className="absolute bottom-2 left-2 text-[10px] font-bold bg-black/60 backdrop-blur px-2 py-0.5 rounded-full text-white border border-white/10">
+                            {t('self')}
+                        </div>
                         
                         <button 
                             onClick={() => setVideoSelfViewOpen(false)}
-                            className="absolute top-2 right-2 p-1 bg-black/60 hover:bg-red-500 rounded-full text-white opacity-0 group-hover:opacity-100 transition-all z-40"
+                            className="absolute top-2 right-2 p-1.5 bg-black/70 hover:bg-red-600 rounded-full text-white opacity-0 group-hover:opacity-100 transition-all z-50"
+                            title="Скрыть селфи-камеру"
                         >
-                            <CloseIcon className="w-4 h-4" />
+                            <CloseIcon className="w-3.5 h-3.5" />
                         </button>
                     </div>
                 )}
 
-                {/* Controls Bar */}
-                <div className="p-6 bg-[#1a1a1a] flex justify-center items-center space-x-6 z-40 pb-10 md:pb-6">
-                    <button onClick={() => setVideoMicOn(!videoMicOn)} className={`p-4 rounded-full transition-all ${videoMicOn ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-red-500 text-white'}`}>
-                        {videoMicOn ? <MicIcon className="w-6 h-6"/> : <div className="w-6 h-6 relative"><div className="absolute inset-0 border-l-2 border-white transform rotate-45 left-1/2"></div><MicIcon/></div>}
-                    </button>
-                    
-                    <button onClick={() => setVideoCameraOn(!videoCameraOn)} className={`p-4 rounded-full transition-all ${videoCameraOn ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-red-500 text-white'}`}>
-                        <VideoIcon className="w-6 h-6"/>
-                    </button>
+                {/* Interactive Bottom Control Bar */}
+                <div className="p-4 md:p-6 bg-[#18181f]/95 backdrop-blur-2xl border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4 z-50 pb-8 md:pb-6">
+                    {/* Live Mic Speech & Recording Button */}
+                    <div className="flex items-center space-x-3 w-full md:w-auto justify-center">
+                        <button 
+                            onClick={toggleRecording} 
+                            disabled={loading}
+                            className={`p-5 rounded-2xl transition-all font-black uppercase text-xs tracking-wider flex items-center space-x-3 shadow-xl active:scale-95 ${
+                                isRecording 
+                                ? 'bg-red-600 text-white animate-pulse ring-4 ring-red-500/50 scale-105' 
+                                : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:brightness-110'
+                            }`}
+                        >
+                            <MicIcon className="w-7 h-7"/>
+                            <span>{isRecording ? "Слушаю вас..." : "Говорить с Duo"}</span>
+                        </button>
 
-                    <button onClick={() => setVideoSelfViewOpen(!videoSelfViewOpen)} className={`p-4 rounded-full transition-all ${videoSelfViewOpen ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-800 text-gray-500 border border-gray-700'}`}>
-                        {videoSelfViewOpen ? <EyeIcon className="w-6 h-6"/> : <div className="w-6 h-6 relative"><div className="absolute inset-0 border-l-2 border-gray-500 transform rotate-45 left-1/2"></div><EyeIcon/></div>}
-                    </button>
+                        <button 
+                            onClick={() => setVideoCameraOn(!videoCameraOn)} 
+                            className={`p-4 rounded-2xl transition-all border ${videoCameraOn ? 'bg-white/10 hover:bg-white/20 text-white border-white/20' : 'bg-red-500/20 text-red-400 border-red-500/50'}`}
+                            title={videoCameraOn ? "Выключить камеру" : "Включить камеру"}
+                        >
+                            <VideoIcon className="w-6 h-6"/>
+                        </button>
 
-                    <button onClick={startVideoInterview} disabled={loading} className="px-6 py-4 rounded-full bg-duo-blue hover:brightness-110 font-bold uppercase tracking-widest text-white transition-all shadow-lg flex items-center space-x-2">
-                        {loading ? <ActivityIcon className="w-6 h-6 animate-spin"/> : <span>{t('startInterview')}</span>}
-                    </button>
+                        <button 
+                            onClick={() => setVideoSelfViewOpen(!videoSelfViewOpen)} 
+                            className={`p-4 rounded-2xl transition-all border ${videoSelfViewOpen ? 'bg-white/10 hover:bg-white/20 text-white border-white/20' : 'bg-gray-800 text-gray-500 border-gray-700'}`}
+                            title="Переключить селфи-вид"
+                        >
+                            <EyeIcon className="w-6 h-6"/>
+                        </button>
 
-                    <button onClick={() => setVideoSmartMode(!videoSmartMode)} className={`p-4 rounded-full transition-all ${videoSmartMode ? 'bg-indigo-600 text-white shadow-[0_0_15px_rgba(79,70,229,0.5)]' : 'bg-gray-700 text-gray-400'}`}>
-                        <MonitorIcon className="w-6 h-6"/>
-                    </button>
+                        <button 
+                            onClick={() => setVideoSmartMode(!videoSmartMode)} 
+                            className={`p-4 rounded-2xl transition-all border ${videoSmartMode ? 'bg-indigo-600 text-white border-indigo-400 shadow-[0_0_15px_rgba(79,70,229,0.5)]' : 'bg-white/10 text-gray-400 border-white/10'}`}
+                            title="AI Copilot подсказки"
+                        >
+                            <MonitorIcon className="w-6 h-6"/>
+                        </button>
+                    </div>
 
-                    <button onClick={() => { playSound('click'); setScreen(AppScreen.PATH); }} className="p-4 rounded-full bg-red-600 hover:bg-red-500 text-white transition-all transform hover:scale-110">
-                        <PhoneIcon className="w-6 h-6 transform rotate-135"/> {/* Rotated to look like hangup */}
+                    {/* Quick Text Input for Typing Reply */}
+                    <form 
+                        onSubmit={(e) => { e.preventDefault(); handleVideoCallSend(videoInputText); }}
+                        className="flex items-center space-x-2 w-full md:max-w-md"
+                    >
+                        <input 
+                            type="text" 
+                            value={videoInputText} 
+                            onChange={(e) => setVideoInputText(e.target.value)} 
+                            placeholder="Или напишите ответ текстом..." 
+                            disabled={loading}
+                            className="flex-1 bg-black/50 border border-white/20 rounded-2xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 font-bold"
+                        />
+                        <button 
+                            type="submit" 
+                            disabled={loading || !videoInputText.trim()} 
+                            className="px-5 py-3 bg-duo-blue hover:brightness-110 disabled:bg-gray-800 disabled:text-gray-600 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all active:scale-95 shadow-md"
+                        >
+                            {loading ? "..." : "Отправить"}
+                        </button>
+                    </form>
+
+                    {/* Hangup / End Call */}
+                    <button 
+                        onClick={() => { playSound('click'); setScreen(AppScreen.PRACTICE); }} 
+                        className="p-4 rounded-2xl bg-red-600 hover:bg-red-500 text-white transition-all transform hover:scale-105 active:scale-95 shadow-lg flex items-center justify-center"
+                        title="Завершить видеозвонок"
+                    >
+                        <PhoneIcon className="w-6 h-6 transform rotate-135"/>
                     </button>
                 </div>
             </div>
@@ -1933,7 +2128,49 @@ export default function App() {
 
           {screen === AppScreen.PRACTICE && (
             <div className="grid md:grid-cols-2 gap-8 py-10 animate-in fade-in">
-              <button onClick={() => startTraining('roleplay')} className="md:col-span-2 bg-gradient-to-r from-purple-600 to-pink-600 p-8 rounded-[2.5rem] border-b-8 border-purple-800 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center justify-between shadow-2xl group"><div className="flex items-center space-x-6"><div className="bg-white/20 p-5 rounded-3xl group-hover:rotate-6 transition-transform"><ChatBubbleIcon className="w-12 h-12 text-white" /></div><div><div className="flex items-center space-x-2 mb-1"><h3 className="text-3xl font-black text-white">{t('roleplays')}</h3>{user.subscription === 'max' && <span className="bg-black text-duo-blue text-[10px] px-2 py-0.5 rounded font-black border border-duo-blue">MAX</span>}</div><p className="opacity-90 font-bold text-white/80">{t('startSpeak')}</p></div></div><Mascot emotion="happy" className="w-32 h-32 hidden sm:block" variant={currentCourse.mascotVariant} /></button>
+              {/* VIDEO CALL & ROLEPLAY FEATURED CARDS */}
+              <div className="md:col-span-2 grid sm:grid-cols-2 gap-4">
+                  <button 
+                      onClick={() => startVideoCall("Видеозвонок DuoWindo6601")} 
+                      className="bg-gradient-to-r from-purple-700 via-indigo-700 to-blue-700 p-6 md:p-8 rounded-[2.5rem] border-b-8 border-purple-900 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center justify-between shadow-2xl group relative overflow-hidden"
+                  >
+                      <div className="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest animate-pulse border border-white/20">
+                          NEW DuoWindo6601
+                      </div>
+                      <div className="flex items-center space-x-5 relative z-10">
+                          <div className="bg-white/20 p-4 rounded-3xl group-hover:scale-110 transition-transform">
+                              <VideoIcon className="w-10 h-10 text-white" />
+                          </div>
+                          <div>
+                              <div className="flex items-center space-x-2 mb-1">
+                                  <h3 className="text-2xl md:text-3xl font-black text-white">Видеозвонок</h3>
+                              </div>
+                              <p className="opacity-90 font-bold text-xs md:text-sm text-purple-200">
+                                  Живое общение с AI партнером
+                              </p>
+                          </div>
+                      </div>
+                  </button>
+
+                  <button 
+                      onClick={() => startTraining('roleplay')} 
+                      className="bg-gradient-to-r from-purple-600 to-pink-600 p-6 md:p-8 rounded-[2.5rem] border-b-8 border-purple-800 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center justify-between shadow-2xl group"
+                  >
+                      <div className="flex items-center space-x-5">
+                          <div className="bg-white/20 p-4 rounded-3xl group-hover:rotate-6 transition-transform">
+                              <ChatBubbleIcon className="w-10 h-10 text-white" />
+                          </div>
+                          <div>
+                              <div className="flex items-center space-x-2 mb-1">
+                                  <h3 className="text-2xl md:text-3xl font-black text-white">{t('roleplays')}</h3>
+                                  {user.subscription === 'max' && <span className="bg-black text-duo-blue text-[10px] px-2 py-0.5 rounded font-black border border-duo-blue">MAX</span>}
+                              </div>
+                              <p className="opacity-90 font-bold text-xs md:text-sm text-white/80">{t('startSpeak')}</p>
+                          </div>
+                      </div>
+                      <Mascot emotion="happy" className="w-20 h-20 hidden sm:block" variant={currentCourse.mascotVariant} />
+                  </button>
+              </div>
               <button onClick={() => startTraining('listening')} className="bg-duo-blue p-12 rounded-[3rem] border-b-8 border-blue-800 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center space-x-8 shadow-2xl"><div className="bg-white/20 p-5 rounded-3xl"><VolumeIcon className="w-14 h-14 text-white" /></div><div><h3 className="text-3xl font-bold mb-1">{t('audio')}</h3><p className="opacity-80 font-bold uppercase tracking-widest text-xs">{t('whatHeard')}</p></div></button>
               <button onClick={() => startTraining('speech')} className="bg-duo-orange p-12 rounded-[3rem] border-b-8 border-orange-700 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center space-x-8 shadow-2xl"><div className="bg-white/20 p-5 rounded-3xl"><MicIcon className="w-14 h-14 text-white" /></div><div><h3 className="text-3xl font-bold mb-1">{t('speech')}</h3><p className="opacity-80 font-bold uppercase tracking-widest text-xs">{t('speakForDuo')}</p></div></button>
               <button onClick={() => startTraining('translation')} className="bg-duo-green p-12 rounded-[3rem] border-b-8 border-duo-greenDark text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center space-x-8 shadow-2xl"><div className="bg-white/20 p-5 rounded-3xl"><BookIcon className="w-14 h-14 text-white" /></div><div><h3 className="text-3xl font-bold mb-1">{t('translate')}</h3><p className="opacity-80 font-bold uppercase tracking-widest text-xs">{t('readPractice')}</p></div></button>
@@ -2481,6 +2718,25 @@ export default function App() {
                  </div>
              ) : currentExercise.type === 'roleplay' && currentExercise.roleplayData ? (
                  <div className="flex-1 flex flex-col relative overflow-hidden min-h-0">
+                     {/* Video Call Quick Switch Banner */}
+                     <div className="bg-gradient-to-r from-purple-900/80 via-indigo-900/80 to-blue-900/80 border border-purple-500/30 p-3 rounded-2xl mb-3 flex items-center justify-between shadow-lg">
+                         <div className="flex items-center space-x-3">
+                             <div className="p-2 bg-purple-600 rounded-xl">
+                                 <VideoIcon className="w-5 h-5 text-white animate-pulse" />
+                             </div>
+                             <div>
+                                 <h4 className="text-white text-xs md:text-sm font-black">Переключиться на видеозвонок?</h4>
+                                 <p className="text-[11px] text-purple-200">Живой разговор с AI партнером DuoWindo6601</p>
+                             </div>
+                         </div>
+                         <button 
+                             onClick={() => startVideoCall(currentCourse.localName || "Ролевой диалог")}
+                             className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center space-x-1"
+                         >
+                             <span>Начать звонок</span>
+                         </button>
+                     </div>
+
                      <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 md:space-y-6 pb-24 px-2">
                         {currentExercise.roleplayData.messages.map((msg, i) => (
                            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2`}>
