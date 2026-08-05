@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db, googleProvider, handleFirestoreError, OperationType } from './firebase';
@@ -780,6 +780,27 @@ export default function App() {
   const transcriptRef = useRef<string>("");
 
   const isLanguageCourse = useMemo(() => !SPECIAL_IDS.includes(currentCourse.id), [currentCourse]);
+
+  const [useRtlOverride, setUseRtlOverride] = useState<boolean>(true);
+
+  const isArabicCourse = useMemo(() => {
+    return currentCourse.id === 'ar' || 
+           currentCourse.name.toLowerCase().includes('arabic') || 
+           currentCourse.localName.toLowerCase().includes('араб');
+  }, [currentCourse]);
+
+  const isArabicText = useCallback((text: string) => {
+    return /[\u0600-\u06FF]/.test(text || '');
+  }, []);
+
+  const formatRTLOverride = useCallback((text: string) => {
+    if (!text) return "";
+    // Only wrap contiguous Arabic character sequences with U+202E ... U+202C.
+    // Cyrillic (Russian) and Latin (English) characters are left completely untouched!
+    return text.replace(/([\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF][\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\s\u060C\u061B\u061F\u064B-\u0652]*)/g, (match) => {
+      return `\u202E${match}\u202C`;
+    });
+  }, []);
 
   const leaderboardData = useMemo(() => {
      const baseXP = Math.max(100, user.xp); 
@@ -1703,12 +1724,17 @@ export default function App() {
                     <div className="flex items-center space-x-3">
                         {/* Topic Selector Menu */}
                         <div className="hidden md:flex items-center space-x-1.5 bg-white/5 p-1 rounded-2xl border border-white/10">
-                            {[
+                            {(isArabicCourse ? [
+                                { name: '☕ في المقهى', topic: 'Заказ в кафе' },
+                                { name: '🤝 التعارف', topic: 'Знакомство' },
+                                { name: '🛒 في السوق', topic: 'Рынок и покупки' },
+                                { name: '💬 حوار حر', topic: 'Свободный разговор' }
+                            ] : [
                                 { name: '☕ Кафе', topic: 'Заказ в кафе' },
                                 { name: '💼 Собеседование', topic: 'Собеседование на работу' },
                                 { name: '✈️ Аэропорт', topic: 'В аэропорту и регистрация' },
                                 { name: '💬 Беседа', topic: 'Свободная беседа о жизни' }
-                            ].map(item => (
+                            ]).map(item => (
                                 <button
                                     key={item.name}
                                     onClick={() => startVideoCall(item.topic)}
@@ -1765,8 +1791,11 @@ export default function App() {
                                     </button>
                                 )}
                             </p>
-                            <h4 className="text-white text-base md:text-xl font-bold leading-relaxed">
-                                {videoQuestion || "Начните разговор! Нажмите микрофон или напишите сообщение."}
+                            <h4 
+                                className={`text-white text-base md:text-xl font-bold leading-relaxed ${isArabicText(videoQuestion) ? 'font-arabic text-right' : ''}`}
+                                dir="auto"
+                            >
+                                {videoQuestion ? formatRTLOverride(videoQuestion) : "Начните разговор! Нажмите микрофон или напишите сообщение."}
                             </h4>
 
                             {loading && (
@@ -2737,13 +2766,49 @@ export default function App() {
                          </button>
                      </div>
 
-                     <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 md:space-y-6 pb-24 px-2">
-                        {currentExercise.roleplayData.messages.map((msg, i) => (
-                           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2`}>
-                               {msg.role === 'model' && <div onClick={() => speakText(msg.text, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-duo-blue flex-shrink-0 mr-3 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"><VolumeIcon className="w-4 h-4 md:w-5 md:h-5 text-white" /></div>}
-                               <div className="max-w-[85%] flex flex-col"><div className={`p-3 md:p-4 rounded-2xl text-sm md:text-lg font-bold ${msg.role === 'user' ? 'bg-duo-blue text-white rounded-br-none' : 'bg-gray-800 text-white rounded-bl-none border-2 border-gray-700'}`}>{msg.text}</div>{msg.correction && <div className="mt-2 bg-black border border-duo-blue/50 p-2 md:p-3 rounded-xl text-xs md:text-sm flex items-start space-x-2 animate-in fade-in"><MaxIcon className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" /><div className="text-gray-300"><span className="text-duo-blue font-black uppercase text-[10px]">Correction: </span>{msg.correction}</div></div>}</div>
-                           </div>
-                        ))}
+                     <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 md:space-y-6 pb-24 px-2" dir="auto">
+                        {currentExercise.roleplayData.messages.map((msg, i) => {
+                           const isAr = isArabicText(msg.text);
+                           const textFormatted = formatRTLOverride(msg.text);
+                           const isUser = msg.role === 'user';
+                           return (
+                             <div key={i} className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2`}>
+                                 {!isUser && (
+                                   <div 
+                                     onClick={() => speakText(msg.text, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} 
+                                     className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-duo-blue flex-shrink-0 mr-3 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
+                                   >
+                                     <VolumeIcon className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                                   </div>
+                                 )}
+                                 <div className="max-w-[85%] flex flex-col">
+                                   <div 
+                                     className={`p-3 md:p-4 rounded-2xl text-sm md:text-lg font-bold ${isAr ? 'font-arabic text-right' : ''} ${isUser ? 'bg-duo-blue text-white rounded-br-none' : 'bg-gray-800 text-white rounded-bl-none border-2 border-gray-700'}`}
+                                     dir="auto"
+                                   >
+                                     {textFormatted}
+                                   </div>
+                                   {msg.correction && (
+                                     <div className="mt-2 bg-black border border-duo-blue/50 p-2 md:p-3 rounded-xl text-xs md:text-sm flex items-start space-x-2 animate-in fade-in" dir="auto">
+                                       <MaxIcon className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                                       <div className="text-gray-300">
+                                         <span className="text-duo-blue font-black uppercase text-[10px]">Correction: </span>
+                                         {formatRTLOverride(msg.correction)}
+                                       </div>
+                                     </div>
+                                   )}
+                                 </div>
+                                 {isUser && (
+                                   <div 
+                                     onClick={() => speakText(msg.text, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} 
+                                     className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-purple-600 flex-shrink-0 ml-3 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
+                                   >
+                                     <VolumeIcon className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                                   </div>
+                                 )}
+                             </div>
+                           );
+                        })}
                         <div ref={chatBottomRef} />
                      </div>
                       <div className="w-full bg-duo-card border-t-2 border-gray-800 p-2 md:p-3 mt-auto">
@@ -2770,7 +2835,8 @@ export default function App() {
                             value={roleplayInput}
                             onChange={(e) => setRoleplayInput(e.target.value)}
                             placeholder={isRecording ? (user.language === 'ru' ? 'Слушаю вашу речь...' : 'Listening to speech...') : (user.language === 'ru' ? 'Напишите сообщение...' : 'Type a message...')}
-                            className="flex-1 bg-gray-900 border-2 border-gray-700 rounded-2xl px-4 py-2.5 text-white text-sm md:text-base font-bold focus:outline-none focus:border-duo-blue transition-colors"
+                            className={`flex-1 bg-gray-900 border-2 border-gray-700 rounded-2xl px-4 py-2.5 text-white text-sm md:text-base font-bold focus:outline-none focus:border-duo-blue transition-colors ${isArabicText(roleplayInput) ? 'font-arabic text-right' : ''}`}
+                            dir="auto"
                           />
 
                           <button 
@@ -2807,8 +2873,8 @@ export default function App() {
                         ) : currentExercise.type === 'speech' ? (
                             <div className="w-full flex justify-center py-2"><button onClick={toggleRecording} className={`w-28 h-28 md:w-36 md:h-36 rounded-[2.5rem] md:rounded-[3rem] flex items-center justify-center transition-all shadow-2xl ${isRecording ? 'bg-red-500 scale-110 animate-pulse' : 'bg-duo-blue hover:brightness-110'}`}><MicIcon className="w-12 h-12 md:w-16 md:h-16 text-white" />{isRecording && <span className="absolute mt-20 md:mt-24 text-xs md:text-sm font-bold animate-bounce">Слушаю...</span>}</button></div>
                         ) : (
-                          <div className="bg-duo-card border-2 border-gray-700 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 pb-16 md:pb-10 text-xl md:text-3xl font-bold relative shadow-xl text-center md:text-left break-words" dir="auto">
-                            {currentExercise.originalSentence}
+                          <div className={`bg-duo-card border-2 border-gray-700 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 pb-16 md:pb-10 text-xl md:text-3xl font-bold relative shadow-xl text-center md:text-left break-words ${isArabicText(currentExercise.originalSentence) ? 'font-arabic text-right' : ''}`} dir="auto">
+                            {formatRTLOverride(currentExercise.originalSentence)}
                             <div className="absolute top-1/2 -left-3 -translate-y-1/2 w-0 h-0 border-t-[10px] border-t-transparent border-r-[15px] border-r-gray-700 border-b-[10px] border-b-transparent hidden md:block"></div>
                             <div className="absolute bottom-4 right-4 flex space-x-3"><button onClick={() => speakText(currentExercise.originalSentence, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} className="p-2 md:p-3 bg-gray-800 rounded-2xl hover:bg-gray-700 transition-all shadow-md border-b-4 border-black/20 active:border-b-0 active:translate-y-1"><VolumeIcon className="w-5 h-5 md:w-6 md:h-6 text-duo-blue" /></button><button onClick={() => speakText(currentExercise.originalSentence, currentCourse.id, true, user.preferredVoice, user.voiceProvider)} className="p-2 md:p-3 bg-gray-800 rounded-2xl hover:bg-gray-700 transition-all shadow-md border-b-4 border-black/20 active:border-b-0 active:translate-y-1"><TurtleIcon className="w-5 h-5 md:w-6 md:h-6 text-duo-blue" /></button></div>
                           </div>
@@ -2818,11 +2884,27 @@ export default function App() {
                    <div className="space-y-6 md:space-y-12 px-2">
                      {(currentExercise.type === 'translation' || currentExercise.type === 'listening') && (
                         <>
-                        <div className="min-h-[80px] md:min-h-[100px] border-b-2 border-gray-700 flex flex-wrap gap-2 md:gap-4 p-2 md:p-4 items-end" dir={currentCourse.id === 'ar' ? 'rtl' : 'ltr'}>
-                          {selectedWordIds.map(id => (<button key={id} onClick={() => { playSound('click'); setSelectedWordIds(p => p.filter(x => x !== id)); }} className="bg-duo-card border-2 border-b-4 border-gray-700 p-2 px-4 md:p-4 md:px-8 rounded-xl md:rounded-2xl font-bold text-lg md:text-2xl hover:bg-gray-700 transition-all animate-in slide-in-from-bottom-2">{availableTokens.find(t => t.id === id)?.text}</button>))}
+                        <div className="min-h-[80px] md:min-h-[100px] border-b-2 border-gray-700 flex flex-wrap gap-2 md:gap-4 p-2 md:p-4 items-end" dir="auto">
+                          {selectedWordIds.map(id => {
+                            const tok = availableTokens.find(t => t.id === id);
+                            const tokText = tok?.text || '';
+                            const isArTok = isArabicText(tokText);
+                            return (
+                              <button key={id} onClick={() => { playSound('click'); setSelectedWordIds(p => p.filter(x => x !== id)); }} className={`bg-duo-card border-2 border-b-4 border-gray-700 p-2 px-4 md:p-4 md:px-8 rounded-xl md:rounded-2xl font-bold text-lg md:text-2xl hover:bg-gray-700 transition-all animate-in slide-in-from-bottom-2 ${isArTok ? 'font-arabic' : ''}`}>
+                                {formatRTLOverride(tokText)}
+                              </button>
+                            );
+                          })}
                         </div>
-                        <div className="flex flex-wrap gap-2 md:gap-4 justify-center pb-4" dir={currentCourse.id === 'ar' ? 'rtl' : 'ltr'}>
-                          {availableTokens.map(token => (<button key={token.id} disabled={selectedWordIds.includes(token.id) || feedback.status !== 'idle'} onClick={() => { playSound('click'); setSelectedWordIds([...selectedWordIds, token.id]); }} className={`p-3 px-6 md:p-5 md:px-10 rounded-xl md:rounded-2xl border-2 border-b-4 font-bold text-lg md:text-2xl transition-all ${selectedWordIds.includes(token.id) ? 'opacity-0 scale-90 pointer-events-none' : 'bg-duo-card border-gray-700 hover:border-duo-blue hover:text-duo-blue'}`}>{token.text}</button>))}
+                        <div className="flex flex-wrap gap-2 md:gap-4 justify-center pb-4" dir="auto">
+                          {availableTokens.map(token => {
+                            const isArTok = isArabicText(token.text);
+                            return (
+                              <button key={token.id} disabled={selectedWordIds.includes(token.id) || feedback.status !== 'idle'} onClick={() => { playSound('click'); setSelectedWordIds([...selectedWordIds, token.id]); }} className={`p-3 px-6 md:p-5 md:px-10 rounded-xl md:rounded-2xl border-2 border-b-4 font-bold text-lg md:text-2xl transition-all ${isArTok ? 'font-arabic' : ''} ${selectedWordIds.includes(token.id) ? 'opacity-0 scale-90 pointer-events-none' : 'bg-duo-card border-gray-700 hover:border-duo-blue hover:text-duo-blue'}`}>
+                                {formatRTLOverride(token.text)}
+                              </button>
+                            );
+                          })}
                         </div>
                         </>
                      )}
@@ -2847,7 +2929,7 @@ export default function App() {
                 <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
                    <div className="flex-1 w-full md:pr-12">
                      <p className={`text-2xl md:text-4xl font-bold mb-2 ${feedback.status === 'correct' ? 'text-duo-green' : 'text-duo-red'}`}>{feedback.status === 'correct' ? t('great') : t('wrong')}</p>
-                     <p className="text-gray-300 font-bold text-lg md:text-xl leading-relaxed">{feedback.message}</p>
+                     <p className={`text-gray-300 font-bold text-lg md:text-xl leading-relaxed ${isArabicText(feedback.message) ? 'font-arabic text-right' : ''}`} dir="auto">{formatRTLOverride(feedback.message)}</p>
                      
                      {/* EXPLAIN MY ANSWER BUTTON */}
                      {feedback.status === 'wrong' && currentExercise.type !== 'ishihara' && (

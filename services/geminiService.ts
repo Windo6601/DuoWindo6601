@@ -372,12 +372,28 @@ export const translateText = async (text: string, targetLang: string): Promise<s
 }
 
 export const startRoleplay = async (subject: string, subjectId: string): Promise<Exercise> => {
-    const scenario = "Ordering coffee";
+    const isArabic = subjectId === 'ar' || subject.toLowerCase().includes('араб') || subject.toLowerCase().includes('arabic');
+    
+    const arabicScenarios = [
+        "في المقهى (Заказ в арабском кафе)",
+        "التعارف والتحية (Знакомство и приветствие)",
+        "في السوق والتبضع (В магазине и на рынке)",
+        "السفر في المطار (Путешествие и аэропорт)"
+    ];
+    
+    const scenario = isArabic 
+        ? arabicScenarios[Math.floor(Math.random() * arabicScenarios.length)]
+        : "Ordering coffee";
+
     try {
         const firstMessage = await callGeminiWithRetry(async () => {
             const ai = new GoogleGenAI({ apiKey: getApiKey() });
-            const response = await ai.models.generateContent({ model: MODEL_FREE, contents: `Act as a friendly local who speaks ${subject}. Scenario: ${scenario}. Start the conversation.` });
-            return response.text?.trim() || "Hello!";
+            const prompt = isArabic 
+                ? `You are an AI Arabic conversation partner in a roleplay. Scenario: "${scenario}". Greet the student in warm natural Arabic (with Russian/English translation in parentheses if helpful). Keep it 1-2 short sentences.`
+                : `Act as a friendly local who speaks ${subject}. Scenario: ${scenario}. Start the conversation.`;
+            
+            const response = await ai.models.generateContent({ model: MODEL_FREE, contents: prompt });
+            return response.text?.trim() || (isArabic ? "مرحباً بك! أهلاً وسهلاً. كيف يمكنني مساعدتك اليوم؟" : "Hello!");
         });
         return {
             id: crypto.randomUUID(), type: 'roleplay', originalSentence: scenario, targetTranslation: "", wordBank: [],
@@ -385,20 +401,28 @@ export const startRoleplay = async (subject: string, subjectId: string): Promise
         };
     } catch (e) {
         return {
-            id: 'fallback-rp', type: 'roleplay', originalSentence: "Offline Practice", targetTranslation: "", wordBank: [], isFallback: true,
-            roleplayData: { topic: "Practice", messages: [{ role: 'model', text: "API Limit Reached." }], userTurn: true }
+            id: 'fallback-rp', type: 'roleplay', originalSentence: isArabic ? "ممارسة اللغة العربية" : "Offline Practice", targetTranslation: "", wordBank: [], isFallback: true,
+            roleplayData: { 
+                topic: scenario, 
+                messages: [{ role: 'model', text: isArabic ? "مرحباً بك! أهلاً وسهلاً في درس المحادثة العربية." : "Hello! Welcome to conversation practice." }], 
+                userTurn: true 
+            }
         };
     }
 };
 
 export const replyToRoleplay = async (history: RoleplayMessage[], userMessageText: string, subject: string, isMax: boolean): Promise<RoleplayMessage> => {
+    const isArabic = subject.toLowerCase().includes('араб') || subject.toLowerCase().includes('arabic');
     try {
          const data = await callGeminiWithRetry(async () => {
              const ai = new GoogleGenAI({ apiKey: getApiKey() });
              const context = history.map(m => `${m.role}: ${m.text}`).join('\n');
+             const prompt = `${context}\nUser: ${userMessageText}
+             ${isArabic ? 'You are a friendly Arabic language tutor. Reply in clear natural Arabic with RTL formatting. If user made a mistake in Arabic, provide a brief correction.' : 'Reply naturally in ' + subject + '.'}`;
+
              const response = await ai.models.generateContent({
                  model: isMax ? MODEL_PRO : MODEL_FREE,
-                 contents: `${context}\nUser: ${userMessageText}`,
+                 contents: prompt,
                  config: {
                      responseMimeType: "application/json",
                      responseSchema: {
@@ -410,9 +434,9 @@ export const replyToRoleplay = async (history: RoleplayMessage[], userMessageTex
              });
              return JSON.parse(response.text || '{}');
          });
-         return { role: 'model', text: data.text || "I see.", correction: data.correction };
+         return { role: 'model', text: data.text || (isArabic ? "أهلاً بك! هذا رائع." : "I see."), correction: data.correction };
     } catch (e) {
-        return { role: 'model', text: "Offline reply.", isFallback: true };
+        return { role: 'model', text: isArabic ? "مرحباً بك! شكراً لك." : "Offline reply.", isFallback: true };
     }
 };
 
