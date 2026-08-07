@@ -31,15 +31,17 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<{ width: number; height: number }>({ width: 340, height: 340 });
 
-  // Measure container and compute canvas dimensions dynamically
+  // Measure container and compute canvas dimensions dynamically for mobile comfort
   useEffect(() => {
     const updateSize = () => {
       const container = containerRef.current;
       if (!container) return;
       const rect = container.getBoundingClientRect();
-      const w = Math.floor(rect.width) || 340;
-      // Keep canvas square-ish, capped between 280 and 420
-      const dimension = Math.max(280, Math.min(w, 400));
+      const w = Math.floor(rect.width) || 320;
+      // Calculate max height based on viewport so everything fits on mobile screens
+      const viewportH = window.innerHeight || 600;
+      const maxH = Math.floor(viewportH * 0.38); // max 38% of screen height
+      const dimension = Math.max(220, Math.min(w, 360, maxH));
       setSize(prev => (prev.width === dimension && prev.height === dimension ? prev : { width: dimension, height: dimension }));
     };
 
@@ -247,8 +249,8 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center relative overflow-hidden touch-none select-none min-h-0 w-full max-w-md mx-auto px-2">
-      <h2 className="text-base md:text-lg font-bold mb-3 text-center tracking-tight text-gray-300 uppercase">
+    <div className="flex-1 flex flex-col items-center justify-center relative overflow-hidden touch-none select-none min-h-0 w-full max-w-sm mx-auto px-2">
+      <h2 className="text-xs md:text-sm font-bold mb-2 text-center tracking-tight text-gray-300 uppercase">
         {instruction}
       </h2>
 
@@ -258,19 +260,32 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
         style={{
           width: size.width,
           height: size.height,
-          backgroundImage: 'linear-gradient(#e2e8f0 1px, transparent 1px), linear-gradient(90deg, #e2e8f0 1px, transparent 1px)',
-          backgroundSize: '20px 20px'
         }}
       >
-        {/* TRACE LAYER */}
+        {/* COPYBOOK GUIDELINES BACKGROUND */}
+        <svg
+          className="absolute inset-0 w-full h-full pointer-events-none select-none z-0"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          {/* Horizontal midline */}
+          <line x1="0" y1="50%" x2="100%" y2="50%" stroke="#cbd5e1" strokeWidth="1.5" strokeDasharray="4 4" />
+          {/* Horizontal top line */}
+          <line x1="0" y1="25%" x2="100%" y2="25%" stroke="#e2e8f0" strokeWidth="1" />
+          {/* Horizontal bottom line */}
+          <line x1="0" y1="75%" x2="100%" y2="75%" stroke="#e2e8f0" strokeWidth="1" />
+          {/* Vertical center axis line */}
+          <line x1="50%" y1="0" x2="50%" y2="100%" stroke="#cbd5e1" strokeWidth="1.5" strokeDasharray="4 4" />
+        </svg>
+
+        {/* TRACE LAYER WITH PROPORTIONAL LETTER SIZE */}
         <div
           className={`absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0 transition-opacity duration-300 ${
-            showTrace ? 'opacity-25' : 'opacity-0'
+            showTrace ? 'opacity-30' : 'opacity-0'
           }`}
         >
           <span
-            style={{ fontSize: Math.min(size.width, size.height) * 0.7, lineHeight: 1 }}
-            className="text-gray-900 font-serif font-bold select-none whitespace-nowrap"
+            style={{ fontSize: Math.min(size.width, size.height) * 0.48, lineHeight: 1 }}
+            className="text-gray-900 font-serif font-bold select-none whitespace-nowrap text-center leading-none"
           >
             {character}
           </span>
@@ -289,25 +304,25 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
         />
       </div>
 
-      <div className="mt-4 flex items-center justify-center gap-3 md:gap-5 p-3 bg-duo-card rounded-2xl border-2 border-gray-700 shadow-xl animate-in fade-in slide-in-from-bottom-2">
+      <div className="mt-3 flex items-center justify-center gap-2 md:gap-4 p-2 md:p-3 bg-duo-card rounded-2xl border-2 border-gray-700 shadow-xl animate-in fade-in slide-in-from-bottom-2">
         <button
           type="button"
           onClick={handleUndo}
           title="Отменить последний штрих"
-          className="p-3 md:p-4 rounded-2xl bg-duo-yellow border-b-4 border-yellowDark text-white shadow-md active:scale-95 active:border-b-0 active:translate-y-1 transition-all"
+          className="p-2.5 md:p-3 rounded-xl bg-duo-yellow border-b-4 border-yellowDark text-white shadow-md active:scale-95 active:border-b-0 active:translate-y-1 transition-all"
         >
-          <UndoIcon className="w-6 h-6 md:w-7 md:h-7" />
+          <UndoIcon className="w-5 h-5 md:w-6 md:h-6" />
         </button>
 
         <button
           type="button"
           onClick={() => setShowTrace(!showTrace)}
           title="Показать / скрыть образцовую букву"
-          className={`p-3 md:p-4 rounded-2xl border-b-4 shadow-md active:scale-95 active:border-b-0 active:translate-y-1 transition-all ${
+          className={`p-2.5 md:p-3 rounded-xl border-b-4 shadow-md active:scale-95 active:border-b-0 active:translate-y-1 transition-all ${
             showTrace ? 'bg-duo-green border-duo-greenDark text-white' : 'bg-gray-700 border-gray-800 text-gray-400'
           }`}
         >
-          <EyeIcon className="w-6 h-6 md:w-7 md:h-7" />
+          <EyeIcon className="w-5 h-5 md:w-6 md:h-6" />
         </button>
 
         {onSpeak && (
@@ -315,21 +330,21 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
             type="button"
             onClick={onSpeak}
             title="Озвучить букву"
-            className="p-3 md:p-4 rounded-2xl bg-duo-blue border-b-4 border-duo-blueDark text-white shadow-md active:scale-95 active:border-b-0 active:translate-y-1 transition-all"
+            className="p-2.5 md:p-3 rounded-xl bg-duo-blue border-b-4 border-duo-blueDark text-white shadow-md active:scale-95 active:border-b-0 active:translate-y-1 transition-all"
           >
-            <VolumeIcon className="w-6 h-6 md:w-7 md:h-7" />
+            <VolumeIcon className="w-5 h-5 md:w-6 md:h-6" />
           </button>
         )}
 
-        <div className="w-px h-8 bg-gray-600 mx-1"></div>
+        <div className="w-px h-6 bg-gray-600 mx-0.5"></div>
 
         <button
           type="button"
           onClick={handleClear}
           title="Очистить холст"
-          className="p-3 md:p-4 rounded-2xl bg-red-500 border-b-4 border-red-700 text-white shadow-md active:scale-95 active:border-b-0 active:translate-y-1 transition-all"
+          className="p-2.5 md:p-3 rounded-xl bg-red-500 border-b-4 border-red-700 text-white shadow-md active:scale-95 active:border-b-0 active:translate-y-1 transition-all"
         >
-          <TrashIcon className="w-6 h-6 md:w-7 md:h-7" />
+          <TrashIcon className="w-5 h-5 md:w-6 md:h-6" />
         </button>
       </div>
     </div>
