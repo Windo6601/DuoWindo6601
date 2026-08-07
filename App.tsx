@@ -735,7 +735,7 @@ export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawing = useRef(false);
   const [paths, setPaths] = useState<Array<{x: number, y: number}[]>>([]);
-  const currentPath = useRef<{x: number, y: number}[]>([]);
+  const [currentPath, setCurrentPath] = useState<{x: number, y: number}[]>([]);
   
   // CHESS STATE
   const [chessBoard, setChessBoard] = useState<Board>([]);
@@ -911,10 +911,10 @@ export default function App() {
 
       paths.forEach(drawSmoothPath);
       
-      if (currentPath.current.length > 0) {
-          drawSmoothPath(currentPath.current);
+      if (currentPath.length > 0) {
+          drawSmoothPath(currentPath);
       }
-  }, [paths, canvasSize]);
+  }, [paths, currentPath, canvasSize]);
 
   useEffect(() => {
     if (currentExercise?.type === 'roleplay' && chatBottomRef.current) {
@@ -1027,19 +1027,32 @@ export default function App() {
       if(!canvas) return;
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left; const y = e.clientY - rect.top;
-      currentPath.current = [{x, y}];
-      const ctx = canvas.getContext('2d');
-      if(ctx) { ctx.lineWidth = 12; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#222'; ctx.beginPath(); ctx.fillStyle = '#222'; ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.moveTo(x, y); }
+      setCurrentPath([{x, y}]);
   }
   const onPointerMove = (e: React.PointerEvent) => {
       e.preventDefault(); e.stopPropagation(); if(!isDrawing.current) return;
       const canvas = canvasRef.current; if(!canvas) return;
       const rect = canvas.getBoundingClientRect(); const x = e.clientX - rect.left; const y = e.clientY - rect.top;
-      const points = currentPath.current; if (points.length === 0) return; const lastPoint = points[points.length - 1]; const dist = Math.hypot(x - lastPoint.x, y - lastPoint.y); if (dist < 2) return;
-      points.push({x, y});
-      const ctx = canvas.getContext('2d'); if(ctx) { ctx.lineWidth = 12; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#222'; ctx.beginPath(); ctx.moveTo(lastPoint.x, lastPoint.y); ctx.lineTo(x, y); ctx.stroke(); }
+
+      setCurrentPath(prev => {
+          if (prev.length === 0) return [{x, y}];
+          const lastPoint = prev[prev.length - 1];
+          const dist = Math.hypot(x - lastPoint.x, y - lastPoint.y);
+          if (dist < 2) return prev;
+          return [...prev, {x, y}];
+      });
   }
-  const onPointerUp = (e: React.PointerEvent) => { e.preventDefault(); const canvas = canvasRef.current; if(canvas && canvas.releasePointerCapture) try { canvas.releasePointerCapture(e.pointerId); } catch(err) {} isDrawing.current = false; if (currentPath.current.length > 0) { setPaths(prev => [...prev, [...currentPath.current]]); } currentPath.current = []; }
+  const onPointerUp = (e: React.PointerEvent) => {
+      e.preventDefault();
+      const canvas = canvasRef.current; if(canvas && canvas.releasePointerCapture) try { canvas.releasePointerCapture(e.pointerId); } catch(err) {}
+      isDrawing.current = false;
+      setCurrentPath(curr => {
+          if (curr.length > 0) {
+              setPaths(prev => [...prev, curr]);
+          }
+          return [];
+      });
+  }
   const onPointerCancel = (e: React.PointerEvent) => { onPointerUp(e); }
   const clearCanvas = () => { setPaths([]); playSound('click'); };
   const undoDrawing = () => { if (paths.length > 0) { setPaths(prev => prev.slice(0, -1)); playSound('click'); } };
