@@ -17,6 +17,7 @@ import {
 } from './components/Icons';
 import { Mascot } from './components/Mascot';
 import { IshiharaPlateCanvas } from './components/IshiharaPlateCanvas';
+import { DrawingCanvas } from './components/DrawingCanvas';
 
 // --- CHESS UTILS & TYPES ---
 type ChessColor = 'w' | 'b';
@@ -2623,44 +2624,14 @@ export default function App() {
              ) : 
              // ... other cases (Drawing, Ishihara etc.) kept same ...
              currentExercise.type === 'drawing' && currentExercise.drawingData ? (
-                 <div className="flex-1 flex flex-col items-center justify-center relative overflow-hidden touch-none select-none min-h-0">
-                    <h2 className="text-lg font-bold mb-4 text-center tracking-tight text-gray-400 uppercase">{currentExercise.drawingData.instruction}</h2>
-                    
-                    <div className="relative border-4 border-gray-300 rounded-3xl bg-white shadow-2xl overflow-hidden cursor-crosshair touch-none select-none" 
-                         style={{ 
-                             width: canvasSize.width, 
-                             height: canvasSize.height,
-                             backgroundImage: 'linear-gradient(#e5e7eb 1px, transparent 1px), linear-gradient(90deg, #e5e7eb 1px, transparent 1px)',
-                             backgroundSize: '20px 20px'
-                         }}>
-                        
-                        {/* TRACE LAYER */}
-                        <div className={`absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0 transition-opacity duration-300 ${showTrace ? 'opacity-20' : 'opacity-0'}`}>
-                            <span style={{ fontSize: Math.min(canvasSize.width, canvasSize.height) * 0.7, lineHeight: 1 }} className="text-black font-serif font-bold select-none whitespace-nowrap">
-                                {currentExercise.drawingData.character}
-                            </span>
-                        </div>
-
-                        <canvas 
-                            ref={canvasRef}
-                            width={canvasSize.width}
-                            height={canvasSize.height}
-                            className="relative z-10 touch-none block touch-action-none w-full h-full"
-                            onPointerDown={onPointerDown}
-                            onPointerMove={onPointerMove}
-                            onPointerUp={onPointerUp}
-                            onPointerCancel={onPointerCancel}
-                        />
-                    </div>
-
-                    <div className="mt-4 md:mt-6 flex items-center justify-center gap-4 md:gap-6 p-3 md:p-4 bg-duo-card rounded-2xl border-2 border-gray-700 shadow-xl animate-in fade-in slide-in-from-bottom-2">
-                        <button onClick={undoDrawing} className="p-3 md:p-4 rounded-2xl bg-duo-yellow border-b-4 border-yellowDark text-white shadow-md active:scale-95 active:border-b-0 active:translate-y-1 transition-all"><UndoIcon className="w-6 h-6 md:w-8 md:h-8" /></button>
-                        <button onClick={() => setShowTrace(!showTrace)} className={`p-3 md:p-4 rounded-2xl border-b-4 shadow-md active:scale-95 active:border-b-0 active:translate-y-1 transition-all ${showTrace ? 'bg-duo-green border-duo-greenDark text-white' : 'bg-gray-700 border-gray-800 text-gray-400'}`}><EyeIcon className="w-6 h-6 md:w-8 md:h-8" /></button>
-                        <button onClick={() => speakText(currentExercise.drawingData!.character, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} className="p-3 md:p-4 rounded-2xl bg-duo-blue border-b-4 border-duo-blueDark text-white shadow-md active:scale-95 active:border-b-0 active:translate-y-1 transition-all"><VolumeIcon className="w-6 h-6 md:w-8 md:h-8" /></button>
-                        <div className="w-px h-10 bg-gray-600 mx-1"></div>
-                        <button onClick={clearCanvas} className="p-3 md:p-4 rounded-2xl bg-red-500 border-b-4 border-red-700 text-white shadow-md active:scale-95 active:border-b-0 active:translate-y-1 transition-all"><TrashIcon className="w-6 h-6 md:w-8 md:h-8" /></button>
-                    </div>
-                 </div>
+                 <DrawingCanvas
+                    canvasRef={canvasRef}
+                    character={currentExercise.drawingData.character}
+                    instruction={currentExercise.drawingData.instruction}
+                    onSpeak={() => speakText(currentExercise.drawingData!.character, currentCourse.id, false, user.preferredVoice, user.voiceProvider)}
+                    showTrace={showTrace}
+                    setShowTrace={setShowTrace}
+                 />
              ) : 
              currentExercise.type === 'ishihara' && currentExercise.ishiharaData ? (
                  <div className="flex-1 flex flex-col items-center justify-center min-h-0">
