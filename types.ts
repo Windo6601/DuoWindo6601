@@ -84,7 +84,36 @@ export enum AppScreen {
   SETTINGS = 'SETTINGS',
   TRANSLATOR = 'TRANSLATOR',
   VIDEO_CALL = 'VIDEO_CALL',
-  CHESS_MATCH = 'CHESS_MATCH'
+  CHESS_MATCH = 'CHESS_MATCH',
+  FEEDBACK = 'FEEDBACK',
+  ADMIN_DASHBOARD = 'ADMIN_DASHBOARD'
+}
+
+export interface FeedbackReply {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  userColor?: string;
+  isAdmin?: boolean;
+  comment: string;
+  createdAt: string;
+}
+
+export interface FeedbackItem {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  userColor?: string;
+  rating: number; // 1 to 5
+  category?: string;
+  comment: string;
+  likes: number;
+  likedBy?: string[];
+  replies?: FeedbackReply[];
+  isPinned?: boolean;
+  createdAt: string;
 }
 
 export type SubscriptionTier = 'free' | 'super' | 'max';
@@ -92,6 +121,7 @@ export type SubscriptionTier = 'free' | 'super' | 'max';
 export interface UserProgress {
   name: string;
   username?: string;
+  isAdmin?: boolean;
   avatarColor: string;
   avatarImage?: string; 
   avatarUrl?: string;

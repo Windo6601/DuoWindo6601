@@ -18,6 +18,8 @@ import {
 import { Mascot } from './components/Mascot';
 import { IshiharaPlateCanvas } from './components/IshiharaPlateCanvas';
 import { DrawingCanvas } from './components/DrawingCanvas';
+import { FeedbackScreen } from './components/FeedbackScreen';
+import { AdminDashboard } from './components/AdminDashboard';
 
 // --- CHESS UTILS & TYPES ---
 type ChessColor = 'w' | 'b';
@@ -287,7 +289,7 @@ const TRANSLATIONS: Record<string, any> = {
     androidAlertBtn: 'УСТАНОВИТЬ',
     androidModalTitle: 'Инструкция по установке',
     androidModalClose: 'Закрыть',
-    home: 'ГЛАВНАЯ', practice: 'ПРАКТИКА', leaderboard: 'РЕЙТИНГ', shop: 'МАГАЗИН', profile: 'ПРОФИЛЬ',
+    home: 'ГЛАВНАЯ', practice: 'ПРАКТИКА', leaderboard: 'РЕЙТИНГ', shop: 'МАГАЗИН', profile: 'ПРОФИЛЬ', feedback: 'ОТЗЫВЫ',
     unit: 'Раздел', start: 'НАЧАТЬ', check: 'ПРОВЕРИТЬ', continue: 'ПРОДОЛЖИТЬ', skip: 'ПРОПУСТИТЬ',
     module1: 'МОДУЛЬ 1, РАЗДЕЛ 1', chessUnitName: 'Движение фигур',
     settings: 'Настройки', language: 'Язык', country: 'Страна', back: 'Назад', save: 'Сохранить',
@@ -549,6 +551,10 @@ export default function App() {
   const [showExplanationModal, setShowExplanationModal] = useState(false);
 
   const [showAndroidModal, setShowAndroidModal] = useState(false);
+  const [showBetaModal, setShowBetaModal] = useState(false);
+  const [betaDismissed, setBetaDismissed] = useState(() => {
+    return localStorage.getItem('duo_beta_dismissed') === 'true';
+  });
   const [androidDismissed, setAndroidDismissed] = useState(() => {
     return localStorage.getItem('duo_android_dismissed') === 'true';
   });
@@ -736,7 +742,7 @@ export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawing = useRef(false);
   const [paths, setPaths] = useState<Array<{x: number, y: number}[]>>([]);
-  const [currentPath, setCurrentPath] = useState<{x: number, y: number}[]>([]);
+  const currentPath = useRef<{x: number, y: number}[]>([]);
   
   // CHESS STATE
   const [chessBoard, setChessBoard] = useState<Board>([]);
@@ -912,10 +918,10 @@ export default function App() {
 
       paths.forEach(drawSmoothPath);
       
-      if (currentPath.length > 0) {
-          drawSmoothPath(currentPath);
+      if (currentPath.current.length > 0) {
+          drawSmoothPath(currentPath.current);
       }
-  }, [paths, currentPath, canvasSize]);
+  }, [paths, canvasSize]);
 
   useEffect(() => {
     if (currentExercise?.type === 'roleplay' && chatBottomRef.current) {
@@ -1028,32 +1034,19 @@ export default function App() {
       if(!canvas) return;
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left; const y = e.clientY - rect.top;
-      setCurrentPath([{x, y}]);
+      currentPath.current = [{x, y}];
+      const ctx = canvas.getContext('2d');
+      if(ctx) { ctx.lineWidth = 12; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#222'; ctx.beginPath(); ctx.fillStyle = '#222'; ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.moveTo(x, y); }
   }
   const onPointerMove = (e: React.PointerEvent) => {
       e.preventDefault(); e.stopPropagation(); if(!isDrawing.current) return;
       const canvas = canvasRef.current; if(!canvas) return;
       const rect = canvas.getBoundingClientRect(); const x = e.clientX - rect.left; const y = e.clientY - rect.top;
-
-      setCurrentPath(prev => {
-          if (prev.length === 0) return [{x, y}];
-          const lastPoint = prev[prev.length - 1];
-          const dist = Math.hypot(x - lastPoint.x, y - lastPoint.y);
-          if (dist < 2) return prev;
-          return [...prev, {x, y}];
-      });
+      const points = currentPath.current; if (points.length === 0) return; const lastPoint = points[points.length - 1]; const dist = Math.hypot(x - lastPoint.x, y - lastPoint.y); if (dist < 2) return;
+      points.push({x, y});
+      const ctx = canvas.getContext('2d'); if(ctx) { ctx.lineWidth = 12; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#222'; ctx.beginPath(); ctx.moveTo(lastPoint.x, lastPoint.y); ctx.lineTo(x, y); ctx.stroke(); }
   }
-  const onPointerUp = (e: React.PointerEvent) => {
-      e.preventDefault();
-      const canvas = canvasRef.current; if(canvas && canvas.releasePointerCapture) try { canvas.releasePointerCapture(e.pointerId); } catch(err) {}
-      isDrawing.current = false;
-      setCurrentPath(curr => {
-          if (curr.length > 0) {
-              setPaths(prev => [...prev, curr]);
-          }
-          return [];
-      });
-  }
+  const onPointerUp = (e: React.PointerEvent) => { e.preventDefault(); const canvas = canvasRef.current; if(canvas && canvas.releasePointerCapture) try { canvas.releasePointerCapture(e.pointerId); } catch(err) {} isDrawing.current = false; if (currentPath.current.length > 0) { setPaths(prev => [...prev, [...currentPath.current]]); } currentPath.current = []; }
   const onPointerCancel = (e: React.PointerEvent) => { onPointerUp(e); }
   const clearCanvas = () => { setPaths([]); playSound('click'); };
   const undoDrawing = () => { if (paths.length > 0) { setPaths(prev => prev.slice(0, -1)); playSound('click'); } };
@@ -1264,6 +1257,7 @@ export default function App() {
     { screen: AppScreen.LEADERBOARD, icon: ShieldIcon, label: t('leaderboard') },
     { screen: AppScreen.SHOP, icon: ChestIcon, label: t('shop') },
     { screen: AppScreen.PROFILE, icon: UserIcon, label: t('profile') },
+    { screen: AppScreen.FEEDBACK, icon: StarIcon, label: t('feedback') },
     { screen: AppScreen.TRANSLATOR, icon: BookIcon, label: t('translator') }
   ];
 
@@ -1301,7 +1295,17 @@ export default function App() {
                   <div className="flex items-center text-duo-blue font-bold text-lg"><GemStoneIcon className="w-6 h-6 mr-1" /> {user.gems}</div>
                   <div className="flex items-center font-bold text-lg text-yellow-400">{user.subscription !== 'free' ? <InfiniteEnergyIcon className="w-7 h-7 text-yellow-400" /> : <><LightningIcon className="w-6 h-6 mr-1" /> {user.energy}</>}</div>
                 </div>
-                <button onClick={() => { playSound('click'); setScreen(AppScreen.SUBSCRIPTION); }} className={`px-4 py-1.5 rounded-xl text-[12px] font-black border-b-4 uppercase tracking-widest transition-transform hover:scale-105 ${user.subscription === 'max' ? 'bg-black border-gray-700 text-duo-blue shadow-[0_0_10px_rgba(28,176,246,0.5)]' : user.subscription === 'super' ? 'bg-gradient-to-r from-blue-500 to-purple-500 border-purple-700 text-white' : 'bg-duo-blue border-blue-800 text-white'}`}>{user.subscription === 'free' ? t('free') : user.subscription === 'super' ? 'SUPER' : 'MAX'}</button>
+                 <div className="flex items-center space-x-2">
+                    <button 
+                      onClick={() => { playSound('click'); setShowBetaModal(true); }} 
+                      className="px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-500/50 hover:scale-105 transition-all flex items-center space-x-1 shadow-md cursor-pointer"
+                      title="Доступ бета-тестирование DuoWindo6601"
+                    >
+                      <span className="animate-pulse">🧪</span>
+                      <span className="hidden sm:inline">Бета-Тест</span>
+                    </button>
+                    <button onClick={() => { playSound('click'); setScreen(AppScreen.SUBSCRIPTION); }} className={`px-4 py-1.5 rounded-xl text-[12px] font-black border-b-4 uppercase tracking-widest transition-transform hover:scale-105 ${user.subscription === 'max' ? 'bg-black border-gray-700 text-duo-blue shadow-[0_0_10px_rgba(28,176,246,0.5)]' : user.subscription === 'super' ? 'bg-gradient-to-r from-blue-500 to-purple-500 border-purple-700 text-white' : 'bg-duo-blue border-blue-800 text-white'}`}>{user.subscription === 'free' ? t('free') : user.subscription === 'super' ? 'SUPER' : 'MAX'}</button>
+                 </div>
              </div>
              <div className="flex items-center space-x-3 overflow-x-auto no-scrollbar py-2 max-w-5xl mx-auto w-full px-4">
                 {COURSES.slice(0, 5).map(c => (
@@ -1942,6 +1946,60 @@ export default function App() {
         <div className="p-4 md:p-10 max-w-5xl mx-auto">
           {screen === AppScreen.PATH && (
             <div className="flex flex-col items-center py-10 animate-in fade-in slide-in-from-bottom-5">
+              {!betaDismissed && (
+                  <div className="w-full max-w-md bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 border-2 border-b-8 border-purple-950 rounded-[2.5rem] p-6 mb-8 shadow-2xl relative animate-in zoom-in duration-300">
+                      {/* Close button */}
+                      <button 
+                          onClick={() => {
+                              playSound('click');
+                              setBetaDismissed(true);
+                              localStorage.setItem('duo_beta_dismissed', 'true');
+                          }}
+                          className="absolute top-4 right-4 text-white/60 hover:text-white transition-colors bg-black/30 p-1.5 rounded-full z-10"
+                          title="Закрыть Баннер"
+                      >
+                          <CloseIcon className="w-4 h-4" />
+                      </button>
+                      
+                      <div className="flex items-start space-x-4">
+                          <div className="bg-purple-500/20 p-3.5 rounded-2xl mt-1 border border-purple-400/30 flex-shrink-0">
+                              <span className="text-3xl">🧪</span>
+                          </div>
+                          <div className="flex-1 pr-6">
+                              <div className="flex items-center space-x-2 mb-1.5 flex-wrap">
+                                  <span className="bg-purple-500 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">Бета-тестирование</span>
+                                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9.5px] font-bold px-2 py-0.5 rounded-full uppercase">v1.0.1 Active</span>
+                              </div>
+                              <h3 className="font-din font-black text-xl text-white tracking-widest uppercase mb-1">DuoWindo6601 Доступ Бета-тестирование</h3>
+                              <p className="font-din font-bold text-xs text-purple-200 leading-normal mb-3">
+                                  Все функции приложения доступны для проверки тестеров: языки СНГ и мира, Шахматы, Графика, AI Озвучка и Панель Управления.
+                              </p>
+
+                              <div className="flex flex-col sm:flex-row gap-2">
+                                  <button 
+                                      onClick={() => {
+                                          playSound('select');
+                                          setShowBetaModal(true);
+                                      }}
+                                      className="font-din font-black text-xs uppercase tracking-widest bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white hover:scale-[1.02] active:scale-95 px-4 py-2.5 rounded-xl border-b-4 border-indigo-950 transition-all shadow-md text-center flex-1 flex items-center justify-center space-x-1.5"
+                                  >
+                                      <span>🧪 Бета-Центр DuoWindo6601</span>
+                                  </button>
+                                  
+                                  <button 
+                                      onClick={() => {
+                                          playSound('click');
+                                          setScreen(AppScreen.FEEDBACK);
+                                      }}
+                                      className="font-din font-black text-xs uppercase tracking-widest bg-gray-800 hover:bg-gray-750 text-amber-300 hover:scale-[1.02] active:scale-95 px-3 py-2.5 rounded-xl border-b-4 border-gray-950 border border-amber-500/30 transition-all shadow-md text-center flex items-center justify-center space-x-1"
+                                  >
+                                      <span>⭐ Отзывы</span>
+                                  </button>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              )}
               {!androidDismissed && (
                   <div className="w-full max-w-md bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-700 border-2 border-b-8 border-emerald-900 rounded-[2.5rem] p-6 mb-8 shadow-2xl relative animate-in zoom-in duration-300">
                       {/* Close button */}
@@ -2344,7 +2402,64 @@ export default function App() {
                       </div>
                    )}
                 </div>
+
+                {/* Feedback Entry Banner */}
+                <button 
+                  onClick={() => { playSound('click'); setScreen(AppScreen.FEEDBACK); }}
+                  className="w-full max-w-md bg-gradient-to-r from-duo-yellow/20 to-duo-green/20 border-2 border-duo-yellow hover:border-white p-5 rounded-[2rem] flex items-center justify-between shadow-xl transition-all group cursor-pointer"
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className="bg-duo-yellow p-3 rounded-2xl text-white shadow-md group-hover:scale-110 transition-transform">
+                      <StarIcon className="w-8 h-8 fill-white" />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="font-black text-white text-lg">Отзывы о DuoWindo6601</h3>
+                      <p className="text-xs text-gray-300 font-bold">Оставьте отзыв или прочитайте мнения других!</p>
+                    </div>
+                  </div>
+                  <ArrowRightIcon className="w-6 h-6 text-duo-yellow group-hover:translate-x-1 transition-transform" />
+                </button>
+
+                {/* Admin Dashboard Entry Banner */}
+                <button 
+                  onClick={() => { playSound('click'); setScreen(AppScreen.ADMIN_DASHBOARD); }}
+                  className="w-full max-w-md bg-gradient-to-r from-amber-500/20 via-amber-600/20 to-amber-700/20 border-2 border-amber-500 hover:border-amber-400 p-5 rounded-[2rem] flex items-center justify-between shadow-xl transition-all group cursor-pointer"
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className="bg-amber-500 p-3 rounded-2xl text-black font-black text-2xl shadow-md group-hover:scale-110 transition-transform">
+                      👑
+                    </div>
+                    <div className="text-left">
+                      <h3 className="font-black text-amber-400 text-lg flex items-center gap-1.5">
+                        Панель Владельца (Admin)
+                      </h3>
+                      <p className="text-xs text-gray-300 font-bold">
+                        Модерация отзывов & Мониторинг пользователей
+                      </p>
+                    </div>
+                  </div>
+                  <ArrowRightIcon className="w-6 h-6 text-amber-400 group-hover:translate-x-1 transition-transform" />
+                </button>
              </div>
+          )}
+
+          {screen === AppScreen.FEEDBACK && (
+            <FeedbackScreen
+              user={user}
+              onBack={() => setScreen(AppScreen.PATH)}
+              playSound={playSound}
+              setToast={setToast}
+              onOpenAdminDashboard={() => setScreen(AppScreen.ADMIN_DASHBOARD)}
+            />
+          )}
+
+          {screen === AppScreen.ADMIN_DASHBOARD && (
+            <AdminDashboard
+              user={user}
+              onBack={() => setScreen(AppScreen.PATH)}
+              playSound={playSound}
+              setToast={setToast}
+            />
           )}
         </div>
       </main>
@@ -3619,6 +3734,125 @@ return (
                     </div>
                 </div>
                 <button onClick={() => setShowExplanationModal(false)} className="w-full mt-8 py-4 bg-duo-blue border-b-4 border-duo-blueDark rounded-2xl font-black text-white uppercase tracking-widest active:border-b-0 active:translate-y-1 transition-all">Понятно</button>
+            </div>
+        </div>
+    )}
+
+    {/* BETA TESTING HUB MODAL */}
+    {showBetaModal && (
+        <div className="fixed inset-0 z-[250] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in" onClick={() => setShowBetaModal(false)}>
+            <div className="bg-duo-card border-2 border-purple-500/50 rounded-[2.5rem] p-6 md:p-8 max-w-2xl w-full shadow-2xl relative max-h-[90vh] overflow-y-auto no-scrollbar animate-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
+                <button 
+                    onClick={() => setShowBetaModal(false)} 
+                    className="absolute top-5 right-5 text-gray-400 hover:text-white bg-gray-800 p-2 rounded-full transition-colors"
+                >
+                    <CloseIcon className="w-5 h-5" />
+                </button>
+
+                <div className="flex items-center space-x-3 mb-6">
+                    <div className="bg-purple-600/30 p-3 rounded-2xl border border-purple-500/40 text-2xl">🧪</div>
+                    <div>
+                        <h2 className="text-2xl font-black text-white uppercase tracking-widest">Бета-Тестирование DuoWindo6601</h2>
+                        <p className="text-xs text-purple-300 font-bold">Центр управления и проверки всех модулей приложения</p>
+                    </div>
+                </div>
+
+                <div className="space-y-4 mb-8">
+                    {/* Module 1 */}
+                    <div className="bg-gray-800/80 border border-gray-700 rounded-2xl p-4 flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                            <span className="text-2xl">🏛️</span>
+                            <div>
+                                <h4 className="font-bold text-sm text-white">1. Языки СНГ и Мировые Курсы</h4>
+                                <p className="text-[11px] text-gray-400">Казахский, Узбекский, Армянский, Грузинский, Английский и др.</p>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={() => { playSound('select'); setShowBetaModal(false); setScreen(AppScreen.COURSE_SELECT); }}
+                            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider rounded-xl border-b-2 border-emerald-800"
+                        >
+                            Тест
+                        </button>
+                    </div>
+
+                    {/* Module 2 */}
+                    <div className="bg-gray-800/80 border border-gray-700 rounded-2xl p-4 flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                            <span className="text-2xl">♟️</span>
+                            <div>
+                                <h4 className="font-bold text-sm text-white">2. Шахматная Игра & ИИ Соперник</h4>
+                                <p className="text-[11px] text-gray-400">Матчи против ИИ, разбор ходов, FEN, чат с тренером</p>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={() => { playSound('select'); setShowBetaModal(false); setScreen(AppScreen.CHESS_MATCH); }}
+                            className="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white font-black text-xs uppercase tracking-wider rounded-xl border-b-2 border-amber-800"
+                        >
+                            Тест
+                        </button>
+                    </div>
+
+                    {/* Module 3 */}
+                    <div className="bg-gray-800/80 border border-gray-700 rounded-2xl p-4 flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                            <span className="text-2xl">🎙️</span>
+                            <div>
+                                <h4 className="font-bold text-sm text-white">3. Видеозвонок & AI Голос DuoWindo6601</h4>
+                                <p className="text-[11px] text-gray-400">Распознавание речи, интерактивная беседа, AI Copilot</p>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={() => { playSound('select'); setShowBetaModal(false); setScreen(AppScreen.VIDEO_CALL); }}
+                            className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs uppercase tracking-wider rounded-xl border-b-2 border-indigo-800"
+                        >
+                            Тест
+                        </button>
+                    </div>
+
+                    {/* Module 4 */}
+                    <div className="bg-gray-800/80 border border-gray-700 rounded-2xl p-4 flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                            <span className="text-2xl">✍️</span>
+                            <div>
+                                <h4 className="font-bold text-sm text-white">4. Графическое Письмо & Алфавиты</h4>
+                                <p className="text-[11px] text-gray-400">Прорисовка иероглифов и символов на холсте</p>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={() => { playSound('select'); setShowBetaModal(false); setScreen(AppScreen.ALPHABET); }}
+                            className="px-3.5 py-2 bg-duo-blue hover:brightness-110 text-white font-black text-xs uppercase tracking-wider rounded-xl border-b-2 border-duo-blueDark"
+                        >
+                            Тест
+                        </button>
+                    </div>
+
+                    {/* Module 5 */}
+                    <div className="bg-purple-950/60 border border-purple-500/40 rounded-2xl p-4 flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                            <span className="text-2xl">👑</span>
+                            <div>
+                                <h4 className="font-bold text-sm text-purple-200">5. Панель Владельцев (Admin Dashboard)</h4>
+                                <p className="text-[11px] text-purple-300">Закреплена за abramovanatolij81@gmail.com / va997217@gmail.com</p>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={() => { playSound('select'); setShowBetaModal(false); setScreen(AppScreen.ADMIN_DASHBOARD); }}
+                            className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-black text-xs uppercase tracking-wider rounded-xl border-b-2 border-purple-800"
+                        >
+                            Панель
+                        </button>
+                    </div>
+                </div>
+
+                <div className="bg-black/40 border border-gray-700/60 rounded-2xl p-4 text-xs text-gray-300 font-bold flex items-center justify-between">
+                    <span>Статус бета-сборки: <strong className="text-emerald-400">1.0.1 Stable</strong></span>
+                    <button 
+                        onClick={() => { playSound('click'); setShowBetaModal(false); setScreen(AppScreen.FEEDBACK); }}
+                        className="text-amber-400 underline hover:text-amber-300 font-bold"
+                    >
+                        Оставить отзыв тестера
+                    </button>
+                </div>
             </div>
         </div>
     )}

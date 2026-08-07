@@ -24,6 +24,27 @@ service cloud.firestore {
         && incoming().updatedAt == request.time;
     }
 
+    // 3. Feedback / Reviews rules
+    match /feedback/{feedbackId} {
+      allow read: if true;
+      allow list: if true;
+
+      allow create: if isSignedIn()
+        && isValidId(feedbackId)
+        && incoming().userId == request.auth.uid
+        && isValidFeedback(incoming())
+        && incoming().createdAt == request.time;
+
+      allow update: if isSignedIn()
+        && isValidFeedback(incoming())
+        && (
+          incoming().userId == request.auth.uid ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['likes', 'likedBy', 'replies', 'isPinned'])
+        );
+
+      allow delete: if isSignedIn();
+    }
+
     // --- HELPER FUNCTIONS ---
 
     function isSignedIn() {
@@ -66,6 +87,20 @@ service cloud.firestore {
         && data.achievements is list
         && data.language is string && data.language.size() <= 5
         && data.country is string && data.country.size() <= 100;
+    }
+
+    function isValidFeedback(data) {
+      return data.userId is string && data.userId.size() <= 128
+        && data.userName is string && data.userName.size() <= 100
+        && (!('userAvatar' in data) || (data.userAvatar is string && data.userAvatar.size() <= 2000))
+        && (!('userColor' in data) || (data.userColor is string && data.userColor.size() <= 50))
+        && data.rating is int && data.rating >= 1 && data.rating <= 5
+        && (!('category' in data) || (data.category is string && data.category.size() <= 50))
+        && data.comment is string && data.comment.size() >= 1 && data.comment.size() <= 1000
+        && (!('likes' in data) || (data.likes is int && data.likes >= 0))
+        && (!('likedBy' in data) || (data.likedBy is list && data.likedBy.size() <= 5000))
+        && (!('replies' in data) || (data.replies is list && data.replies.size() <= 500))
+        && (!('isPinned' in data) || (data.isPinned is bool));
     }
   }
 }

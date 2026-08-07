@@ -31,12 +31,36 @@
         "updatedAt": { "type": "string", "format": "date-time", "description": "Profile last update timestamp" }
       },
       "required": ["name", "energy", "hearts", "subscription", "streak", "gems", "xp", "language", "country"]
+    },
+    "Feedback": {
+      "title": "User Feedback",
+      "description": "User reviews and feedback for DuoWindo6601",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "ID of the user who submitted feedback" },
+        "userName": { "type": "string", "description": "Display name of the author" },
+        "userAvatar": { "type": "string", "description": "Avatar emoji, icon or URL" },
+        "userColor": { "type": "string", "description": "Color associated with user" },
+        "rating": { "type": "integer", "description": "Rating out of 5 stars (1 to 5)" },
+        "category": { "type": "string", "description": "Category of feedback e.g. general, feature, bug, praise" },
+        "comment": { "type": "string", "description": "Review text content" },
+        "likes": { "type": "integer", "description": "Number of upvotes/likes" },
+        "likedBy": { "type": "array", "description": "List of user IDs who liked this review" },
+        "replies": { "type": "array", "description": "Comments and administrator replies" },
+        "isPinned": { "type": "boolean", "description": "Whether review is pinned by administrator" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["userId", "userName", "rating", "comment", "createdAt"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": "UserProfile",
       "description": "The user profile document containing progress, settings, and stats"
+    },
+    "/feedback/{feedbackId}": {
+      "schema": "Feedback",
+      "description": "Public user feedback and app reviews for DuoWindo6601"
     }
   }
 }
