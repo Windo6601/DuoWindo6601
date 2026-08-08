@@ -8,6 +8,10 @@ const TTS_MODEL = "gemini-2.5-flash-preview-tts";
 
 const USER_PROVIDED_KEY = "AIzaSyCts7NuiqtwiRwtHuIcNEPJN_xs5ApRVFs";
 export const getApiKey = () => {
+  if (typeof window !== 'undefined') {
+    const customKey = localStorage.getItem('duo_gemini_api_key');
+    if (customKey) return customKey;
+  }
   return process.env.API_KEY || process.env.GEMINI_API_KEY || USER_PROVIDED_KEY;
 };
 
