@@ -258,12 +258,65 @@ const COURSES: Course[] = [
   ...generateCourses(RF_OBLASTS, 'obl')
 ];
 
+interface AlphabetCategory {
+  title: string;
+  items: string[];
+}
+
+const ALPHABET_SETS: Record<string, AlphabetCategory[]> = {
+  'zh': [
+    {
+      title: 'Иероглифы (Hanzi)',
+      items: ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '人', '口', '日', '月', '水', '火', '木', '金', '土', '女', '子', '大', '小', '中', '国', '山', '田', '天', '地', '心', '手', '目', '石', '竹', '米', '糸', '耳', '言', '走', '足', '雨', '风', '龙', '车', '门', '马', '鸟', '鱼']
+    },
+    {
+      title: 'Пиньинь (Pinyin)',
+      items: ['ā', 'á', 'ǎ', 'à', 'ō', 'ó', 'ǒ', 'ò', 'ē', 'é', 'ě', 'è', 'ī', 'í', 'ǐ', 'ì', 'ū', 'ú', 'ǔ', 'ù', 'b', 'p', 'm', 'f', 'd', 't', 'n', 'l', 'g', 'k', 'h', 'j', 'q', 'x', 'zh', 'ch', 'sh', 'r', 'z', 'c', 's']
+    }
+  ],
+  'ja': [
+    {
+      title: 'Хирагана (Hiragana)',
+      items: ['あ', 'い', 'う', 'え', 'お', 'か', 'き', 'く', 'け', 'こ', 'さ', 'し', 'す', 'せ', 'そ', 'た', 'ち', 'つ', 'て', 'と', 'な', 'に', 'ぬ', 'ね', 'の', 'は', 'ひ', 'ふ', 'へ', 'ほ', 'ま', 'み', 'む', 'め', 'も', 'や', 'ゆ', 'よ', 'ら', 'り', 'る', 'れ', 'ろ', 'わ', 'を', 'ん']
+    },
+    {
+      title: 'Катакана (Katakana)',
+      items: ['ア', 'イ', 'ウ', 'エ', 'オ', 'カ', 'キ', 'ク', 'ケ', 'コ', 'サ', 'シ', 'ス', 'セ', 'ソ', 'タ', 'チ', 'ツ', 'テ', 'ト', 'ナ', 'ニ', 'ヌ', 'ネ', 'ノ', 'ハ', 'ヒ', 'フ', 'ヘ', 'ホ', 'マ', 'ミ', 'ム', 'メ', 'モ', 'ヤ', 'ユ', 'ヨ', 'ラ', 'リ', 'ル', 'レ', 'ロ', 'ワ', 'ヲ', 'ン']
+    }
+  ],
+  'ko': [
+    {
+      title: 'Согласные (Consonants)',
+      items: ['ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅅ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ', 'ㄲ', 'ㄸ', 'ㅃ', 'ㅆ', 'ㅉ']
+    },
+    {
+      title: 'Гласные (Vowels)',
+      items: ['ㅏ', 'ㅑ', 'ㅓ', 'ㅕ', 'ㅗ', 'ㅛ', 'ㅜ', 'ㅠ', 'ㅡ', 'ㅣ', 'ㅐ', 'ㅒ', 'ㅔ', 'ㅖ', 'ㅘ', 'ㅙ', 'ㅚ', 'ㅝ', 'ㅞ', 'ㅟ', 'ㅢ']
+    }
+  ]
+};
+
 const ALPHABETS: Record<string, string[]> = {
   'ru': ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ё', 'Ж', 'З', 'И', 'Й', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ', 'Ъ', 'Ы', 'Ь', 'Э', 'Ю', 'Я'],
   'en': ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'],
-  'ja': ['あ', 'い', 'う', 'え', 'お', 'か', 'き', 'く', 'け', 'こ', 'さ', 'し', 'す', 'せ', 'そ', 'た', 'ち', 'つ', 'て', 'と', 'な', 'に', 'ぬ', 'ね', 'の', 'は', 'ひ', 'ふ', 'へ', 'ほ', 'ま', 'み', 'む', 'め', 'も', 'や', 'ゆ', 'よ', 'ら', 'り', 'る', 'れ', 'ろ', 'わ', 'を', 'ん'],
+  'de': ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'Ä', 'Ö', 'Ü', 'ß'],
+  'fr': ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'É', 'È', 'Ç', 'À', 'Ù', 'Â', 'Ê', 'Î', 'Ô', 'Û'],
   'es': ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'Ñ', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'],
+  'it': ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'Z'],
+  'pt': ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ã', 'Õ', 'Ç'],
+  'zh': ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '人', '口', '日', '月', '水', '火', '木', '金', '土', '女', '子', '大', '小', '中', '国', '山', '田', '天', '地', '心', '手', '目', '石', '竹', '米', '糸', '耳', '言', '走', '足', '雨', '风', '龙', '车', '门', '马', '鸟', '鱼'],
+  'ja': ['あ', 'い', 'う', 'え', 'お', 'か', 'き', 'く', 'け', 'こ', 'さ', 'し', 'す', 'せ', 'そ', 'た', 'ち', 'つ', 'て', 'と', 'な', 'に', 'ぬ', 'ね', 'の', 'は', 'ひ', 'ふ', 'へ', 'ほ', 'ま', 'み', 'む', 'め', 'も', 'や', 'ゆ', 'よ', 'ら', 'り', 'る', 'れ', 'ろ', 'わ', 'を', 'ん'],
+  'ko': ['ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅅ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ', 'ㅏ', 'ㅑ', 'ㅓ', 'ㅕ', 'ㅗ', 'ㅛ', 'ㅜ', 'ㅠ', 'ㅡ', 'ㅣ'],
   'ar': ['ا', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي'],
+  'ka': ['ა', 'ბ', 'გ', 'დ', 'ე', 'ვ', 'ზ', 'თ', 'ი', 'კ', 'ლ', 'მ', 'ნ', 'ო', 'პ', 'ჟ', 'რ', 'ს', 'ტ', 'უ', 'ფ', 'ქ', 'ღ', 'ყ', 'შ', 'ჩ', 'ც', 'ძ', 'წ', 'ჭ', 'ხ', 'ჯ', 'ჰ'],
+  'hy': ['Ա', 'Բ', 'Գ', 'Դ', 'Ե', 'Զ', 'Է', 'Ը', 'Թ', 'Ժ', 'Ի', 'Լ', 'Խ', 'Ծ', 'Կ', 'Հ', 'Ձ', 'Ղ', 'Ճ', 'Մ', 'Յ', 'Ն', 'Շ', 'Ո', 'Չ', 'Պ', 'Ջ', 'Ռ', 'Ս', 'Վ', 'Տ', 'Ր', 'Ց', 'Ւ', 'Փ', 'Ք', 'Օ', 'Ֆ'],
+  'uk': ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е', 'Є', 'Ж', 'З', 'И', 'І', 'Ї', 'Й', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ', 'Ь', 'Ю', 'Я'],
+  'be': ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ё', 'Ж', 'З', 'І', 'Й', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ў', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Ы', 'Ь', 'Э', 'Ю', 'Я'],
+  'kk': ['А', 'Ә', 'Б', 'В', 'Г', 'Ғ', 'Д', 'Е', 'Ё', 'Ж', 'З', 'И', 'Й', 'К', 'Қ', 'Л', 'М', 'Н', 'Ң', 'О', 'Ө', 'П', 'Р', 'С', 'Т', 'У', 'Ұ', 'Ү', 'Ф', 'Х', 'Һ', 'Ц', 'Ч', 'Ш', 'Щ', 'Ъ', 'Ы', 'І', 'Ь', 'Э', 'Ю', 'Я'],
+  'ky': ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ё', 'Ж', 'З', 'И', 'Й', 'К', 'Л', 'М', 'Н', 'Ң', 'О', 'Ө', 'П', 'Р', 'С', 'Т', 'У', 'Ү', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ', 'Ъ', 'Ы', 'Ь', 'Э', 'Ю', 'Я'],
+  'tg': ['А', 'Б', 'В', 'Г', 'Ғ', 'Д', 'Е', 'Ё', 'Ж', 'З', 'И', 'Ӣ', 'Й', 'К', 'Қ', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ӯ', 'Ф', 'Х', 'Ҳ', 'Ч', 'Ҷ', 'Ш', 'Ъ', 'Э', 'Ю', 'Я'],
+  'az': ['A', 'B', 'C', 'Ç', 'D', 'E', 'Ə', 'F', 'G', 'Ğ', 'H', 'X', 'I', 'İ', 'J', 'K', 'Q', 'L', 'M', 'N', 'O', 'Ö', 'P', 'R', 'S', 'Ş', 'T', 'U', 'Ü', 'V', 'Y', 'Z'],
+  'uz': ['A', 'B', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'X', 'Y', 'Z', "O'", "G'"],
 };
 
 const COUNTRIES = [
@@ -322,7 +375,9 @@ const TRANSLATIONS: Record<string, any> = {
     videoCall: "ВИДЕОЗВОНОК", startInterview: "Начать интервью", smartMode: "Умный режим", interviewer: "Интервьюер", self: "Вы",
     serverJsTitle: 'Поддержка server.js!',
     serverJsDesc: 'В проект DuoWindo официально добавлен собственный продакшн-сервер server.js с полной раздачей статики и поддержкой SPA-маршрутов!',
-    serverJsBtn: 'Классно! 🚀'
+    serverJsBtn: 'Классно! 🚀',
+    streakResume: 'Возобновить ударный режим',
+    streakResumed: '🔥 Ударный режим успешно возобновлен и сохранен!'
   },
   en: {
     androidAlertTitle: 'Android App Available!',
@@ -361,7 +416,9 @@ const TRANSLATIONS: Record<string, any> = {
     videoCall: "VIDEO CALL", startInterview: "Start Interview", smartMode: "Smart Mode", interviewer: "Interviewer", self: "You",
     serverJsTitle: 'server.js support is LIVE!',
     serverJsDesc: 'The DuoWindo project has officially integrated its own production server.js with complete static assets distribution and SPA fallback handling!',
-    serverJsBtn: 'Awesome! 🚀'
+    serverJsBtn: 'Awesome! 🚀',
+    streakResume: 'Resume Streak',
+    streakResumed: '🔥 Streak successfully resumed and saved!'
   },
   de: {
     androidAlertTitle: 'Android-App verfügbar!',
@@ -598,6 +655,7 @@ export default function App() {
   const [explanation, setExplanation] = useState<string>('');
   const [explanationLoading, setExplanationLoading] = useState<boolean>(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [alphabetTab, setAlphabetTab] = useState<number>(0);
   
   const [user, setUser] = useState<UserProgress>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -1549,30 +1607,59 @@ export default function App() {
         {/* ... (Other Screens) ... */}
         {screen === AppScreen.ALPHABET && (
             <div className="p-4 md:p-10 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-5">
-                <div className="flex flex-col items-center mb-10">
+                <div className="flex flex-col items-center mb-6">
                     <h2 className="text-3xl font-black uppercase tracking-widest text-white mb-2">{t('alphabet')}</h2>
-                    <p className="text-gray-400 font-bold">{user.language === 'en' ? currentCourse.name : currentCourse.localName} Alphabet</p>
+                    <p className="text-gray-400 font-bold text-lg">{user.language === 'en' ? currentCourse.name : currentCourse.localName}</p>
                 </div>
+
+                {/* CATEGORY TABS for CJK or multi-script languages (e.g. Chinese Hanzi/Pinyin, Japanese Hiragana/Katakana, Korean) */}
+                {ALPHABET_SETS[currentCourse.id] && (
+                    <div className="flex items-center justify-center space-x-3 mb-6">
+                        {ALPHABET_SETS[currentCourse.id].map((cat, idx) => (
+                            <button
+                                key={cat.title}
+                                onClick={() => { playSound('click'); setAlphabetTab(idx); }}
+                                className={`px-5 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider transition-all border-b-4 ${
+                                    alphabetTab === idx
+                                        ? 'bg-duo-blue text-white border-duo-blueDark shadow-lg scale-105'
+                                        : 'bg-gray-800 text-gray-400 border-gray-900 hover:bg-gray-700'
+                                }`}
+                            >
+                                {cat.title}
+                            </button>
+                        ))}
+                    </div>
+                )}
                 
-                <div className="bg-duo-card border-2 border-gray-700 rounded-[2.5rem] p-8 shadow-2xl" dir={currentCourse.id === 'ar' ? 'rtl' : 'ltr'}>
-                    <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 gap-4">
-                        {(ALPHABETS[currentCourse.id] || ALPHABETS['en']).map((char) => (
+                <div className="bg-duo-card border-2 border-gray-700 rounded-[2.5rem] p-6 md:p-8 shadow-2xl" dir={currentCourse.id === 'ar' ? 'rtl' : 'ltr'}>
+                    <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 gap-3 md:gap-4">
+                        {(
+                            ALPHABET_SETS[currentCourse.id]
+                                ? (ALPHABET_SETS[currentCourse.id][alphabetTab]?.items || ALPHABET_SETS[currentCourse.id][0].items)
+                                : (ALPHABETS[currentCourse.id] || ALPHABETS['en'])
+                        ).map((char) => (
                             <button 
                                 key={char} 
                                 onClick={() => startTraining('drawing', char)}
-                                className="aspect-square bg-gray-800 border-b-4 border-gray-900 rounded-2xl flex flex-col items-center justify-center hover:bg-gray-700 hover:scale-105 active:scale-95 active:border-b-0 active:translate-y-1 transition-all group"
+                                className="aspect-square bg-gray-800 border-b-4 border-gray-900 rounded-2xl flex flex-col items-center justify-center hover:bg-gray-700 hover:scale-105 active:scale-95 active:border-b-0 active:translate-y-1 transition-all group p-1"
                             >
-                                <span className="text-3xl font-black text-white group-hover:text-duo-blue">{char}</span>
-                                <span className="text-[10px] font-bold text-gray-500 uppercase mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Write</span>
+                                <span className="text-2xl md:text-3xl font-black text-white group-hover:text-duo-blue">{char}</span>
+                                <span className="text-[9px] font-bold text-gray-500 uppercase mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">Писать</span>
                             </button>
                         ))}
                     </div>
                 </div>
                 
-                <div className="mt-12 flex justify-center">
-                    <button onClick={() => startTraining('drawing')} className="bg-duo-blue px-8 py-4 rounded-2xl font-black text-white uppercase tracking-widest border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all shadow-xl flex items-center space-x-3">
+                <div className="mt-8 flex justify-center">
+                    <button onClick={() => {
+                        const chars = ALPHABET_SETS[currentCourse.id]
+                            ? (ALPHABET_SETS[currentCourse.id][alphabetTab]?.items || ALPHABET_SETS[currentCourse.id][0].items)
+                            : (ALPHABETS[currentCourse.id] || ALPHABETS['en']);
+                        const randomChar = chars[Math.floor(Math.random() * chars.length)];
+                        startTraining('drawing', randomChar);
+                    }} className="bg-duo-blue px-8 py-4 rounded-2xl font-black text-white uppercase tracking-widest border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all shadow-xl flex items-center space-x-3">
                         <PenIcon className="w-6 h-6" />
-                        <span>Random Practice</span>
+                        <span>Случайный Символ</span>
                     </button>
                 </div>
             </div>
@@ -2547,12 +2634,12 @@ export default function App() {
           )}
 
           {screen === AppScreen.PROFILE && (
-             <div className="flex flex-col items-center space-y-8 py-10 animate-in fade-in relative max-w-xl mx-auto w-full px-4">
+             <div className="flex flex-col items-center space-y-8 py-10 animate-in fade-in relative max-w-3xl mx-auto w-full px-4">
                 <button onClick={() => { playSound('click'); setScreen(AppScreen.SETTINGS); }} className="absolute top-0 right-4 p-3 bg-duo-card rounded-2xl border-2 border-gray-700 hover:bg-gray-800 transition-colors shadow-lg"><GearIcon className="w-7 h-7 text-gray-400" /></button>
                 
                 {/* AVATAR INTERACTIVE DISPLAY */}
                 <div onClick={openEditProfile} className="relative group cursor-pointer mt-2">
-                   <div className={`w-40 h-40 md:w-48 md:h-48 rounded-[3rem] ${user.avatarColor || 'bg-duo-blue'} border-8 border-gray-800 flex items-center justify-center text-7xl font-bold shadow-2xl relative overflow-hidden font-feather transition-transform group-hover:scale-105`}>
+                   <div className={`w-36 h-36 md:w-44 md:h-44 rounded-[3rem] ${user.avatarColor || 'bg-duo-blue'} border-8 border-gray-800 flex items-center justify-center text-7xl font-bold shadow-2xl relative overflow-hidden font-feather transition-transform group-hover:scale-105`}>
                       {user.avatarUrl || user.avatarImage ? (
                          <img src={user.avatarUrl || user.avatarImage} alt={user.name} className="w-full h-full object-cover" />
                       ) : user.avatarIcon ? (
@@ -2583,93 +2670,198 @@ export default function App() {
                    </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6 w-full max-w-md">
-                   <div className="bg-duo-card p-6 md:p-8 rounded-3xl border-2 border-gray-800 text-center shadow-xl"><p className="text-xs text-gray-500 font-bold mb-2 uppercase tracking-widest">{t('streakDays')}</p><p className="text-4xl font-bold text-duo-red">{user.streak}</p></div>
-                   <div className="bg-duo-card p-6 md:p-8 rounded-3xl border-2 border-gray-800 text-center shadow-xl"><p className="text-xs text-gray-500 font-bold mb-2 uppercase tracking-widest">{t('totalXP')}</p><p className="text-4xl font-bold text-duo-yellow">{user.xp}</p></div>
-                </div>
-
-                {/* Cloud Sync Auth Block */}
-                <div className="w-full max-w-md bg-duo-card rounded-[2rem] border-2 border-gray-800 p-6 flex flex-col items-center text-center space-y-4 shadow-xl">
-                   <div className="flex items-center space-x-2">
-                      <span className="text-2xl">☁️</span>
-                      <h3 className="text-xl font-bold text-white uppercase tracking-wider">Облачное сохранение</h3>
-                   </div>
-                   {authLoading ? (
-                      <p className="text-sm text-gray-500 font-bold">Загрузка...</p>
-                   ) : firebaseUser ? (
-                      <div className="space-y-3 w-full">
-                         <div className="text-sm text-gray-400 font-bold">
-                            Вы вошли как <span className="text-duo-blue">{firebaseUser.displayName || firebaseUser.email}</span>
+                {/* RESPONSIVE GRID FOR PROFILE CARDS (2-COL ON PC, 1-COL ON MOBILE) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+                   {/* COLUMN 1: STATS & STREAK CONTROL */}
+                   <div className="space-y-6 flex flex-col">
+                      <div className="grid grid-cols-2 gap-4 w-full">
+                         <div className="bg-duo-card p-5 rounded-3xl border-2 border-gray-800 text-center shadow-xl">
+                            <p className="text-[11px] text-gray-500 font-bold mb-1 uppercase tracking-widest">{t('streakDays')}</p>
+                            <p className="text-3xl md:text-4xl font-black text-duo-red">{user.streak}</p>
                          </div>
-                         <p className="text-xs text-green-400 font-medium">● Прогресс синхронизирован с облаком</p>
-                         <button 
-                            onClick={handleSignOut} 
-                            className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-2xl border-b-4 border-red-800 active:border-b-0 active:translate-y-1 transition-all text-sm uppercase"
+                         <div className="bg-duo-card p-5 rounded-3xl border-2 border-gray-800 text-center shadow-xl">
+                            <p className="text-[11px] text-gray-500 font-bold mb-1 uppercase tracking-widest">{t('totalXP')}</p>
+                            <p className="text-3xl md:text-4xl font-black text-duo-yellow">{user.xp}</p>
+                         </div>
+                      </div>
+
+                      {/* Streak Resume & Adjustment Card */}
+                      <div className="w-full bg-duo-card border-2 border-duo-red/50 rounded-3xl p-5 shadow-xl text-center space-y-4">
+                         <div className="flex items-center justify-center space-x-2">
+                            <span className="text-2xl animate-bounce">🔥</span>
+                            <h3 className="text-sm md:text-base font-black text-white uppercase tracking-wider">{t('streakResume')}</h3>
+                         </div>
+                         <p className="text-xs text-gray-400 font-bold">
+                            {user.language === 'ru' 
+                               ? 'Регулировка ударного режима: возобновление и настройка дней.' 
+                               : 'Adjust your streak days forward or backward.'}
+                         </p>
+
+                         {/* Stepper Display */}
+                         <div className="flex items-center justify-between bg-black/40 p-2.5 rounded-2xl border border-gray-800">
+                            <div className="flex items-center space-x-1">
+                               <button
+                                  onClick={() => {
+                                     playSound('click');
+                                     const newStreak = Math.max(0, user.streak - 7);
+                                     setUser(u => ({ ...u, streak: newStreak }));
+                                     setToast(user.language === 'ru' ? `⏪ Ударный режим: ${newStreak} дн.` : `⏪ Streak: ${newStreak} days`);
+                                  }}
+                                  className="w-10 h-10 bg-gray-800 hover:bg-gray-700 active:scale-95 text-red-400 font-black rounded-xl border-b-2 border-gray-700 text-xs transition-all flex items-center justify-center"
+                                  title="Назад (-7 дней)"
+                               >
+                                  -7
+                               </button>
+                               <button
+                                  onClick={() => {
+                                     playSound('click');
+                                     const newStreak = Math.max(0, user.streak - 1);
+                                     setUser(u => ({ ...u, streak: newStreak }));
+                                     setToast(user.language === 'ru' ? `◀ Назад: ${newStreak} дн.` : `◀ Backward: ${newStreak} days`);
+                                  }}
+                                  className="w-10 h-10 bg-gray-800 hover:bg-gray-700 active:scale-95 text-red-400 font-black rounded-xl border-b-2 border-gray-700 text-xs transition-all flex items-center justify-center"
+                                  title="Назад (-1 день)"
+                               >
+                                  -1
+                               </button>
+                            </div>
+
+                            <div className="text-center px-2">
+                               <span className="text-2xl font-black text-duo-red">
+                                  {user.streak}
+                               </span>
+                               <span className="block text-[10px] text-gray-400 font-bold uppercase">
+                                  {user.language === 'ru' ? 'дней' : 'days'}
+                               </span>
+                            </div>
+
+                            <div className="flex items-center space-x-1">
+                               <button
+                                  onClick={() => {
+                                     playSound('success');
+                                     const newStreak = user.streak + 1;
+                                     setUser(u => ({ ...u, streak: newStreak }));
+                                     setToast(user.language === 'ru' ? `▶ Вперёд: ${newStreak} дн.` : `▶ Forward: ${newStreak} days`);
+                                  }}
+                                  className="w-10 h-10 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black rounded-xl border-b-2 border-emerald-800 text-xs transition-all flex items-center justify-center"
+                                  title="Вперёд (+1 день)"
+                               >
+                                  +1
+                               </button>
+                               <button
+                                  onClick={() => {
+                                     playSound('success');
+                                     const newStreak = user.streak + 7;
+                                     setUser(u => ({ ...u, streak: newStreak }));
+                                     setToast(user.language === 'ru' ? `⏩ Вперёд (+7): ${newStreak} дн.` : `⏩ Forward (+7): ${newStreak} days`);
+                                  }}
+                                  className="w-10 h-10 bg-duo-red hover:bg-red-600 active:scale-95 text-white font-black rounded-xl border-b-2 border-red-800 text-xs transition-all flex items-center justify-center"
+                                  title="Вперёд (+7 дней)"
+                               >
+                                  +7
+                               </button>
+                            </div>
+                         </div>
+
+                         {/* Direct Resume Action */}
+                         <button
+                            onClick={() => {
+                               playSound('success');
+                               const newStreak = user.streak + 7;
+                               setUser(u => ({ ...u, streak: newStreak }));
+                               setToast(t('streakResumed'));
+                            }}
+                            className="w-full py-3 bg-duo-red hover:bg-red-600 text-white font-black rounded-2xl border-b-4 border-red-800 active:translate-y-1 transition-all uppercase text-xs tracking-wider shadow-md flex items-center justify-center space-x-2"
                          >
-                            Выйти из аккаунта
+                            <span>🚀</span>
+                            <span>{t('streakResume')} (+7 дн)</span>
                          </button>
                       </div>
-                   ) : (
-                      <div className="space-y-3 w-full">
-                         <p className="text-sm text-gray-400 font-medium">Войдите в аккаунт Google, чтобы сохранить свой прогресс, кристаллы и достижения в облаке!</p>
-                          {isIframe && (
-                             <div className="bg-amber-950/40 border border-amber-800/60 p-4 rounded-2xl text-xs text-amber-200 font-medium space-y-2 mb-2 text-left">
-                                <p>⚠️ <strong>Ограничение фрейма:</strong> Вход через Google может блокироваться браузером внутри фрейма AI Studio.</p>
-                                <button 
-                                   onClick={() => { playSound('click'); window.open(window.location.href, '_blank'); }} 
-                                   className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-black font-bold rounded-xl active:translate-y-0.5 transition-all uppercase text-[10px] tracking-wider text-center"
-                                >
-                                   Открыть в новой вкладке ↗
-                                </button>
+                   </div>
+
+                   {/* COLUMN 2: CLOUD SYNC & FEEDBACK */}
+                   <div className="space-y-6 flex flex-col">
+                      <div className="w-full bg-duo-card rounded-3xl border-2 border-gray-800 p-5 md:p-6 flex flex-col items-center text-center space-y-4 shadow-xl h-full justify-between">
+                         <div className="w-full space-y-3">
+                            <div className="flex items-center justify-center space-x-2">
+                               <span className="text-2xl">☁️</span>
+                               <h3 className="text-lg font-bold text-white uppercase tracking-wider">Облачное сохранение</h3>
+                            </div>
+                            {authLoading ? (
+                               <p className="text-sm text-gray-500 font-bold">Загрузка...</p>
+                            ) : firebaseUser ? (
+                               <div className="space-y-3 w-full">
+                                  <div className="text-sm text-gray-400 font-bold">
+                                     Вы вошли как <span className="text-duo-blue">{firebaseUser.displayName || firebaseUser.email}</span>
+                                  </div>
+                                  <p className="text-xs text-green-400 font-medium">● Прогресс синхронизирован с облаком</p>
+                                  <button 
+                                     onClick={handleSignOut} 
+                                     className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-2xl border-b-4 border-red-800 active:border-b-0 active:translate-y-1 transition-all text-xs uppercase"
+                                  >
+                                     Выйти из аккаунта
+                                  </button>
+                               </div>
+                            ) : (
+                               <div className="space-y-3 w-full">
+                                  <p className="text-xs text-gray-400 font-medium leading-relaxed">Войдите в аккаунт Google, чтобы сохранить свой прогресс, кристаллы и достижения в облаке!</p>
+                                  {isIframe && (
+                                     <div className="bg-amber-950/40 border border-amber-800/60 p-3 rounded-2xl text-xs text-amber-200 font-medium space-y-2 mb-2 text-left">
+                                        <p>⚠️ <strong>Ограничение фрейма:</strong> Вход может блокироваться внутри фрейма.</p>
+                                        <button 
+                                           onClick={() => { playSound('click'); window.open(window.location.href, '_blank'); }} 
+                                           className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-black font-bold rounded-xl active:translate-y-0.5 transition-all uppercase text-[10px] tracking-wider text-center"
+                                        >
+                                           Открыть в новой вкладке ↗
+                                        </button>
+                                     </div>
+                                  )}
+                                  <button 
+                                     onClick={handleGoogleSignIn} 
+                                     className="w-full py-3 bg-duo-blue hover:brightness-110 text-white font-bold rounded-2xl border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all text-xs uppercase flex items-center justify-center space-x-2 shadow-lg"
+                                  >
+                                     <span>Войти через Google</span>
+                                  </button>
+                               </div>
+                            )}
+                         </div>
+
+                         {/* Feedback Entry Banner inside column 2 */}
+                         <button 
+                           onClick={() => { playSound('click'); setScreen(AppScreen.FEEDBACK); }}
+                           className="w-full bg-gradient-to-r from-duo-yellow/20 to-duo-green/20 border-2 border-duo-yellow hover:border-white p-4 rounded-2xl flex items-center justify-between shadow-xl transition-all group cursor-pointer mt-2"
+                         >
+                           <div className="flex items-center space-x-3 text-left">
+                             <div className="bg-duo-yellow p-2.5 rounded-xl text-white shadow-md group-hover:scale-110 transition-transform">
+                               <ChatBubbleIcon className="w-5 h-5" />
                              </div>
-                          )}
+                             <div>
+                               <h4 className="font-bold text-xs uppercase text-white tracking-wider">Отзывы и Поддержка</h4>
+                               <p className="text-[10px] text-gray-300 font-bold">Нашли ошибку или хотите идею?</p>
+                             </div>
+                           </div>
+                           <ArrowRightIcon className="w-5 h-5 text-duo-yellow group-hover:translate-x-1 transition-transform" />
+                         </button>
+
+                         {/* Admin Dashboard Entry Banner */}
                          <button 
-                            onClick={handleGoogleSignIn} 
-                            className="w-full py-3 bg-duo-blue hover:brightness-110 text-white font-bold rounded-2xl border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all text-sm uppercase flex items-center justify-center space-x-2 shadow-lg"
+                           onClick={() => { playSound('click'); setScreen(AppScreen.ADMIN_DASHBOARD); }}
+                           className="w-full bg-gradient-to-r from-amber-500/20 via-amber-600/20 to-amber-700/20 border-2 border-amber-500 hover:border-amber-400 p-4 rounded-2xl flex items-center justify-between shadow-xl transition-all group cursor-pointer mt-2"
                          >
-                            <span>Войти через Google</span>
+                           <div className="flex items-center space-x-3 text-left">
+                             <div className="bg-amber-500 p-2 rounded-xl text-black font-black text-xl shadow-md group-hover:scale-110 transition-transform">
+                               👑
+                             </div>
+                             <div>
+                               <h4 className="font-bold text-xs text-amber-400 uppercase tracking-wider">Панель Владельца</h4>
+                               <p className="text-[10px] text-gray-300 font-bold">Модерация и мониторинг</p>
+                             </div>
+                           </div>
+                           <ArrowRightIcon className="w-5 h-5 text-amber-400 group-hover:translate-x-1 transition-transform" />
                          </button>
                       </div>
-                   )}
+                   </div>
                 </div>
-
-                {/* Feedback Entry Banner */}
-                <button 
-                  onClick={() => { playSound('click'); setScreen(AppScreen.FEEDBACK); }}
-                  className="w-full max-w-md bg-gradient-to-r from-duo-yellow/20 to-duo-green/20 border-2 border-duo-yellow hover:border-white p-5 rounded-[2rem] flex items-center justify-between shadow-xl transition-all group cursor-pointer"
-                >
-                  <div className="flex items-center space-x-4">
-                    <div className="bg-duo-yellow p-3 rounded-2xl text-white shadow-md group-hover:scale-110 transition-transform">
-                      <StarIcon className="w-8 h-8 fill-white" />
-                    </div>
-                    <div className="text-left">
-                      <h3 className="font-black text-white text-lg">Отзывы о DuoWindo6601</h3>
-                      <p className="text-xs text-gray-300 font-bold">Оставьте отзыв или прочитайте мнения других!</p>
-                    </div>
-                  </div>
-                  <ArrowRightIcon className="w-6 h-6 text-duo-yellow group-hover:translate-x-1 transition-transform" />
-                </button>
-
-                {/* Admin Dashboard Entry Banner */}
-                <button 
-                  onClick={() => { playSound('click'); setScreen(AppScreen.ADMIN_DASHBOARD); }}
-                  className="w-full max-w-md bg-gradient-to-r from-amber-500/20 via-amber-600/20 to-amber-700/20 border-2 border-amber-500 hover:border-amber-400 p-5 rounded-[2rem] flex items-center justify-between shadow-xl transition-all group cursor-pointer"
-                >
-                  <div className="flex items-center space-x-4">
-                    <div className="bg-amber-500 p-3 rounded-2xl text-black font-black text-2xl shadow-md group-hover:scale-110 transition-transform">
-                      👑
-                    </div>
-                    <div className="text-left">
-                      <h3 className="font-black text-amber-400 text-lg flex items-center gap-1.5">
-                        Панель Владельца (Admin)
-                      </h3>
-                      <p className="text-xs text-gray-300 font-bold">
-                        Модерация отзывов & Мониторинг пользователей
-                      </p>
-                    </div>
-                  </div>
-                  <ArrowRightIcon className="w-6 h-6 text-amber-400 group-hover:translate-x-1 transition-transform" />
-                </button>
              </div>
           )}
 

@@ -120,7 +120,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const currentEmail = auth.currentUser?.email?.toLowerCase() || user.username?.toLowerCase() || user.name?.toLowerCase() || '';
   const isOwnerByEmail = OWNER_EMAILS.some(email => currentEmail.includes(email.toLowerCase())) ||
     Boolean(user.username && (user.username.toLowerCase().includes('abramov') || user.username.toLowerCase().includes('va997217'))) ||
-    Boolean(user.name && (user.name.includes('Анатолий') || user.name.includes('Abramov') || user.name.toLowerCase().includes('va997217')));
+    Boolean(user.name && (user.name.includes('Анатолий') || user.name.includes('Владимир') || user.name.includes('Abramov') || user.name.toLowerCase().includes('va997217')));
 
   const [isUnlocked, setIsUnlocked] = useState<boolean>(isOwnerByEmail || Boolean(user.isAdmin));
   const [unlockPass, setUnlockPass] = useState<string>('');

@@ -285,7 +285,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
         >
           <span
             style={{ fontSize: Math.min(size.width, size.height) * 0.48, lineHeight: 1 }}
-            className="text-gray-900 font-serif font-bold select-none whitespace-nowrap text-center leading-none"
+            className="text-gray-900 font-sans font-bold select-none whitespace-nowrap text-center leading-none"
           >
             {character}
           </span>

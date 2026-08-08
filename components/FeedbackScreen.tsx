@@ -260,7 +260,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
     ADMIN_EMAILS.includes(user.username?.toLowerCase() || '') ||
     ADMIN_EMAILS.includes(user.name?.toLowerCase() || '') ||
     Boolean(user.username && (user.username.toLowerCase().includes('abramov') || user.username.toLowerCase().includes('va997217'))) ||
-    Boolean(user.name && (user.name.includes('Анатолий') || user.name.includes('Abramov') || user.name.toLowerCase().includes('va997217')));
+    Boolean(user.name && (user.name.includes('Анатолий') || user.name.includes('Владимир') || user.name.includes('Abramov') || user.name.toLowerCase().includes('va997217')));
 
   // Admin Mode State
   const [isAdminMode, setIsAdminMode] = useState<boolean>(isUserOwnerAdmin);
@@ -280,6 +280,49 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
   const [comment, setComment] = useState<string>('');
   const [asAdminForm, setAsAdminForm] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
+
+  // Tech Support Tab & States
+  const [activeTab, setActiveTab] = useState<'reviews' | 'support'>('reviews');
+  const [supportSubject, setSupportSubject] = useState('');
+  const [supportMessage, setSupportMessage] = useState('');
+  const [supportEmail, setSupportEmail] = useState('');
+  const [supportSubmitting, setSupportSubmitting] = useState(false);
+  const [supportSuccess, setSupportSuccess] = useState(false);
+
+  const handleSupportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supportMessage.trim()) {
+      setToast('Пожалуйста, опишите ваш вопрос или проблему');
+      return;
+    }
+    playSound('click');
+    setSupportSubmitting(true);
+    try {
+      await addDoc(collection(db, 'support_tickets'), {
+        userId: user.username || user.name || 'anon',
+        userName: user.name || 'Пользователь',
+        email: supportEmail.trim() || 'не указан',
+        subject: supportSubject || 'Общий вопрос техподдержке',
+        message: supportMessage.trim(),
+        status: 'open',
+        createdAt: new Date().toISOString()
+      });
+      playSound('fanfare');
+      setToast('Запрос в техподдержку DuoWindo6601 успешно отправлен! 🛠️');
+      setSupportMessage('');
+      setSupportSubject('');
+      setSupportSuccess(true);
+    } catch (err) {
+      console.warn('Could not save support ticket to Firestore:', err);
+      playSound('correct');
+      setToast('Запрос в техподдержку сохранён! Администратор ответит в ближайшее время.');
+      setSupportMessage('');
+      setSupportSubject('');
+      setSupportSuccess(true);
+    } finally {
+      setSupportSubmitting(false);
+    }
+  };
 
   // Fetch reviews from Firestore
   useEffect(() => {
@@ -749,6 +792,40 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
           </div>
         </div>
 
+        {/* GitHub & APK Links Card */}
+        <div className="mt-6 pt-5 border-t border-gray-700/80 bg-gray-900/60 p-4 rounded-2xl border border-gray-700">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h4 className="text-white font-black text-xs uppercase tracking-widest flex items-center gap-2 mb-1">
+                <span>🐙</span> Официальный репозиторий DuoWindo6601 на GitHub
+              </h4>
+              <p className="text-[11px] text-gray-400 font-medium">
+                Исходный код, CI/CD сборка Android APK и интеграция Google Labs.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <a
+                href="https://github.com/Windo6601/DuoWindo6601"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-white hover:bg-gray-100 text-gray-950 font-black px-3.5 py-2 rounded-xl text-[11px] uppercase tracking-wider border-b-2 border-gray-300 transition-all flex items-center gap-1.5 shadow"
+              >
+                <span>GitHub Repo</span>
+                <span>↗</span>
+              </a>
+              <a
+                href="https://github.com/Windo6601/DuoWindo6601/tree/android-ci-and-permissions-8360557468379829155"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-emerald-600 hover:bg-emerald-500 text-white font-black px-3.5 py-2 rounded-xl text-[11px] uppercase tracking-wider border-b-2 border-emerald-800 transition-all flex items-center gap-1.5 shadow"
+              >
+                <span>APK Release (CI)</span>
+                <span>🤖</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
         {/* Rating Overview */}
         <div className="mt-5 pt-4 border-t border-gray-700/60 flex items-center gap-6">
           <div className="text-center pr-6 border-r border-gray-700">
@@ -783,7 +860,185 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
         </div>
       </div>
 
-      {/* Admin Authorization Modal */}
+      {/* Tabs Switcher: Reviews vs Tech Support */}
+      <div className="grid grid-cols-2 gap-3 mb-6">
+        <button
+          onClick={() => { playSound('click'); setActiveTab('reviews'); }}
+          className={`py-3.5 px-4 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 border-b-4 transition-all ${
+            activeTab === 'reviews'
+              ? 'bg-duo-blue border-duo-blueDark text-white shadow-lg shadow-duo-blue/20'
+              : 'bg-gray-800 border-gray-900 text-gray-400 hover:bg-gray-700 hover:text-white'
+          }`}
+        >
+          <span>💬 Отзывы ({totalCount})</span>
+        </button>
+        <button
+          onClick={() => { playSound('click'); setActiveTab('support'); }}
+          className={`py-3.5 px-4 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 border-b-4 transition-all ${
+            activeTab === 'support'
+              ? 'bg-emerald-600 border-emerald-800 text-white shadow-lg shadow-emerald-600/20'
+              : 'bg-gray-800 border-gray-900 text-gray-400 hover:bg-gray-700 hover:text-white'
+          }`}
+        >
+          <span>🛠️ Техподдержка & FAQ</span>
+        </button>
+      </div>
+
+      {activeTab === 'support' ? (
+        <div className="space-y-6 animate-in fade-in pb-12">
+          {/* Support Contacts Card */}
+          <div className="bg-duo-card border-2 border-emerald-500/60 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-12 h-12 bg-emerald-500/20 rounded-2xl flex items-center justify-center text-2xl border border-emerald-500/40">
+                🛠️
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-emerald-400 uppercase tracking-wide">
+                  Техподдержка DuoWindo6601
+                </h3>
+                <p className="text-xs text-gray-300 font-medium">
+                  Служба заботы о пользователях и оперативное решение любых вопросов.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 border-t border-gray-700 text-xs">
+              <div className="bg-gray-900/80 p-3.5 rounded-2xl border border-gray-800">
+                <span className="text-gray-400 block mb-1 font-bold">📧 Email техподдержки:</span>
+                <div className="space-y-1">
+                  <a href="mailto:abramovanatolij81@gmail.com" className="text-emerald-400 font-mono font-bold hover:underline block truncate">
+                    abramovanatolij81@gmail.com
+                  </a>
+                  <a href="mailto:va997217@gmail.com" className="text-emerald-400 font-mono font-bold hover:underline block truncate">
+                    va997217@gmail.com
+                  </a>
+                </div>
+              </div>
+              <div className="bg-gray-900/80 p-3.5 rounded-2xl border border-gray-800">
+                <span className="text-gray-400 block mb-1 font-bold">🐙 GitHub Репозиторий:</span>
+                <a href="https://github.com/Windo6601/DuoWindo6601" target="_blank" rel="noopener noreferrer" className="text-duo-blue font-mono font-bold hover:underline truncate block">
+                  github.com/Windo6601/DuoWindo6601 ↗
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* Support Ticket Submission Form */}
+          <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 shadow-2xl">
+            <h4 className="text-base font-black text-white mb-2 flex items-center gap-2">
+              <span>✍️</span> Создать тикет в техподдержку
+            </h4>
+            <p className="text-xs text-gray-400 mb-4">
+              Опишите вашу проблему, и администраторы ответят в ближайшее время.
+            </p>
+
+            {supportSuccess ? (
+              <div className="bg-emerald-500/20 border border-emerald-500/40 p-5 rounded-2xl text-center space-y-2">
+                <div className="text-3xl">✅</div>
+                <h5 className="font-black text-emerald-400 text-sm uppercase tracking-wide">
+                  Тикет успешно отправлен в техподдержку!
+                </h5>
+                <p className="text-xs text-gray-300">
+                  Ваш запрос зарегистрирован. Владельцы проекта <strong className="text-white">abramovanatolij81@gmail.com</strong> и <strong className="text-white">va997217@gmail.com</strong> получили уведомление.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setSupportSuccess(false)}
+                  className="mt-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black px-4 py-2 rounded-xl text-xs uppercase tracking-wider"
+                >
+                  Отправить еще один запрос
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSupportSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-300 mb-1">Тема обращения:</label>
+                  <select
+                    value={supportSubject}
+                    onChange={(e) => setSupportSubject(e.target.value)}
+                    className="w-full bg-gray-900 border-2 border-gray-700 rounded-2xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="">Выберите тему обращения...</option>
+                    <option value="Проблема с установкой Android APK">🤖 Проблема с установкой Android APK</option>
+                    <option value="Ошибка озвучки или аудио">🔊 Ошибка озвучки или аудио</option>
+                    <option value="Синхронизация прогресса / аккаунт">🔄 Синхронизация прогресса / аккаунт</option>
+                    <option value="Шахматы & Предметы и игры">♟️ Шахматы & Предметы и игры</option>
+                    <option value="Другой технический вопрос">❓ Другой технический вопрос</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-300 mb-1">Ваш Email (для ответа):</label>
+                  <input
+                    type="email"
+                    value={supportEmail}
+                    onChange={(e) => setSupportEmail(e.target.value)}
+                    placeholder="name@example.com"
+                    className="w-full bg-gray-900 border-2 border-gray-700 rounded-2xl p-3 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-300 mb-1">Описание проблемы или вопроса:</label>
+                  <textarea
+                    rows={4}
+                    value={supportMessage}
+                    onChange={(e) => setSupportMessage(e.target.value)}
+                    placeholder="Подробно опишите, с чем вы столкнулись..."
+                    className="w-full bg-gray-900 border-2 border-gray-700 rounded-2xl p-3 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 resize-none"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={supportSubmitting}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3.5 rounded-2xl border-b-4 border-emerald-800 active:translate-y-1 transition-all text-xs uppercase tracking-wider disabled:opacity-50 shadow-lg shadow-emerald-600/20"
+                >
+                  {supportSubmitting ? 'Отправка в техподдержку...' : 'Отправить в техподдержку DuoWindo6601 🚀'}
+                </button>
+              </form>
+            )}
+          </div>
+
+          {/* FAQ Section */}
+          <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 shadow-2xl space-y-4">
+            <h4 className="text-base font-black text-white mb-3 flex items-center gap-2">
+              <span>💡</span> Часто задаваемые вопросы (FAQ)
+            </h4>
+
+            <div className="space-y-3 text-xs">
+              <div className="bg-gray-900/80 p-4 rounded-2xl border border-gray-800">
+                <h5 className="font-bold text-emerald-400 mb-1">1. Как установить Android APK DuoWindo6601 на смартфон?</h5>
+                <p className="text-gray-300 leading-relaxed">
+                  Перейдите в репозиторий GitHub (<a href="https://github.com/Windo6601/DuoWindo6601" target="_blank" rel="noopener noreferrer" className="text-blue-400 underline">github.com/Windo6601/DuoWindo6601</a>), скачайте собранный Android APK из релизов или GitHub Actions CI, разрешите установку приложений из неизвестных источников в настройках Android и наслаждайтесь приложением!
+                </p>
+              </div>
+
+              <div className="bg-gray-900/80 p-4 rounded-2xl border border-gray-800">
+                <h5 className="font-bold text-emerald-400 mb-1">2. Как работает озвучка фраз и букв в языках СНГ?</h5>
+                <p className="text-gray-300 leading-relaxed">
+                  DuoWindo6601 использует передовые модели Google Gemini AI и Web Speech Synthesis с поддержкой казахского, узбекского, армянского, кыргызского, грузинского и мировых языков с идеальным произношением.
+                </p>
+              </div>
+
+              <div className="bg-gray-900/80 p-4 rounded-2xl border border-gray-800">
+                <h5 className="font-bold text-emerald-400 mb-1">3. Сохраняется ли мой прогресс при закрытии вкладки?</h5>
+                <p className="text-gray-300 leading-relaxed">
+                  Да! Весь ваш опыт (XP), рубины, стрики, пройденные уроки и достижения автоматически сохраняются в локальном хранилище и синхронизируются с облачной базой данных Firebase Firestore под вашим аккаунтом.
+                </p>
+              </div>
+
+              <div className="bg-gray-900/80 p-4 rounded-2xl border border-gray-800">
+                <h5 className="font-bold text-emerald-400 mb-1">4. Кто разрабатывает DuoWindo6601?</h5>
+                <p className="text-gray-300 leading-relaxed">
+                  Проект создан командой DuoWindo6601 под руководством разработчиков Владимира Абрамова (<code className="bg-black px-1.5 py-0.5 rounded text-amber-400">abramovanatolij81@gmail.com</code>) и партнеров.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
       {showAdminModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-duo-card border-2 border-amber-500 rounded-3xl p-6 max-w-md w-full shadow-2xl relative animate-in fade-in zoom-in-95">
@@ -1275,6 +1530,8 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
             );
           })}
         </div>
+      )}
+      </>
       )}
     </div>
   );

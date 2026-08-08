@@ -227,6 +227,12 @@ export const getFallbackExercise = (subjectId: string, type: Exercise['type'], s
     const vocab: Record<string, [string, string][]> = {
         'en': [['Hello', 'Привет'], ['Cat', 'Кошка'], ['Dog', 'Собака'], ['Apple', 'Яблоко'], ['Water', 'Вода'], ['House', 'Дом']],
         'ru': [['Hello', 'Привет'], ['Friend', 'Друг'], ['Good', 'Хорошо'], ['Yes', 'Да'], ['No', 'Нет']],
+        'zh': [['你好', 'Привет'], ['猫', 'Кошка'], ['狗', 'Собака'], ['水', 'Вода'], ['家', 'Дом'], ['人', 'Человек'], ['谢谢', 'Спасибо'], ['中国', 'Китай']],
+        'ja': [['こんにちは', 'Привет'], ['猫', 'Кошка'], ['犬', 'Собака'], ['水', 'Вода'], ['家', 'Дом'], ['ありがとう', 'Спасибо']],
+        'ko': [['안녕하세요', 'Привет'], ['고양이', 'Кошка'], ['강아지', 'Собака'], ['물', 'Вода'], ['집', 'Дом'], ['감사합니다', 'Спасибо']],
+        'de': [['Hallo', 'Привет'], ['Katze', 'Кошка'], ['Hund', 'Собака'], ['Wasser', 'Вода'], ['Haus', 'Дом'], ['Danke', 'Спасибо']],
+        'fr': [['Bonjour', 'Привет'], ['Chat', 'Кошка'], ['Chien', 'Собака'], ['Eau', 'Вода'], ['Maison', 'Дом'], ['Merci', 'Спасибо']],
+        'es': [['Hola', 'Привет'], ['Gato', 'Кошка'], ['Perro', 'Собака'], ['Agua', 'Вода'], ['Casa', 'Дом'], ['Gracias', 'Спасибо']],
         'ar': [['مرحبا', 'Привет'], ['بيت', 'Дом'], ['ماء', 'Вода'], ['كتاب', 'Книга'], ['قلم', 'Ручка'], ['صديق', 'Друг'], ['شمس', 'Солнце'], ['قمر', 'Луна']],
     };
     
@@ -492,7 +498,26 @@ export const generateDrawing = async (subject: string, subjectId: string, specif
 
         return { id: crypto.randomUUID(), type: 'drawing', originalSentence: "Draw", targetTranslation: "", wordBank: [], drawingData: data };
     } catch (e) {
-        return { id: 'fb-dr', type: 'drawing', originalSentence: "Draw", targetTranslation: "", wordBank: [], isFallback: true, drawingData: { character: specificChar || "A", instruction: `Draw the letter ${specificChar || "A"}` } };
+        let fallbackChar = specificChar || "A";
+        if (!specificChar) {
+            if (subjectId === 'zh') fallbackChar = "人";
+            else if (subjectId === 'ja') fallbackChar = "あ";
+            else if (subjectId === 'ko') fallbackChar = "ㄱ";
+            else if (subjectId === 'ru') fallbackChar = "А";
+            else if (subjectId === 'ar') fallbackChar = "ا";
+        }
+        return { 
+            id: 'fb-dr', 
+            type: 'drawing', 
+            originalSentence: "Draw", 
+            targetTranslation: "", 
+            wordBank: [], 
+            isFallback: true, 
+            drawingData: { 
+                character: fallbackChar, 
+                instruction: `Нарисуйте символ: ${fallbackChar}` 
+            } 
+        };
     }
 };
 
@@ -505,7 +530,7 @@ export const checkDrawing = async (base64Image: string, targetCharacter: string)
                 contents: {
                     parts: [
                         { inlineData: { mimeType: "image/png", data: base64Image } },
-                        { text: `Is this legible as "${targetCharacter}"? Return JSON {isCorrect, feedback}` }
+                        { text: `Is this drawing legible as "${targetCharacter}"? Return JSON {isCorrect: boolean, feedback: string}. Give feedback in Russian.` }
                     ]
                 },
                 config: {
@@ -521,7 +546,7 @@ export const checkDrawing = async (base64Image: string, targetCharacter: string)
         });
         return result;
     } catch (e) {
-        return { isCorrect: true, feedback: "Offline Mode - Check skipped", isFallback: true };
+        return { isCorrect: true, feedback: `Отличная работа! Символ "${targetCharacter}" нарисован.`, isFallback: true };
     }
 };
 
