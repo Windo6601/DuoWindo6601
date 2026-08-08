@@ -330,7 +330,7 @@ const TRANSLATIONS: Record<string, any> = {
     androidAlertBtn: 'INSTALL NOW',
     androidModalTitle: 'Android Installation Guide',
     androidModalClose: 'Close',
-    home: 'HOME', practice: 'PRACTICE', leaderboard: 'LEADERBOARD', shop: 'SHOP', profile: 'PROFILE',
+    home: 'HOME', practice: 'PRACTICE', leaderboard: 'LEADERBOARD', shop: 'SHOP', profile: 'PROFILE', feedback: 'FEEDBACK',
     unit: 'Unit', start: 'START', check: 'CHECK', continue: 'CONTINUE', skip: 'SKIP',
     module1: 'MODULE 1, UNIT 1', chessUnitName: 'Movement of pieces',
     settings: 'Settings', language: 'Language', country: 'Country', back: 'Back', save: 'Save',
@@ -364,202 +364,208 @@ const TRANSLATIONS: Record<string, any> = {
     serverJsBtn: 'Awesome! 🚀'
   },
   de: {
-    androidAlertTitle: 'Android App verfügbar!',
+    androidAlertTitle: 'Android-App verfügbar!',
     androidAlertDesc: 'DuoWindo6601 ist jetzt auf Android verfügbar! Lernen Sie unterwegs.',
     androidAlertBtn: 'JETZT INSTALLIEREN',
-    androidModalTitle: 'Android Installationsanleitung',
+    androidModalTitle: 'Installationsanleitung',
     androidModalClose: 'Schließen',
-    home: 'HOME', practice: 'ÜBUNG', leaderboard: 'BESTENLISTE', shop: 'SHOP', profile: 'PROFIL', feedback: 'FEEDBACK',
-    unit: 'Lektion', start: 'START', check: 'PRÜFEN', continue: 'WEITER', skip: 'ÜBERSPRINGEN',
+    home: 'STARTSEITE', practice: 'ÜBEN', leaderboard: 'RANGLISTE', shop: 'SHOP', profile: 'PROFIL', feedback: 'BEWERTUNGEN',
+    unit: 'Einheit', start: 'STARTEN', check: 'ÜBERPRÜFEN', continue: 'WEITER', skip: 'ÜBERSPRINGEN',
+    module1: 'MODUL 1, EINHEIT 1', chessUnitName: 'Figurenbewegung',
     settings: 'Einstellungen', language: 'Sprache', country: 'Land', back: 'Zurück', save: 'Speichern',
-    free: 'Kostenlos', trySuper: 'SUPER VERSUCHEN', connectMax: 'GET MAX', cancelSub: 'Abonnement kündigen',
-    offline: 'OFFLINE', apiStatus: 'API-Status', online: 'Online',
+    free: 'Kostenlos', trySuper: 'SUPER TESTEN', connectMax: 'MAX VERBINDEN', cancelSub: 'Abonnement kündigen',
+    whatToLearn: 'Was möchten Sie lernen?', newCourses: 'Neue Kurse', forRu: 'Für Russischsprachige',
+    shopTitle: 'Shop 6601', leaderboardTitle: 'Bronze-Liga', roleplays: 'Rollenspiele',
+    audio: 'Audio', speech: 'Sprache', translate: 'Übersetzung', translator: 'Übersetzer', illusion: 'Klang illusion',
+    drawing: 'Buchstaben zeichnen', offline: 'OFFLINE', apiStatus: 'API-Status', online: 'Online',
     limitReached: 'Limit erreicht', checkConnection: 'Verbindung prüfen', voice: 'Stimme',
-    voiceProvider: 'Sprachanbieter', t_api_online: 'API Online!', t_offline_limit: 'Offline / Limit erreicht',
-    t_skip: 'Lektion übersprungen', t_energy_low: 'Keine Energie mehr!',
+    voiceProvider: 'Sprachausgabe', t_api_online: 'API Online!', t_offline_limit: 'Offline / Limit erreicht',
+    t_skip: 'Übung übersprungen', t_energy_low: 'Keine Energie mehr! Holen Sie sich Super oder füllen Sie auf.',
     t_sub_cancel: 'Abonnement gekündigt', t_welcome_super: 'Willkommen bei Super!', t_welcome_max: 'Willkommen bei Max!',
-    t_buy_energy: 'Refilled!', t_freeze_used: 'Eingefroren!', t_rec_error: 'Fehlgeschlagen.',
-    t_buy_gems: 'Gekauft', t_topic_empty: 'Kein Thema ausgewählt', t_api_error: 'API-Fehler',
-    t_speech_empty: 'Nichts gehört', alphabet: 'BUCHSTABEN', explainMax: 'Erkläre meine Antwort', explainHeader: 'Erklärung des Fehlers',
-    ishihara: 'Ishihara-Test', ishiharaDesc: 'Farbsehen prüfen', auto: 'Auto',
-    chooseTier: "Wählen Sie Ihre Stufe", energy25: "25 Energie", ads: "Werbung", infEnergy: "Unbegrenzte Energie", noAds: "Keine Werbung",
-    allInSuper: "Alles in Super", aiExplain: "Antwort-Erklärung (AI)", currentPlan: "AKTUELLER PLAN", streakDays: "Streak Tage",
-    totalXP: "Gesamt-XP", playChess: "LASS UNS SCHACH SPIELEN", chessDesc: "Spiele mit DuoWindo6601", games: "SPIELE", wins: "SIEGE", elo: "ELO",
-    startChess: "START: +30 XP", startSpeak: "Sprechen starten →", whatHeard: "Was haben Sie gehört?", speakForDuo: "Sprich für Duo",
-    chessSubtitle: "20-Minuten-Spiele mit DuoWindo6601", startChessMatch: "SPIEL STARTEN: +30 XP",
+    t_buy_energy: 'Energie wieder aufgefüllt!', t_freeze_used: 'Streak eingefroren!', t_rec_error: 'Erkennung fehlgeschlagen.',
+    t_buy_gems: 'Gekauft', t_topic_empty: 'Kein Thema ausgewählt', t_api_error: 'Netzwerkfehler oder API-Limit',
+    t_speech_empty: 'Nichts gehört.', alphabet: 'BUCHSTABEN', explainMax: 'Antwort erklären', explainHeader: 'Fehlererklärung',
+    ishihara: 'Ishihara-Test', ishiharaDesc: 'Farbsehtest', auto: 'Auto',
+    chooseTier: "Stufe wählen", energy25: "25 Energie", ads: "Werbung", infEnergy: "Unendliche Energie", noAds: "Keine Werbung",
+    allInSuper: "Alles in Super", aiExplain: "Antworterklärung (AI)", currentPlan: "AKTUELLER PLAN", streakDays: "Streak-Tage",
+    totalXP: "Gesamt-XP", playChess: "SCHACH SPIELEN", chessDesc: "Partien mit DuoWindo6601", games: "SPIELE", wins: "SIEGE", elo: "ELO",
+    startChess: "START: +30 XP", startSpeak: "Sprechen beginnen →", whatHeard: "Was haben Sie gehört?", speakForDuo: "Für Duo sprechen",
+    chessSubtitle: "20-Minuten-Partien mit DuoWindo6601", startChessMatch: "PARTIE STARTEN: +30 XP",
     pvp: "Spieler gegen Spieler", pve: "Spieler gegen DuoWindo6601",
-    readPractice: "Lesepraxis", aiTrans: "AI Übersetzer", realOrNot: "Echt oder nicht?", writePractice: "Schreibpraxis",
-    topicPrompt: "Thema für Vokabeln?", topicPlaceholder: "Leer lassen für Allgemeines...", trySuperTitle: "VERSUCHE SUPER",
-    trySuperDesc: "Keine Werbung, keine Limits!", refill: "Auffüllen auf 25", freeze: "Einfrieren", freezeDesc: "Streak sichern",
-    refillGems: "Edelsteine auffüllen", popular: "Beliebt", handful: "Handvoll", sack: "Sack", chest: "Truhe", cantListen: "KANN NICHT HÖREN",
-    cantSpeak: "KANN NICHT SPRECHEN", endChat: "Chat beenden", exitGame: "Spiel verlassen", great: "Gute Arbeit!", wrong: "Falsch!", next: "WEITER",
-    correctAnswer: "Richtig:", checkmateWin: "Schachmatt! Sie gewinnen!", checkmateLoss: "Schachmatt! AI gewinnt.",
-    videoCall: "VIDEOANRUF", startInterview: "Interview starten", smartMode: "Smarter Modus", interviewer: "Interviewer", self: "Sie",
-    serverJsTitle: 'server.js Unterstützung ist LIVE!',
-    serverJsDesc: 'Das DuoWindo-Projekt hat offiziell einen eigenen Produktions-server.js mit vollständiger statischer Bereitstellung integriert!',
-    serverJsBtn: 'Großartig! 🚀'
+    readPractice: "Lesepraxis", aiTrans: "KI-Übersetzer", realOrNot: "Echt oder nicht?", writePractice: "Schreibpraxis",
+    topicPrompt: "Thema für Vokabeln?", topicPlaceholder: "Leer lassen...", trySuperTitle: "SUPER TESTEN",
+    trySuperDesc: "Keine Werbung, keine Limits!", refill: "Auf 25 auffüllen", freeze: "Einfrieren", freezeDesc: "Streak retten",
+    refillGems: "Edelsteine aufladen", popular: "Beliebt", handful: "Handvoll", sack: "Sack", chest: "Schatulle", cantListen: "KANN NICHT HÖREN",
+    cantSpeak: "KANN NICHT SPRECHEN", endChat: "Chat beenden", exitGame: "Spiel verlassen", great: "Großartig!", wrong: "Falsch!", next: "WEITER",
+    correctAnswer: "Richtig:", checkmateWin: "Schachmatt! Sie haben gewonnen!", checkmateLoss: "Schachmatt! KI gewinnt.",
+    videoCall: "VIDEOANRUF", startInterview: "Interview starten", smartMode: "Smart-Modus", interviewer: "Interviewer", self: "Sie",
+    serverJsTitle: 'server.js Unterstützung!',
+    serverJsDesc: 'DuoWindo hat offiziell einen eigenen Produktionsserver server.js mit Statik- und SPA-Routing integriert!',
+    serverJsBtn: 'Fantastisch! 🚀'
   },
   fr: {
     androidAlertTitle: 'Application Android disponible !',
-    androidAlertDesc: 'DuoWindo6601 est maintenant disponible sur Android ! Apprenez en déplacement.',
-    androidAlertBtn: 'INSTALLER MAINTENANT',
-    androidModalTitle: 'Guide d\'installation Android',
+    androidAlertDesc: 'DuoWindo6601 est désormais disponible sur Android !',
+    androidAlertBtn: 'INSTALLER',
+    androidModalTitle: "Guide d'installation",
     androidModalClose: 'Fermer',
-    home: 'ACCUEIL', practice: 'ENTRAÎNEMENT', leaderboard: 'CLASSEMENT', shop: 'BOUTIQUE', profile: 'PROFIL', feedback: 'RETOUR',
+    home: 'ACCUEIL', practice: 'PRATIQUE', leaderboard: 'CLASSEMENT', shop: 'BOUTIQUE', profile: 'PROFIL', feedback: 'AVIS',
     unit: 'Unité', start: 'COMMENCER', check: 'VÉRIFIER', continue: 'CONTINUER', skip: 'PASSER',
+    module1: 'MODULE 1, UNITÉ 1', chessUnitName: 'Déplacement des pièces',
     settings: 'Paramètres', language: 'Langue', country: 'Pays', back: 'Retour', save: 'Enregistrer',
-    free: 'Gratuit', trySuper: 'ESSAYER SUPER', connectMax: 'OBTENIR MAX', cancelSub: 'Annuler l\'abonnement',
-    offline: 'HORS LIGNE', apiStatus: 'Statut de l\'API', online: 'En ligne',
+    free: 'Gratuit', trySuper: 'ESSAYER SUPER', connectMax: 'OBTENIR MAX', cancelSub: "Annuler l'abonnement",
+    whatToLearn: 'Que voulez-vous apprendre ?', newCourses: 'Nouveaux cours', forRu: 'Pour les russophones',
+    shopTitle: 'Boutique 6601', leaderboardTitle: 'Ligue de Bronze', roleplays: 'Jeux de rôle',
+    audio: 'Audio', speech: 'Parole', translate: 'Traduction', translator: 'Traducteur', illusion: 'Illusion sonore',
+    drawing: 'Dessiner les lettres', offline: 'HORS-LIGNE', apiStatus: "Statut de l'API", online: 'En ligne',
     limitReached: 'Limite atteinte', checkConnection: 'Vérifier la connexion', voice: 'Voix',
-    voiceProvider: 'Fournisseur voix', t_api_online: 'API en ligne !', t_offline_limit: 'Hors ligne / Limite atteinte',
-    t_skip: 'Leçon passée', t_energy_low: 'Plus d\'énergie !',
-    t_sub_cancel: 'Abonnement annulé', t_welcome_super: 'Bienvenue chez Super !', t_welcome_max: 'Bienvenue chez Max !',
-    t_buy_energy: 'Rechargé !', t_freeze_used: 'Gelé !', t_rec_error: 'Échec de la reconnaissance.',
-    t_buy_gems: 'Acheté', t_topic_empty: 'Aucun sujet sélectionné', t_api_error: 'Erreur API',
-    t_speech_empty: 'Rien entendu', alphabet: 'LETTRES', explainMax: 'Expliquer ma réponse', explainHeader: 'Explication de l\'erreur',
-    ishihara: 'Test d\'Ishihara', ishiharaDesc: 'Vérifier la vision des couleurs', auto: 'Auto',
-    chooseTier: "Choisissez votre niveau", energy25: "25 Énergie", ads: "Publicités", infEnergy: "Énergie infinie", noAds: "Sans publicité",
-    allInSuper: "Tout ce qui est dans Super", aiExplain: "Explication des réponses (AI)", currentPlan: "PLAN ACTUEL", streakDays: "Jours de Série",
-    totalXP: "XP Total", playChess: "JOOUONS AUX ÉCHECS", chessDesc: "Parties avec DuoWindo6601", games: "PARTIES", wins: "VICTOIRES", elo: "ELO",
-    startChess: "DÉBUTER: +30 XP", startSpeak: "Commencer à parler →", whatHeard: "Qu'avez-vous entendu ?", speakForDuo: "Parle pour Duo",
-    chessSubtitle: "Jeux de 20 minutes avec DuoWindo6601", startChessMatch: "COMMENCER LA PARTIE: +30 XP",
+    voiceProvider: 'Fournisseur de voix', t_api_online: 'API en ligne !', t_offline_limit: 'Hors-ligne / Limite atteinte',
+    t_skip: 'Exercice passé', t_energy_low: "Plus d'énergie !", t_sub_cancel: 'Abonnement annulé',
+    t_welcome_super: 'Bienvenue dans Super !', t_welcome_max: 'Bienvenue dans Max !', t_buy_energy: 'Énergie rechargée !',
+    t_freeze_used: 'Série gelée !', t_rec_error: 'Échec de la reconnaissance.', t_buy_gems: 'Acheté',
+    t_topic_empty: 'Aucun sujet choisi', t_api_error: 'Erreur réseau', t_speech_empty: 'Rien entendu.', alphabet: 'LETTRES', explainMax: 'Expliquer ma réponse', explainHeader: 'Explication de l’erreur',
+    ishihara: 'Test d’Ishihara', ishiharaDesc: 'Contrôle de la vision des couleurs', auto: 'Auto',
+    chooseTier: "Choisir le niveau", energy25: "25 Énergie", ads: "Publicités", infEnergy: "Énergie illimitée", noAds: "Sans pub",
+    allInSuper: "Tout dans Super", aiExplain: "Explication des réponses (IA)", currentPlan: "PLAN ACTUEL", streakDays: "Jours de série",
+    totalXP: "XP Total", playChess: "JOUER AUX ÉCHECS", chessDesc: "Parties avec DuoWindo6601", games: "PARTIES", wins: "VICTOIRES", elo: "ELO",
+    startChess: "DÉMARRER : +30 XP", startSpeak: "Commencer à parler →", whatHeard: "Qu’avez-vous entendu ?", speakForDuo: "Parler pour Duo",
+    chessSubtitle: "Parties de 20 min avec DuoWindo6601", startChessMatch: "LANCER LE MATCH : +30 XP",
     pvp: "Joueur contre Joueur", pve: "Joueur contre DuoWindo6601",
-    readPractice: "Pratique de la lecture", aiTrans: "AI Traducteur", realOrNot: "Réel ou pas ?", writePractice: "Pratique de l'écriture",
-    topicPrompt: "Sujet de vocabulaire ?", topicPlaceholder: "Laisser vide pour général...", trySuperTitle: "ESSAYEZ SUPER",
-    trySuperDesc: "Pas de pub, pas de limites !", refill: "Recharger à 25", freeze: "Geler", freezeDesc: "Sauvegarder la série",
-    refillGems: "Recharger les gemmes", popular: "Populaire", handful: "Poignée", sack: "Sac", chest: "Coffre", cantListen: "JE NE PEUX PAS ÉCOUTER",
-    cantSpeak: "JE NE PEUX PAS PARLER", endChat: "Quitter le chat", exitGame: "Quitter le jeu", great: "Bon travail !", wrong: "Incorrect !", next: "CONTINUER",
-    correctAnswer: "Correct :", checkmateWin: "Échec et mat ! Vous gagnez !", checkmateLoss: "Échec et mat ! L'IA gagne.",
-    videoCall: "APPEL VIDÉO", startInterview: "Démarrer l'interview", smartMode: "Mode Intelligent", interviewer: "Interviewer", self: "Vous",
-    serverJsTitle: 'Support server.js en ligne !',
-    serverJsDesc: 'Le projet DuoWindo a officiellement intégré son propre serveur de production server.js avec distribution complète des fichiers statiques !',
+    readPractice: "Pratique de lecture", aiTrans: "Traducteur IA", realOrNot: "Réel ou non ?", writePractice: "Pratique d'écriture",
+    topicPrompt: "Sujet de vocabulaire ?", topicPlaceholder: 'Laisser vide...', trySuperTitle: 'ESSAYER SUPER',
+    trySuperDesc: 'Sans pubs, sans limites !', refill: 'Recharger à 25', freeze: 'Gel', freezeDesc: 'Sauvegarder votre série',
+    refillGems: 'Recharger gemmes', popular: 'Populaire', handful: 'Poignée', sack: 'Sac', chest: 'Coffre', cantListen: 'JE NE PEUX PAS ÉCOUTER',
+    cantSpeak: 'JE NE PEUX PAS PARLER', endChat: 'Terminer', exitGame: 'Quitter', great: 'Superbe !', wrong: 'Erreur !', next: 'CONTINUER',
+    correctAnswer: 'Correct :', checkmateWin: 'Échec et mat ! Vous avez gagné !', checkmateLoss: 'Échec et mat ! L’IA a gagné.',
+    videoCall: 'APPEL VIDÉO', startInterview: 'Commencer l’entretien', smartMode: 'Mode intelligent', interviewer: 'Interviewer', self: 'Vous',
+    serverJsTitle: 'Support de server.js !',
+    serverJsDesc: 'DuoWindo a officiellement intégré son propre serveur de production server.js avec distribution des assets et support SPA !',
     serverJsBtn: 'Génial ! 🚀'
   },
   es: {
-    androidAlertTitle: '¡Aplicación Android disponible!',
-    androidAlertDesc: '¡DuoWindo6601 ya está disponible en Android! Aprende en cualquier lugar.',
+    androidAlertTitle: '¡Aplicación de Android disponible!',
+    androidAlertDesc: '¡DuoWindo6601 ya está disponible en Android!',
     androidAlertBtn: 'INSTALAR AHORA',
-    androidModalTitle: 'Guía de instalación de Android',
+    androidModalTitle: 'Guía de instalación',
     androidModalClose: 'Cerrar',
-    home: 'INICIO', practice: 'PRÁCTICA', leaderboard: 'CLASIFICACIÓN', shop: 'TIENDA', profile: 'PERFIL', feedback: 'COMENTARIOS',
+    home: 'INICIO', practice: 'PRÁCTICA', leaderboard: 'CLASIFICACIÓN', shop: 'TIENDA', profile: 'PERFIL', feedback: 'OPINIONES',
     unit: 'Unidad', start: 'EMPEZAR', check: 'COMPROBAR', continue: 'CONTINUAR', skip: 'OMITIR',
-    settings: 'Ajustes', language: 'Idioma', country: 'País', back: 'Volver', save: 'Guardar',
+    module1: 'MÓDULO 1, UNIDAD 1', chessUnitName: 'Movimiento de piezas',
+    settings: 'Ajustes', language: 'Idioma', country: 'País', back: 'Atrás', save: 'Guardar',
     free: 'Gratis', trySuper: 'PROBAR SUPER', connectMax: 'OBTENER MAX', cancelSub: 'Cancelar suscripción',
-    offline: 'HORS LIGNE', apiStatus: 'Estado de la API', online: 'En línea',
-    limitReached: 'Límite alcanzado', checkConnection: 'Probar conexión', voice: 'Voz',
-    voiceProvider: 'Proveedor de voz', t_api_online: '¡API en línea!', t_offline_limit: 'Desconectado / Límite alcanzado',
-    t_skip: 'Lección omitida', t_energy_low: '¡Sin energía!',
-    t_sub_cancel: 'Suscripción cancelada', t_welcome_super: '¡Bienvenido a Super!', t_welcome_max: '¡Bienvenido a Max!',
-    t_buy_energy: '¡Recargado!', t_freeze_used: '¡Congelado!', t_rec_error: 'Fallo al reconocer.',
-    t_buy_gems: 'Comprado', t_topic_empty: 'Sin tema seleccionado', t_api_error: 'Error de API',
-    t_speech_empty: 'No se escuchó nada', alphabet: 'LETRAS', explainMax: 'Explicar mi respuesta', explainHeader: 'Explicación del error',
-    ishihara: 'Test de Ishihara', ishiharaDesc: 'Comprobar visión de colores', auto: 'Auto',
-    chooseTier: "Elige tu nivel", energy25: "25 Energía", ads: "Anuncios", infEnergy: "Energía ilimitada", noAds: "Sin anuncios",
-    allInSuper: "Todo en Super", aiExplain: "Explicación de respuestas (AI)", currentPlan: "PLAN ACTUAL", streakDays: "Días de Racha",
-    totalXP: "XP Total", playChess: "JUGUEMOS AJEDREZ", chessDesc: "Partidas con DuoWindo6601", games: "PARTIDAS", wins: "VICTORIAS", elo: "ELO",
-    startChess: "INICIAR: +30 XP", startSpeak: "Empezar a hablar →", whatHeard: "¿Qué escuchaste?", speakForDuo: "Habla por Duo",
-    chessSubtitle: "Partidas de 20 minutos con DuoWindo6601", startChessMatch: "EMPEZAR PARTIDA: +30 XP",
-    pvp: "Jugador contra Jugador", pve: "Jugador contra DuoWindo6601",
-    readPractice: "Práctica de lectura", aiTrans: "Traductor AI", realOrNot: "¿Real o no?", writePractice: "Práctica de escritura",
-    topicPrompt: "¿Tema de vocabulario?", topicPlaceholder: "Dejar vacío para general...", trySuperTitle: "PRUEBA SUPER",
-    trySuperDesc: "¡Sin anuncios ni límites!", refill: "Recargar a 25", freeze: "Congelar", freezeDesc: "Guardar racha",
-    refillGems: "Recargar gemas", popular: "Popular", handful: "Puñado", sack: "Saco", chest: "Cofre", cantListen: "NO PUEDO ESCUCHAR",
-    cantSpeak: "NO PUEDO HABLAR", endChat: "Terminar chat", exitGame: "Salir del juego", great: "¡Buen trabajo!", wrong: "¡Incorrecto!", next: "CONTINUAR",
-    correctAnswer: "Correcto:", checkmateWin: "¡Jaque mate! ¡Tú ganas!", checkmateLoss: "Jaque mate! La IA gana.",
-    videoCall: "VIDEOLLAMADA", startInterview: "Iniciar entrevista", smartMode: "Modo inteligente", interviewer: "Entrevistador", self: "Tú",
-    serverJsTitle: '¡El soporte de server.js está activo!',
-    serverJsDesc: '¡El proyecto DuoWindo ha integrado oficialmente su propio servidor server.js con distribución estática completa!',
-    serverJsBtn: '¡Excelente! 🚀'
+    whatToLearn: '¿Qué quieres aprender?', newCourses: 'Nuevos cursos', forRu: 'Para hispanohablantes',
+    shopTitle: 'Tienda 6601', leaderboardTitle: 'Liga de Bronce', roleplays: 'Juegos de rol',
+    audio: 'Audio', speech: 'Voz', translate: 'Traducción', translator: 'Traductor', illusion: 'Ilusión sonora',
+    drawing: 'Dibujar letras', offline: 'OFFLINE', apiStatus: 'Estado de API', online: 'En línea',
+    limitReached: 'Límite alcanzado', checkConnection: 'Comprobar conexión', voice: 'Voz',
+    voiceProvider: 'Proveedor de voz', t_api_online: '¡API en línea!', t_offline_limit: 'Sin conexión / Límite alcanzado',
+    t_skip: 'Ejercicio omitido', t_energy_low: '¡Sin energía!', t_sub_cancel: 'Suscripción cancelada',
+    t_welcome_super: '¡Bienvenido a Super!', t_welcome_max: '¡Bienvenido a Max!', t_buy_energy: '¡Energía recargada!',
+    t_freeze_used: '¡Racha congelada!', t_rec_error: 'Reconocimiento fallido.', t_buy_gems: 'Comprado',
+    t_topic_empty: 'Sin tema seleccionado', t_api_error: 'Error de red', t_speech_empty: 'No se escuchó nada.', alphabet: 'LETRAS', explainMax: 'Explicar mi respuesta', explainHeader: 'Explicación del error',
+    ishihara: 'Test de Ishihara', ishiharaDesc: 'Prueba de visión cromática', auto: 'Auto',
+    chooseTier: "Elige tu nivel", energy25: "25 Energía", ads: "Anuncios", infEnergy: "Energía infinita", noAds: "Sin anuncios",
+    allInSuper: "Todo en Super", aiExplain: "Explicación de respuestas (IA)", currentPlan: "PLAN ACTUAL", streakDays: "Días de racha",
+    totalXP: "XP Total", playChess: "JUGAR AL AJEDREZ", chessDesc: "Partidas con DuoWindo6601", games: "PARTIDAS", wins: "VICTORIAS", elo: "ELO",
+    startChess: "INICIAR: +30 XP", startSpeak: "Empezar a hablar →", whatHeard: "¿Qué escuchaste?", speakForDuo: "Hablar por Duo",
+    chessSubtitle: "Partidas de 20 min con DuoWindo6601", startChessMatch: "INICIAR PARTIDA: +30 XP",
+    pvp: "Jugador vs Jugador", pve: "Jugador vs DuoWindo6601",
+    readPractice: "Práctica de lectura", aiTrans: "Traductor IA", realOrNot: "¿Real o no?", writePractice: "Práctica de escritura",
+    topicPrompt: "¿Tema para vocabulario?", topicPlaceholder: 'Dejar vacío...', trySuperTitle: 'PRUEBA SUPER',
+    trySuperDesc: '¡Sin anuncios, sin límites!', refill: 'Recargar a 25', freeze: 'Congelar', freezeDesc: 'Salva tu racha',
+    refillGems: 'Recargar gemas', popular: 'Popular', handful: 'Puñado', sack: 'Saco', chest: 'Cofre', cantListen: 'NO PUEDO ESCUCHAR',
+    cantSpeak: 'NO PUEDO HABLAR', endChat: 'Terminar', exitGame: 'Salir', great: '¡Excelente!', wrong: '¡Incorrecto!', next: 'CONTINUAR',
+    correctAnswer: 'Correcto:', checkmateWin: '¡Jaque mate! ¡Ganaste!', checkmateLoss: '¡Jaque mate! La IA gana.',
+    videoCall: 'VIDEOCALL', startInterview: 'Iniciar entrevista', smartMode: 'Modo inteligente', interviewer: 'Entrevistador', self: 'Tú',
+    serverJsTitle: '¡Soporte de server.js!',
+    serverJsDesc: '¡DuoWindo ha integrado oficialmente su propio servidor server.js con distribución de estáticos y SPA!',
+    serverJsBtn: '¡Genial! 🚀'
   },
   ja: {
-    androidAlertTitle: 'Androidアプリ提供中！',
-    androidAlertDesc: 'DuoWindo6601がAndroidで利用可能になりました！外出先でも学びましょう。',
+    androidAlertTitle: 'Androidアプリ利用可能！',
+    androidAlertDesc: 'DuoWindo6601がAndroidで利用可能になりました！',
     androidAlertBtn: '今すぐインストール',
-    androidModalTitle: 'Androidインストールガイド',
+    androidModalTitle: 'インストール手順',
     androidModalClose: '閉じる',
-    home: 'ホーム', practice: '練習', leaderboard: 'リーダーボード', shop: 'ショップ', profile: 'プロフィール', feedback: 'フィードバック',
-    unit: 'ユニット', start: 'スタート', check: '確認する', continue: '続ける', skip: 'スキップ',
+    home: 'ホーム', practice: '練習', leaderboard: 'ランキング', shop: 'ショップ', profile: 'プロフィール', feedback: 'フィードバック',
+    unit: 'セクション', start: 'スタート', check: '確認', continue: '続ける', skip: 'スキップ',
+    module1: 'モジュール 1, セクション 1', chessUnitName: '駒の動き',
     settings: '設定', language: '言語', country: '国', back: '戻る', save: '保存',
-    free: '無料', trySuper: 'SUPERを試す', connectMax: 'MAXを取得', cancelSub: 'サブスクをキャンセル',
-    offline: 'オフライン', apiStatus: 'APIステータス', online: 'オンライン',
+    free: '無料', trySuper: 'Superを試す', connectMax: 'Maxに接続', cancelSub: 'サブスクリプションをキャンセル',
+    whatToLearn: '何を学びますか？', newCourses: '新しいコース', forRu: 'ロシア語話者向け',
+    shopTitle: 'ショップ 6601', leaderboardTitle: 'ブロンズリーグ', roleplays: 'ロールプレイ',
+    audio: 'オーディオ', speech: '音声', translate: '翻訳', translator: '翻訳者', illusion: '音の錯覚',
+    drawing: '文字を書く', offline: 'オフライン', apiStatus: 'APIステータス', online: 'オンライン',
     limitReached: '制限に達しました', checkConnection: '接続を確認', voice: '音声',
-    voiceProvider: '音声プロバイダー', t_api_online: 'APIオンライン！', t_offline_limit: 'オフライン/制限到達',
-    t_skip: 'スキップされました', t_energy_low: 'エネルギーがありません！',
-    t_sub_cancel: 'サブスクをキャンセルしました', t_welcome_super: 'Superへようこそ！', t_welcome_max: 'Maxへようこそ！',
-    t_buy_energy: '全回復しました！', t_freeze_used: 'フリーズを使用！', t_rec_error: '認識に失敗しました。',
-    t_buy_gems: '購入しました', t_topic_empty: 'トピック未選択', t_api_error: 'APIエラー',
-    t_speech_empty: '何も聞こえませんでした', alphabet: '文字', explainMax: '解答の解説を聞く', explainHeader: '間違いの解説',
-    ishihara: '石原テスト', ishiharaDesc: '色覚チェック', auto: '自動',
-    chooseTier: "プランを選択", energy25: "25 エネルギー", ads: "広告あり", infEnergy: "無限エネルギー", noAds: "広告なし",
-    allInSuper: "Superの全機能", aiExplain: "AIによる解説", currentPlan: "現在のプラン", streakDays: "連続学習日数",
-    totalXP: "累計XP", playChess: "チェス対戦", chessDesc: "DuoWindo6601とチェスをする", games: "対局数", wins: "勝利数", elo: "レート",
-    startChess: "開始: +30 XP", startSpeak: "話す →", whatHeard: "何と聞こえましたか？", speakForDuo: "Duoの代わりに話す",
-    chessSubtitle: "DuoWindo6601との20分対局", startChessMatch: "対局開始: +30 XP",
-    pvp: "対人戦", pve: "DuoWindo6601と対局",
-    readPractice: "リーディング練習", aiTrans: "AI翻訳機", realOrNot: "本物か偽物か？", writePractice: "ライティング練習",
-    topicPrompt: "ボキャブラリーのテーマは？", topicPlaceholder: "一般トピックの場合は空欄に...", trySuperTitle: "SUPERを試す",
-    trySuperDesc: "広告なし、制限なし！", refill: "25まで回復", freeze: "フリーズ", freezeDesc: "連続記録をキープ",
-    refillGems: "ジェムをチャージ", popular: "人気", handful: "一握り", sack: "小袋", chest: "宝箱", cantListen: "今聴けない",
-    cantSpeak: "今話せない", endChat: "チャットを終了", exitGame: "終了する", great: "素晴らしい！", wrong: "不正解！", next: "続ける",
-    correctAnswer: "正解：", checkmateWin: "チェックメイト！あなたの勝ち！", checkmateLoss: "チェックメイト！AIの勝ち。",
-    videoCall: "ビデオ通話", startInterview: "インタビューを開始", smartMode: "スマートモード", interviewer: "面接官", self: "あなた",
-    serverJsTitle: 'server.jsをサポート！',
-    serverJsDesc: 'DuoWindoプロジェクトに公式な本番用server.jsが導入され、静的ファイルの配信とSPA完全対応が実現しました！',
-    serverJsBtn: '素晴らしい！ 🚀'
+    voiceProvider: '音声プロバイダー', t_api_online: 'APIオンライン！', t_offline_limit: 'オフライン / 制限到達',
+    t_skip: 'スキップしました', t_energy_low: 'エネルギー切れです！', t_sub_cancel: 'キャンセルされました',
+    t_welcome_super: 'Superへようこそ！', t_welcome_max: 'Maxへようこそ！', t_buy_energy: '回復しました！',
+    t_freeze_used: '凍結しました！', t_rec_error: '認識失敗', t_buy_gems: '購入しました',
+    t_topic_empty: 'トピック未選択', t_api_error: 'APIエラー', t_speech_empty: '音声なし', alphabet: '文字', explainMax: '回答を解説', explainHeader: 'ミスの解説',
+    ishihara: '石原式色覚テスト', ishiharaDesc: '色覚チェック', auto: '自動',
+    chooseTier: "プランを選択", energy25: "25 エネルギー", ads: "広告", infEnergy: "無制限エネルギー", noAds: "広告なし",
+    allInSuper: "Superの全機能", aiExplain: "AIによる回答解説", currentPlan: "現在のプラン", streakDays: "連続日数",
+    totalXP: "合計XP", playChess: "チェスで遊ぶ", chessDesc: "DuoWindo6601との対局", games: "対局数", wins: "勝利", elo: "イロ",
+    startChess: "開始：+30 XP", startSpeak: "話し始める →", whatHeard: "何が聞こえましたか？", speakForDuo: "Duoの代わりに話す",
+    chessSubtitle: "DuoWindo6601との20分間の対局", startChessMatch: "マッチ開始：+30 XP",
+    pvp: "プレイヤー対プレイヤー", pve: "プレイヤー対DuoWindo6601",
+    readPractice: "リーディング練習", aiTrans: "AI翻訳", realOrNot: "本物？偽物？", writePractice: "ライティング練習",
+    topicPrompt: "語彙のトピックは？", topicPlaceholder: "空欄...", trySuperTitle: "SUPERを試す",
+    trySuperDesc: "広告なし、制限なし！", refill: "25まで回復", freeze: "凍結", freezeDesc: "ストリークを維持",
+    refillGems: "ジェムを補充", popular: "人気", handful: "少量", sack: "袋", chest: "宝箱", cantListen: "聴き取れません",
+    cantSpeak: "話せません", endChat: "チャット終了", exitGame: "ゲーム終了", great: "素晴らしい！", wrong: "不正解！", next: "続ける",
+    correctAnswer: "正解：", checkmateWin: "チェックメイト！あなたの勝ちです！", checkmateLoss: "チェックメイト！AIの勝ちです。",
+    videoCall: "ビデオ通話", startInterview: "面接を開始", smartMode: "スマートモード", interviewer: "面接官", self: "あなた",
+    serverJsTitle: 'server.js サポート！',
+    serverJsDesc: 'DuoWindoプロジェクトに独自のプロダクションサーバー server.js が統合され、静的配信とSPAルーティングが有効になりました！',
+    serverJsBtn: '最高！ 🚀'
   },
   zh: {
-    androidAlertTitle: 'Android 应用已上线！',
-    androidAlertDesc: 'DuoWindo6601 现在已支持 Android！随时随地开启学习。',
+    androidAlertTitle: 'Android 应用可用！',
+    androidAlertDesc: 'DuoWindo6601 现已登陆 Android！',
     androidAlertBtn: '立即安装',
-    androidModalTitle: 'Android 安装指南',
+    androidModalTitle: '安装指南',
     androidModalClose: '关闭',
     home: '首页', practice: '练习', leaderboard: '排行榜', shop: '商店', profile: '个人资料', feedback: '反馈',
     unit: '单元', start: '开始', check: '检查', continue: '继续', skip: '跳过',
+    module1: '模块 1，单元 1', chessUnitName: '棋子走法',
     settings: '设置', language: '语言', country: '国家', back: '返回', save: '保存',
-    free: '免费', trySuper: '试用 SUPER', connectMax: '获取 MAX', cancelSub: '取消订阅',
-    offline: '离线', apiStatus: 'API 状态', online: '在线',
-    limitReached: '已达上限', checkConnection: '检查连接', voice: '语音',
-    voiceProvider: '语音提供商', t_api_online: 'API 在线！', t_offline_limit: '离线 / 已达上限',
-    t_skip: '已跳过', t_energy_low: '没有能量了！',
-    t_sub_cancel: '已取消订阅', t_welcome_super: '欢迎使用 Super！', t_welcome_max: '欢迎使用 Max！',
-    t_buy_energy: '已充满！', t_freeze_used: '已冻结连击！', t_rec_error: '识别失败。',
-    t_buy_gems: '已购买', t_topic_empty: '未选择主题', t_api_error: 'API 错误',
-    t_speech_empty: '没有听清，请重试', alphabet: '字母', explainMax: 'AI 错题解析', explainHeader: '错题解析详情',
-    ishihara: '色盲测试', ishiharaDesc: '色觉检查', auto: '自动',
-    chooseTier: "选择您的方案", energy25: "25 能量", ads: "包含广告", infEnergy: "无限能量", noAds: "免广告",
-    allInSuper: "包含 Super 所有特权", aiExplain: "AI 解答详情", currentPlan: "当前方案", streakDays: "连击天数",
-    totalXP: "总经验值", playChess: "下国际象棋", chessDesc: "与 DuoWindo6601 对局", games: "对局数", wins: "胜局", elo: "等级分",
-    startChess: "开始: +30 经验", startSpeak: "开始说话 →", whatHeard: "你听到了什么？", speakForDuo: "帮 Duo 说话",
-    chessSubtitle: "与 DuoWindo6601 进行 20 分钟对局", startChessMatch: "开始对局: +30 经验",
-    pvp: "双人对战", pve: "人机对战",
-    readPractice: "阅读练习", aiTrans: "AI 翻译机", realOrNot: "真假难辨？", writePractice: "书写练习",
-    topicPrompt: "词汇主题？", topicPlaceholder: "留空表示通用...", trySuperTitle: "试用 SUPER",
-    trySuperDesc: "免广告，无限畅学！", refill: "补充到 25", freeze: "冰冻连击", freezeDesc: "保留连击天数",
-    refillGems: "充值宝石", popular: "最热", handful: "一把", sack: "一袋", chest: "一箱", cantListen: "现在不便听",
-    cantSpeak: "现在不便说", endChat: "结束聊天", exitGame: "退出对局", great: "太棒了！", wrong: "答错了！", next: "继续",
-    correctAnswer: "正确答案:", checkmateWin: "将死！你赢了！", checkmateLoss: "将死！AI 获胜。",
-    videoCall: "视频通话", startInterview: "开始模拟面试", smartMode: "智能模式", interviewer: "面试官", self: "你",
-    serverJsTitle: 'server.js 支持已启用！',
-    serverJsDesc: 'DuoWindo 项目已正式集成自主运行的本番 server.js 静态分发和 SPA 路由降级！',
+    free: '免费', trySuper: '试用 Super', connectMax: '连接 Max', cancelSub: '取消订阅',
+    whatToLearn: '你想学什么？', newCourses: '新课程', forRu: '俄语学习者专属',
+    shopTitle: '商店 6601', leaderboardTitle: '青铜联赛', roleplays: '角色扮演',
+    audio: '音频', speech: '语音', translate: '翻译', translator: '翻译器', illusion: '声音错觉',
+    drawing: '书写字母', offline: '离线', apiStatus: 'API 状态', online: '在线',
+    limitReached: '额度已用尽', checkConnection: '检查连接', voice: '声音',
+    voiceProvider: '语音提供商', t_api_online: 'API 在线！', t_offline_limit: '离线 / 额度已用尽',
+    t_skip: '已跳过', t_energy_low: '能量耗尽！', t_sub_cancel: '订阅已取消',
+    t_welcome_super: '欢迎来到 Super！', t_welcome_max: '欢迎来到 Max！', t_buy_energy: '能量已恢复！',
+    t_freeze_used: '已冻结！', t_rec_error: '识别失败', t_buy_gems: '已购买',
+    t_topic_empty: '未选择主题', t_api_error: 'API 错误', t_speech_empty: '未听到语音', alphabet: '字母', explainMax: '解释我的回答', explainHeader: '错误解释',
+    ishihara: '石原色盲测试', ishiharaDesc: '色觉检查', auto: '自动',
+    chooseTier: "选择等级", energy25: "25 能量", ads: "广告", infEnergy: "无限能量", noAds: "无广告",
+    allInSuper: "Super 的所有功能", aiExplain: "AI 解答纠错", currentPlan: "当前方案", streakDays: "连续天数",
+    totalXP: "总经验值", playChess: "下国际象棋", chessDesc: "与 DuoWindo6601 对弈", games: "对局", wins: "胜利", elo: "积分",
+    startChess: "开始：+30 XP", startSpeak: "开始说话 →", whatHeard: "你听到了什么？", speakForDuo: "替 Duo 发言",
+    chessSubtitle: "与 DuoWindo6601 进行 20 分钟对弈", startChessMatch: "开始对局：+30 经验值",
+    pvp: "玩家对战玩家", pve: "玩家对战 DuoWindo6601",
+    readPractice: "阅读练习", aiTrans: "AI 翻译官", realOrNot: "是真是假？", writePractice: "写作练习",
+    topicPrompt: "词汇主题？", topicPlaceholder: "留空...", trySuperTitle: "试用 SUPER",
+    trySuperDesc: "无广告，无限制！", refill: "补充至 25", freeze: "冻结", freezeDesc: "保留连续天数",
+    refillGems: "充值宝石", popular: "热门", handful: "一把", sack: "麻袋", chest: "宝箱", cantListen: "无法收听",
+    cantSpeak: "无法说话", endChat: "结束对话", exitGame: "退出游戏", great: "太棒了！", wrong: "回答错误！", next: "继续",
+    correctAnswer: "正确答案：", checkmateWin: "将死！你赢了！", checkmateLoss: "将死！AI 获胜。",
+    videoCall: "视频通话", startInterview: "开始面试", smartMode: "智能模式", interviewer: "面试官", self: "你",
+    serverJsTitle: 'server.js 支持！',
+    serverJsDesc: 'DuoWindo 项目已正式集成专属生产服务器 server.js，完美支持静态托管与 SPA 路由！',
     serverJsBtn: '太棒了！ 🚀'
   }
 };
 
-// Helper to recursively strip undefined properties from Firestore payloads
-const sanitizeForFirestore = (data: any): any => {
-  if (data === null || data === undefined) return null;
-  if (typeof data !== 'object') return data;
-  if (Array.isArray(data)) return data.map(sanitizeForFirestore);
-  
-  // Preserve Firestore FieldValues (like serverTimestamp()) or objects with custom constructors/methods
-  if (data.constructor?.name === 'FieldValue' || (data as any)._methodName || typeof (data as any).toMillis === 'function') {
-    return data;
-  }
-
-  const cleaned: Record<string, any> = {};
-  for (const [key, val] of Object.entries(data)) {
-    if (val !== undefined) {
-      cleaned[key] = sanitizeForFirestore(val);
+const sanitizeForFirestore = (obj: any) => {
+  const cleaned: any = {};
+  for (const key of Object.keys(obj)) {
+    if (obj[key] !== undefined) {
+      cleaned[key] = obj[key];
     }
   }
   return cleaned;
@@ -568,12 +574,6 @@ const sanitizeForFirestore = (data: any): any => {
 export default function App() {
   const [screen, setScreen] = useState<AppScreen>(AppScreen.PATH);
   const [offlineMode, setOfflineMode] = useState(false);
-  
-  // API Keys and MCP states
-  const [geminiApiKey, setGeminiApiKey] = useState<string>(() => localStorage.getItem('duo_gemini_api_key') || '');
-  const [mcpEnabled, setMcpEnabled] = useState<boolean>(() => localStorage.getItem('duo_mcp_enabled') === 'true');
-  const [mcpApiKey, setMcpApiKey] = useState<string>(() => localStorage.getItem('duo_render_mcp_api_key') || 'rnd_oKY93YNjjiw10HPgvrwykFi29U83');
-  const [isGeminiPaid, setIsGeminiPaid] = useState<boolean>(() => localStorage.getItem('duo_gemini_is_paid') === 'true');
   
   // Mobile test simulator states
   const [simulatorMode, setSimulatorMode] = useState<'none' | 'android' | 'ios'>('none');
@@ -592,6 +592,12 @@ export default function App() {
   const [showScreenshotAlert, setShowScreenshotAlert] = useState<boolean>(false);
   const [isSwiping, setIsSwiping] = useState<boolean>(false);
   const [swipePath, setSwipePath] = useState<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
+  const [simTriggerDismissed, setSimTriggerDismissed] = useState<boolean>(() => localStorage.getItem('duo_sim_trigger_dismissed') === 'true');
+  const [showBetaModal, setShowBetaModal] = useState<boolean>(false);
+  const [showExplanationModal, setShowExplanationModal] = useState<boolean>(false);
+  const [explanation, setExplanation] = useState<string>('');
+  const [explanationLoading, setExplanationLoading] = useState<boolean>(false);
+  const [toast, setToast] = useState<string | null>(null);
   
   const [user, setUser] = useState<UserProgress>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -611,8 +617,8 @@ export default function App() {
   });
 
   const t = (key: string) => {
-    const lang = user.language || 'ru';
-    return TRANSLATIONS[lang]?.[key] || TRANSLATIONS['en']?.[key] || TRANSLATIONS['ru']?.[key] || key;
+    const lang = TRANSLATIONS[user.language] ? user.language : 'en';
+    return TRANSLATIONS[lang]?.[key] || TRANSLATIONS['en'][key] || TRANSLATIONS['ru'][key] || key;
   };
 
   const [currentCourse, setCurrentCourse] = useState<Course>(() => {
@@ -632,7 +638,6 @@ export default function App() {
       setAuthLoading(false);
       
       if (fUser) {
-        // Fetch profile
         try {
           const userRef = doc(db, 'users', fUser.uid);
           const docSnap = await getDoc(userRef);
@@ -723,7 +728,6 @@ export default function App() {
   const [selectedWordIds, setSelectedWordIds] = useState<string[]>([]);
   const [availableTokens, setAvailableTokens] = useState<WordToken[]>([]);
   const [feedback, setFeedback] = useState<{ status: 'idle' | 'correct' | 'wrong', message: string }>({ status: 'idle', message: '' });
-  const [toast, setToast] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [showAd, setShowAd] = useState(false);
   const [customTopic, setCustomTopic] = useState("");
@@ -731,25 +735,11 @@ export default function App() {
   const [canvasSize, setCanvasSize] = useState<{width: number, height: number}>({width: 320, height: 320}); 
   const [showTrace, setShowTrace] = useState(true); 
   const chatBottomRef = useRef<HTMLDivElement>(null);
-  
-  const [explanation, setExplanation] = useState<string | null>(null);
-  const [explanationLoading, setExplanationLoading] = useState(false);
-  const [showExplanationModal, setShowExplanationModal] = useState(false);
-
   const [showAndroidModal, setShowAndroidModal] = useState(false);
-  const [showBetaModal, setShowBetaModal] = useState(false);
-  const [betaDismissed, setBetaDismissed] = useState(() => {
-    return localStorage.getItem('duo_beta_dismissed') === 'true';
-  });
-  const [androidDismissed, setAndroidDismissed] = useState(() => {
-    return localStorage.getItem('duo_android_dismissed') === 'true';
-  });
-  const [serverJsDismissed, setServerJsDismissed] = useState(() => {
-    return localStorage.getItem('duo_serverjs_dismissed') === 'true';
-  });
-  const [simTriggerDismissed, setSimTriggerDismissed] = useState(() => {
-    return localStorage.getItem('duo_sim_trigger_dismissed') === 'true';
-  });
+  const [betaDismissed, setBetaDismissed] = useState(() => localStorage.getItem('duo_beta_dismissed') === 'true');
+  const [androidDismissed, setAndroidDismissed] = useState(() => localStorage.getItem('duo_android_dismissed') === 'true');
+  const [serverJsDismissed, setServerJsDismissed] = useState(() => localStorage.getItem('duo_serverjs_dismissed') === 'true');
+
 
   const triggerCelebrationConfetti = useCallback(() => {
     try {
@@ -1478,32 +1468,7 @@ export default function App() {
   const checkIllusionAnswer = async (selectedOption: 'A' | 'B') => { if (!currentExercise || !currentExercise.illusionData) return; setLoading(true); try { const isCorrect = currentExercise.illusionData.correctOption === selectedOption; if (isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: currentExercise.illusionData.explanation }); setUser(u => ({ ...u, xp: u.xp + 20 })); } else { playSound('wrong'); const correctText = currentExercise.illusionData.correctOption === 'A' ? currentExercise.illusionData.optionA : currentExercise.illusionData.optionB; setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${correctText}. ${currentExercise.illusionData.explanation}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } finally { setLoading(false); } };
   const checkDrawingAnswer = async () => { if (!currentExercise || !currentExercise.drawingData || !canvasRef.current) return; playSound('click'); setLoading(true); try { const imageBase64 = canvasRef.current.toDataURL('image/png').split(',')[1]; const result = await checkDrawing(imageBase64, currentExercise.drawingData.character); if (result.isFallback && !offlineMode) setShowLimitModal(true); if (result.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: result.feedback }); setUser(u => ({ ...u, xp: u.xp + 20 })); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: result.feedback }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } catch (e) { console.error(e); } finally { setLoading(false); } };
   const checkAnswer = async (spokenText?: string) => { if (!currentExercise) return; if (isRecording) { setIsRecording(false); if (recognitionRef.current) recognitionRef.current.stop(); if (timerRef.current) clearTimeout(timerRef.current); } if (!spokenText && currentExercise.type !== 'ishihara') playSound('click'); if (currentExercise.type === 'ishihara') { const correct = currentExercise.targetTranslation; const userAnswer = ishiharaInput.trim(); if (userAnswer === correct) { playSound('correct'); setFeedback({ status: 'correct', message: "Correct! You have good color vision for this plate." }); setUser(u => ({ ...u, xp: u.xp + 15 })); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `Incorrect. The number was ${correct}.` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } return; } if (currentExercise.type === 'reading') { setLoading(true); if (currentExercise.readingData?.mode === 'write') { const ans = readingInput; const res = await checkAnswerWithAI(currentCourse.localName, ans, currentExercise.readingData.prompt || "Write something relevant", user.subscription === 'max'); if (res.isFallback && !offlineMode) setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + 20, gems: u.gems + 5 })); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: res.feedback }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } setLoading(false); return; } else { let tempText = currentExercise.readingData!.text; const blanksCount = (tempText.match(/___/g) || []).length; if (selectedWordIds.length !== blanksCount) { setToast("Fill all blanks!"); setLoading(false); return; } const correctWords = currentExercise.readingData!.blanks?.map(b => b.word) || []; const userWords = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text); const isCorrect = correctWords.every((w, i) => w.toLowerCase() === userWords[i]?.toLowerCase()); if (isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: "Perfect!" }); setUser(u => ({ ...u, xp: u.xp + 20 })); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `Correct: ${currentExercise.targetTranslation}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } setLoading(false); return; } } setLoading(true); try { let ans = ""; if (typeof spokenText === 'string') ans = spokenText; else if (currentExercise.type === 'speech') { if (transcriptRef.current.trim()) ans = transcriptRef.current; else if (!recognitionRef.current) ans = currentExercise.originalSentence; else { setLoading(false); setToast(t('t_speech_empty')); return; } } else ans = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text).join(' '); const correctAnswer = currentExercise.type === 'speech' ? currentExercise.originalSentence : currentExercise.targetTranslation; const res = await checkAnswerWithAI(currentCourse.localName, ans, correctAnswer, user.subscription === 'max'); if (res.isFallback && !offlineMode) setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + 20, gems: u.gems + 5 })); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${correctAnswer}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } catch (e) { console.error(e); setToast("Ошибка проверки"); } finally { setLoading(false); } };
-  const handleContinueAfterLesson = () => {
-    playSound('click');
-    if (feedback.status === 'correct' || (currentExercise && (currentExercise.type === 'roleplay' || currentExercise.type === 'chess'))) {
-      setScreen(AppScreen.CELEBRATION);
-      setTimeout(() => {
-        triggerCelebrationConfetti();
-      }, 300);
-    } else {
-      if (user.subscription === 'free' && Math.random() > 0.5) setShowAd(true);
-      else setScreen(AppScreen.PATH);
-      setFeedback({ status: 'idle', message: '' });
-      setCurrentExercise(null);
-      setExplanation(null);
-      setShowExplanationModal(false);
-    }
-  };
-
-  const handleFinishCelebration = () => {
-    playSound('success');
-    if (user.subscription === 'free' && Math.random() > 0.5) setShowAd(true);
-    else setScreen(AppScreen.PATH);
-    setFeedback({ status: 'idle', message: '' });
-    setCurrentExercise(null);
-    setExplanation(null);
-    setShowExplanationModal(false);
-  };
+  const handleContinueAfterLesson = () => { playSound('click'); if (user.subscription === 'free' && Math.random() > 0.5) setShowAd(true); else setScreen(AppScreen.PATH); setFeedback({ status: 'idle', message: '' }); setCurrentExercise(null); setExplanation(null); setShowExplanationModal(false); }
   const handleSkip = () => { playSound('click'); setToast(t('t_skip')); handleContinueAfterLesson(); };
   const toggleRecording = () => { playSound('click'); if (isRecording) { setIsRecording(false); if (recognitionRef.current) recognitionRef.current.stop(); if (timerRef.current) clearTimeout(timerRef.current); if (currentExercise?.type === 'roleplay') setTimeout(() => { if (transcriptRef.current) handleRoleplaySend(transcriptRef.current); }, 500); else if (screen === AppScreen.VIDEO_CALL) setTimeout(() => { if (transcriptRef.current) handleVideoCallSend(transcriptRef.current); }, 500); else if (!recognitionRef.current) checkAnswer(currentExercise?.originalSentence); else setTimeout(() => checkAnswer(), 200); } else { transcriptRef.current = ""; setIsRecording(true); if (recognitionRef.current) try { recognitionRef.current.start(); } catch (e) { console.error("Rec start error", e); setIsRecording(false); } else timerRef.current = setTimeout(() => { setIsRecording(false); if (currentExercise?.type === 'roleplay') handleRoleplaySend("Hello friend!"); else if (screen === AppScreen.VIDEO_CALL) handleVideoCallSend("Hello DuoWindo6601!"); else checkAnswer(currentExercise?.originalSentence); }, 3000); } };
   const upgradeSubscription = (tier: SubscriptionTier) => { playSound('success'); setUser(u => ({ ...u, subscription: tier, energy: 25 })); setToast(tier === 'super' ? t('t_welcome_super') : t('t_welcome_max')); setScreen(AppScreen.PATH); };
@@ -1667,156 +1632,6 @@ export default function App() {
                     </div>
 
                     <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl"><h3 className="text-xl font-bold mb-4 text-white uppercase tracking-widest">{t('apiStatus')}</h3><div className="flex items-center justify-between"><div className="flex items-center space-x-3"><div className={`w-4 h-4 rounded-full ${offlineMode ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div><span className={`font-bold text-lg ${offlineMode ? 'text-red-400' : 'text-green-400'}`}>{offlineMode ? t('limitReached') : t('online')}</span></div><button onClick={() => { playSound('click'); checkApiStatus(); }} className="px-4 py-2 bg-gray-700 rounded-xl font-bold text-sm hover:bg-gray-600 transition-all border-b-4 border-gray-800 active:border-b-0 active:translate-y-1">{t('checkConnection')}</button></div></div>
-                    
-                    {/* API Keys & Integrations Panel */}
-                    <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl">
-                      <h3 className="text-xl font-bold mb-4 text-white uppercase tracking-widest">
-                        {user.language === 'ru' ? 'Ключи API и Интеграции' : 'API Keys & Integrations'}
-                      </h3>
-                      
-                      {/* Gemini API Section */}
-                      <div className="mb-6 pb-6 border-b border-gray-800">
-                        <label className="block text-sm font-bold text-gray-300 mb-2">
-                          {user.language === 'ru' ? 'Режим Gemini API' : 'Gemini API Mode'}
-                        </label>
-                        <div className="grid grid-cols-2 gap-3 mb-4">
-                          <button
-                            onClick={() => {
-                              playSound('select');
-                              setIsGeminiPaid(false);
-                              localStorage.setItem('duo_gemini_is_paid', 'false');
-                              localStorage.removeItem('duo_gemini_api_key');
-                              setGeminiApiKey('');
-                              setToast(user.language === 'ru' ? 'Включен бесплатный режим AI Studio' : 'AI Studio Free Tier Enabled');
-                            }}
-                            className={`p-3 rounded-xl font-bold border-b-4 text-xs transition-all ${!isGeminiPaid ? 'bg-purple-600 border-purple-800 text-white animate-pulse' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'}`}
-                          >
-                            AI Studio Free Tier
-                          </button>
-                          <button
-                            onClick={() => {
-                              playSound('select');
-                              setIsGeminiPaid(true);
-                              localStorage.setItem('duo_gemini_is_paid', 'true');
-                              setToast(user.language === 'ru' ? 'Включен режим Paid API' : 'Paid Gemini API Enabled');
-                            }}
-                            className={`p-3 rounded-xl font-bold border-b-4 text-xs transition-all ${isGeminiPaid ? 'bg-purple-600 border-purple-800 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'}`}
-                          >
-                            Paid Gemini API
-                          </button>
-                        </div>
-                        
-                        {isGeminiPaid && (
-                          <div className="mt-2 animate-in fade-in duration-200">
-                            <label className="block text-xs font-bold text-gray-400 mb-1">
-                              Gemini API Key
-                            </label>
-                            <div className="flex gap-2">
-                              <input
-                                type="password"
-                                value={geminiApiKey}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setGeminiApiKey(val);
-                                  localStorage.setItem('duo_gemini_api_key', val);
-                                }}
-                                placeholder="AIzaSy..."
-                                className="flex-1 px-4 py-2 bg-gray-800 border-2 border-gray-700 rounded-xl text-white text-sm focus:outline-none focus:border-purple-500 font-mono"
-                              />
-                              <button
-                                onClick={() => {
-                                  playSound('success');
-                                  setToast(user.language === 'ru' ? 'Ключ сохранен!' : 'Key Saved!');
-                                }}
-                                className="px-3 py-2 bg-purple-600 text-white text-xs font-bold rounded-xl hover:bg-purple-500 transition-all border-b-4 border-purple-800 active:border-b-0 active:translate-y-1"
-                              >
-                                {user.language === 'ru' ? 'Сохранить' : 'Save'}
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Render MCP Section */}
-                      <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <div>
-                            <span className="block text-sm font-bold text-gray-300">
-                              {user.language === 'ru' ? 'Функции отладки MCP' : 'MCP Debugging Features'}
-                            </span>
-                            <span className="block text-xs text-gray-500 font-medium">
-                              {user.language === 'ru' ? 'Использовать Render MCP для Jules' : 'Use Render MCP for Jules'}
-                            </span>
-                          </div>
-                          <button
-                            onClick={() => {
-                              playSound('click');
-                              const nextVal = !mcpEnabled;
-                              setMcpEnabled(nextVal);
-                              localStorage.setItem('duo_mcp_enabled', String(nextVal));
-                              setToast(nextVal ? (user.language === 'ru' ? 'MCP Включен' : 'MCP Enabled') : (user.language === 'ru' ? 'MCP Выключен' : 'MCP Disabled'));
-                            }}
-                            className={`w-12 h-6 rounded-full p-1 transition-colors duration-200 focus:outline-none ${mcpEnabled ? 'bg-emerald-500' : 'bg-gray-700'}`}
-                          >
-                            <div className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-200 ${mcpEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
-                          </button>
-                        </div>
-
-                        {mcpEnabled && (
-                          <div className="space-y-3 mt-3 animate-fade-in">
-                            <div>
-                              <label className="block text-xs font-bold text-gray-400 mb-1">
-                                Render MCP API Key
-                              </label>
-                              <div className="flex gap-2">
-                                <input
-                                  type="password"
-                                  value={mcpApiKey}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setMcpApiKey(val);
-                                    localStorage.setItem('duo_render_mcp_api_key', val);
-                                  }}
-                                  placeholder="rnd_..."
-                                  className="flex-1 px-4 py-2 bg-gray-800 border-2 border-gray-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500 font-mono"
-                                />
-                                <button
-                                  onClick={() => {
-                                    playSound('success');
-                                    setToast(user.language === 'ru' ? 'MCP Ключ сохранен!' : 'MCP Key Saved!');
-                                  }}
-                                  className="px-3 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-500 transition-all border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1"
-                                >
-                                  {user.language === 'ru' ? 'Сохранить' : 'Save'}
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* MCP Status & Live Console logs */}
-                            <div className="bg-gray-950 rounded-xl p-3 border-2 border-gray-800">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center space-x-2">
-                                  <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></div>
-                                  <span className="text-[10px] text-emerald-400 font-black tracking-wider uppercase">
-                                    {user.language === 'ru' ? 'СВЯЗЬ УСТАНОВЛЕНА' : 'MCP HOST CONNECTED'}
-                                  </span>
-                                </div>
-                                <span className="text-[9px] text-gray-500 font-mono">
-                                  {"port: 3000 -> render.mcp"}
-                                </span>
-                              </div>
-                              <div className="h-20 overflow-y-auto font-mono text-[9px] text-emerald-500/80 leading-relaxed no-scrollbar space-y-1">
-                                <p className="text-gray-500">[system] Handshaking with Render MCP Host...</p>
-                                <p className="text-emerald-400">[mcp] Authenticated successfully with key {mcpApiKey ? `${mcpApiKey.slice(0, 7)}...` : 'empty'}</p>
-                                <p className="text-blue-400">[jules] Registered tools: queryLogs, triggerRedeploy, getHealthCheck</p>
-                                <p className="text-purple-400">[jules] Active debugging pipeline enabled for {user.name}.</p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
                     <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl">
                     <h3 className="text-xl font-bold mb-4 text-white uppercase tracking-widest">{t('language')}</h3>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -1839,76 +1654,6 @@ export default function App() {
                     <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl"><h3 className="text-xl font-bold mb-4 text-white uppercase tracking-widest">{t('voiceProvider')}</h3><div className="grid grid-cols-2 md:grid-cols-4 gap-2"><button onClick={() => setUser({...user, voiceProvider: 'gemini'})} className={`p-3 rounded-xl font-bold border-b-4 ${user.voiceProvider === 'gemini' ? 'bg-purple-600 border-purple-800 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>Gemini AI</button><button onClick={() => setUser({...user, voiceProvider: 'google'})} className={`p-3 rounded-xl font-bold border-b-4 ${user.voiceProvider === 'google' ? 'bg-blue-600 border-blue-800 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>Google</button><button onClick={() => setUser({...user, voiceProvider: 'yandex'})} className={`p-3 rounded-xl font-bold border-b-4 ${user.voiceProvider === 'yandex' ? 'bg-red-600 border-red-800 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>Yandex</button><button onClick={() => setUser({...user, voiceProvider: 'system'})} className={`p-3 rounded-xl font-bold border-b-4 ${user.voiceProvider === 'system' ? 'bg-green-600 border-green-800 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>System</button></div></div>
                 </div>
             </div>
-        )}
-
-        {/* LESSON COMPLETION / CELEBRATION SCREEN */}
-        {screen === AppScreen.CELEBRATION && (
-          <div className="fixed inset-0 z-[150] bg-duo-dark flex items-center justify-center p-4 md:p-6 font-din overflow-y-auto">
-            <div className="bg-duo-card border-4 border-gray-700 rounded-[2.5rem] p-8 md:p-12 max-w-xl w-full text-center shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative overflow-hidden flex flex-col items-center animate-in zoom-in-95 duration-300">
-              
-              {/* Floating ambient shapes (confetti background) */}
-              <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-                <div className="absolute top-10 left-10 w-8 h-8 rounded-full bg-yellow-400 animate-bounce"></div>
-                <div className="absolute top-20 right-20 w-6 h-6 bg-blue-400 rotate-45 animate-pulse"></div>
-                <div className="absolute bottom-16 left-24 w-10 h-10 bg-emerald-400 rounded-lg animate-spin"></div>
-              </div>
-
-              {/* Celebrating Mascot */}
-              <div className="w-48 h-48 md:w-56 md:h-56 mb-6 drop-shadow-[0_15px_15px_rgba(0,0,0,0.4)] transition-transform hover:scale-105 duration-300">
-                <Mascot variant={currentCourse.mascotVariant || 'standard'} emotion="happy" className="w-full h-full" />
-              </div>
-
-              {/* Typography */}
-              <h2 className="text-3xl md:text-5xl font-black uppercase tracking-wider text-duo-green mb-2 drop-shadow-md">
-                {user.language === 'ru' ? 'УРОК ЗАВЕРШЕН!' : 'LESSON COMPLETE!'}
-              </h2>
-              <p className="text-gray-400 text-base md:text-lg font-bold mb-8">
-                {user.language === 'ru' ? 'Отличная работа! Вы стали еще ближе к своей цели.' : 'Amazing job! You are getting closer to your goals.'}
-              </p>
-
-              {/* Stats badges */}
-              <div className="grid grid-cols-2 gap-4 w-full mb-8">
-                <div className="bg-gray-800/80 border-2 border-gray-700 rounded-2xl p-4 flex flex-col items-center justify-center shadow-md">
-                  <div className="flex items-center space-x-2 text-yellow-400 font-black text-2xl md:text-3xl mb-1">
-                    <FireIcon className="w-6 h-6 md:w-8 md:h-8 animate-pulse text-yellow-500" />
-                    <span>+{currentExercise?.type === 'chess' ? 30 : 20}</span>
-                  </div>
-                  <span className="text-[10px] md:text-xs text-gray-400 font-extrabold uppercase tracking-widest">
-                    {user.language === 'ru' ? 'ОЧКИ ОПЫТА (XP)' : 'XP GAINED'}
-                  </span>
-                </div>
-                
-                <div className="bg-gray-800/80 border-2 border-gray-700 rounded-2xl p-4 flex flex-col items-center justify-center shadow-md">
-                  <div className="flex items-center space-x-2 text-emerald-400 font-black text-2xl md:text-3xl mb-1">
-                    <GemStoneIcon className="w-6 h-6 md:w-8 md:h-8 text-emerald-400" />
-                    <span>+5</span>
-                  </div>
-                  <span className="text-[10px] md:text-xs text-gray-400 font-extrabold uppercase tracking-widest">
-                    {user.language === 'ru' ? 'ДРАГОЦЕННОСТИ' : 'GEMS EARNED'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Animated progress bar */}
-              <div className="w-full mb-8">
-                <div className="flex justify-between items-center text-xs font-black text-gray-400 mb-2 uppercase tracking-wider">
-                  <span>{user.language === 'ru' ? 'ДНЕВНАЯ ЦЕЛЬ' : 'DAILY PROGRESS'}</span>
-                  <span className="text-duo-green">100%</span>
-                </div>
-                <div className="w-full bg-gray-800 rounded-full h-5 relative overflow-hidden shadow-inner border border-gray-700 p-1">
-                  <div className="h-full bg-gradient-to-r from-yellow-400 to-duo-green rounded-full shadow-[0_0_10px_rgba(88,204,2,0.5)] transition-all duration-1000 ease-out" style={{ width: '100%' }}></div>
-                </div>
-              </div>
-
-              {/* Action button */}
-              <button
-                onClick={handleFinishCelebration}
-                className="w-full py-4 bg-duo-green hover:bg-emerald-500 text-white font-black text-lg md:text-2xl rounded-2xl border-b-8 border-duo-greenDark active:border-b-0 active:translate-y-2 transition-all shadow-[0_10px_20px_rgba(88,204,2,0.3)] uppercase tracking-wider"
-              >
-                {user.language === 'ru' ? 'ПРОДОЛЖИТЬ' : 'CONTINUE'}
-              </button>
-            </div>
-          </div>
         )}
 
         {/* COURSE SELECT OVERLAY */}
