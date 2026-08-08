@@ -362,7 +362,41 @@ const TRANSLATIONS: Record<string, any> = {
     serverJsDesc: 'The DuoWindo project has officially integrated its own production server.js with complete static assets distribution and SPA fallback handling!',
     serverJsBtn: 'Awesome! 🚀'
   },
-  // ... other langs kept simplified as in previous turns for brevity, but functional ...
+  de: {
+    home: "STARTSEITE", practice: "ÜBUNG", leaderboard: "BESTENLISTE", shop: "SHOP", profile: "PROFIL",
+    unit: "Lektion", start: "START", check: "PRÜFEN", continue: "WEITER", skip: "ÜBERSPRINGEN",
+    settings: "Einstellungen", language: "Sprache", country: "Land", back: "Zurück", save: "Speichern",
+    voiceProvider: "Sprachausgabe", apiStatus: "API-Status", online: "Online", limitReached: "Limit erreicht",
+    checkConnection: "Verbindung prüfen", next: "WEITER"
+  },
+  fr: {
+    home: "ACCUEIL", practice: "PRATIQUE", leaderboard: "CLASSEMENT", shop: "BOUTIQUE", profile: "PROFIL",
+    unit: "Unité", start: "COMMENCER", check: "VÉRIFIER", continue: "CONTINUER", skip: "PASSER",
+    settings: "Paramètres", language: "Langue", country: "Pays", back: "Retour", save: "Enregistrer",
+    voiceProvider: "Fournisseur de voix", apiStatus: "Statut de l'API", online: "En ligne", limitReached: "Limite atteinte",
+    checkConnection: "Vérifier la connexion", next: "CONTINUER"
+  },
+  es: {
+    home: "INICIO", practice: "PRÁCTICA", leaderboard: "CLASIFICACIÓN", shop: "TIENDA", profile: "PERFIL",
+    unit: "Unidad", start: "EMPEZAR", check: "COMPROBAR", continue: "CONTINUAR", skip: "OMITIR",
+    settings: "Ajustes", language: "Idioma", country: "País", back: "Atrás", save: "Guardar",
+    voiceProvider: "Proveedor de voz", apiStatus: "Estado de la API", online: "En línea", limitReached: "Límite alcanzado",
+    checkConnection: "Comprobar conexión", next: "CONTINUAR"
+  },
+  ja: {
+    home: "ホーム", practice: "練習", leaderboard: "リーダーボード", shop: "ショップ", profile: "プロフィール",
+    unit: "ユニット", start: "スタート", check: "確認", continue: "続行", skip: "スキップ",
+    settings: "設定", language: "言語", country: "国", back: "戻る", save: "保存",
+    voiceProvider: "音声プロバイダー", apiStatus: "APIステータス", online: "オンライン", limitReached: "制限に達しました",
+    checkConnection: "接続を確認", next: "次へ"
+  },
+  zh: {
+    home: "首页", practice: "练习", leaderboard: "排行榜", shop: "商店", profile: "个人资料",
+    unit: "单元", start: "开始", check: "检查", continue: "继续", skip: "跳过",
+    settings: "设置", language: "语言", country: "国家", back: "返回", save: "保存",
+    voiceProvider: "语音提供商", apiStatus: "API 状态", online: "在线", limitReached: "达到限制",
+    checkConnection: "检查连接", next: "继续"
+  }
 };
 
 // Helper to recursively strip undefined properties from Firestore payloads
@@ -425,8 +459,8 @@ export default function App() {
   });
 
   const t = (key: string) => {
-    const lang = user.language === 'ru' ? 'ru' : 'en'; // Simple fallback for demo
-    return TRANSLATIONS[lang]?.[key] || TRANSLATIONS['ru'][key] || key;
+    const lang = TRANSLATIONS[user.language] ? user.language : "en";
+    return TRANSLATIONS[lang]?.[key] || TRANSLATIONS["en"]?.[key] || TRANSLATIONS["ru"]?.[key] || key;
   };
 
   const [currentCourse, setCurrentCourse] = useState<Course>(() => {
