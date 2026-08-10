@@ -930,6 +930,8 @@ export default function App() {
     }
   }, []);
 
+  const isIncognitoUser = !firebaseUser || !user.username || user.username.startsWith('incognito_') || user.name.includes('Гость') || user.name.includes('Incognito');
+
   const handleRegisterUser = () => {
     playSound('success');
     const cleanName = regName.trim() || (user.language === 'ru' ? 'Ученик' : 'Learner');
@@ -954,17 +956,18 @@ export default function App() {
   const handleContinueIncognito = () => {
     playSound('click');
     localStorage.setItem('duo_reg_prompt_seen_6601', 'true');
-    if (!user.username) {
-      const guestUser: UserProgress = {
-        ...user,
-        name: user.name === "Ученик 6601" ? (user.language === 'ru' ? "Гость (Инкогнито)" : "Guest (Incognito)") : user.name,
-        username: user.username || `incognito_${Math.floor(100 + Math.random() * 900)}`
-      };
-      setUser(guestUser);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(guestUser));
-    }
+    const assignedUsername = (user.username && !user.username.startsWith('user_')) 
+      ? user.username 
+      : `incognito_${Math.floor(100 + Math.random() * 900)}`;
+    const guestUser: UserProgress = {
+      ...user,
+      name: (user.name === "Ученик 6601" || user.name === "Ученик") ? (user.language === 'ru' ? "Гость (Инкогнито)" : "Guest (Incognito)") : user.name,
+      username: assignedUsername
+    };
+    setUser(guestUser);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(guestUser));
     setShowRegisterModal(false);
-    setToast(user.language === 'ru' ? "🕵️ Режим Инкогнито активен (Без аккаунта)" : "🕵️ Incognito Mode active (No account)");
+    setToast(user.language === 'ru' ? `🕵️ Режим Инкогнито активен (@${assignedUsername})` : `🕵️ Incognito Mode active (@${assignedUsername})`);
   };
 
   // Profile Editor Modal states & handlers
@@ -1709,16 +1712,32 @@ export default function App() {
                   <div className="flex items-center font-bold text-lg text-yellow-400">{user.subscription !== 'free' ? <InfiniteEnergyIcon className="w-7 h-7 text-yellow-400" /> : <><LightningIcon className="w-6 h-6 mr-1" /> {user.energy}</>}</div>
                 </div>
                  <div className="flex items-center space-x-2">
-                    <button 
-                      onClick={() => openRegisterModal('register')} 
-                      className="px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider bg-gray-800 hover:bg-gray-700 text-white border border-gray-700 hover:scale-105 transition-all flex items-center space-x-1 shadow-md cursor-pointer"
-                      title="Регистрация / Вход / Инкогнито"
-                    >
-                      <span>👤</span>
-                      <span className="hidden sm:inline">
-                        {user.username ? `@${user.username}` : user.name !== "Ученик 6601" ? user.name : (user.language === 'ru' ? 'Регистрация' : 'Register')}
-                      </span>
-                    </button>
+                    {isIncognitoUser ? (
+                      <button 
+                        onClick={() => openRegisterModal('register')} 
+                        className="px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/50 hover:scale-105 transition-all flex items-center space-x-1.5 shadow-md cursor-pointer"
+                        title="Режим Инкогнито (Без аккаунта) — Нажмите для регистрации"
+                      >
+                        <span>🕵️</span>
+                        <span className="hidden sm:inline">
+                          {user.language === 'ru' ? 'Инкогнито' : 'Incognito'}
+                        </span>
+                        <span className="text-[10px] bg-emerald-500/30 text-emerald-200 px-1.5 py-0.5 rounded-md font-bold">
+                          {user.username ? `@${user.username}` : 'Гость'}
+                        </span>
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => openRegisterModal('register')} 
+                        className="px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider bg-gray-800 hover:bg-gray-700 text-white border border-gray-700 hover:scale-105 transition-all flex items-center space-x-1 shadow-md cursor-pointer"
+                        title="Регистрация / Вход / Инкогнито"
+                      >
+                        <span>👤</span>
+                        <span className="hidden sm:inline">
+                          {user.username ? `@${user.username}` : user.name !== "Ученик 6601" ? user.name : (user.language === 'ru' ? 'Регистрация' : 'Register')}
+                        </span>
+                      </button>
+                    )}
                     <button 
                       onClick={() => { playSound('click'); setShowBetaModal(true); }} 
                       className="px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-500/50 hover:scale-105 transition-all flex items-center space-x-1 shadow-md cursor-pointer"
@@ -2744,6 +2763,32 @@ export default function App() {
           {screen === AppScreen.LEADERBOARD && (
              <div className="py-10 animate-in fade-in max-w-2xl mx-auto w-full px-4">
                 <div className="flex flex-col items-center mb-10 text-center"><ShieldIcon className="w-24 h-24 text-yellow-400 mb-4 animate-bounce" /><h2 className="text-3xl font-black uppercase tracking-widest text-yellow-400">{t('leaderboardTitle')}</h2><p className="text-gray-400 font-bold mt-2">Топ-3 переходят в Серебряную лигу</p></div>
+                
+                {isIncognitoUser && (
+                  <div className="mb-6 p-5 rounded-3xl bg-amber-950/50 border-2 border-amber-500/50 flex flex-col md:flex-row items-center justify-between gap-4 text-left shadow-xl">
+                    <div className="flex items-center space-x-3">
+                      <span className="text-3xl">🕵️</span>
+                      <div>
+                        <h4 className="font-black text-sm text-amber-300 uppercase">
+                          {user.language === 'ru' ? 'Режим Инкогнито (Без аккаунта)' : 'Incognito Mode (No Account)'}
+                        </h4>
+                        <p className="text-xs text-amber-200/80 font-medium leading-relaxed">
+                          {user.language === 'ru' 
+                            ? 'Очки зачитываются локально. Зарегистрируйтесь, чтобы участвовать в глобальном рейтинге!' 
+                            : 'Scores count locally. Register to join the global leaderboard!'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => openRegisterModal('register')}
+                      className="w-full md:w-auto px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase rounded-2xl border-b-2 border-amber-700 active:translate-y-0.5 transition-all whitespace-nowrap shadow-md flex items-center justify-center space-x-1"
+                    >
+                      <span>✨</span>
+                      <span>{user.language === 'ru' ? 'Регистрация' : 'Register'}</span>
+                    </button>
+                  </div>
+                )}
+
                 <div className="bg-duo-card border-2 border-gray-700 rounded-3xl overflow-hidden shadow-2xl">
                    {leaderboardData.map((entry, index) => {
                       const isUser = entry.id === 'user';
@@ -2949,7 +2994,20 @@ export default function App() {
                                </div>
                             ) : (
                                <div className="space-y-3 w-full">
-                                  <p className="text-xs text-gray-400 font-medium leading-relaxed">Войдите в аккаунт Google, чтобы сохранить свой прогресс, кристаллы и достижения в облаке!</p>
+                                  <div className="bg-emerald-950/50 border border-emerald-500/50 p-3 rounded-2xl text-left space-y-1.5">
+                                     <div className="flex items-center space-x-2">
+                                        <span className="text-base">🕵️</span>
+                                        <span className="font-black text-xs text-emerald-300 uppercase">
+                                           {user.language === 'ru' ? 'Режим Инкогнито (Без аккаунта)' : 'Incognito Mode (No Account)'}
+                                        </span>
+                                     </div>
+                                     <p className="text-[11px] text-emerald-200/80 font-bold leading-normal">
+                                        {user.language === 'ru' 
+                                           ? `Вы зашли как @${user.username || 'incognito'}. Данные сохраняются только в этом браузере.` 
+                                           : `Saved locally in browser as @${user.username || 'incognito'}.`}
+                                     </p>
+                                  </div>
+
                                   {isIframe && (
                                      <div className="bg-amber-950/40 border border-amber-800/60 p-3 rounded-2xl text-xs text-amber-200 font-medium space-y-2 mb-2 text-left">
                                         <p>⚠️ <strong>Ограничение фрейма:</strong> Вход может блокироваться внутри фрейма.</p>
@@ -2961,12 +3019,24 @@ export default function App() {
                                         </button>
                                      </div>
                                   )}
-                                  <button 
-                                     onClick={handleGoogleSignIn} 
-                                     className="w-full py-3 bg-duo-blue hover:brightness-110 text-white font-bold rounded-2xl border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all text-xs uppercase flex items-center justify-center space-x-2 shadow-lg"
-                                  >
-                                     <span>Войти через Google</span>
-                                  </button>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                                     <button 
+                                        onClick={() => openRegisterModal('register')} 
+                                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all text-xs uppercase flex items-center justify-center space-x-1 shadow-lg"
+                                     >
+                                        <span>👤</span>
+                                        <span>{user.language === 'ru' ? 'Регистрация' : 'Register'}</span>
+                                     </button>
+
+                                     <button 
+                                        onClick={handleGoogleSignIn} 
+                                        className="w-full py-3 bg-duo-blue hover:brightness-110 text-white font-black rounded-2xl border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all text-xs uppercase flex items-center justify-center space-x-1 shadow-lg"
+                                     >
+                                        <span>🌐</span>
+                                        <span>Google</span>
+                                     </button>
+                                  </div>
                                </div>
                             )}
                          </div>
@@ -3106,7 +3176,7 @@ export default function App() {
                     type="text" 
                     value={regName}
                     onChange={(e) => setRegName(e.target.value)}
-                    placeholder={user.language === 'ru' ? 'Например: Анатолий' : 'E.g. Anatoly'}
+                    placeholder={user.language === 'ru' ? 'Например: Иван' : 'E.g. Alex'}
                     maxLength={40}
                     className="w-full bg-gray-800 border-2 border-gray-700 focus:border-duo-blue text-white rounded-2xl px-4 py-3 text-sm font-bold focus:outline-none transition-colors"
                   />
@@ -3124,7 +3194,7 @@ export default function App() {
                       type="text" 
                       value={regUsername}
                       onChange={(e) => setRegUsername(e.target.value.replace(/[^a-zA-Z0-9_\.]/g, ''))}
-                      placeholder="anatolij81"
+                      placeholder="user123"
                       maxLength={30}
                       className="w-full bg-gray-800 border-2 border-gray-700 focus:border-duo-blue text-white rounded-2xl pl-9 pr-4 py-3 text-sm font-bold focus:outline-none transition-colors"
                     />
@@ -3400,7 +3470,7 @@ export default function App() {
                   type="text" 
                   value={editUsername}
                   onChange={(e) => setEditUsername(e.target.value.replace(/[^a-zA-Z0-9_\.]/g, ''))}
-                  placeholder="anatolij81"
+                  placeholder="user123"
                   maxLength={30}
                   className="w-full bg-gray-800 border-2 border-gray-700 focus:border-duo-blue text-white rounded-2xl pl-9 pr-4 py-3 text-sm font-bold focus:outline-none transition-colors"
                 />
@@ -4619,7 +4689,7 @@ return (
                             <span className="text-2xl">👑</span>
                             <div>
                                 <h4 className="font-bold text-sm text-purple-200">5. Панель Владельцев (Admin Dashboard)</h4>
-                                <p className="text-[11px] text-purple-300">Закреплена за abramovanatolij81@gmail.com / va997217@gmail.com</p>
+                                <p className="text-[11px] text-purple-300">Доступна владельцам и администраторам системы</p>
                             </div>
                         </div>
                         <button 
