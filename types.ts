@@ -108,6 +108,8 @@ export interface FeedbackItem {
   userColor?: string;
   rating: number; // 1 to 5
   category?: string;
+  courseId?: string;
+  courseName?: string;
   comment: string;
   likes: number;
   likedBy?: string[];

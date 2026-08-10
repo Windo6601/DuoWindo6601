@@ -285,7 +285,10 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
         >
           <span
             style={{ fontSize: Math.min(size.width, size.height) * 0.48, lineHeight: 1 }}
-            className="text-gray-900 font-sans font-bold select-none whitespace-nowrap text-center leading-none"
+            className={`text-gray-900 font-bold select-none whitespace-nowrap text-center leading-none ${
+              /[\u0600-\u06FF]/.test(character) ? 'font-arabic' : /[\u0590-\u05FF]/.test(character) ? 'font-hebrew' : 'font-sans'
+            }`}
+            dir={/[\u0600-\u06FF\u0590-\u05FF]/.test(character) ? 'rtl' : 'ltr'}
           >
             {character}
           </span>

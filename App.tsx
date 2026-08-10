@@ -79,71 +79,96 @@ const getAllAI_Moves = (fen: string): {from: Coords, to: Coords}[] => {
 const coordToAlg = (r: number, c: number) => `${String.fromCharCode(97 + c)}${8 - r}`;
 const algToCoord = (alg: string) => ({ c: alg.charCodeAt(0) - 97, r: 8 - parseInt(alg[1]) });
 
-// Improved Chess Piece Icons (Staunton Style) - RESTORED SVG
-const ChessPieceIcon: React.FC<{ type: string; color: ChessColor; className?: string }> = ({ type, color, className }) => {
-    const isWhite = color === 'w';
-    const fill = isWhite ? "#ffffff" : "#000000";
-    const stroke = isWhite ? "#000000" : "#ffffff";
-    const strokeWidth = 1.2;
-    const t = type.toUpperCase(); 
-    
-    return (
-        <svg viewBox="0 0 45 45" className={className} fill={fill} stroke={stroke} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
-            <g transform="translate(0,0)">
-                {(t === 'P') && (
-                    <path d="M22.5 9c-2.21 0-4 1.79-4 4 0 .89.29 1.71.78 2.38C17.33 16.5 16 18.59 16 21c0 2.03.94 3.84 2.41 5.03-3 1.06-7.41 5.55-7.41 13.47h23c0-7.92-4.41-12.41-7.41-13.47 1.47-1.19 2.41-3 2.41-5.03 0-2.41-1.33-4.5-3.28-5.62.49-.67.78-1.49.78-2.38 0-2.21-1.79-4-4-4z" />
-                )}
-                {(t === 'R') && (
-                   <g>
-                     <path d="M9 39h27v-3H9v3zM12.5 32l1.5-2.5h17l1.5 2.5h-20zM12 36v-4h21v4H12z" strokeLinecap="butt" />
-                     <path d="M14 29.5v-13h17v13H14z" strokeLinecap="butt" />
-                     <path d="M14 16.5L11 14h23l-3 2.5H14zM11 14V9h4v2h5V9h5v2h4V9h5v5H11z" strokeLinecap="butt" />
-                   </g>
-                )}
-                {(t === 'N') && (
-                   <g>
-                    <path d="M22 10c10.5 1 16.5 8 16 29H15c0-9 10-6.5 8-21" fill={fill} />
-                    <path d="M24 18c3.2 3.7 8.7 5 10 7-0.5-3.5-1-5.5-5-8 1-1.5-0.5-3-1.5-3.5-3-0.5-5.5 2-3.5 4.5z" fill={fill} />
-                    <path d="M9.5 25.5a4.5 4.5 0 1 1 9 0 4.5 4.5 0 1 1-9 0" fill={fill} stroke={stroke} />
-                    <path d="M15 15.5c-1.33 0-2.42.84-2.83 2.03-1.89.54-3.17 2.37-3.17 4.47 0 2.22 1.44 4.12 3.5 4.8 0 4.2 3.13 7.7 7.5 8.2v-1.5c-3.19-.46-5.5-3.4-5.5-6.7 0-2.3 1.22-4.32 3.03-5.55L16.5 20c.51.56 1.24.93 2.06.93 1.35 0 2.47-.92 2.75-2.18.51-.15 1.05-.22 1.59-.22.58 0 1.13.08 1.66.23.41-1.12 1.48-1.92 2.74-1.92 1.66 0 3 1.34 3 3 0 1.25-.77 2.32-1.85 2.78.33.68.51 1.45.51 2.26 0 2.76-2.24 5-5 5-1.99 0-3.7-.38-5.26-1.07-.36.72-.57 1.54-.57 2.4 0 2.2 1.32 4.12 3.23 5.07L22 37.5c-2.82-1.15-4.83-3.88-4.83-7.1 0-1.2.29-2.34.79-3.35.25-.5.25-1.09-.01-1.58-.26-.49-.78-.79-1.34-.76-1.56.07-2.99-1.02-3.23-2.57-.06-.39.06-.79.33-1.08.27-.29.67-.42 1.06-.33.39.09.79-.06 1.08-.33.29-.27.42-.67.33-1.06-.23-1.03-.68-1.97-1.3-2.77C14.18 16.1 14.58 15.5 15 15.5z" stroke="none" fill={stroke} /> 
-                   </g>
-                )}
-                {(t === 'B') && (
-                    <g>
-                        <path d="M9 36c3.39-.97 6.88-4.32 6.88-8.1 0-3.59-2.74-6.54-6.3-6.87L9 21c4.97 0 9 4.03 9 9 0 4.97-4.03 9-9 9z" fill={fill} stroke={stroke} /> 
-                        <path d="M22.5 9c2.21 0 4 1.79 4 4 0 .89-.29 1.71-.78 2.38 1.95 1.12 3.28 3.21 3.28 5.62 0 2.03-.94 3.84-2.41 5.03 3 1.06 7.41 5.55 7.41 13.47h-23c0-7.92 4.41-12.41 7.41-13.47-1.47-1.19-2.41-3-2.41-5.03 0-2.41 1.33-4.5 3.28-5.62-.49-.67-.78-1.49-.78-2.38 0-2.21 1.79-4 4-4z" fill={fill} stroke={stroke} />
-                        <path d="M22.5 15V6M19.5 9h6" stroke={stroke} strokeWidth={1.5}/>
-                    </g>
-                )}
-                {(t === 'Q') && (
-                    <g>
-                        <path d="M8 12l5 3 2.5-5 7 5 7-5 2.5 5 5-3L36 29H9L8 12z" fill={fill} stroke={stroke} />
-                        <path d="M8 29h29v5H8z" fill={fill} stroke={stroke} />
-                        <path d="M12 34h21v3H12z" fill={fill} stroke={stroke} />
-                        <circle cx="6" cy="12" r="2" fill={fill} stroke={stroke} />
-                        <circle cx="14" cy="9" r="2" fill={fill} stroke={stroke} />
-                        <circle cx="22.5" cy="8" r="2" fill={fill} stroke={stroke} />
-                        <circle cx="31" cy="9" r="2" fill={fill} stroke={stroke} />
-                        <circle cx="39" cy="12" r="2" fill={fill} stroke={stroke} />
-                    </g>
-                )}
-                {(t === 'K') && (
-                    <g>
-                        <path d="M22.5 11.63V6M20 8h5" stroke={stroke} strokeWidth={1.5} />
-                        <path d="M22.5 25c-2.21 0-4 1.79-4 4 0 .89.29 1.71.78 2.38C17.33 32.5 16 34.59 16 37c0 2.03.94 3.84 2.41 5.03-3 1.06-7.41 5.55-7.41 13.47h23c0-7.92-4.41-12.41-7.41-13.47 1.47-1.19 2.41-3 2.41-5.03 0-2.41-1.33-4.5-3.28-5.62.49-.67.78-1.49.78-2.38 0-2.21-1.79-4-4-4z" fill="none" stroke="none"/>
-                        <path d="M11.5 37c5.5 3 16.5 3 22 0v-7c0-2.21-1.79-4-4-4H15.5c-2.21 0-4 1.79-4 4v7z" fill={fill} stroke={stroke} />
-                        <path d="M11.5 30c5.5-3 16.5-3 22 0" fill="none" stroke={stroke} />
-                        <path d="M11.5 33.5c5.5-3 16.5-3 22 0" fill="none" stroke={stroke} />
-                        <path d="M22.5 26c-6.5 0-8-5.5-8-9 0-3.5 1.5-6 4-6 2.5 0 4 2.5 4 6 0 3.5-1.5 9-8 9z" fill={fill} stroke={stroke} />
-                        <path d="M22.5 11.63V6M20 8h5" stroke={stroke} strokeWidth={1.5} />
-                    </g>
-                )}
-            </g>
-        </svg>
-    );
+// Clean Staunton Chess Piece SVGs
+const CHESS_UNICODE: Record<string, { w: string; b: string }> = {
+  p: { w: '♙', b: '♟' },
+  r: { w: '♖', b: '♜' },
+  n: { w: '♘', b: '♞' },
+  b: { w: '♗', b: '♝' },
+  q: { w: '♕', b: '♛' },
+  k: { w: '♔', b: '♚' },
 };
 
-// ... (Other data constants RF_REPUBLICS, COURSES etc. kept as is) ...
+const ChessPieceIcon: React.FC<{ type: string; color: ChessColor; className?: string }> = ({ type, color, className }) => {
+    const isWhite = color === 'w';
+    const fill = isWhite ? "#FFFFFF" : "#1E293B";
+    const stroke = isWhite ? "#0F172A" : "#FFFFFF";
+    const strokeWidth = 1.5;
+    const t = type.toLowerCase(); 
+
+    if (t === 'p') {
+        return (
+            <svg viewBox="0 0 45 45" className={className} fill={fill} stroke={stroke} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M 22.5,9 C 20,9 18,11 18,13.5 C 18,14.5 18.3,15.4 18.8,16.2 C 16.8,17.2 15.5,19.2 15.5,21.5 C 15.5,23.5 16.4,25.3 17.8,26.5 C 14.8,27.5 12,31.5 12,36 L 33,36 C 33,31.5 30.2,27.5 27.2,26.5 C 28.6,25.3 29.5,23.5 29.5,21.5 C 29.5,19.2 28.2,17.2 26.2,16.2 C 26.7,15.4 27,14.5 27,13.5 C 27,11 25,9 22.5,9 Z" />
+                <path d="M 12,36 L 33,36 L 33,39 L 12,39 Z" />
+            </svg>
+        );
+    }
+
+    if (t === 'r') {
+        return (
+            <svg viewBox="0 0 45 45" className={className} fill={fill} stroke={stroke} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M 9,39 L 36,39 L 36,36 L 9,36 Z" />
+                <path d="M 12,36 L 12,32 L 33,32 L 33,36 Z" />
+                <path d="M 14,32 L 14,16 L 31,16 L 31,32 Z" />
+                <path d="M 12,16 L 12,9 L 16,9 L 16,12 L 21,12 L 21,9 L 24,9 L 24,12 L 29,12 L 29,9 L 33,9 L 33,16 Z" />
+            </svg>
+        );
+    }
+
+    if (t === 'n') {
+        const eyeFill = isWhite ? "#0F172A" : "#FFFFFF";
+        return (
+            <svg viewBox="0 0 45 45" className={className} fill={fill} stroke={stroke} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M 22,10 C 32.5,11 38.5,18 38,39 L 15,39 C 15,30 25,27.5 23,13" />
+                <path d="M 24,18 C 24.38,20.91 18.45,25.37 16,27 C 13,18 25.5,11 28,13.5 C 29,14.5 30,16.5 30,18.5 C 30,22.5 28,25 28,25 Z" />
+                <path d="M 9.5,25.5 C 9.5,27.5 11,29 13,29 C 15,29 16.5,27.5 16.5,25.5 C 16.5,23.5 15,22 13,22 C 11,22 9.5,23.5 9.5,25.5 Z" />
+                <circle cx="27" cy="15" r="1.5" fill={eyeFill} stroke="none" />
+            </svg>
+        );
+    }
+
+    if (t === 'b') {
+        return (
+            <svg viewBox="0 0 45 45" className={className} fill={fill} stroke={stroke} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M 9,39 L 36,39 L 36,36 L 9,36 Z" />
+                <path d="M 12,36 C 12,32 15,27 18,25 C 16,23 15,20 15,17 C 15,12.5 18.3,9 22.5,9 C 26.7,9 30,12.5 30,17 C 30,20 29,23 27,25 C 30,27 33,32 33,36 Z" />
+                <circle cx="22.5" cy="6" r="1.8" />
+                <path d="M 17.5,26 L 27.5,26 M 22.5,21 L 22.5,31" />
+            </svg>
+        );
+    }
+
+    if (t === 'q') {
+        return (
+            <svg viewBox="0 0 45 45" className={className} fill={fill} stroke={stroke} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M 9,39 L 36,39 L 36,36 L 9,36 Z" />
+                <path d="M 11,36 L 13,28 L 32,28 L 34,36 Z" />
+                <path d="M 9,26 L 9,14 L 15,22 L 22.5,11 L 30,22 L 36,14 L 36,26 Z" />
+                <circle cx="9" cy="12" r="2" />
+                <circle cx="15" cy="19" r="2" />
+                <circle cx="22.5" cy="9" r="2" />
+                <circle cx="30" cy="19" r="2" />
+                <circle cx="36" cy="12" r="2" />
+            </svg>
+        );
+    }
+
+    if (t === 'k') {
+        return (
+            <svg viewBox="0 0 45 45" className={className} fill={fill} stroke={stroke} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M 22.5,11.5 L 22.5,6 M 20,8.5 L 25,8.5" strokeWidth="2" />
+                <path d="M 22.5,25 C 22.5,25 27,17.5 27,13 C 27,10.5 25.5,9 22.5,9 C 19.5,9 18,10.5 18,13 C 18,17.5 22.5,25 22.5,25 Z" />
+                <path d="M 11.5,37 C 17,35 28,35 33.5,37 C 33.5,32 30,27 22.5,27 C 15,27 11.5,32 11.5,37 Z" />
+                <path d="M 11.5,37 L 33.5,37 L 33.5,40 L 11.5,40 Z" />
+                <path d="M 20,21 C 20,21 22.5,23.5 25,21" />
+            </svg>
+        );
+    }
+
+    return <span className={`text-2xl select-none ${isWhite ? 'text-white' : 'text-gray-900'}`}>{CHESS_UNICODE[t]?.[color] || '?'}</span>;
+};
+
 const RF_REPUBLICS = [
   { name: 'Adygea', local: 'Республика Адыгея' }, { name: 'Altai', local: 'Республика Алтай' },
   { name: 'Bashkortostan', local: 'Республика Башкортостан' }, { name: 'Buryatia', local: 'Республика Бурятия' },
@@ -237,6 +262,7 @@ const WORLD_COURSES: Course[] = [
   { id: 'it', name: 'Italian', localName: 'Итальянский', flagCode: 'it', themeColor: 'bg-green-600', themeBorder: 'border-green-800', mascotVariant: 'default' },
   { id: 'pt', name: 'Portuguese', localName: 'Португальский', flagCode: 'br', themeColor: 'bg-blue-500', themeBorder: 'border-blue-700', mascotVariant: 'default' },
   { id: 'ar', name: 'Arabic', localName: 'Арабский', flagCode: 'sa', themeColor: 'bg-emerald-600', themeBorder: 'border-emerald-800', mascotVariant: 'default' },
+  { id: 'he', name: 'Hebrew', localName: 'Иврит', flagCode: 'il', themeColor: 'bg-blue-600', themeBorder: 'border-blue-800', mascotVariant: 'default' },
 ];
 
 const SPECIAL_COURSES: Course[] = [
@@ -293,6 +319,26 @@ const ALPHABET_SETS: Record<string, AlphabetCategory[]> = {
       title: 'Гласные (Vowels)',
       items: ['ㅏ', 'ㅑ', 'ㅓ', 'ㅕ', 'ㅗ', 'ㅛ', 'ㅜ', 'ㅠ', 'ㅡ', 'ㅣ', 'ㅐ', 'ㅒ', 'ㅔ', 'ㅖ', 'ㅘ', 'ㅙ', 'ㅚ', 'ㅝ', 'ㅞ', 'ㅟ', 'ㅢ']
     }
+  ],
+  'ar': [
+    {
+      title: 'Арабские буквы (28)',
+      items: ['ا', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي']
+    },
+    {
+      title: 'Харкаты и Знаки',
+      items: ['َ', 'ُ', 'ِ', 'ً', 'ٌ', 'ٍ', 'ْ', 'ّ', 'آ', 'إ', 'أ', 'ء']
+    }
+  ],
+  'he': [
+    {
+      title: 'Буквы иврита (22)',
+      items: ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 'י', 'כ', 'ל', 'מ', 'נ', 'ס', 'ע', 'פ', 'צ', 'ק', 'ר', 'ש', 'ת']
+    },
+    {
+      title: 'Софиот (Конечные)',
+      items: ['ך', 'ם', 'ן', 'ף', 'ץ']
+    }
   ]
 };
 
@@ -308,6 +354,7 @@ const ALPHABETS: Record<string, string[]> = {
   'ja': ['あ', 'い', 'う', 'え', 'お', 'か', 'き', 'く', 'け', 'こ', 'さ', 'し', 'す', 'せ', 'そ', 'た', 'ち', 'つ', 'て', 'と', 'な', 'に', 'ぬ', 'ね', 'の', 'は', 'ひ', 'ふ', 'へ', 'ほ', 'ま', 'み', 'む', 'め', 'も', 'や', 'ゆ', 'よ', 'ら', 'り', 'る', 'れ', 'ろ', 'わ', 'を', 'ん'],
   'ko': ['ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅅ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ', 'ㅏ', 'ㅑ', 'ㅓ', 'ㅕ', 'ㅗ', 'ㅛ', 'ㅜ', 'ㅠ', 'ㅡ', 'ㅣ'],
   'ar': ['ا', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي'],
+  'he': ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 'י', 'כ', 'ל', 'מ', 'נ', 'ס', 'ע', 'פ', 'צ', 'ק', 'ר', 'ש', 'ת'],
   'ka': ['ა', 'ბ', 'გ', 'დ', 'ე', 'ვ', 'ზ', 'თ', 'ი', 'კ', 'ლ', 'მ', 'ნ', 'ო', 'პ', 'ჟ', 'რ', 'ს', 'ტ', 'უ', 'ფ', 'ქ', 'ღ', 'ყ', 'შ', 'ჩ', 'ც', 'ძ', 'წ', 'ჭ', 'ხ', 'ჯ', 'ჰ'],
   'hy': ['Ա', 'Բ', 'Գ', 'Դ', 'Ե', 'Զ', 'Է', 'Ը', 'Թ', 'Ժ', 'Ի', 'Լ', 'Խ', 'Ծ', 'Կ', 'Հ', 'Ձ', 'Ղ', 'Ճ', 'Մ', 'Յ', 'Ն', 'Շ', 'Ո', 'Չ', 'Պ', 'Ջ', 'Ռ', 'Ս', 'Վ', 'Տ', 'Ր', 'Ց', 'Ւ', 'Փ', 'Ք', 'Օ', 'Ֆ'],
   'uk': ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е', 'Є', 'Ж', 'З', 'И', 'І', 'Ї', 'Й', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ', 'Ь', 'Ю', 'Я'],
@@ -853,6 +900,73 @@ export default function App() {
     }
   }, [feedback.status, triggerCelebrationConfetti]);
 
+  // Registration & Incognito Auth Modal states & handlers
+  const [showRegisterModal, setShowRegisterModal] = useState<boolean>(false);
+  const [regName, setRegName] = useState<string>('');
+  const [regUsername, setRegUsername] = useState<string>('');
+  const [regAvatarColor, setRegAvatarColor] = useState<string>('bg-duo-blue');
+  const [regAvatarIcon, setRegAvatarIcon] = useState<string>('🦉');
+  const [regTab, setRegTab] = useState<'register' | 'incognito' | 'google'>('register');
+
+  const openRegisterModal = (initialTab: 'register' | 'incognito' | 'google' = 'register') => {
+    playSound('click');
+    setRegName(user.name !== "Ученик 6601" ? user.name : '');
+    setRegUsername(user.username || '');
+    setRegAvatarColor(user.avatarColor || 'bg-duo-blue');
+    setRegAvatarIcon(user.avatarIcon || '🦉');
+    setRegTab(initialTab);
+    setShowRegisterModal(true);
+  };
+
+  useEffect(() => {
+    const hasPrompted = localStorage.getItem('duo_reg_prompt_seen_6601');
+    if (!hasPrompted && !user.username && user.name === "Ученик 6601") {
+      const timer = setTimeout(() => {
+        setRegName('');
+        setRegUsername('');
+        setShowRegisterModal(true);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  const handleRegisterUser = () => {
+    playSound('success');
+    const cleanName = regName.trim() || (user.language === 'ru' ? 'Ученик' : 'Learner');
+    const cleanUsername = regUsername.trim().replace(/^@/, '');
+    
+    const updatedUser: UserProgress = {
+      ...user,
+      name: cleanName,
+      username: cleanUsername ? cleanUsername : `user_${Math.floor(1000 + Math.random() * 9000)}`,
+      avatarColor: regAvatarColor,
+      avatarIcon: regAvatarIcon,
+    };
+    setUser(updatedUser);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUser));
+    localStorage.setItem('duo_reg_prompt_seen_6601', 'true');
+    setShowRegisterModal(false);
+    setToast(user.language === 'ru' 
+      ? `🎉 Регистрация завершена! Имя: ${cleanName}, @${updatedUser.username}` 
+      : `🎉 Registration complete! Name: ${cleanName}, @${updatedUser.username}`);
+  };
+
+  const handleContinueIncognito = () => {
+    playSound('click');
+    localStorage.setItem('duo_reg_prompt_seen_6601', 'true');
+    if (!user.username) {
+      const guestUser: UserProgress = {
+        ...user,
+        name: user.name === "Ученик 6601" ? (user.language === 'ru' ? "Гость (Инкогнито)" : "Guest (Incognito)") : user.name,
+        username: user.username || `incognito_${Math.floor(100 + Math.random() * 900)}`
+      };
+      setUser(guestUser);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(guestUser));
+    }
+    setShowRegisterModal(false);
+    setToast(user.language === 'ru' ? "🕵️ Режим Инкогнито активен (Без аккаунта)" : "🕵️ Incognito Mode active (No account)");
+  };
+
   // Profile Editor Modal states & handlers
   const [showEditProfileModal, setShowEditProfileModal] = useState<boolean>(false);
   const [editName, setEditName] = useState<string>('');
@@ -1084,17 +1198,28 @@ export default function App() {
            currentCourse.localName.toLowerCase().includes('араб');
   }, [currentCourse]);
 
+  const isHebrewCourse = useMemo(() => {
+    return currentCourse.id === 'he' || 
+           currentCourse.name.toLowerCase().includes('hebrew') || 
+           currentCourse.localName.toLowerCase().includes('иврит');
+  }, [currentCourse]);
+
+  const isRtlCourse = useMemo(() => {
+    return isArabicCourse || isHebrewCourse;
+  }, [isArabicCourse, isHebrewCourse]);
+
   const isArabicText = useCallback((text: string) => {
     return /[\u0600-\u06FF]/.test(text || '');
   }, []);
 
+  const isHebrewText = useCallback((text: string) => {
+    return /[\u0590-\u05FF]/.test(text || '');
+  }, []);
+
   const formatRTLOverride = useCallback((text: string) => {
     if (!text) return "";
-    // Only wrap contiguous Arabic character sequences with U+202E ... U+202C.
-    // Cyrillic (Russian) and Latin (English) characters are left completely untouched!
-    return text.replace(/([\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF][\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\s\u060C\u061B\u061F\u064B-\u0652]*)/g, (match) => {
-      return `\u202E${match}\u202C`;
-    });
+    // Clean up any stray legacy \u202E / \u202C characters so connected script works naturally
+    return text.replace(/[\u202E\u202C]/g, '');
   }, []);
 
   const leaderboardData = useMemo(() => {
@@ -1585,6 +1710,16 @@ export default function App() {
                 </div>
                  <div className="flex items-center space-x-2">
                     <button 
+                      onClick={() => openRegisterModal('register')} 
+                      className="px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider bg-gray-800 hover:bg-gray-700 text-white border border-gray-700 hover:scale-105 transition-all flex items-center space-x-1 shadow-md cursor-pointer"
+                      title="Регистрация / Вход / Инкогнито"
+                    >
+                      <span>👤</span>
+                      <span className="hidden sm:inline">
+                        {user.username ? `@${user.username}` : user.name !== "Ученик 6601" ? user.name : (user.language === 'ru' ? 'Регистрация' : 'Register')}
+                      </span>
+                    </button>
+                    <button 
                       onClick={() => { playSound('click'); setShowBetaModal(true); }} 
                       className="px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-500/50 hover:scale-105 transition-all flex items-center space-x-1 shadow-md cursor-pointer"
                       title="Доступ бета-тестирование DuoWindo6601"
@@ -1631,7 +1766,7 @@ export default function App() {
                     </div>
                 )}
                 
-                <div className="bg-duo-card border-2 border-gray-700 rounded-[2.5rem] p-6 md:p-8 shadow-2xl" dir={currentCourse.id === 'ar' ? 'rtl' : 'ltr'}>
+                <div className="bg-duo-card border-2 border-gray-700 rounded-[2.5rem] p-6 md:p-8 shadow-2xl" dir={['ar', 'he'].includes(currentCourse.id) ? 'rtl' : 'ltr'}>
                     <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 gap-3 md:gap-4">
                         {(
                             ALPHABET_SETS[currentCourse.id]
@@ -1643,7 +1778,7 @@ export default function App() {
                                 onClick={() => startTraining('drawing', char)}
                                 className="aspect-square bg-gray-800 border-b-4 border-gray-900 rounded-2xl flex flex-col items-center justify-center hover:bg-gray-700 hover:scale-105 active:scale-95 active:border-b-0 active:translate-y-1 transition-all group p-1"
                             >
-                                <span className="text-2xl md:text-3xl font-black text-white group-hover:text-duo-blue">{char}</span>
+                                <span className={`text-2xl md:text-3xl font-black text-white group-hover:text-duo-blue ${currentCourse.id === 'ar' ? 'font-arabic' : currentCourse.id === 'he' ? 'font-hebrew' : ''}`}>{char}</span>
                                 <span className="text-[9px] font-bold text-gray-500 uppercase mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">Писать</span>
                             </button>
                         ))}
@@ -1917,7 +2052,11 @@ export default function App() {
                                                     <p className="text-[11px] text-amber-400 font-bold uppercase tracking-wider">
                                                         {c.id === 'chess' 
                                                             ? (user.language === 'ru' ? 'Шахматная игра & Логика' : 'Chess Game & Logic') 
-                                                            : (user.language === 'ru' ? 'Специальный курс' : 'Special Course')}
+                                                            : c.id === 'math'
+                                                            ? (user.language === 'ru' ? 'Точная наука' : 'Exact Science')
+                                                            : c.id === 'music'
+                                                            ? (user.language === 'ru' ? 'Музыкальная теория' : 'Music Theory')
+                                                            : (user.language === 'ru' ? 'Специальный предмет' : 'Special Subject')}
                                                     </p>
                                                 </div>
                                                 {currentCourse.id === c.id && <div className="bg-duo-green rounded-full p-1"><CheckCircleIcon className="w-6 h-6 text-white"/></div>}
@@ -2664,10 +2803,16 @@ export default function App() {
                    <p className="text-gray-400 font-bold text-sm md:text-base">
                       {user.username ? `@${user.username}` : (user.language === 'ru' ? 'Юзернейм не установлен' : 'No username set')}
                    </p>
-                   <button onClick={openEditProfile} className="mt-3 px-6 py-2.5 bg-duo-blue hover:brightness-110 text-white rounded-2xl font-black text-xs uppercase tracking-wider border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all flex items-center space-x-2 mx-auto shadow-lg">
-                      <PenIcon className="w-4 h-4" />
-                      <span>{user.language === 'ru' ? 'Редактировать профиль' : 'Edit Profile'}</span>
-                   </button>
+                   <div className="flex flex-wrap justify-center gap-3 mt-3">
+                      <button onClick={openEditProfile} className="px-5 py-2.5 bg-duo-blue hover:brightness-110 text-white rounded-2xl font-black text-xs uppercase tracking-wider border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all flex items-center space-x-2 shadow-lg">
+                         <PenIcon className="w-4 h-4" />
+                         <span>{user.language === 'ru' ? 'Редактировать профиль' : 'Edit Profile'}</span>
+                      </button>
+                      <button onClick={() => openRegisterModal('register')} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-wider border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all flex items-center space-x-2 shadow-lg">
+                         <span>👤</span>
+                         <span>{user.language === 'ru' ? 'Регистрация / Вход' : 'Registration / Auth'}</span>
+                      </button>
+                   </div>
                 </div>
 
                 {/* RESPONSIVE GRID FOR PROFILE CARDS (2-COL ON PC, 1-COL ON MOBILE) */}
@@ -2872,6 +3017,8 @@ export default function App() {
               playSound={playSound}
               setToast={setToast}
               onOpenAdminDashboard={() => setScreen(AppScreen.ADMIN_DASHBOARD)}
+              courses={COURSES}
+              currentCourse={currentCourse}
             />
           )}
 
@@ -2895,6 +3042,218 @@ export default function App() {
           <button key={item.screen} onClick={() => handleNavigation(item.screen)} className={`transition-all duration-300 ${screen === item.screen ? 'text-duo-blue scale-125 -translate-y-2' : 'text-gray-500'}`}><item.icon className="w-8 h-8" /></button>
         ))}
       </nav>
+
+      {/* REGISTRATION & INCOGNITO AUTH MODAL */}
+      {showRegisterModal && (
+        <div className="fixed inset-0 z-[220] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
+          <div className="bg-duo-dark border-2 border-gray-700 rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl space-y-6 text-white my-8 relative">
+            <button 
+              onClick={() => { playSound('click'); setShowRegisterModal(false); }} 
+              className="absolute top-5 right-5 text-gray-400 hover:text-white p-2 rounded-xl bg-gray-800 transition-colors"
+              title="Закрыть"
+            >
+              <CloseIcon className="w-6 h-6"/>
+            </button>
+
+            {/* HEADER */}
+            <div className="text-center space-y-2 pt-2">
+              <div className="w-16 h-16 bg-duo-blue/20 border-2 border-duo-blue rounded-3xl flex items-center justify-center text-3xl mx-auto shadow-lg">
+                🦉
+              </div>
+              <h2 className="text-2xl md:text-3xl font-black uppercase tracking-wider text-white">
+                {user.language === 'ru' ? 'Регистрация и Вход' : 'Registration & Login'}
+              </h2>
+              <p className="text-xs text-gray-400 font-bold max-w-xs mx-auto">
+                {user.language === 'ru' 
+                  ? 'Зарегистрируйте аккаунт, войдите через Google или играйте Инкогнито без аккаунта' 
+                  : 'Register an account, sign in with Google or play Incognito without an account'}
+              </p>
+            </div>
+
+            {/* TAB SELECTOR */}
+            <div className="grid grid-cols-3 gap-2 bg-gray-900 p-1.5 rounded-2xl border border-gray-800">
+              <button 
+                onClick={() => { playSound('click'); setRegTab('register'); }}
+                className={`py-2.5 px-1 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${regTab === 'register' ? 'bg-duo-blue text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+              >
+                {user.language === 'ru' ? 'Регистрация' : 'Register'}
+              </button>
+              <button 
+                onClick={() => { playSound('click'); setRegTab('incognito'); }}
+                className={`py-2.5 px-1 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center space-x-1 ${regTab === 'incognito' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+              >
+                <span>🕵️</span>
+                <span>{user.language === 'ru' ? 'Инкогнито' : 'Incognito'}</span>
+              </button>
+              <button 
+                onClick={() => { playSound('click'); setRegTab('google'); }}
+                className={`py-2.5 px-1 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${regTab === 'google' ? 'bg-purple-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+              >
+                {user.language === 'ru' ? 'Google' : 'Google'}
+              </button>
+            </div>
+
+            {/* CONTENT BY TAB */}
+            {regTab === 'register' && (
+              <div className="space-y-4 animate-in fade-in">
+                {/* NAME INPUT */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center justify-between">
+                    <span>{user.language === 'ru' ? 'Ваше Имя' : 'Display Name'}</span>
+                    <span className="text-[10px] text-duo-green font-black">{user.language === 'ru' ? '*Обязательно' : '*Required'}</span>
+                  </label>
+                  <input 
+                    type="text" 
+                    value={regName}
+                    onChange={(e) => setRegName(e.target.value)}
+                    placeholder={user.language === 'ru' ? 'Например: Анатолий' : 'E.g. Anatoly'}
+                    maxLength={40}
+                    className="w-full bg-gray-800 border-2 border-gray-700 focus:border-duo-blue text-white rounded-2xl px-4 py-3 text-sm font-bold focus:outline-none transition-colors"
+                  />
+                </div>
+
+                {/* USERNAME (@HANDLE) INPUT */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center justify-between">
+                    <span>{user.language === 'ru' ? 'Имя пользователя (@username)' : 'Username (@handle)'}</span>
+                    <span className="text-[10px] text-duo-blue font-black">{user.language === 'ru' ? 'Уникальный ник' : 'Unique handle'}</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-3.5 text-duo-blue font-black text-sm">@</span>
+                    <input 
+                      type="text" 
+                      value={regUsername}
+                      onChange={(e) => setRegUsername(e.target.value.replace(/[^a-zA-Z0-9_\.]/g, ''))}
+                      placeholder="anatolij81"
+                      maxLength={30}
+                      className="w-full bg-gray-800 border-2 border-gray-700 focus:border-duo-blue text-white rounded-2xl pl-9 pr-4 py-3 text-sm font-bold focus:outline-none transition-colors"
+                    />
+                  </div>
+                  <p className="text-[11px] text-gray-400 font-bold pl-1">
+                    {user.language === 'ru' ? 'Отображается в профиле и рейтинге' : 'Visible in profile and leaderboards'}
+                  </p>
+                </div>
+
+                {/* AVATAR COLOR & EMOJI QUICK SELECT */}
+                <div className="space-y-2 pt-1">
+                  <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">
+                    {user.language === 'ru' ? 'Выбор аватарки' : 'Select Avatar'}
+                  </label>
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-14 h-14 rounded-2xl ${regAvatarColor} border-2 border-white flex items-center justify-center text-2xl shadow-md flex-shrink-0`}>
+                      {regAvatarIcon}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 flex-1">
+                      {['🦉', '👑', '🚀', '⚡', '🏆', '♟️', '🎨', '🔥'].map(icon => (
+                        <button 
+                          key={icon}
+                          onClick={() => setRegAvatarIcon(icon)}
+                          className={`w-8 h-8 rounded-xl bg-gray-800 border transition-all text-sm flex items-center justify-center ${regAvatarIcon === icon ? 'border-duo-blue bg-duo-blue/30 scale-110' : 'border-gray-700'}`}
+                        >
+                          {icon}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* SUBMIT BUTTON */}
+                <button 
+                  onClick={handleRegisterUser}
+                  className="w-full py-4 bg-duo-green hover:brightness-110 text-white font-black rounded-2xl border-b-4 border-duo-greenDark active:border-b-0 active:translate-y-1 transition-all uppercase text-xs tracking-wider shadow-lg flex items-center justify-center space-x-2 mt-2"
+                >
+                  <span>🚀</span>
+                  <span>{user.language === 'ru' ? 'Зарегистрироваться и Начать' : 'Register & Get Started'}</span>
+                </button>
+              </div>
+            )}
+
+            {regTab === 'incognito' && (
+              <div className="space-y-5 animate-in fade-in py-2">
+                <div className="bg-emerald-950/40 border-2 border-emerald-500/50 p-5 rounded-2xl space-y-3 text-left">
+                  <div className="flex items-center space-x-3">
+                    <span className="text-3xl">🕵️</span>
+                    <div>
+                      <h4 className="font-black text-base text-emerald-300 uppercase">
+                        {user.language === 'ru' ? 'Режим Инкогнито (Без аккаунта)' : 'Incognito Mode (No Account)'}
+                      </h4>
+                      <p className="text-xs text-emerald-200/80 font-bold">
+                        {user.language === 'ru' ? 'Полная анонимность без ввода имени и почты' : 'Full privacy without entering email or name'}
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="text-xs text-gray-300 font-bold space-y-1.5 pl-2 list-disc list-inside">
+                    <li>{user.language === 'ru' ? 'Никакой регистрации и паролей' : 'No signups or passwords required'}</li>
+                    <li>{user.language === 'ru' ? 'Весь прогресс сохраняется в вашем браузере' : 'All progress is stored locally in browser'}</li>
+                    <li>{user.language === 'ru' ? 'Вы сможете зарегистрироваться в любой момент' : 'You can create an account at any time'}</li>
+                  </ul>
+                </div>
+
+                <button 
+                  onClick={handleContinueIncognito}
+                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all uppercase text-xs tracking-wider shadow-lg flex items-center justify-center space-x-2"
+                >
+                  <span>🕵️</span>
+                  <span>{user.language === 'ru' ? 'Войти как Гость / Инкогнито' : 'Continue as Guest / Incognito'}</span>
+                </button>
+              </div>
+            )}
+
+            {regTab === 'google' && (
+              <div className="space-y-5 animate-in fade-in py-2">
+                <div className="bg-purple-950/40 border-2 border-purple-500/50 p-5 rounded-2xl space-y-3 text-left">
+                  <div className="flex items-center space-x-3">
+                    <span className="text-3xl">🌐</span>
+                    <div>
+                      <h4 className="font-black text-base text-purple-300 uppercase">
+                        {user.language === 'ru' ? 'Облачная синхронизация Firebase' : 'Firebase Cloud Sync'}
+                      </h4>
+                      <p className="text-xs text-purple-200/80 font-bold">
+                        {user.language === 'ru' ? 'Сохраняйте свой прогресс на всех устройствах' : 'Sync your learning stats across devices'}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-300 font-bold">
+                    {user.language === 'ru' 
+                      ? 'При входе ваш прогресс будет автоматически привязан к вашему Google-аккаунту.' 
+                      : 'Your progress will automatically sync with your Google account.'}
+                  </p>
+                </div>
+
+                {isIframe && (
+                  <div className="bg-amber-950/40 border border-amber-800/60 p-3 rounded-2xl text-xs text-amber-200 font-medium space-y-2 text-left">
+                    <p>⚠️ <strong>Ограничение фрейма:</strong> Вход Google может блокироваться в iFrame.</p>
+                    <button 
+                      onClick={() => { playSound('click'); window.open(window.location.href, '_blank'); }} 
+                      className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-black font-bold rounded-xl active:translate-y-0.5 transition-all uppercase text-[10px] tracking-wider text-center"
+                    >
+                      Открыть в новой вкладке ↗
+                    </button>
+                  </div>
+                )}
+
+                <button 
+                  onClick={() => { setShowRegisterModal(false); handleGoogleSignIn(); }}
+                  className="w-full py-4 bg-duo-blue hover:brightness-110 text-white font-black rounded-2xl border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all uppercase text-xs tracking-wider shadow-lg flex items-center justify-center space-x-2"
+                >
+                  <span>🌐</span>
+                  <span>{user.language === 'ru' ? 'Войти через Google' : 'Sign in with Google'}</span>
+                </button>
+              </div>
+            )}
+
+            {/* BOTTOM INCOGNITO QUICK FOOTER LINK */}
+            <div className="pt-2 text-center border-t border-gray-800">
+              <button 
+                onClick={handleContinueIncognito} 
+                className="text-xs font-bold text-gray-400 hover:text-white transition-colors underline"
+              >
+                {user.language === 'ru' ? 'Пропустить / Продолжить без аккаунта (Инкогнито) ↗' : 'Skip / Continue without account (Incognito) ↗'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* EDIT PROFILE MODAL */}
       {showEditProfileModal && (
@@ -3124,7 +3483,13 @@ export default function App() {
                              <Mascot variant="chess" className="w-full h-full" />
                          </div>
                          <div className="bg-gray-800 border-2 border-gray-700 rounded-2xl rounded-bl-none p-4 ml-2 mb-4 relative shadow-lg flex-1">
-                             <p className="text-white font-bold text-sm">Не бойтесь. Я буду играть вполсилы.</p>
+                             <p className="text-white font-bold text-sm">
+                               {chessMode === 'study' 
+                                 ? (user.language === 'ru' ? 'Режим урока (без бота). Готовьтесь и отрабатывайте ходы!' : 'Lesson mode (no bot). Practice your moves!') 
+                                 : chessMode === 'tutorial' 
+                                 ? (user.language === 'ru' ? 'Обучение! Нажмите на любую белую фигуру, чтобы узнать её правила.' : 'Tutorial! Click on any white piece to learn its moves.')
+                                 : (user.language === 'ru' ? 'Не бойтесь. Я буду играть вполсилы!' : "Don't be afraid! I will play at half strength!")}
+                             </p>
                              <div className="absolute -left-2 bottom-0 w-4 h-4 bg-gray-800 border-l-2 border-b-2 border-gray-700 transform rotate-45 translate-y-1/2"></div>
                          </div>
                      </div>

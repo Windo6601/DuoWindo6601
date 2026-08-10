@@ -218,6 +218,24 @@ export const getFallbackExercise = (subjectId: string, type: Exercise['type'], s
             isFallback: true
         };
     }
+    if (subjectId === 'music') {
+        const notes = [
+            { note: "До (C)", question: "Какая нота идет первой в гамме До-мажор?", answer: "До" },
+            { note: "Ре (D)", question: "Какая нота находится между До и Ми?", answer: "Ре" },
+            { note: "Ми (E)", question: "На какой линейке нотного стана пишется нота Ми первой октавы?", answer: "Первой" },
+            { note: "Скрипичный ключ", question: "Какой ключ называют ключом Соль?", answer: "Скрипичный" },
+            { note: "Форте", question: "Как в музыке обозначается громкое исполнение?", answer: "Форте" },
+            { note: "Пиано", question: "Как в музыке обозначается тихое исполнение?", answer: "Пиано" },
+        ];
+        const item = notes[Math.floor(Math.random() * notes.length)];
+        const distractors = ["Фа", "Соль", "Ля", "Си", "Басовый", "Анданте", "Престо"].filter(d => d !== item.answer).slice(0, 3);
+        return {
+            id: crypto.randomUUID(), type: 'translation', originalSentence: item.question,
+            targetTranslation: item.answer,
+            wordBank: [item.answer, ...distractors].sort(() => Math.random() - 0.5),
+            isFallback: true
+        };
+    }
     if (subjectId.startsWith('rf-')) {
         return {
             id: crypto.randomUUID(), type: 'translation', originalSentence: `Это регион РФ: ${subjectName}?`,
@@ -234,6 +252,7 @@ export const getFallbackExercise = (subjectId: string, type: Exercise['type'], s
         'fr': [['Bonjour', 'Привет'], ['Chat', 'Кошка'], ['Chien', 'Собака'], ['Eau', 'Вода'], ['Maison', 'Дом'], ['Merci', 'Спасибо']],
         'es': [['Hola', 'Привет'], ['Gato', 'Кошка'], ['Perro', 'Собака'], ['Agua', 'Вода'], ['Casa', 'Дом'], ['Gracias', 'Спасибо']],
         'ar': [['مرحبا', 'Привет'], ['بيت', 'Дом'], ['ماء', 'Вода'], ['كتاب', 'Книга'], ['قلم', 'Ручка'], ['صديق', 'Друг'], ['شمس', 'Солнце'], ['قمر', 'Луна']],
+        'he': [['שלום', 'Привет'], ['בית', 'Дом'], ['מים', 'Вода'], ['ספר', 'Книга'], ['חבר', 'Друг'], ['תודה', 'Спасибо']],
     };
     
     const currentVocab = vocab[subjectId] || vocab['en'];
@@ -505,6 +524,7 @@ export const generateDrawing = async (subject: string, subjectId: string, specif
             else if (subjectId === 'ko') fallbackChar = "ㄱ";
             else if (subjectId === 'ru') fallbackChar = "А";
             else if (subjectId === 'ar') fallbackChar = "ا";
+            else if (subjectId === 'he') fallbackChar = "א";
         }
         return { 
             id: 'fb-dr', 

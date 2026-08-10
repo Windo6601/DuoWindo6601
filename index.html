@@ -6,16 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>DuoWindo6601</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Noto+Sans+Arabic:wght@400;600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400;1,700&family=Cairo:wght@400;600;700;800;900&family=Noto+Sans+Arabic:wght@400;600;700;800&family=Noto+Sans+Hebrew:wght@400;600;700;800&family=Nunito:wght@400;600;700;800&family=Rubik:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     <script>
       tailwind.config = {
         theme: {
           extend: {
             fontFamily: {
-              sans: ['"DIN Next Rounded"', 'Cairo', 'Nunito', 'sans-serif'],
+              sans: ['"DIN Next Rounded"', 'Cairo', 'Rubik', 'Nunito', 'sans-serif'],
               din: ['"DIN Next Rounded"', 'Nunito', 'sans-serif'],
               feather: ['"Feather"', 'sans-serif'],
-              arabic: ['"Cairo"', '"Noto Sans Arabic"', 'sans-serif'],
+              arabic: ['"Cairo"', '"Amiri"', '"Noto Sans Arabic"', 'sans-serif'],
+              hebrew: ['"Rubik"', '"Noto Sans Hebrew"', 'sans-serif'],
             },
             colors: {
               duo: {
@@ -95,9 +96,12 @@
         font-weight: 700;
       }
 
-      /* Arabic typography and RTL override U+202E helper */
+      /* Arabic & Hebrew typography helpers */
       .font-arabic {
-        font-family: 'Cairo', 'Noto Sans Arabic', sans-serif !important;
+        font-family: 'Cairo', 'Amiri', 'Noto Sans Arabic', sans-serif !important;
+      }
+      .font-hebrew {
+        font-family: 'Rubik', 'Noto Sans Hebrew', sans-serif !important;
       }
       .rtl-text {
         direction: rtl;

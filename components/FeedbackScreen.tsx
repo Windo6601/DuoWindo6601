@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, orderBy, getDocs, addDoc, updateDoc, deleteDoc, doc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '../firebase';
-import { UserProgress, FeedbackItem, FeedbackReply } from '../types';
+import { UserProgress, FeedbackItem, FeedbackReply, Course } from '../types';
 import { StarIcon, ThumbsUpIcon, MessageSquareIcon, CloseIcon, TrashIcon } from './Icons';
 
 interface FeedbackScreenProps {
@@ -10,7 +10,32 @@ interface FeedbackScreenProps {
   playSound: (type: 'click' | 'correct' | 'wrong' | 'fanfare' | 'streak') => void;
   setToast: (msg: string) => void;
   onOpenAdminDashboard?: () => void;
+  courses?: Course[];
+  currentCourse?: Course;
 }
+
+export const DEFAULT_FEEDBACK_COURSES = [
+  { id: 'general', name: 'Общий отзыв о DuoWindo6601', localName: 'Все курсы', flagEmoji: '🌟' },
+  { id: 'kk', name: 'Казахский язык', localName: 'Казахстан', flagEmoji: '🇰🇿' },
+  { id: 'uz', name: 'Узбекский язык', localName: 'Узбекистан', flagEmoji: '🇺🇿' },
+  { id: 'am', name: 'Армянский язык', localName: 'Армения', flagEmoji: '🇦🇲' },
+  { id: 'kg', name: 'Киргизский язык', localName: 'Кыргызстан', flagEmoji: '🇰🇬' },
+  { id: 'az', name: 'Азербайджанский язык', localName: 'Азербайджан', flagEmoji: '🇦🇿' },
+  { id: 'tg', name: 'Таджикский язык', localName: 'Таджикистан', flagEmoji: '🇹🇯' },
+  { id: 'tm', name: 'Туркменский язык', localName: 'Туркменистан', flagEmoji: '🇹🇲' },
+  { id: 'en', name: 'Английский язык', localName: 'English', flagEmoji: '🇬🇧' },
+  { id: 'de', name: 'Немецкий язык', localName: 'Deutsch', flagEmoji: '🇩🇪' },
+  { id: 'fr', name: 'Французский язык', localName: 'Français', flagEmoji: '🇫🇷' },
+  { id: 'es', name: 'Испанский язык', localName: 'Español', flagEmoji: '🇪🇸' },
+  { id: 'zh', name: 'Китайский язык', localName: '中文', flagEmoji: '🇨🇳' },
+  { id: 'ja', name: 'Японский язык', localName: '日本語', flagEmoji: '🇯🇵' },
+  { id: 'ko', name: 'Корейский язык', localName: '한국어', flagEmoji: '🇰🇷' },
+  { id: 'ar', name: 'Арабский язык', localName: 'العربية', flagEmoji: '🇸🇦' },
+  { id: 'he', name: 'Иврит', localName: 'עברית', flagEmoji: '🇮🇱' },
+  { id: 'chess', name: 'Шахматы', localName: 'Предметы & Игры', flagEmoji: '♟️' },
+  { id: 'math', name: 'Математика', localName: 'Предметы & Игры', flagEmoji: '🔢' },
+  { id: 'music', name: 'Музыка', localName: 'Предметы & Игры', flagEmoji: '🎵' },
+];
 
 const CATEGORIES = [
   '🌟 Общие впечатления',
@@ -130,6 +155,8 @@ const INITIAL_REVIEWS: FeedbackItem[] = [
     userColor: '#1cb0f6',
     rating: 5,
     category: '🏛️ Языки СНГ (казахский, узбекский, армянский и др.)',
+    courseId: 'kk',
+    courseName: 'Казахский язык',
     comment: 'Отличное приложение DuoWindo6601! Озвучка букв и тренажер письменности для казахского, узбекского, армянского и других языков СНГ очень помогают в обучении!',
     likes: 12,
     likedBy: [],
@@ -156,6 +183,8 @@ const INITIAL_REVIEWS: FeedbackItem[] = [
     userColor: '#ff9600',
     rating: 5,
     category: '🌍 Мировые языки (английский, испанский, китайский и др.)',
+    courseId: 'en',
+    courseName: 'Английский язык',
     comment: 'Курсы мировых языков (английский, испанский, китайский, немецкий) сделаны великолепно! Практика написания и аудио на смартфоне дают прекрасный результат.',
     likes: 8,
     likedBy: [],
@@ -181,6 +210,8 @@ const INITIAL_REVIEWS: FeedbackItem[] = [
     userColor: '#ce82ff',
     rating: 5,
     category: '🧩 Предметы & Игры (шахматы, математика, логика)',
+    courseId: 'chess',
+    courseName: 'Шахматы',
     comment: 'Раздел Предметы & Игры потрясающий! Шахматный симулятор и логика превосходно сочетаются с обучением языкам.',
     likes: 14,
     likedBy: [],
@@ -206,6 +237,8 @@ const INITIAL_REVIEWS: FeedbackItem[] = [
     userColor: '#ff4b4b',
     rating: 2,
     category: '🐛 Ошибка / Доработка',
+    courseId: 'general',
+    courseName: 'Общий отзыв о DuoWindo6601',
     comment: 'При слабом сигнале сети звук произношения букв подгружается с задержкой в пару секунд.',
     likes: 3,
     likedBy: [],
@@ -231,7 +264,9 @@ const INITIAL_REVIEWS: FeedbackItem[] = [
     userColor: '#58cc02',
     rating: 5,
     category: '🌟 Общие впечатления',
-    comment: 'Супер интерфейс в стиле Duolingo, шахматный тренажер и AI озвучка просто восторг. Спасибо разработчикам за DuoWindo6601!',
+    courseId: 'am',
+    courseName: 'Армянский язык',
+    comment: 'Супер интерфейс в стиле Duolingo, тренажер армянского языка и AI озвучка просто восторг. Спасибо разработчикам за DuoWindo6601!',
     likes: 15,
     likedBy: [],
     replies: [],
@@ -244,12 +279,46 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
   onBack,
   playSound,
   setToast,
-  onOpenAdminDashboard
+  onOpenAdminDashboard,
+  courses = [],
+  currentCourse
 }) => {
   const [reviews, setReviews] = useState<FeedbackItem[]>(INITIAL_REVIEWS);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [filterRating, setFilterRating] = useState<number | 'all'>('all');
+
+  // Build course list for feedback form & filter
+  const availableCourseList = React.useMemo(() => {
+    if (courses && courses.length > 0) {
+      const mapped = courses.map((c) => ({
+        id: c.id,
+        name: c.localName || c.name,
+        localName: c.name,
+        flagEmoji: c.flagCode
+          ? c.flagCode.length === 2
+            ? c.flagCode
+                .toUpperCase()
+                .replace(/./g, (char) => String.fromCodePoint(127397 + char.charCodeAt(0)))
+            : c.flagCode === 'math'
+            ? '🔢'
+            : c.flagCode === 'chess'
+            ? '♟️'
+            : c.flagCode === 'music'
+            ? '🎵'
+            : '📚'
+          : '📚'
+      }));
+      return [
+        { id: 'general', name: 'Общий отзыв о DuoWindo6601', localName: 'Все курсы', flagEmoji: '🌟' },
+        ...mapped
+      ];
+    }
+    return DEFAULT_FEEDBACK_COURSES;
+  }, [courses]);
+
+  const [selectedCourseId, setSelectedCourseId] = useState<string>(currentCourse?.id || 'general');
+  const [filterCourseId, setFilterCourseId] = useState<string>('all');
 
   // Admin Check helper for Owner
   const ADMIN_EMAILS = ['abramovanatolij81@gmail.com', 'va997217@gmail.com'];
@@ -353,6 +422,8 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
             userColor: data.userColor || '#58cc02',
             rating: data.rating || 5,
             category: data.category || '🌟 Общие впечатления',
+            courseId: data.courseId || undefined,
+            courseName: data.courseName || undefined,
             comment: data.comment || '',
             likes: data.likes || 0,
             likedBy: data.likedBy || [],
@@ -403,6 +474,8 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
           userColor: data.userColor || '#58cc02',
           rating: data.rating || 5,
           category: data.category || '🌟 Общие впечатления',
+          courseId: data.courseId || undefined,
+          courseName: data.courseName || undefined,
           comment: data.comment || '',
           likes: data.likes || 0,
           likedBy: data.likedBy || [],
@@ -440,6 +513,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
     const randomAvatar = RANDOM_USER_AVATARS[Math.floor(Math.random() * RANDOM_USER_AVATARS.length)];
     const randomColor = RANDOM_USER_COLORS[Math.floor(Math.random() * RANDOM_USER_COLORS.length)];
     const includeReply = Math.random() > 0.2;
+    const randomCourse = availableCourseList[Math.floor(Math.random() * availableCourseList.length)];
 
     const randomReplyList: FeedbackReply[] = includeReply ? [
       {
@@ -461,6 +535,8 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
       userColor: randomColor,
       rating: template.rating,
       category: template.category,
+      courseId: randomCourse.id,
+      courseName: randomCourse.name,
       comment: template.comment,
       likes: Math.floor(Math.random() * 8),
       likedBy: [],
@@ -519,6 +595,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
     setSubmitting(true);
 
     const isAdminAuthor = isAdminMode && asAdminForm;
+    const selectedCourseObj = availableCourseList.find((c) => c.id === selectedCourseId);
 
     const newFeedback: Omit<FeedbackItem, 'id'> = {
       userId: isAdminAuthor ? 'admin-duowindo6601' : (user.username || user.name || 'user-' + Date.now()),
@@ -527,6 +604,8 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
       userColor: isAdminAuthor ? '#f59e0b' : (user.avatarColor || '#1cb0f6'),
       rating,
       category,
+      courseId: selectedCourseId,
+      courseName: selectedCourseObj ? selectedCourseObj.name : 'Общий отзыв',
       comment: comment.trim(),
       likes: 0,
       likedBy: [],
@@ -703,7 +782,14 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
-  const filteredReviews = sortedReviews.filter((r) => filterRating === 'all' || r.rating === filterRating);
+  const filteredReviews = sortedReviews.filter((r) => {
+    const matchesRating = filterRating === 'all' || r.rating === filterRating;
+    const matchesCourse =
+      filterCourseId === 'all' ||
+      r.courseId === filterCourseId ||
+      (!r.courseId && filterCourseId === 'general');
+    return matchesRating && matchesCourse;
+  });
 
   return (
     <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full px-4 py-4 md:py-6 overflow-y-auto">
@@ -1158,6 +1244,24 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
             </div>
           </div>
 
+          {/* Course Selector */}
+          <div className="mb-4">
+            <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <span>📚</span> Выберите курс DuoWindo6601:
+            </label>
+            <select
+              value={selectedCourseId}
+              onChange={(e) => { playSound('click'); setSelectedCourseId(e.target.value); }}
+              className="w-full bg-gray-900 border-2 border-gray-700 rounded-2xl p-3 text-xs md:text-sm text-white focus:outline-none focus:border-duo-green transition-all"
+            >
+              {availableCourseList.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.flagEmoji} {c.name} {c.localName ? `(${c.localName})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Category Selector */}
           <div className="mb-4">
             <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
@@ -1217,6 +1321,49 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
           </div>
         </form>
       )}
+
+      {/* Course Filter Bar */}
+      <div className="bg-duo-card border border-gray-700/80 rounded-2xl p-3 mb-4 space-y-2">
+        <div className="flex items-center justify-between text-xs font-bold text-gray-300">
+          <span className="flex items-center gap-1.5 text-duo-yellow">
+            <span>🎓</span> Фильтр по курсу:
+          </span>
+          {filterCourseId !== 'all' && (
+            <button
+              onClick={() => { playSound('click'); setFilterCourseId('all'); }}
+              className="text-[11px] text-duo-blue hover:underline font-bold"
+            >
+              Сбросить фильтр
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-1 scrollbar-thin">
+          <button
+            onClick={() => { playSound('click'); setFilterCourseId('all'); }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              filterCourseId === 'all'
+                ? 'bg-duo-blue text-white shadow-md border-b-2 border-duo-blueDark'
+                : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700'
+            }`}
+          >
+            🌍 Все курсы
+          </button>
+          {availableCourseList.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => { playSound('click'); setFilterCourseId(c.id); }}
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                filterCourseId === c.id
+                  ? 'bg-duo-blue text-white shadow-md border-b-2 border-duo-blueDark'
+                  : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700'
+              }`}
+            >
+              <span>{c.flagEmoji}</span>
+              <span>{c.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Filter Tabs */}
       <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 scrollbar-none">
@@ -1318,6 +1465,11 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
                         {rev.category && (
                           <span className="text-[10px] font-normal bg-gray-800 text-gray-300 px-2 py-0.5 rounded-full border border-gray-700">
                             {rev.category}
+                          </span>
+                        )}
+                        {rev.courseName && (
+                          <span className="text-[10px] font-bold bg-duo-blue/20 text-duo-blue px-2 py-0.5 rounded-full border border-duo-blue/40 flex items-center gap-1">
+                            🎓 {rev.courseName}
                           </span>
                         )}
                       </div>
