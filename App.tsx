@@ -841,9 +841,29 @@ export default function App() {
   const [showTrace, setShowTrace] = useState(true); 
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const [showAndroidModal, setShowAndroidModal] = useState(false);
+  const [showBrowserModal, setShowBrowserModal] = useState(false);
+  const [isOutdatedBrowserDetected, setIsOutdatedBrowserDetected] = useState(false);
   const [betaDismissed, setBetaDismissed] = useState(() => localStorage.getItem('duo_beta_dismissed') === 'true');
   const [androidDismissed, setAndroidDismissed] = useState(() => localStorage.getItem('duo_android_dismissed') === 'true');
   const [serverJsDismissed, setServerJsDismissed] = useState(() => localStorage.getItem('duo_serverjs_dismissed') === 'true');
+
+  useEffect(() => {
+    try {
+      const ua = navigator.userAgent || '';
+      const isOldOS = /Windows NT 5\.1|Windows NT 5\.2|Windows NT 6\.0/i.test(ua); // Windows XP / Vista
+      const isOldUA = /MSIE|Trident|Chrome\/[1-8][0-9]\.|Firefox\/[1-8][0-9]\.|Safari\/[1-9]\.|Version\/[1-9]\.|Version\/1[0-3]\./i.test(ua);
+      const isMissingFeatures = !(window.fetch && window.Promise && window.crypto && window.MediaRecorder && window.AudioContext);
+      if (isOldOS || isOldUA || isMissingFeatures) {
+        setIsOutdatedBrowserDetected(true);
+        const dismissed = sessionStorage.getItem('duo_browser_warning_dismissed');
+        if (!dismissed) {
+          setShowBrowserModal(true);
+        }
+      }
+    } catch (e) {
+      console.warn("Browser compatibility check failed:", e);
+    }
+  }, []);
 
 
   const triggerCelebrationConfetti = useCallback(() => {
@@ -1745,6 +1765,14 @@ export default function App() {
                     >
                       <span className="animate-pulse">🧪</span>
                       <span className="hidden sm:inline">Бета-Тест</span>
+                    </button>
+                    <button 
+                      onClick={() => { playSound('click'); setShowBrowserModal(true); }} 
+                      className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider ${isOutdatedBrowserDetected ? 'bg-amber-950 text-amber-300 border border-amber-500/80 animate-pulse' : 'bg-gray-800/80 text-gray-300 border border-gray-700 hover:text-white'} hover:scale-105 transition-all flex items-center space-x-1 shadow-md cursor-pointer`}
+                      title="Предупреждение о браузере / Поддержка"
+                    >
+                      <span>⚠️</span>
+                      <span className="hidden md:inline">Браузер</span>
                     </button>
                     <button onClick={() => { playSound('click'); setScreen(AppScreen.SUBSCRIPTION); }} className={`px-4 py-1.5 rounded-xl text-[12px] font-black border-b-4 uppercase tracking-widest transition-transform hover:scale-105 ${user.subscription === 'max' ? 'bg-black border-gray-700 text-duo-blue shadow-[0_0_10px_rgba(28,176,246,0.5)]' : user.subscription === 'super' ? 'bg-gradient-to-r from-blue-500 to-purple-500 border-purple-700 text-white' : 'bg-duo-blue border-blue-800 text-white'}`}>{user.subscription === 'free' ? t('free') : user.subscription === 'super' ? 'SUPER' : 'MAX'}</button>
                  </div>
@@ -3100,6 +3128,135 @@ export default function App() {
               setToast={setToast}
             />
           )}
+
+          {screen === AppScreen.BROWSER_WARNING && (
+            <div className="py-8 max-w-3xl mx-auto w-full px-4 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between mb-6">
+                <button
+                  onClick={() => { playSound('click'); setScreen(AppScreen.PATH); }}
+                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold text-xs uppercase rounded-xl border-b-2 border-gray-900 flex items-center space-x-2 transition-all shadow-md"
+                >
+                  <span>←</span>
+                  <span>{t('back')}</span>
+                </button>
+
+                <span className="text-xs font-mono font-bold text-amber-400 bg-amber-950/60 px-3 py-1 rounded-full border border-amber-500/40">
+                  DuoWindo6601 Browser & OS Alert
+                </span>
+              </div>
+
+              <div className="bg-duo-card border-2 border-amber-500/80 rounded-[2.5rem] p-6 md:p-10 shadow-2xl space-y-6">
+                <div className="flex items-start space-x-4">
+                  <div className="bg-amber-500/20 p-4 rounded-2xl border border-amber-500/50 text-4xl shrink-0">
+                    ⚠️
+                  </div>
+                  <div>
+                    <h1 className="text-2xl md:text-3xl font-black text-amber-400 uppercase tracking-wide leading-tight">
+                      Экран предупреждения: старый браузер не поддерживается
+                    </h1>
+                    <p className="text-xs text-amber-200/80 font-bold uppercase tracking-wider mt-1">
+                      Проверка совместимости платформы DuoWindo6601
+                    </p>
+                  </div>
+                </div>
+
+                {!isOutdatedBrowserDetected ? (
+                  <div className="bg-emerald-950/70 border-2 border-emerald-500/70 p-4 rounded-2xl flex items-center space-x-3 text-emerald-200 text-xs md:text-sm font-bold shadow-md">
+                    <span className="text-2xl">✅</span>
+                    <div>
+                      <span className="text-emerald-300 font-black uppercase block">Современный браузер обнаружен:</span>
+                      <span>Ваше устройство поддерживает все функции DuoWindo6601, включая Gemini API и голосовой ввод.</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-rose-950/70 border-2 border-rose-500/70 p-4 rounded-2xl flex items-center space-x-3 text-rose-200 text-xs md:text-sm font-bold shadow-md">
+                    <span className="text-2xl">🛑</span>
+                    <div>
+                      <span className="text-rose-300 font-black uppercase block">Обнаружен устаревший браузер или неподдерживаемая ОС:</span>
+                      <span>Ваша система устарела (устаревший браузер или Windows XP / Windows Vista).</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-amber-950/60 border-2 border-amber-500/60 p-5 rounded-2xl text-amber-100 text-sm md:text-base font-bold leading-relaxed shadow-inner">
+                  <p className="text-xs uppercase text-amber-400 font-black mb-1.5 tracking-wider">Сообщение системы:</p>
+                  <p>
+                    К сожалению, ваш текущий браузер больше не поддерживается. Чтобы продолжить использовать Duowindo6601 обновитесь до современного браузера или Windows XP/Windows Vista не поддерживается
+                  </p>
+                </div>
+
+                <div className="bg-rose-950/70 border-2 border-rose-500/60 p-5 rounded-2xl flex items-start space-x-3.5 text-rose-200 text-xs md:text-sm font-bold leading-relaxed shadow-lg">
+                  <span className="text-2xl shrink-0">🚨</span>
+                  <div>
+                    <span className="text-rose-300 font-black uppercase block text-xs tracking-wider mb-1">Риск:</span>
+                    <span>Могут некорректно работать Gemini API</span>
+                  </div>
+                </div>
+
+                <div className="bg-gray-900/80 border border-gray-700/80 p-5 rounded-2xl space-y-3">
+                  <h3 className="font-black text-xs text-white uppercase tracking-wider flex items-center gap-2">
+                    <span>🌐</span>
+                    <span>Рекомендуемые современные браузеры:</span>
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-bold">
+                    <a href="https://www.google.com/chrome/" target="_blank" rel="noopener noreferrer" className="p-3 bg-gray-800 hover:bg-gray-700 rounded-xl flex items-center justify-between text-blue-300 transition-colors border border-gray-700">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xl">🌐</span>
+                        <span>Google Chrome</span>
+                      </div>
+                      <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded uppercase font-black">Скачать</span>
+                    </a>
+
+                    <a href="https://www.mozilla.org/firefox/" target="_blank" rel="noopener noreferrer" className="p-3 bg-gray-800 hover:bg-gray-700 rounded-xl flex items-center justify-between text-amber-300 transition-colors border border-gray-700">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xl">🦊</span>
+                        <span>Mozilla Firefox</span>
+                      </div>
+                      <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded uppercase font-black">Скачать</span>
+                    </a>
+
+                    <a href="https://browser.yandex.ru/" target="_blank" rel="noopener noreferrer" className="p-3 bg-gray-800 hover:bg-gray-700 rounded-xl flex items-center justify-between text-red-300 transition-colors border border-gray-700">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xl">🔴</span>
+                        <span>Яндекс Браузер</span>
+                      </div>
+                      <span className="text-[10px] bg-red-500/20 text-red-300 px-2 py-0.5 rounded uppercase font-black">Скачать</span>
+                    </a>
+
+                    <a href="https://www.microsoft.com/edge" target="_blank" rel="noopener noreferrer" className="p-3 bg-gray-800 hover:bg-gray-700 rounded-xl flex items-center justify-between text-teal-300 transition-colors border border-gray-700">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xl">🌀</span>
+                        <span>Microsoft Edge</span>
+                      </div>
+                      <span className="text-[10px] bg-teal-500/20 text-teal-300 px-2 py-0.5 rounded uppercase font-black">Скачать</span>
+                    </a>
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-2">
+                  <a
+                    href="https://www.google.com/chrome/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-sm uppercase tracking-widest rounded-2xl border-b-4 border-amber-700 active:translate-y-0.5 transition-all flex items-center justify-center space-x-2 shadow-xl text-center block"
+                  >
+                    <span>🚀</span>
+                    <span>Обновите свой браузер</span>
+                  </a>
+
+                  <button
+                    onClick={() => {
+                      playSound('click');
+                      setScreen(AppScreen.PATH);
+                    }}
+                    className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold text-xs uppercase rounded-xl transition-all border border-gray-700"
+                  >
+                    Продолжить работу в DuoWindo6601
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </main>
 
@@ -3176,7 +3333,7 @@ export default function App() {
                     type="text" 
                     value={regName}
                     onChange={(e) => setRegName(e.target.value)}
-                    placeholder={user.language === 'ru' ? 'Например: Иван' : 'E.g. Alex'}
+                    placeholder={user.language === 'ru' ? 'Например: Анатолий' : 'E.g. Anatoly'}
                     maxLength={40}
                     className="w-full bg-gray-800 border-2 border-gray-700 focus:border-duo-blue text-white rounded-2xl px-4 py-3 text-sm font-bold focus:outline-none transition-colors"
                   />
@@ -3194,7 +3351,7 @@ export default function App() {
                       type="text" 
                       value={regUsername}
                       onChange={(e) => setRegUsername(e.target.value.replace(/[^a-zA-Z0-9_\.]/g, ''))}
-                      placeholder="user123"
+                      placeholder="anatolij81"
                       maxLength={30}
                       className="w-full bg-gray-800 border-2 border-gray-700 focus:border-duo-blue text-white rounded-2xl pl-9 pr-4 py-3 text-sm font-bold focus:outline-none transition-colors"
                     />
@@ -3470,7 +3627,7 @@ export default function App() {
                   type="text" 
                   value={editUsername}
                   onChange={(e) => setEditUsername(e.target.value.replace(/[^a-zA-Z0-9_\.]/g, ''))}
-                  placeholder="user123"
+                  placeholder="anatolij81"
                   maxLength={30}
                   className="w-full bg-gray-800 border-2 border-gray-700 focus:border-duo-blue text-white rounded-2xl pl-9 pr-4 py-3 text-sm font-bold focus:outline-none transition-colors"
                 />
@@ -4689,7 +4846,7 @@ return (
                             <span className="text-2xl">👑</span>
                             <div>
                                 <h4 className="font-bold text-sm text-purple-200">5. Панель Владельцев (Admin Dashboard)</h4>
-                                <p className="text-[11px] text-purple-300">Доступна владельцам и администраторам системы</p>
+                                <p className="text-[11px] text-purple-300">Закреплена за abramovanatolij81@gmail.com / va997217@gmail.com</p>
                             </div>
                         </div>
                         <button 
@@ -4697,6 +4854,23 @@ return (
                             className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-black text-xs uppercase tracking-wider rounded-xl border-b-2 border-purple-800"
                         >
                             Панель
+                        </button>
+                    </div>
+
+                    {/* Module 6: Outdated Browser Alert */}
+                    <div className="bg-amber-950/60 border border-amber-500/40 rounded-2xl p-4 flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                            <span className="text-2xl">⚠️</span>
+                            <div>
+                                <h4 className="font-bold text-sm text-amber-200">6. Предупреждение о браузере</h4>
+                                <p className="text-[11px] text-amber-300/80">Проверка совместимости и рисков Gemini API</p>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={() => { playSound('select'); setShowBetaModal(false); setShowBrowserModal(true); }}
+                            className="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-black font-black text-xs uppercase tracking-wider rounded-xl border-b-2 border-amber-800"
+                        >
+                            Проверить
                         </button>
                     </div>
                 </div>
@@ -4708,6 +4882,108 @@ return (
                         className="text-amber-400 underline hover:text-amber-300 font-bold"
                     >
                         Оставить отзыв тестера
+                    </button>
+                </div>
+            </div>
+        </div>
+    )}
+
+    {/* OUTDATED BROWSER WARNING MODAL */}
+    {showBrowserModal && (
+        <div className="fixed inset-0 z-[350] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in" onClick={() => setShowBrowserModal(false)}>
+            <div className="bg-duo-card border-2 border-amber-500/80 rounded-[2.5rem] p-6 md:p-8 max-w-lg w-full shadow-2xl relative animate-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
+                <button 
+                    onClick={() => {
+                        setShowBrowserModal(false);
+                        sessionStorage.setItem('duo_browser_warning_dismissed', 'true');
+                    }} 
+                    className="absolute top-5 right-5 text-gray-400 hover:text-white bg-gray-800 p-2 rounded-full transition-colors"
+                    title="Закрыть"
+                >
+                    <CloseIcon className="w-5 h-5" />
+                </button>
+
+                <div className="flex items-center space-x-3.5 mb-5">
+                    <div className="bg-amber-500/20 p-3 rounded-2xl border border-amber-500/40 text-3xl shrink-0">⚠️</div>
+                    <div>
+                        <h2 className="text-xl font-black text-amber-400 uppercase tracking-wide leading-tight">
+                            Предупреждение: старый браузер не поддерживается
+                        </h2>
+                        <p className="text-[11px] text-amber-200/80 font-bold uppercase tracking-wider mt-0.5">DuoWindo6601 Browser & OS Alert</p>
+                    </div>
+                </div>
+
+                <div className="space-y-4 mb-6">
+                    {/* Status Badge for Modern vs Outdated Browser */}
+                    {!isOutdatedBrowserDetected ? (
+                        <div className="bg-emerald-950/60 border border-emerald-500/60 p-3.5 rounded-2xl flex items-center space-x-3 text-emerald-200 text-xs font-bold">
+                            <span className="text-xl">✅</span>
+                            <div>
+                                <span className="text-emerald-300 font-black uppercase block">Ваш браузер современный:</span>
+                                <span>Все функции, в том числе Gemini API и озвучка, работают отлично!</span>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="bg-rose-950/60 border border-rose-500/60 p-3.5 rounded-2xl flex items-center space-x-3 text-rose-200 text-xs font-bold">
+                            <span className="text-xl">🛑</span>
+                            <div>
+                                <span className="text-rose-300 font-black uppercase block">Обнаружен устаревший браузер или ОС:</span>
+                                <span>Требуется обновление браузера для стабильной работы.</span>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="bg-amber-950/50 border border-amber-500/50 p-4 rounded-2xl text-amber-100 text-sm font-medium leading-relaxed shadow-inner">
+                        <strong>Сообщение:</strong> К сожалению, ваш текущий браузер больше не поддерживается. Чтобы продолжить использовать Duowindo6601 обновитесь до современного браузера или Windows XP/Windows Vista не поддерживается.
+                    </div>
+
+                    <div className="bg-rose-950/60 border border-rose-500/50 p-4 rounded-2xl flex items-start space-x-3 text-rose-200 text-xs font-bold leading-relaxed shadow-sm">
+                        <span className="text-xl shrink-0">🚨</span>
+                        <div>
+                            <span className="text-rose-300 font-black uppercase block mb-0.5">Риск:</span>
+                            <span>Могут некорректно работать Gemini API, интерактивная проверка и голосовой ввод.</span>
+                        </div>
+                    </div>
+
+                    <div className="bg-gray-800/80 border border-gray-700 p-3.5 rounded-2xl text-xs text-gray-300 space-y-2">
+                        <p className="font-bold text-white uppercase tracking-wider text-[11px]">Рекомендуемые современные браузеры:</p>
+                        <div className="grid grid-cols-2 gap-2 text-[11px] font-bold">
+                            <a href="https://www.google.com/chrome/" target="_blank" rel="noopener noreferrer" className="p-2 bg-gray-700/70 hover:bg-gray-700 rounded-xl flex items-center space-x-1.5 text-blue-300 transition-colors border border-gray-600/40">
+                                <span>🌐</span><span>Google Chrome</span>
+                            </a>
+                            <a href="https://www.mozilla.org/firefox/" target="_blank" rel="noopener noreferrer" className="p-2 bg-gray-700/70 hover:bg-gray-700 rounded-xl flex items-center space-x-1.5 text-amber-300 transition-colors border border-gray-600/40">
+                                <span>🦊</span><span>Mozilla Firefox</span>
+                            </a>
+                            <a href="https://www.microsoft.com/edge" target="_blank" rel="noopener noreferrer" className="p-2 bg-gray-700/70 hover:bg-gray-700 rounded-xl flex items-center space-x-1.5 text-teal-300 transition-colors border border-gray-600/40">
+                                <span>🌀</span><span>Microsoft Edge</span>
+                            </a>
+                            <a href="https://browser.yandex.ru/" target="_blank" rel="noopener noreferrer" className="p-2 bg-gray-700/70 hover:bg-gray-700 rounded-xl flex items-center space-x-1.5 text-red-300 transition-colors border border-gray-600/40">
+                                <span>🔴</span><span>Яндекс Браузер</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-2">
+                    <a 
+                        href="https://www.google.com/chrome/" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-sm uppercase tracking-widest rounded-2xl border-b-4 border-amber-700 active:translate-y-0.5 transition-all flex items-center justify-center space-x-2 shadow-xl text-center block"
+                    >
+                        <span>🚀</span>
+                        <span>Обновите свой браузер</span>
+                    </a>
+
+                    <button 
+                        onClick={() => {
+                            setShowBrowserModal(false);
+                            sessionStorage.setItem('duo_browser_warning_dismissed', 'true');
+                            setToast('Предупреждение закрыто. Вы работаете в текущем браузере.');
+                        }}
+                        className="w-full py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white font-bold text-xs uppercase rounded-xl transition-all"
+                    >
+                        Продолжить всё равно (на свой страх и риск)
                     </button>
                 </div>
             </div>

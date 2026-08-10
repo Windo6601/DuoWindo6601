@@ -71,13 +71,13 @@ const GOOD_REVIEWS_POOL: ReviewTemplate[] = [
   {
     rating: 5,
     category: '🏛️ Языки СНГ (казахский, узбекский, армянский и др.)',
-    comment: 'Курсы языков СНГ в DuoWindo6601 просто супер! Очень качественно проработана тренажёрная часть письменности и озвучка для казахского, узбекского, армянского, кыргызского и грузинского языков.',
-    adminReply: 'Спасибо за отзыв! Поддержка и развитие курсов языков СНГ — один из наших главных приоритетов в DuoWindo6601! 🇰🇿🇺🇿🇦🇲🇰🇬🇬🇪'
+    comment: 'Курсы языков СНГ на https://duowindo6601.ai.studio/ просто супер! Очень качественно проработана тренажёрная часть письменности и озвучка для казахского, узбекского, армянского, кыргызского и грузинского языков.',
+    adminReply: 'Спасибо за отзыв! Поддержка и развитие курсов языков СНГ на https://duowindo6601.ai.studio/ — один из наших главных приоритетов! 🇰🇿🇺🇿🇦🇲🇰🇬🇬🇪'
   },
   {
     rating: 5,
     category: '🌍 Мировые языки (английский, испанский, китайский и др.)',
-    comment: 'Курсы мировых языков отлично структурированы! Алфавит, карточки и озвучка для английского, испанского, немецкого, французского и китайского дают быстрый результат.',
+    comment: 'Курсы мировых языков на https://duowindo6601.ai.studio/ отлично структурированы! Алфавит, карточки и озвучка для английского, испанского, немецкого, французского и китайского дают быстрый результат.',
     adminReply: 'Благодарим за высокую оценку! В курсах мировых языков скоро появятся новые разговорные блоки и тренировка диалогов! 🇬🇧🇪🇸🇨🇳🇫🇷🇩🇪'
   },
   {
@@ -89,7 +89,7 @@ const GOOD_REVIEWS_POOL: ReviewTemplate[] = [
   {
     rating: 5,
     category: '📚 Тренажер и графическое письмо',
-    comment: 'Очень нравится тренажер письменности и интерактивная озвучка букв! Занимаюсь каждый день в DuoWindo6601 с большим удовольствием.',
+    comment: 'Очень нравится тренажер письменности и интерактивная озвучка букв! Занимаюсь каждый день в DuoWindo6601 на https://duowindo6601.ai.studio/ с большим удовольствием.',
     adminReply: 'Спасибо за прекрасный отзыв! Мы рады, что DuoWindo6601 помогает вам в изучении языков каждый день 🚀'
   },
   {
@@ -110,7 +110,7 @@ const BAD_REVIEWS_POOL: ReviewTemplate[] = [
   {
     rating: 2,
     category: '🏛️ Языки СНГ (казахский, узбекский, армянский и др.)',
-    comment: 'В курсах армянского и грузинского языков хотелось бы видеть больше упражнений на чтение связных текстов и фразеологизмов, а не только отдельные слова.',
+    comment: 'В курсах армянского и грузинского языков на https://duowindo6601.ai.studio/ хотелось бы видеть больше упражнений на чтение связных текстов и фразеологизмов, а не только отдельные слова.',
     adminReply: 'Спасибо за важную обратную связь! В ближайшем обновлении DuoWindo6601 мы расширим раздел разговорных диалогов и текстов по всем языкам СНГ.'
   },
   {
@@ -128,7 +128,7 @@ const BAD_REVIEWS_POOL: ReviewTemplate[] = [
   {
     rating: 1,
     category: '🐛 Ошибка / Доработка',
-    comment: 'При медленном мобильном интернете аудиозаписи произношения слов долго загружаются. Приходится долго ждать!',
+    comment: 'При медленном мобильном интернете на https://duowindo6601.ai.studio/ аудиозаписи произношения слов долго загружаются. Приходится долго ждать!',
     adminReply: 'Приносим извинения за неудобства! Мы оптимизировали сжатие аудио и добавили офлайн-кэширование произношений.'
   },
   {
@@ -287,6 +287,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [filterRating, setFilterRating] = useState<number | 'all'>('all');
+  const [filterSentiment, setFilterSentiment] = useState<'all' | 'good' | 'bad'>('all');
 
   // Build course list for feedback form & filter
   const availableCourseList = React.useMemo(() => {
@@ -501,11 +502,11 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
   };
 
   // Generate Random Review & Comment Handler
-  const handleGenerateRandomReview = async () => {
+  const handleGenerateRandomReview = async (forcedType?: 'good' | 'bad') => {
     playSound('click');
     setSubmitting(true);
 
-    const isGood = Math.random() > 0.4;
+    const isGood = forcedType ? forcedType === 'good' : Math.random() > 0.4;
     const pool = isGood ? GOOD_REVIEWS_POOL : BAD_REVIEWS_POOL;
     const template = pool[Math.floor(Math.random() * pool.length)];
 
@@ -550,7 +551,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
       const createdItem: FeedbackItem = { id: docRef.id, ...newFeedback };
       setReviews((prev) => [createdItem, ...prev]);
       playSound('fanfare');
-      setToast(`Сгенерирован случайный отзыв от ${randomName} 🎲`);
+      setToast(isGood ? `Добавлен отзыв с высокой оценкой (👍 ${randomName})` : `Добавлен критический отзыв (👎 ${randomName})`);
     } catch (err) {
       console.warn('Could not save random review to Firestore:', err);
       const fallbackItem: FeedbackItem = {
@@ -559,7 +560,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
       };
       setReviews((prev) => [fallbackItem, ...prev]);
       playSound('fanfare');
-      setToast(`Случайный отзыв добавлен (${randomName}) 🎲`);
+      setToast(isGood ? `Хороший отзыв добавлен (${randomName}) 👍` : `Критический отзыв добавлен (${randomName}) 👎`);
     } finally {
       setSubmitting(false);
     }
@@ -784,11 +785,15 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
 
   const filteredReviews = sortedReviews.filter((r) => {
     const matchesRating = filterRating === 'all' || r.rating === filterRating;
+    const matchesSentiment =
+      filterSentiment === 'all' ||
+      (filterSentiment === 'good' && r.rating >= 4) ||
+      (filterSentiment === 'bad' && r.rating <= 3);
     const matchesCourse =
       filterCourseId === 'all' ||
       r.courseId === filterCourseId ||
       (!r.courseId && filterCourseId === 'general');
-    return matchesRating && matchesCourse;
+    return matchesRating && matchesSentiment && matchesCourse;
   });
 
   return (
@@ -852,25 +857,35 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
               onClick={handleRefreshReviews}
               disabled={loading}
               title="Обновить отзывы из базы данных"
-              className="bg-gray-800 hover:bg-gray-700 text-duo-blue font-bold px-3.5 py-3 rounded-2xl border-b-4 border-gray-900 active:translate-y-1 active:border-b-0 transition-all shadow-md flex items-center justify-center gap-1.5 text-xs uppercase tracking-wider disabled:opacity-50"
+              className="bg-gray-800 hover:bg-gray-700 text-duo-blue font-bold px-3 py-2.5 rounded-2xl border-b-4 border-gray-900 active:translate-y-1 active:border-b-0 transition-all shadow-md flex items-center justify-center gap-1.5 text-xs uppercase tracking-wider disabled:opacity-50"
             >
               <span className={`text-base ${loading ? 'animate-spin' : ''}`}>🔄</span>
               <span>{loading ? 'Обновление...' : 'Обновить'}</span>
             </button>
 
             <button
-              onClick={handleGenerateRandomReview}
+              onClick={() => handleGenerateRandomReview('good')}
               disabled={submitting}
-              title="Сгенерировать случайный отзыв и комментарий"
-              className="bg-duo-purple text-white font-bold px-3.5 py-3 rounded-2xl border-b-4 border-purple-800 hover:brightness-110 active:translate-y-1 active:border-b-0 transition-all shadow-md flex items-center justify-center gap-1.5 text-xs uppercase tracking-wider disabled:opacity-50"
+              title="Сгенерировать случайный положительный отзыв"
+              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-2.5 rounded-2xl border-b-4 border-emerald-800 active:translate-y-1 active:border-b-0 transition-all shadow-md flex items-center justify-center gap-1.5 text-xs uppercase tracking-wider disabled:opacity-50"
             >
-              <span className="text-base">🎲</span>
-              <span>Случайный отзыв</span>
+              <span className="text-base">👍</span>
+              <span>+ Хороший</span>
+            </button>
+
+            <button
+              onClick={() => handleGenerateRandomReview('bad')}
+              disabled={submitting}
+              title="Сгенерировать случайный критический отзыв"
+              className="bg-rose-600 hover:bg-rose-500 text-white font-bold px-3 py-2.5 rounded-2xl border-b-4 border-rose-800 active:translate-y-1 active:border-b-0 transition-all shadow-md flex items-center justify-center gap-1.5 text-xs uppercase tracking-wider disabled:opacity-50"
+            >
+              <span className="text-base">👎</span>
+              <span>+ Критический</span>
             </button>
 
             <button
               onClick={() => { playSound('click'); setShowForm(!showForm); }}
-              className="bg-duo-green text-white font-black px-4 py-3 rounded-2xl border-b-4 border-duo-greenDark hover:brightness-110 active:translate-y-1 active:border-b-0 transition-all shadow-lg flex items-center justify-center gap-2 text-xs uppercase tracking-wider whitespace-nowrap"
+              className="bg-duo-green text-white font-black px-4 py-2.5 rounded-2xl border-b-4 border-duo-greenDark hover:brightness-110 active:translate-y-1 active:border-b-0 transition-all shadow-lg flex items-center justify-center gap-2 text-xs uppercase tracking-wider whitespace-nowrap"
             >
               <StarIcon className="w-4 h-4 text-yellow-300 fill-yellow-300" />
               {showForm ? 'Закрыть форму' : 'Написать отзыв'}
@@ -878,8 +893,39 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
           </div>
         </div>
 
+        {/* DuoWindo6601 Site & Share Link Banner */}
+        <div className="mt-6 pt-5 border-t border-gray-700/80 bg-gradient-to-r from-emerald-950/80 via-gray-900 to-purple-950/80 p-4 rounded-2xl border border-emerald-500/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center text-xl border border-emerald-500/40 shrink-0">
+              🌐
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-black text-xs text-white uppercase tracking-wider">Платформа DuoWindo6601</span>
+                <span className="text-[11px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-md font-mono font-bold border border-emerald-500/40">
+                  https://duowindo6601.ai.studio/
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-300 font-medium mt-0.5">
+                Оставляйте хорошие и критические отзывы для нашей команды разработки
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText('https://duowindo6601.ai.studio/');
+              playSound('correct');
+              setToast('Ссылка https://duowindo6601.ai.studio/ скопирована в буфер обмена! 📋');
+            }}
+            className="w-full sm:w-auto px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] uppercase tracking-wider rounded-xl border-b-2 border-emerald-800 active:translate-y-0.5 transition-all flex items-center justify-center space-x-1 shrink-0 shadow-md"
+          >
+            <span>📋</span>
+            <span>Копировать URL</span>
+          </button>
+        </div>
+
         {/* GitHub & APK Links Card */}
-        <div className="mt-6 pt-5 border-t border-gray-700/80 bg-gray-900/60 p-4 rounded-2xl border border-gray-700">
+        <div className="mt-3 pt-3 border-t border-gray-700/50 bg-gray-900/60 p-4 rounded-2xl border border-gray-700">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <h4 className="text-white font-black text-xs uppercase tracking-widest flex items-center gap-2 mb-1">
@@ -1214,6 +1260,48 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
             )}
           </div>
 
+          {/* Quick Preset Template Buttons */}
+          <div className="mb-4">
+            <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
+              Быстрый шаблон типа отзыва:
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  playSound('click');
+                  setRating(5);
+                  setCategory('🌟 Общие впечатления');
+                  setComment('Отличное приложение DuoWindo6601 (https://duowindo6601.ai.studio/)! Очень удобные уроки, проработанный интерфейс и качественная озвучка курсов.');
+                }}
+                className="p-3 rounded-2xl bg-emerald-950/60 border-2 border-emerald-500/50 hover:bg-emerald-900/60 text-emerald-200 font-bold text-xs text-left transition-all flex items-center space-x-2 shadow-sm"
+              >
+                <span className="text-xl shrink-0">👍</span>
+                <div>
+                  <div className="font-black text-emerald-300 text-xs">Положительный отзыв (5★)</div>
+                  <div className="text-[10px] text-emerald-300/80 font-normal">Хвала за качество, уроки и дизайн</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  playSound('click');
+                  setRating(2);
+                  setCategory('🐛 Ошибка / Доработка');
+                  setComment('В приложении DuoWindo6601 на https://duowindo6601.ai.studio/ хотелось бы улучшить следующую деталь: ');
+                }}
+                className="p-3 rounded-2xl bg-rose-950/60 border-2 border-rose-500/50 hover:bg-rose-900/60 text-rose-200 font-bold text-xs text-left transition-all flex items-center space-x-2 shadow-sm"
+              >
+                <span className="text-xl shrink-0">👎</span>
+                <div>
+                  <div className="font-black text-rose-300 text-xs">Критический отзыв (1-3★)</div>
+                  <div className="text-[10px] text-rose-300/80 font-normal">Замечание, баг или идея доработки</div>
+                </div>
+              </button>
+            </div>
+          </div>
+
           {/* Rating Interactive Stars */}
           <div className="mb-4">
             <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
@@ -1365,37 +1453,76 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 scrollbar-none">
-        <button
-          onClick={() => { playSound('click'); setFilterRating('all'); }}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-            filterRating === 'all'
-              ? 'bg-duo-blue text-white shadow-md'
-              : 'bg-duo-card text-gray-400 hover:text-white border border-gray-700'
-          }`}
-        >
-          Все ({reviews.length})
-        </button>
+      {/* Filter Tabs: Sentiment & Rating Stars */}
+      <div className="flex flex-col gap-2 mb-4">
+        {/* Sentiment Filter Toggle */}
+        <div className="grid grid-cols-3 gap-1.5 p-1 bg-gray-900 rounded-2xl border border-gray-800">
+          <button
+            onClick={() => { playSound('click'); setFilterSentiment('all'); }}
+            className={`py-2 px-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center space-x-1 ${
+              filterSentiment === 'all'
+                ? 'bg-duo-blue text-white shadow-md'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <span>💬 Все ({reviews.length})</span>
+          </button>
 
-        {[5, 4, 3, 2, 1].map((r) => {
-          const c = reviews.filter((rev) => rev.rating === r).length;
-          return (
-            <button
-              key={r}
-              onClick={() => { playSound('click'); setFilterRating(r); }}
-              className={`px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 ${
-                filterRating === r
-                  ? 'bg-duo-yellow text-white shadow-md'
-                  : 'bg-duo-card text-gray-400 hover:text-white border border-gray-700'
-              }`}
-            >
-              <span>{r}</span>
-              <StarIcon className="w-3.5 h-3.5 fill-current" />
-              <span className="opacity-70">({c})</span>
-            </button>
-          );
-        })}
+          <button
+            onClick={() => { playSound('click'); setFilterSentiment('good'); }}
+            className={`py-2 px-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center space-x-1 ${
+              filterSentiment === 'good'
+                ? 'bg-emerald-600 text-white shadow-md'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <span>👍 Хорошие ({reviews.filter(r => r.rating >= 4).length})</span>
+          </button>
+
+          <button
+            onClick={() => { playSound('click'); setFilterSentiment('bad'); }}
+            className={`py-2 px-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center space-x-1 ${
+              filterSentiment === 'bad'
+                ? 'bg-rose-600 text-white shadow-md'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <span>👎 Критические ({reviews.filter(r => r.rating <= 3).length})</span>
+          </button>
+        </div>
+
+        {/* Rating Stars Filters */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          <button
+            onClick={() => { playSound('click'); setFilterRating('all'); }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              filterRating === 'all'
+                ? 'bg-duo-blue text-white shadow-md'
+                : 'bg-duo-card text-gray-400 hover:text-white border border-gray-700'
+            }`}
+          >
+            Все оценки
+          </button>
+
+          {[5, 4, 3, 2, 1].map((r) => {
+            const c = reviews.filter((rev) => rev.rating === r).length;
+            return (
+              <button
+                key={r}
+                onClick={() => { playSound('click'); setFilterRating(r); }}
+                className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 ${
+                  filterRating === r
+                    ? 'bg-duo-yellow text-white shadow-md'
+                    : 'bg-duo-card text-gray-400 hover:text-white border border-gray-700'
+                }`}
+              >
+                <span>{r}</span>
+                <StarIcon className="w-3.5 h-3.5 fill-current" />
+                <span className="opacity-70">({c})</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Reviews Feed List */}
@@ -1460,6 +1587,15 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
                         {rev.userId === 'admin-duowindo6601' && (
                           <span className="text-[10px] font-black bg-amber-500 text-gray-950 px-2 py-0.5 rounded-full uppercase tracking-wider">
                             👑 Админ
+                          </span>
+                        )}
+                        {rev.rating >= 4 ? (
+                          <span className="text-[10px] font-black bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/40 flex items-center gap-1">
+                            👍 Хороший отзыв
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-black bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full border border-rose-500/40 flex items-center gap-1">
+                            👎 Критический
                           </span>
                         )}
                         {rev.category && (
