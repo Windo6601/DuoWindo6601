@@ -30,11 +30,15 @@ The Android build is configured directly at the root, allowing seamless compilat
    ```bash
    npm run build
    ```
-2. Sync compiled assets into the Android native module:
+2. Optional: provide a Gemini key for AI features when compiling the web bundle:
+   ```bash
+   export GEMINI_API_KEY=your_key_here
+   ```
+3. Sync compiled assets into the Android native module:
    ```bash
    npm run cap:sync
    ```
-3. Build the Debug APK using Gradle:
+4. Build the Debug APK using Gradle:
    ```bash
    ./gradlew assembleDebug
    ```
@@ -44,4 +48,4 @@ The Android build is configured directly at the root, allowing seamless compilat
 ---
 
 ## 🏛️ Continuous Integration
-Automatic builds are configured via GitHub Actions in `.github/workflows/build.yml`. Every push to the `main` branch compiles the web code, bundles it with Capacitor, and publishes a downloadable `app-debug.apk` artifact.
+Automatic builds are configured via GitHub Actions in `.github/workflows/build.yml`. Every push or pull request to `main`/`master` compiles the web code, bundles it with Capacitor, builds the debug APK, and publishes a downloadable `app-debug-apk` artifact. Add a repository secret named `GEMINI_API_KEY` so AI features are available in the built app without committing a key to source control.

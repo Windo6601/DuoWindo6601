@@ -6,9 +6,8 @@ export const MODEL_FREE = "gemini-3-flash-preview";
 export const MODEL_PRO = "gemini-3-pro-preview";
 const TTS_MODEL = "gemini-2.5-flash-preview-tts";
 
-const USER_PROVIDED_KEY = "AIzaSyCts7NuiqtwiRwtHuIcNEPJN_xs5ApRVFs";
 export const getApiKey = () => {
-  return process.env.API_KEY || process.env.GEMINI_API_KEY || USER_PROVIDED_KEY;
+  return process.env.API_KEY || process.env.GEMINI_API_KEY || "";
 };
 
 const TOPICS = ['приветствия', 'еда', 'семья', 'путешествия', 'хобби', 'магазины', 'работа', 'погода', 'числа'];
@@ -320,7 +319,7 @@ export const checkAnswerWithAI = async (
 
   try {
     const result = await callGeminiWithRetry(async () => {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey: getApiKey() });
       const response = await ai.models.generateContent({
         model: isMax ? MODEL_PRO : MODEL_FREE,
         contents: `I am learning ${subject}. 
