@@ -817,7 +817,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
   });
 
   return (
-    <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full px-4 py-4 md:py-6 overflow-y-auto">
+    <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full px-4 py-4 md:py-6 overflow-y-auto rtl-directional-aware">
       {/* Top Bar with Admin Controls */}
       <div className="flex items-center justify-between mb-4">
         <button
@@ -862,13 +862,15 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
       {/* Main Title Banner */}
       <div className="bg-gradient-to-r from-duo-card to-gray-800 rounded-3xl p-5 md:p-6 border-2 border-gray-700 shadow-2xl mb-6 relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight mb-1 flex items-center gap-2">
-              <MessageSquareIcon className="w-8 h-8 text-duo-yellow" />
-              {t ? t('reviews_duowindo6601') : 'Отзывы о DuoWindo6601'}
+          <div dir="auto">
+            <h1 dir="auto" className="text-2xl md:text-3xl font-black text-white tracking-tight mb-1 flex items-center gap-2">
+              <MessageSquareIcon className="w-8 h-8 text-duo-yellow shrink-0" />
+              <bdi dir="auto">{t ? t('reviews_duowindo6601') : 'Отзывы о DuoWindo6601'}</bdi>
             </h1>
-            <p className="text-gray-300 text-xs md:text-sm">
-              Оставьте отзыв или задайте вопрос Администратору DuoWindo6601!
+            <p dir="auto" className="text-gray-300 text-xs md:text-sm">
+              <bdi dir="auto">
+                {t && t('reviews_subtitle') ? t('reviews_subtitle') : 'Оставьте отзыв или задайте вопрос Администратору DuoWindo6601!'}
+              </bdi>
             </p>
           </div>
 
@@ -915,19 +917,19 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
 
         {/* DuoWindo6601 Site & Share Link Banner */}
         <div className="mt-6 pt-5 border-t border-gray-700/80 bg-gradient-to-r from-emerald-950/80 via-gray-900 to-purple-950/80 p-4 rounded-2xl border border-emerald-500/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3" dir="auto">
             <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center text-xl border border-emerald-500/40 shrink-0">
               🌐
             </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-black text-xs text-white uppercase tracking-wider">Платформа DuoWindo6601</span>
-                <span className="text-[11px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-md font-mono font-bold border border-emerald-500/40">
+            <div dir="auto">
+              <div className="flex items-center gap-2 flex-wrap" dir="auto">
+                <span className="font-black text-xs text-white uppercase tracking-wider"><bdi dir="auto">Платформа DuoWindo6601</bdi></span>
+                <span className="text-[11px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-md font-mono font-bold border border-emerald-500/40 ltr-preserve" dir="ltr">
                   https://duowindo6601.ai.studio/
                 </span>
               </div>
-              <p className="text-[11px] text-gray-300 font-medium mt-0.5">
-                Оставляйте хорошие и критические отзывы для нашей команды разработки
+              <p className="text-[11px] text-gray-300 font-medium mt-0.5" dir="auto">
+                <bdi dir="auto">Оставляйте хорошие и критические отзывы для нашей команды разработки</bdi>
               </p>
             </div>
           </div>
@@ -947,12 +949,12 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
         {/* GitHub & APK Links Card */}
         <div className="mt-3 pt-3 border-t border-gray-700/50 bg-gray-900/60 p-4 rounded-2xl border border-gray-700">
           <div className="flex items-center justify-between flex-wrap gap-3">
-            <div>
-              <h4 className="text-white font-black text-xs uppercase tracking-widest flex items-center gap-2 mb-1">
-                <span>🐙</span> Официальный репозиторий DuoWindo6601 на GitHub
+            <div dir="auto">
+              <h4 className="text-white font-black text-xs uppercase tracking-widest flex items-center gap-2 mb-1" dir="auto">
+                <span>🐙</span> <bdi dir="auto">Официальный репозиторий DuoWindo6601 на GitHub</bdi>
               </h4>
-              <p className="text-[11px] text-gray-400 font-medium">
-                Исходный код, CI/CD сборка Android APK и интеграция Google Labs.
+              <p className="text-[11px] text-gray-400 font-medium" dir="auto">
+                <bdi dir="auto">Исходный код, CI/CD сборка Android APK и интеграция Google Labs.</bdi>
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -1399,6 +1401,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
               Текст отзыва:
             </label>
             <textarea
+              dir="auto"
               value={comment}
               onChange={(e) => setComment(e.target.value.slice(0, 500))}
               placeholder="Расскажите, что вам нравится в DuoWindo6601 или что стоит улучшить..."
@@ -1602,8 +1605,8 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
                       {rev.userAvatar || '👤'}
                     </div>
                     <div>
-                      <div className="font-bold text-white text-sm flex items-center gap-1.5 flex-wrap">
-                        <span>{rev.userName}</span>
+                      <div className="font-bold text-white text-sm flex items-center gap-1.5 flex-wrap" dir="auto">
+                        <bdi dir="auto">{rev.userName}</bdi>
                         {rev.userId === 'admin-duowindo6601' && (
                           <span className="text-[10px] font-black bg-amber-500 text-gray-950 px-2 py-0.5 rounded-full uppercase tracking-wider">
                             👑 Админ
@@ -1619,13 +1622,13 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
                           </span>
                         )}
                         {rev.category && (
-                          <span className="text-[10px] font-normal bg-gray-800 text-gray-300 px-2 py-0.5 rounded-full border border-gray-700">
-                            {rev.category}
+                          <span className="text-[10px] font-normal bg-gray-800 text-gray-300 px-2 py-0.5 rounded-full border border-gray-700" dir="auto">
+                            <bdi dir="auto">{rev.category}</bdi>
                           </span>
                         )}
                         {rev.courseName && (
-                          <span className="text-[10px] font-bold bg-duo-blue/20 text-duo-blue px-2 py-0.5 rounded-full border border-duo-blue/40 flex items-center gap-1">
-                            🎓 {rev.courseName}
+                          <span className="text-[10px] font-bold bg-duo-blue/20 text-duo-blue px-2 py-0.5 rounded-full border border-duo-blue/40 flex items-center gap-1" dir="auto">
+                            <bdi dir="auto">🎓 {rev.courseName}</bdi>
                           </span>
                         )}
                       </div>
@@ -1649,8 +1652,8 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
                 </div>
 
                 {/* Comment Text */}
-                <p className="text-gray-200 text-xs md:text-sm leading-relaxed mb-4 whitespace-pre-wrap">
-                  {rev.comment}
+                <p dir="auto" className="text-gray-200 text-xs md:text-sm leading-relaxed mb-4 whitespace-pre-wrap bdi-isolate">
+                  <bdi dir="auto">{rev.comment}</bdi>
                 </p>
 
                 {/* Card Footer Actions */}
@@ -1745,8 +1748,8 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
                                   >
                                     {reply.userAvatar || '👤'}
                                   </div>
-                                  <span className="font-bold text-white flex items-center gap-1">
-                                    {reply.userName}
+                                  <span className="font-bold text-white flex items-center gap-1" dir="auto">
+                                    <bdi dir="auto">{reply.userName}</bdi>
                                     {reply.isAdmin && (
                                       <span className="bg-amber-500 text-gray-950 font-black text-[9px] px-1.5 py-0.2 rounded uppercase">
                                         Официальный ответ
@@ -1769,8 +1772,8 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
                                 </div>
                               </div>
 
-                              <p className="text-gray-300 leading-relaxed pl-8 whitespace-pre-wrap">
-                                {reply.comment}
+                              <p dir="auto" className="text-gray-300 leading-relaxed pl-8 whitespace-pre-wrap bdi-isolate">
+                                <bdi dir="auto">{reply.comment}</bdi>
                               </p>
                             </div>
                           );

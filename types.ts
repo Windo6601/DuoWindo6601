@@ -143,7 +143,7 @@ export interface UserProgress {
   mistakes: Exercise[];
   learnedWords: string[];
   achievements: any[];
-  language: 'ru' | 'en' | 'de' | 'fr' | 'es' | 'ja' | 'zh';
+  language: 'ru' | 'en' | 'de' | 'fr' | 'es' | 'ja' | 'zh' | 'ar';
   country: string;
   preferredVoice?: string;
   voiceProvider?: 'gemini' | 'google' | 'yandex' | 'system';

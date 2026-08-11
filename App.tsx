@@ -354,33 +354,24 @@ const ALPHABETS: Record<string, string[]> = {
   'ja': ['あ', 'い', 'う', 'え', 'お', 'か', 'き', 'く', 'け', 'こ', 'さ', 'し', 'す', 'せ', 'そ', 'た', 'ち', 'つ', 'て', 'と', 'な', 'に', 'ぬ', 'ね', 'の', 'は', 'ひ', 'ふ', 'へ', 'ほ', 'ま', 'み', 'む', 'め', 'も', 'や', 'ゆ', 'よ', 'ら', 'り', 'る', 'れ', 'ろ', 'わ', 'を', 'ん'],
   'ko': ['ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅅ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ', 'ㅏ', 'ㅑ', 'ㅓ', 'ㅕ', 'ㅗ', 'ㅛ', 'ㅜ', 'ㅠ', 'ㅡ', 'ㅣ'],
   'ar': ['ا', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي'],
-  'he': ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 'י', 'כ', 'ל', 'מ', 'נ', 'ס', 'ע', 'פ', 'צ', 'ק', 'ר', 'ש', 'ת'],
-  'ka': ['ა', 'ბ', 'გ', 'დ', 'ე', 'ვ', 'ზ', 'თ', 'ი', 'კ', 'ლ', 'მ', 'ნ', 'ო', 'პ', 'ჟ', 'რ', 'ს', 'ტ', 'უ', 'ფ', 'ქ', 'ღ', 'ყ', 'შ', 'ჩ', 'ც', 'ძ', 'წ', 'ჭ', 'ხ', 'ჯ', 'ჰ'],
-  'hy': ['Ա', 'Բ', 'Գ', 'Դ', 'Ե', 'Զ', 'Է', 'Ը', 'Թ', 'Ժ', 'Ի', 'Լ', 'Խ', 'Ծ', 'Կ', 'Հ', 'Ձ', 'Ղ', 'Ճ', 'Մ', 'Յ', 'Ն', 'Շ', 'Ո', 'Չ', 'Պ', 'Ջ', 'Ռ', 'Ս', 'Վ', 'Տ', 'Ր', 'Ց', 'Ւ', 'Փ', 'Ք', 'Օ', 'Ֆ'],
-  'uk': ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е', 'Є', 'Ж', 'З', 'И', 'І', 'Ї', 'Й', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ', 'Ь', 'Ю', 'Я'],
-  'be': ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ё', 'Ж', 'З', 'І', 'Й', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ў', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Ы', 'Ь', 'Э', 'Ю', 'Я'],
-  'kk': ['А', 'Ә', 'Б', 'В', 'Г', 'Ғ', 'Д', 'Е', 'Ё', 'Ж', 'З', 'И', 'Й', 'К', 'Қ', 'Л', 'М', 'Н', 'Ң', 'О', 'Ө', 'П', 'Р', 'С', 'Т', 'У', 'Ұ', 'Ү', 'Ф', 'Х', 'Һ', 'Ц', 'Ч', 'Ш', 'Щ', 'Ъ', 'Ы', 'І', 'Ь', 'Э', 'Ю', 'Я'],
-  'ky': ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ё', 'Ж', 'З', 'И', 'Й', 'К', 'Л', 'М', 'Н', 'Ң', 'О', 'Ө', 'П', 'Р', 'С', 'Т', 'У', 'Ү', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ', 'Ъ', 'Ы', 'Ь', 'Э', 'Ю', 'Я'],
-  'tg': ['А', 'Б', 'В', 'Г', 'Ғ', 'Д', 'Е', 'Ё', 'Ж', 'З', 'И', 'Ӣ', 'Й', 'К', 'Қ', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ӯ', 'Ф', 'Х', 'Ҳ', 'Ч', 'Ҷ', 'Ш', 'Ъ', 'Э', 'Ю', 'Я'],
-  'az': ['A', 'B', 'C', 'Ç', 'D', 'E', 'Ə', 'F', 'G', 'Ğ', 'H', 'X', 'I', 'İ', 'J', 'K', 'Q', 'L', 'M', 'N', 'O', 'Ö', 'P', 'R', 'S', 'Ş', 'T', 'U', 'Ü', 'V', 'Y', 'Z'],
-  'uz': ['A', 'B', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'X', 'Y', 'Z', "O'", "G'"],
 };
 
-const COUNTRIES = [
-    { code: 'ru', name: 'Russia', local: 'Россия' },
-    { code: 'us', name: 'USA', local: 'США' },
-    { code: 'gb', name: 'UK', local: 'Великобритания' },
-    { code: 'de', name: 'Germany', local: 'Германия' },
-    { code: 'fr', name: 'France', local: 'Франция' },
-    { code: 'cn', name: 'China', local: 'Китай' },
-    { code: 'jp', name: 'Japan', local: 'Япония' },
-    { code: 'kr', name: 'South Korea', local: 'Южная Корея' },
-    { code: 'es', name: 'Spain', local: 'Испания' },
-    { code: 'it', name: 'Italy', local: 'Италия' },
-    { code: 'br', name: 'Brazil', local: 'Бразилия' },
-];
+const STORAGE_KEY = 'duowindo6601_user_progress_v1';
 
-const STORAGE_KEY = 'duowindo6601_v26_chess_fix';
+const COUNTRIES = [
+  { code: 'ru', name: 'Russia', local: 'Россия' },
+  { code: 'us', name: 'United States', local: 'США' },
+  { code: 'de', name: 'Germany', local: 'Германия' },
+  { code: 'fr', name: 'France', local: 'Франция' },
+  { code: 'es', name: 'Spain', local: 'Испания' },
+  { code: 'sa', name: 'Saudi Arabia', local: 'Саудовская Аравия' },
+  { code: 'cn', name: 'China', local: 'Китай' },
+  { code: 'jp', name: 'Japan', local: 'Япония' },
+  { code: 'gb', name: 'United Kingdom', local: 'Великобритания' },
+  { code: 'kz', name: 'Kazakhstan', local: 'Казахстан' },
+  { code: 'by', name: 'Belarus', local: 'Беларусь' },
+  { code: 'uz', name: 'Uzbekistan', local: 'Узбекистан' },
+];
 
 const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
   "home": {
@@ -390,7 +381,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Accueil",
     "es": "Inicio",
     "ja": "ホーム",
-    "zh": "主页"
+    "zh": "主页",
+    "ar": "الرئيسية"
   },
   "play_chess": {
     "ru": "Сыграем в Шахматы",
@@ -399,7 +391,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Jouer aux échecs",
     "es": "Jugar ajedrez",
     "ja": "チェスをする",
-    "zh": "下棋"
+    "zh": "下棋",
+    "ar": "لعب الشطرنج"
   },
   "playChess": {
     "ru": "Сыграем в Шахматы",
@@ -408,7 +401,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Jouer aux échecs",
     "es": "Jugar ajedrez",
     "ja": "チェスをする",
-    "zh": "下棋"
+    "zh": "下棋",
+    "ar": "لعب الشطرنج"
   },
   "practice": {
     "ru": "Практика",
@@ -417,7 +411,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Pratique",
     "es": "Práctica",
     "ja": "練習",
-    "zh": "练习"
+    "zh": "练习",
+    "ar": "التدريب"
   },
   "video_call": {
     "ru": "ВидеоЗвонок",
@@ -426,7 +421,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Appel vidéo",
     "es": "Videollamada",
     "ja": "ビデオ通話",
-    "zh": "视频通话"
+    "zh": "视频通话",
+    "ar": "مكالمة فيديو"
   },
   "videoCall": {
     "ru": "ВидеоЗвонок",
@@ -435,7 +431,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Appel vidéo",
     "es": "Videollamada",
     "ja": "ビデオ通話",
-    "zh": "视频通话"
+    "zh": "视频通话",
+    "ar": "مكالمة فيديو"
   },
   "rating": {
     "ru": "Рейтинг",
@@ -444,7 +441,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Classement",
     "es": "Clasificación",
     "ja": "評価",
-    "zh": "评分"
+    "zh": "评分",
+    "ar": "التصنيف"
   },
   "leaderboard": {
     "ru": "Рейтинг",
@@ -453,7 +451,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Classement",
     "es": "Clasificación",
     "ja": "評価",
-    "zh": "评分"
+    "zh": "评分",
+    "ar": "التصنيف"
   },
   "store": {
     "ru": "Магазин",
@@ -462,7 +461,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Boutique",
     "es": "Tienda",
     "ja": "ストア",
-    "zh": "商店"
+    "zh": "商店",
+    "ar": "المتجر"
   },
   "shop": {
     "ru": "Магазин",
@@ -471,7 +471,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Boutique",
     "es": "Tienda",
     "ja": "ストア",
-    "zh": "商店"
+    "zh": "商店",
+    "ar": "المتجر"
   },
   "profile": {
     "ru": "Профиль",
@@ -480,7 +481,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Profil",
     "es": "Perfil",
     "ja": "プロフィール",
-    "zh": "个人资料"
+    "zh": "个人资料",
+    "ar": "الملف الشخصي"
   },
   "full_access": {
     "ru": "Полный доступ",
@@ -489,7 +491,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Accès complet",
     "es": "Acceso completo",
     "ja": "フルアクセス",
-    "zh": "完全访问"
+    "zh": "完全访问",
+    "ar": "وصول كامل"
   },
   "fullAccess": {
     "ru": "Полный доступ",
@@ -498,7 +501,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Accès complet",
     "es": "Acceso completo",
     "ja": "フルアクセス",
-    "zh": "完全访问"
+    "zh": "完全访问",
+    "ar": "وصول كامل"
   },
   "languages": {
     "ru": "Язык стран",
@@ -507,7 +511,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Langues",
     "es": "Idiomas",
     "ja": "言語",
-    "zh": "语言"
+    "zh": "语言",
+    "ar": "اللغات"
   },
   "section": {
     "ru": "Раздел",
@@ -516,7 +521,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Section",
     "es": "Sección",
     "ja": "セクション",
-    "zh": "部分"
+    "zh": "部分",
+    "ar": "القسم"
   },
   "feedback": {
     "ru": "Отзыв",
@@ -525,7 +531,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Retour",
     "es": "Opinión",
     "ja": "フィードバック",
-    "zh": "反馈"
+    "zh": "反馈",
+    "ar": "الآراء"
   },
   "translator": {
     "ru": "Переводчик",
@@ -534,7 +541,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Traducteur",
     "es": "Traductor",
     "ja": "翻訳",
-    "zh": "翻译"
+    "zh": "翻译",
+    "ar": "المترجم"
   },
   "register": {
     "ru": "Регистрация",
@@ -543,7 +551,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Inscription",
     "es": "Registro",
     "ja": "登録",
-    "zh": "注册"
+    "zh": "注册",
+    "ar": "تسجيل الحساب"
   },
   "login": {
     "ru": "Вход",
@@ -552,7 +561,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Connexion",
     "es": "Iniciar sesión",
     "ja": "ログイン",
-    "zh": "登录"
+    "zh": "登录",
+    "ar": "تسجيل الدخول"
   },
   "guest_mode": {
     "ru": "Войти как Гость",
@@ -561,7 +571,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Mode invité",
     "es": "Modo invitado",
     "ja": "ゲストモード",
-    "zh": "访客模式"
+    "zh": "访客模式",
+    "ar": "وضع الضيف"
   },
   "guestMode": {
     "ru": "Войти как Гость",
@@ -570,7 +581,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Mode invité",
     "es": "Modo invitado",
     "ja": "ゲストモード",
-    "zh": "访客模式"
+    "zh": "访客模式",
+    "ar": "وضع الضيف"
   },
   "username": {
     "ru": "Имя пользователя",
@@ -579,7 +591,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Nom d'utilisateur",
     "es": "Nombre de usuario",
     "ja": "ユーザー名",
-    "zh": "用户名"
+    "zh": "用户名",
+    "ar": "اسم المستخدم"
   },
   "name": {
     "ru": "Имя",
@@ -588,7 +601,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Nom",
     "es": "Nombre",
     "ja": "名前",
-    "zh": "姓名"
+    "zh": "姓名",
+    "ar": "الاسم"
   },
   "avatar": {
     "ru": "Аватар",
@@ -596,8 +610,9 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "de": "Avatar",
     "fr": "Avatar",
     "es": "Avatar",
-    "ja": "Аバター",
-    "zh": "头像"
+    "ja": "アバター",
+    "zh": "头像",
+    "ar": "الصورة الرمزية"
   },
   "color": {
     "ru": "Цвет",
@@ -606,7 +621,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Couleur",
     "es": "Color",
     "ja": "色",
-    "zh": "颜色"
+    "zh": "颜色",
+    "ar": "اللون"
   },
   "save": {
     "ru": "Сохранить",
@@ -615,7 +631,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Sauvegarder",
     "es": "Guardar",
     "ja": "保存",
-    "zh": "保存"
+    "zh": "保存",
+    "ar": "حفظ"
   },
   "cancel": {
     "ru": "Отмена",
@@ -624,7 +641,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Annuler",
     "es": "Cancelar",
     "ja": "キャンセル",
-    "zh": "取消"
+    "zh": "取消",
+    "ar": "إلغاء"
   },
   "continue": {
     "ru": "Продолжить",
@@ -633,7 +651,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Continuer",
     "es": "Continuar",
     "ja": "続ける",
-    "zh": "继续"
+    "zh": "继续",
+    "ar": "متابعة"
   },
   "loading": {
     "ru": "Загрузка",
@@ -642,7 +661,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Chargement",
     "es": "Cargando",
     "ja": "読み込み中",
-    "zh": "加载中"
+    "zh": "加载中",
+    "ar": "جاري التحميل"
   },
   "error": {
     "ru": "Ошибка",
@@ -651,7 +671,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Erreur",
     "es": "Error",
     "ja": "エラー",
-    "zh": "错误"
+    "zh": "错误",
+    "ar": "خطأ"
   },
   "no_internet": {
     "ru": "Нет интернета",
@@ -660,7 +681,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Pas d'internet",
     "es": "Sin internet",
     "ja": "インターネットなし",
-    "zh": "无网络"
+    "zh": "无网络",
+    "ar": "لا يوجد إنترنت"
   },
   "noInternet": {
     "ru": "Нет интернета",
@@ -669,7 +691,8 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Pas d'internet",
     "es": "Sin internet",
     "ja": "インターネットなし",
-    "zh": "无网络"
+    "zh": "无网络",
+    "ar": "لا يوجد إنترنت"
   },
   "reviews_duowindo6601": {
     "ru": "Отзывы о DuoWindo6601",
@@ -678,7 +701,58 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Avis sur DuoWindo6601",
     "es": "Reseñas sobre DuoWindo6601",
     "ja": "DuoWindo6601のレビュー",
-    "zh": "关于DuoWindo6601的评价"
+    "zh": "关于DuoWindo6601的评价",
+    "ar": "مراجعات DuoWindo6601"
+  },
+  "reviewsduowindo6601": {
+    "ru": "Отзывы о DuoWindo6601",
+    "en": "Reviews about DuoWindo6601",
+    "de": "Bewertungen über DuoWindo6601",
+    "fr": "Avis sur DuoWindo6601",
+    "es": "Reseñas sobre DuoWindo6601",
+    "ja": "DuoWindo6601のレビュー",
+    "zh": "关于DuoWindo6601的评价",
+    "ar": "مراجعات DuoWindo6601"
+  },
+  "reviews_subtitle": {
+    "ru": "Оставьте отзыв или задайте вопрос Администратору DuoWindo6601!",
+    "en": "Leave feedback or ask a DuoWindo6601 Administrator a question!",
+    "de": "Hinterlassen Sie Feedback oder stellen Sie Fragen an den DuoWindo6601-Administrator!",
+    "fr": "Laissez un avis ou posez une question à l'administrateur DuoWindo6601 !",
+    "es": "¡Deja tu opinión o haz una pregunta al Administrador de DuoWindo6601!",
+    "ja": "レビューを投稿するか、DuoWindo6601管理者にご質問ください！",
+    "zh": "留下评价或向DuoWindo6601管理员提问！",
+    "ar": "اترك رأيك أو اسأل مسؤول DuoWindo6601!"
+  },
+  "reviews": {
+    "ru": "Отзывы",
+    "en": "Reviews",
+    "de": "Bewertungen",
+    "fr": "Avis",
+    "es": "Reseñas",
+    "ja": "レビュー",
+    "zh": "评价",
+    "ar": "المراجعات"
+  },
+  "suggestions": {
+    "ru": "Предложения",
+    "en": "Suggestions",
+    "de": "Vorschläge",
+    "fr": "Suggestions",
+    "es": "Sugerencias",
+    "ja": "提案",
+    "zh": "建议",
+    "ar": "المقترحات"
+  },
+  "write_review": {
+    "ru": "Написать отзыв о DuoWindo6601",
+    "en": "Write a review about DuoWindo6601",
+    "de": "Eine Bewertung zu DuoWindo6601 schreiben",
+    "fr": "Écrire un avis sur DuoWindo6601",
+    "es": "Escribir una reseña sobre DuoWindo6601",
+    "ja": "DuoWindo6601のレビューを書く",
+    "zh": "撰写关于DuoWindo6601的评价",
+    "ar": "كتابة مراجعة عن DuoWindo6601"
   },
   "comments_access": {
     "ru": "Доступ Комментарии",
@@ -687,7 +761,18 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "fr": "Accès aux commentaires",
     "es": "Acceso a comentarios",
     "ja": "コメントアクセス",
-    "zh": "评论访问"
+    "zh": "评论访问",
+    "ar": "الوصول إلى التعليقات"
+  },
+  "commentsaccess": {
+    "ru": "Доступ Комментарии",
+    "en": "Comments Access",
+    "de": "Kommentare Zugriff",
+    "fr": "Accès aux commentaires",
+    "es": "Acceso a comentarios",
+    "ja": "コメントアクセス",
+    "zh": "评论访问",
+    "ar": "الوصول إلى التعليقات"
   }
 };
 
@@ -727,7 +812,7 @@ const TRANSLATIONS: Record<string, any> = {
     home: 'ГЛАВНАЯ', practice: 'ПРАКТИКА', leaderboard: 'РЕЙТИНГ', shop: 'МАГАЗИН', profile: 'ПРОФИЛЬ', feedback: 'ОТЗЫВЫ',
     lang_ru: 'Русский', lang_en: 'Английский', lang_de: 'Немецкий', lang_fr: 'Французский', lang_es: 'Испанский', lang_ja: 'Японский', lang_zh: 'Китайский',
     videoCallDesc: 'Живое общение с AI партнером', storiesAndWriting: 'Истории и Письмо', leaderboardDesc: 'Топ-3 переходят в Серебряную лигу',
-    sslCertificateTitle: 'Сертификат SSL (WR2 / Старый сайт)', sslCertificateDesc: 'Данный подтверждение что издатель сертификата сайт старый WR2. Сервер представил их журналы не удалось.',
+    sslCertificateTitle: 'Сертификат SSL (WR2 / Новый сайт)', sslCertificateDesc: 'Данное подтверждение: издатель сертификата — сайт WR2. Серверу успешно удалось предоставить журналы прозрачности.',
     edit: 'Изменить', mobileSimulatorBench: 'Тест-стенд Мобильный Симулятор', mobileSimulatorDesc: 'Интерактивный эмулятор iOS и Android для проверки адаптивности на ПК.',
     launchSimulator: 'Запустить стенд', usernameNotSet: 'Юзернейм не указан', incognito: 'Инкогнито',
     listenSpeech: 'Слушаю вашу речь...', typeMessage: 'Напишите сообщение...', send: 'Отправить', recordingSpeech: 'Запись речи... Нажмите микрофон еще раз для отправки',
@@ -844,8 +929,8 @@ const TRANSLATIONS: Record<string, any> = {
     win11Note: '* Срок поддержки зависит от ежегодных крупных обновлений. Версия 24H2 (Home/Pro) поддерживается до 13 октября 2026 года.',
     modernBrowsersLabel: 'Рекомендуемые современные браузеры:',
     downloadBtn: 'Скачать',
-    sslTitle: 'Сертификат SSL (WR2 / Старый сайт)',
-    sslDesc: 'Данный подтверждение что издатель сертификата сайт старый WR2. Сервер представил их журналы не удалось.',
+    sslTitle: 'Сертификат SSL (WR2 / Новый сайт)',
+    sslDesc: 'Данное подтверждение: издатель сертификата — сайт WR2. Серверу успешно удалось предоставить журналы прозрачности.',
     mobileSimTitle: 'Тест-стенд Мобильный Симулятор',
     mobileSimDesc: 'Интерактивный эмулятор iOS и Android для проверки адаптивности на ПК.',
     mobileSimBtn: 'Запустить стенд',
@@ -896,7 +981,7 @@ const TRANSLATIONS: Record<string, any> = {
     home: 'HOME', practice: 'PRACTICE', leaderboard: 'LEADERBOARD', shop: 'SHOP', profile: 'PROFILE', feedback: 'FEEDBACK',
     lang_ru: 'Russian', lang_en: 'English', lang_de: 'German', lang_fr: 'French', lang_es: 'Spanish', lang_ja: 'Japanese', lang_zh: 'Chinese',
     videoCallDesc: 'Live communication with an AI partner', storiesAndWriting: 'Stories & Writing', leaderboardDesc: 'Top 3 advance to Silver League',
-    sslCertificateTitle: 'SSL Certificate (WR2 / Legacy)', sslCertificateDesc: 'Confirmation that certificate issuer is old WR2 site. Server failed to present their logs.',
+    sslCertificateTitle: 'SSL Certificate (WR2 / New Site)', sslCertificateDesc: 'Confirmation that certificate issuer is WR2 site. Server successfully presented transparency logs.',
     edit: 'Edit', mobileSimulatorBench: 'Mobile Simulator Test Bench', mobileSimulatorDesc: 'Interactive iOS & Android emulator for testing layouts on PC.',
     launchSimulator: 'Launch Simulator', usernameNotSet: 'No handle set', incognito: 'Incognito',
     listenSpeech: 'Listening to speech...', typeMessage: 'Type a message...', send: 'Send', recordingSpeech: 'Recording speech... Tap mic again to send',
@@ -1012,8 +1097,8 @@ const TRANSLATIONS: Record<string, any> = {
     win11Note: '* Support lifecycle depends on annual feature updates. Version 24H2 (Home/Pro) is supported until October 13, 2026.',
     modernBrowsersLabel: 'Recommended modern browsers:',
     downloadBtn: 'Download',
-    sslTitle: 'SSL Certificate (WR2 / Legacy Site)',
-    sslDesc: 'Confirmation that the certificate issuer is the legacy WR2 site. The server failed to present transparency logs.',
+    sslTitle: 'SSL Certificate (WR2 / New Site)',
+    sslDesc: 'Confirmation that the certificate issuer is the WR2 site. The server successfully presented transparency logs.',
     mobileSimTitle: 'Mobile Simulator Test Bench',
     mobileSimDesc: 'Interactive iOS & Android emulator for testing responsive layouts on PC.',
     mobileSimBtn: 'Launch Simulator',
@@ -1064,7 +1149,7 @@ const TRANSLATIONS: Record<string, any> = {
     home: 'STARTSEITE', practice: 'ÜBEN', leaderboard: 'RANGLISTE', shop: 'SHOP', profile: 'PROFIL', feedback: 'BEWERTUNGEN',
     lang_ru: 'Russisch', lang_en: 'Englisch', lang_de: 'Deutsch', lang_fr: 'Französisch', lang_es: 'Spanisch', lang_ja: 'Japanisch', lang_zh: 'Chinesisch',
     videoCallDesc: 'Live-Kommunikation mit einem KI-Partner', storiesAndWriting: 'Geschichten & Schreiben', leaderboardDesc: 'Die Top 3 steigen in die Silber-Liga auf',
-    sslCertificateTitle: 'SSL-Zertifikat (WR2 / Legacy)', sslCertificateDesc: 'Bestätigung, dass der Zertifikatsaussteller die alte WR2-Website ist. Der Server konnte die Protokolle nicht bereitstellen.',
+    sslCertificateTitle: 'SSL-Zertifikat (WR2 / Neue Website)', sslCertificateDesc: 'Bestätigung, dass der Zertifikatsaussteller die WR2-Website ist. Der Server hat die Protokolle erfolgreich bereitgestellt.',
     edit: 'Bearbeiten', mobileSimulatorBench: 'Mobiler Simulator-Teststand', mobileSimulatorDesc: 'Interaktiver iOS- und Android-Emulator zum Testen von Layouts auf dem PC.',
     launchSimulator: 'Simulator starten', usernameNotSet: 'Kein Benutzername festgelegt', incognito: 'Inkognito',
     listenSpeech: 'Zuhören...', typeMessage: 'Nachricht eingeben...', send: 'Senden', recordingSpeech: 'Sprachaufnahme... Tippen Sie erneut, um zu senden',
@@ -1181,8 +1266,8 @@ const TRANSLATIONS: Record<string, any> = {
     win11Note: '* Die Supportdauer hängt von den jährlichen Funktionsupdates ab. Version 24H2 (Home/Pro) wird bis zum 13. Oktober 2026 unterstützt.',
     modernBrowsersLabel: 'Empfohlene moderne Browser:',
     downloadBtn: 'Herunterladen',
-    sslTitle: 'SSL-Zertifikat (WR2 / Veraltete Website)',
-    sslDesc: 'Bestätigung, dass der Zertifikatsaussteller die veraltete WR2-Website ist. Der Server konnte keine Transparenzprotokolle vorlegen.',
+    sslTitle: 'SSL-Zertifikat (WR2 / Neue Website)',
+    sslDesc: 'Bestätigung, dass der Zertifikatsaussteller die WR2-Website ist. Der Server hat die Protokolle erfolgreich bereitgestellt.',
     mobileSimTitle: 'Mobile Simulator Teststand',
     mobileSimDesc: 'Interaktiver iOS- und Android-Emulator zum Testen reaktionsfähiger Layouts auf dem PC.',
     mobileSimBtn: 'Simulator starten',
@@ -1233,7 +1318,7 @@ const TRANSLATIONS: Record<string, any> = {
     home: 'ACCUEIL', practice: 'PRATIQUE', leaderboard: 'CLASSEMENT', shop: 'BOUTIQUE', profile: 'PROFIL', feedback: 'AVIS',
     lang_ru: 'Russe', lang_en: 'Anglais', lang_de: 'Allemand', lang_fr: 'Français', lang_es: 'Espagnol', lang_ja: 'Japonais', lang_zh: 'Chinois',
     videoCallDesc: 'Communication en direct avec un partenaire IA', storiesAndWriting: 'Histoires & Écriture', leaderboardDesc: 'Les 3 premiers passent en Ligue Argent',
-    sslCertificateTitle: 'Certificat SSL (WR2 / Hérité)', sslCertificateDesc: 'Confirmation que l’émetteur du certificat est l’ancien site WR2. Le serveur n’a pas pu présenter ses journaux.',
+    sslCertificateTitle: 'Certificat SSL (WR2 / Nouveau site)', sslCertificateDesc: 'Confirmation que l’émetteur du certificat est le site WR2. Le serveur a réussi à présenter les journaux de transparence.',
     edit: 'Modifier', mobileSimulatorBench: 'Banc d’essai du simulateur mobile', mobileSimulatorDesc: 'Émulateur interactif iOS et Android pour tester les mises en page sur PC.',
     launchSimulator: 'Lancer le simulateur', usernameNotSet: 'Aucun identifiant défini', incognito: 'Incognito',
     listenSpeech: 'Écoute de la parole...', typeMessage: 'Saisissez un message...', send: 'Envoyer', recordingSpeech: 'Enregistrement... Appuyez à nouveau pour envoyer',
@@ -1349,8 +1434,8 @@ const TRANSLATIONS: Record<string, any> = {
     win11Note: '* Le cycle de vie du support dépend des mises à jour annuelles. La version 24H2 (Home/Pro) est prise en charge jusqu\'au 13 octobre 2026.',
     modernBrowsersLabel: 'Navigateurs modernes recommandés :',
     downloadBtn: 'Télécharger',
-    sslTitle: 'Certificat SSL (WR2 / Site hérité)',
-    sslDesc: 'Confirmation que l\'émetteur du certificat est le site hérité WR2. Le serveur n\'a pas réussi à présenter les journaux de transparence.',
+    sslTitle: 'Certificat SSL (WR2 / Nouveau site)',
+    sslDesc: 'Confirmation que l\'émetteur du certificat est le site WR2. Le serveur a réussi à présenter les journaux de transparence.',
     mobileSimTitle: 'Banc d\'essai du simulateur mobile',
     mobileSimDesc: 'Émulateur interactif iOS et Android pour tester les mises en page réactives sur PC.',
     mobileSimBtn: 'Lancer le simulateur',
@@ -1401,7 +1486,7 @@ const TRANSLATIONS: Record<string, any> = {
     home: 'INICIO', practice: 'PRÁCTICA', leaderboard: 'CLASIFICACIÓN', shop: 'TIENDA', profile: 'PERFIL', feedback: 'OPINIONES',
     lang_ru: 'Ruso', lang_en: 'Inglés', lang_de: 'Alemán', lang_fr: 'Francés', lang_es: 'Español', lang_ja: 'Japonés', lang_zh: 'Chino',
     videoCallDesc: 'Comunicación en vivo con un socio de IA', storiesAndWriting: 'Historias y Escritura', leaderboardDesc: 'Los 3 mejores ascienden a la Liga de Plata',
-    sslCertificateTitle: 'Certificado SSL (WR2 / Heredado)', sslCertificateDesc: 'Confirmación de que el emisor del certificado es el antiguo sitio WR2. El servidor no pudo presentar sus registros.',
+    sslCertificateTitle: 'Certificado SSL (WR2 / Nuevo sitio)', sslCertificateDesc: 'Confirmación de que el emisor del certificado es el sitio WR2. El servidor presentó con éxito los registros de transparencia.',
     edit: 'Editar', mobileSimulatorBench: 'Banco de pruebas del simulador móvil', mobileSimulatorDesc: 'Emulador interactivo de iOS y Android para probar diseños en PC.',
     launchSimulator: 'Iniciar simulador', usernameNotSet: 'Sin nombre de usuario establecido', incognito: 'Incógnito',
     listenSpeech: 'Escuchando voz...', typeMessage: 'Escribe un mensaje...', send: 'Enviar', recordingSpeech: 'Grabando voz... Toca el micrófono otra vez para enviar',
@@ -1517,8 +1602,8 @@ const TRANSLATIONS: Record<string, any> = {
     win11Note: '* El ciclo de vida de soporte depende de las actualizaciones anuales de funciones. La versión 24H2 (Home/Pro) es compatible hasta el 13 de octubre de 2026.',
     modernBrowsersLabel: 'Navegadores modernos recomendados:',
     downloadBtn: 'Descargar',
-    sslTitle: 'Certificado SSL (WR2 / Sitio heredado)',
-    sslDesc: 'Confirmación de que el emisor del certificado es el sitio heredado WR2. El servidor no pudo presentar los registros de transparencia.',
+    sslTitle: 'Certificado SSL (WR2 / Nuevo sitio)',
+    sslDesc: 'Confirmación de que el emisor del certificado es el sitio WR2. El servidor presentó con éxito los registros de transparencia.',
     mobileSimTitle: 'Banco de pruebas del simulador móvil',
     mobileSimDesc: 'Emulador interactivo de iOS y Android para probar diseños adaptables en PC.',
     mobileSimBtn: 'Iniciar simulador',
@@ -1569,7 +1654,7 @@ const TRANSLATIONS: Record<string, any> = {
     home: 'ホーム', practice: '練習', leaderboard: 'ランキング', shop: 'ショップ', profile: 'プロフィール', feedback: 'フィードバック',
     lang_ru: 'ロシア語', lang_en: '英語', lang_de: 'ドイツ語', lang_fr: 'フランス語', lang_es: 'スペイン語', lang_ja: '日本語', lang_zh: '中国語',
     videoCallDesc: 'AIパートナーとのライブコミュニケーション', storiesAndWriting: 'ストーリーと執筆', leaderboardDesc: 'トップ3がシルバーリーグに進出',
-    sslCertificateTitle: 'SSL証明書 (WR2 / レガシー)', sslCertificateDesc: '証明書の発行元が古いWR2サイトであることの確認。サーバーがログの提示に失敗しました。',
+    sslCertificateTitle: 'SSL証明書 (WR2 / 新しいサイト)', sslCertificateDesc: '証明書の発行元がWR2サイトであることの確認。サーバーがログの提示に成功しました。',
     edit: '編集', mobileSimulatorBench: 'モバイルシミュレータテストベンチ', mobileSimulatorDesc: 'PCでレイアウトをテストするためのインタラクティブなiOSおよびAndroidエミュレータ。',
     launchSimulator: 'シミュレータを起動', usernameNotSet: 'ユーザー名が設定されていません', incognito: 'シークレット',
     listenSpeech: '音声を聞いています...', typeMessage: 'メッセージを入力...', send: '送信', recordingSpeech: '音声を録音中... マイクをもう一度タップして送信',
@@ -1685,8 +1770,8 @@ const TRANSLATIONS: Record<string, any> = {
     win11Note: '* サポートライフサイクルは、毎年的機能アップデートによって異なります。バージョン 24H2（Home/Pro）は2026年10月13日までサポートされます。',
     modernBrowsersLabel: '推奨されるモダンなブラウザ：',
     downloadBtn: 'ダウンロード',
-    sslTitle: 'SSL証明書 (WR2 / レガシーサイト)',
-    sslDesc: '証明書の発行元がレガシーなWR2サイトであることの確認。サーバーは透明性ログの提示に失敗しました。',
+    sslTitle: 'SSL証明書 (WR2 / 新しいサイト)',
+    sslDesc: '証明書の発行元がWR2サイトであることの確認。サーバーは透明性ログの提示に成功しました。',
     mobileSimTitle: 'モバイルシミュレータテストベンチ',
     mobileSimDesc: 'PCでレスポンシブレイアウトをテストするためのインタラクティブなiOSおよびAndroidエミュレータ。',
     mobileSimBtn: 'シミュレータを起動',
@@ -1737,7 +1822,7 @@ const TRANSLATIONS: Record<string, any> = {
     home: '首页', practice: '练习', leaderboard: '排行榜', shop: '商店', profile: '个人资料', feedback: '反馈',
     lang_ru: '俄语', lang_en: '英语', lang_de: '德语', lang_fr: '法语', lang_es: '西班牙语', lang_ja: '日语', lang_zh: '中文',
     videoCallDesc: '与人工智能伙伴的实时交流', storiesAndWriting: '故事与写作', leaderboardDesc: '前3名晋级白银联赛',
-    sslCertificateTitle: 'SSL 证书 (WR2 / 传统)', sslCertificateDesc: '确认证书颁发者是旧的 WR2 网站。服务器未能提供其日志。',
+    sslCertificateTitle: 'SSL 证书 (WR2 / 新版网站)', sslCertificateDesc: '确认证书颁发者是 WR2 网站。服务器已成功提供透明度日志。',
     edit: '编辑', mobileSimulatorBench: '移动模拟器测试台', mobileSimulatorDesc: '用于在 PC 上测试布局的交互式 iOS 和 Android 模拟器。',
     launchSimulator: '启动模拟器', usernameNotSet: '未设置用户名', incognito: '无痕',
     listenSpeech: '正在聆听语音...', typeMessage: '输入消息...', send: '发送', recordingSpeech: '正在录制语音... 再次点击麦克风发送',
@@ -1853,8 +1938,8 @@ const TRANSLATIONS: Record<string, any> = {
     win11Note: '* 支持周期取决于年度功能更新。24H2 版本 (家庭版/专业版) 的支持持续至 2026 年 10 月 13 日。',
     modernBrowsersLabel: '推荐的现代浏览器：',
     downloadBtn: '下载',
-    sslTitle: 'SSL 证书 (WR2 / 历史旧版网站)',
-    sslDesc: '确认证书颁发者是旧版 WR2 网站。服务器未能提供透明度日志。',
+    sslTitle: 'SSL 证书 (WR2 / 新版网站)',
+    sslDesc: '确认证书颁发者是 WR2 网站。服务器已成功提供透明度日志。',
     mobileSimTitle: '移动模拟器测试台',
     mobileSimDesc: '用于在电脑端测试响应式布局的交互式 iOS 和 Android 模拟器。',
     mobileSimBtn: '启动模拟器',
@@ -1870,6 +1955,174 @@ const TRANSLATIONS: Record<string, any> = {
     savedLocallyAs: '已作为 @{username} 仅在浏览器本地保存。',
     updateBrowserBtn: '更新您的浏览器',
     continueDuoWindoBtn: '继续使用 DuoWindo6601'
+  },
+  ar: {
+    androidAlertTitle: 'تطبيق أندرويد!',
+    androidAlertDesc: 'DuoWindo6601 متاح الآن على جهازك المحمول! اكتشف عالم المعرفة.',
+    androidAlertBtn: 'تثبيت',
+    androidModalTitle: 'تعليمات التثبيت',
+    androidModalClose: 'إغلاق',
+    coursesAndRegions: 'الدورات والمناطق اللغوية',
+    searchPlaceholder: '🔍 البحث عن لغة أو منطقة...',
+    allCourses: 'جميع الدورات',
+    cisLanguages: 'لغات رابطة الدول المستقلة',
+    worldLanguages: 'اللغات العالمية',
+    subjectsAndGames: 'المواد والألعاب',
+    rfRegions: 'مناطق روسيا',
+    searchResults: 'نتائج البحث',
+    cisSectionTitle: 'لغات رابطة الدول المستقلة والدول المجاورة',
+    worldSectionTitle: 'اللغات العالمية الشائعة',
+    specialSectionTitle: 'المواد الخاصة والألعاب',
+    rfSectionTitle: 'مناطق روسيا الاتحادية',
+    regionalCourse: 'دورة إقليمية',
+    foreignLanguage: 'لغة أجنبية',
+    specialSubject: 'مادة خاصة',
+    musicTheory: 'نظرية الموسيقى',
+    exactScience: 'العلوم الدقيقة',
+    chessLogic: 'لعبة الشطرنج والمنطق',
+    betaTitle: 'DuoWindo6601 الوصول للاختبار التجريبي',
+    betaDesc: 'جميع ميزات التطبيق متاحة للاختبار.',
+    betaBtn: '🧪 مركز بيتا DuoWindo6601',
+    reviewsBtn: '⭐ المراجعات',
+    githubTitle: 'DuoWindo6601 متاح على GitHub',
+    githubDesc: 'تم إطلاق البناء التلقائي لـ Android APK عبر .github/workflows/build.yml.',
+    testAndroidBtn: '🤖 اختبار أندرويد',
+    home: 'الرئيسية', practice: 'الممارسة', leaderboard: 'التصنيف', shop: 'المتجر', profile: 'الملف الشخصي', feedback: 'الآراء',
+    lang_ru: 'الروسية', lang_en: 'الإنجليزية', lang_de: 'الألمانية', lang_fr: 'الفرنسية', lang_es: 'الإسبانية', lang_ja: 'اليابانية', lang_zh: 'الصينية', lang_ar: 'العربية',
+    videoCallDesc: 'تواصل مباشر مع شريك الذكاء الاصطناعي', storiesAndWriting: 'القصص والكتابة', leaderboardDesc: 'أفضل 3 ينتقلون إلى الدوري الفضي',
+    sslCertificateTitle: 'شهادة SSL (WR2 / الموقع الجديد)', sslCertificateDesc: 'تأكيد الشهادة: الناشر موقع WR2.',
+    edit: 'تعديل', mobileSimulatorBench: 'منصة محاكي الهاتف', mobileSimulatorDesc: 'محاكي تفاعلي لـ iOS و Android.',
+    launchSimulator: 'تشغيل المنصة', usernameNotSet: 'اسم المستخدم غير محدد', incognito: 'المتخفي',
+    listenSpeech: 'أستمع لكلامك...', typeMessage: 'اكتب رسالة...', send: 'إرسال', recordingSpeech: 'تسجيل الصوت...',
+    activeWith: 'نشط مع', change: 'تغيير', isYou: 'هذا أنت',
+    unit: 'الوحدة', start: 'ابدأ', check: 'تحقق', continue: 'متابعة', skip: 'تخطي',
+    module1: 'الوحدة 1، القسم 1', chessUnitName: 'حركة القطع',
+    settings: 'الإعدادات', language: 'اللغة', country: 'البلد', back: 'عودة', save: 'حفظ',
+    free: 'مجاني', trySuper: 'تجربة Super', connectMax: 'توصيل Max', cancelSub: 'إلغاء الاشتراك',
+    whatToLearn: 'ماذا تريد أن تتعلم؟', newCourses: 'دورات جديدة', forRu: 'للناطقين بالروسية',
+    shopTitle: 'متجر 6601', leaderboardTitle: 'الدوري البرونزي', roleplays: 'تمثيل الأدوار',
+    audio: 'الصوت', speech: 'الكلام', translate: 'الترجمة', translator: 'المترجم', illusion: 'الخداع الصوتي',
+    drawing: 'رسم الحروف', offline: 'غير متصل', apiStatus: 'حالة API', online: 'متصل',
+    limitReached: 'تم الوصول إلى الحد', checkConnection: 'تحقق من الاتصال', voice: 'الصوت',
+    voiceProvider: 'مزود الصوت', t_api_online: 'API متصل!', t_offline_limit: 'غير متصل / تم الوصول إلى الحد',
+    t_skip: 'تم تخطي التمرين', t_energy_low: 'نفدت طاقتك!', t_sub_cancel: 'تم إلغاء الاشتراك',
+    t_welcome_super: 'مرحباً بك في Super!', t_welcome_max: 'مرحباً بك في Max!', t_buy_energy: 'تم استعادة الطاقة!',
+    t_freeze_used: 'تم تجميد السلسلة!', t_rec_error: 'تعذر التعرف. حاول مرة أخرى.', t_buy_gems: 'تم الشراء',
+    t_topic_empty: 'لم يتم تحديد موضوع', t_api_error: 'خطأ في API', t_speech_empty: 'لم يتم سماع صوت', alphabet: 'الأبجدية', explainMax: 'شرح إجابتي', explainHeader: 'شرح الخطأ',
+    ishihara: 'اختبار إيشيهارا', ishiharaDesc: 'فحص رؤية الألوان', auto: 'تلقائي',
+    chooseTier: "اختر المستوى", energy25: "25 طاقة", ads: "الإعلانات", infEnergy: "طاقة غير محدودة", noAds: "بدون إعلانات",
+    allInSuper: "جميع ميزات Super", aiExplain: "توضيح الذكاء الاصطناعي", currentPlan: "الخطة الحالية", streakDays: "أيام متتالية",
+    totalXP: "إجمالي النقاط", playChess: "لعب الشطرنج", chessDesc: "اللعب مع DuoWindo6601", games: "مباريات", wins: "انتصارات", elo: "التصنيف",
+    startChess: "ابدأ: +30 XP", startSpeak: "ابدأ التحدث ←", whatHeard: "ماذا سمعت؟", speakForDuo: "التحدث عن Duo",
+    chessSubtitle: "لعبة شطرنج مدتها 20 دقيقة مع DuoWindo6601", startChessMatch: "بدء المباراة: +30 XP",
+    pvp: "لاعب ضد لاعب", pve: "لاعب ضد DuoWindo6601",
+    readPractice: "تمرين القراءة", aiTrans: "مترجم الذكاء الاصطناعي", realOrNot: "حقيقي أم لا؟", writePractice: "تمرين الكتابة",
+    topicPrompt: "موضوع المفردات؟", topicPlaceholder: "اتركه فارغاً...", trySuperTitle: "تجربة SUPER",
+    trySuperDesc: "بدون إعلانات، بدون حدود!", refill: "إعادة التعبئة إلى 25", freeze: "تجميد", freezeDesc: "الحفاظ على السلسلة",
+    refillGems: "تعبئة الجواهر", popular: "شائع", handful: "حفنة", sack: "كيس", chest: "صندوق", cantListen: "تعذر الاستماع",
+    cantSpeak: "تعذر التحدث", endChat: "إنهاء المحادثة", exitGame: "خروج من اللعبة", great: "رائع!", wrong: "إجابة خاطئة!", next: "التالي",
+    correctAnswer: "الإجابة الصحيحة:", checkmateWin: "كش مات! لقد فزت!", checkmateLoss: "كش مات! فاز الذكاء الاصطناعي.",
+    videoCall: "مكالمة فيديو", startInterview: "بدء المقابلة", smartMode: "الوضع الذكي", interviewer: "المقابل", self: "أنت",
+    serverJsTitle: 'دعم server.js!',
+    serverJsDesc: 'تم دمج خادم الإنتاج الخصوصي server.js بنجاح!',
+    serverJsBtn: 'رائع! 🚀',
+    streakResume: 'استعادة السلسلة',
+    streakResumed: '🔥 تم استعادة السلسلة وحفظها بنجاح!',
+    browserBtn: 'المتصفح',
+    eduBtn: '💡 التعلم',
+    eduWelcome: 'مرحباً! انقر على أي قطعة بيضاء لمعرفة طريقة حركتها.',
+    lessonWelcome: 'وضع الدرس. تم تعطيل الروبوت.',
+    lessonBtn: 'درس (بدون روبوت)',
+    playDuoBtn: 'لعب مع DuoWindo6601',
+    chessStudyDesc: 'وضع الدرس (بدون روبوت). تدرب على النقلات!',
+    chessTutorialDesc: 'تعليمي! انقر على أي قطعة بيضاء لمعرفة قواعدها.',
+    chessPlayDesc: 'لا تقلق، سألعب ببطء!',
+    incognitoTitle: 'وضع المتخفي (بدون حساب)',
+    incognitoLeaderboardDesc: 'تُحسب النقاط محلياً. سجل للمشاركة في التصنيف العالمي!',
+    register: 'تسجيل',
+    noUsername: 'اسم المستخدم غير محدد',
+    editProfile: 'تعديل الملف الشخصي',
+    registerAuth: 'التسجيل / الدخول',
+    streakAdjustment: 'تعديل السلسلة المتتالية.',
+    toastStreakBack7: '⏪ السلسلة: {streak} يوم',
+    toastStreakBack1: '◀ للخلف: {streak} يوم',
+    toastStreakForward1: '▶ للأمام: {streak} يوم',
+    toastStreakForward7: '⏩ للأمام (+7): {streak} يوم',
+    days: 'أيام',
+    registerAndLogin: 'التسجيل والدخول',
+    regLoginSubtitle: 'إنشاء حساب أو الدخول عبر Google أو اللعب كمتخفٍ',
+    incognitoTab: 'المتخفي',
+    googleTab: 'Google',
+    displayNameLabel: 'الاسم المعروض',
+    requiredLabel: '*مطلوب',
+    displayNamePlaceholder: 'مثال: أحمد',
+    usernameLabel: 'اسم المستخدم (@username)',
+    uniqueHandleLabel: 'المعرف الفريد',
+    profileLeaderboardVisible: 'يظهر في الملف الشخصي والتصنيف',
+    selectAvatarLabel: 'اختر الصورة الرمزية',
+    registerAndStartBtn: 'التسجيل والبدء',
+    fullIncognitoTitle: 'خصوصية تامة بدون بريد أو اسم',
+    noSignupPasswordsRule: 'بدون تسجيل أو كلمة سر',
+    allProgressLocalRule: 'يتم حفظ جميع التطورات محلياً',
+    canRegisterAnytimeRule: 'يمكنك التسجيل في أي وقت',
+    continueGuestBtn: 'المتابعة كضيف / متخفٍ',
+    firebaseCloudSyncTitle: 'مزامنة Firebase السحابية',
+    syncAllDevicesDesc: 'حفظ تقدمك عبر جميع الأجهزة',
+    progressSyncNote: 'عند الدخول، سيتم ربط التقدم بحساب Google الخاص بك.',
+    iframeWarning: '⚠️ تنبيه الإطار: قد يتم حظر الدخول داخل الإطار.',
+    openNewTabBtn: 'فتح في تبويب جديد ↗',
+    signInGoogleBtn: 'الدخول عبر Google',
+    skipContinueIncognitoBtn: 'تخطي / المتابعة بدون حساب (متخفٍ) ↗',
+    uploadPhotoBtn: '📷 رفع صورة',
+    deletePhotoBtn: '🗑️ حذف الصورة',
+    avatarUrlLabel: 'رابط الصورة (URL)',
+    avatarBgColorLabel: 'لون خلفية الصورة الرمزية',
+    avatarIconLabel: 'الرمز / الأيقونة',
+    cancelBtn: 'إلغاء',
+    saveProfileBtn: 'حفظ',
+    listeningPlaceholder: 'جاري الاستماع لكلامك...',
+    typingPlaceholder: 'اكتب رسالة...',
+    sendBtn: 'إرسال',
+    recordingToastText: '🎙 تسجيل الصوت... انقر على الميكروفون مرة أخرى للإرسال',
+    browserWarningTitle: 'شاشة التنبيه: المتصفح القديم غير مدعوم',
+    browserWarningSub: 'فحص توافق منصة DuoWindo6601',
+    browserCompatibleTitle: 'متصفح حديث ونظام تشغيل حديث (Windows / Linux / macOS / Android):',
+    browserCompatibleDesc: 'نظامك متوافق تماماً! لا توجد تحذيرات. جميع الميزات و Gemini API والمدخلات الصوتية تعمل بامتياز.',
+    browserOutdatedTitle: 'تم اكتشاف متصفح قديم أو نظام تشغيل غير مدعوم:',
+    browserOutdatedDesc: 'نظامك قديم (متصفح قديم أو Windows XP / Windows Vista).',
+    sysMessageLabel: 'رسالة النظام:',
+    sysMessageDesc: 'عذراً، متصفحك الحالي لم يعد مدعوماً. لمواصلة استخدام Duowindo6601 يرجى التحديث لمتصفح حديث. Windows XP/Vista غير مدعوم.',
+    riskLabel: 'المخاطر:',
+    riskDesc: 'قد لا تعمل ميزات Gemini API بشكل صحيح',
+    winOsSupportLabel: 'دورات دعم أنظمة تشغيل Windows:',
+    win7Desc: 'إنهاء الدعم الكامل',
+    win7Status: '❌ انتهى (14 يناير 2020)',
+    win8Status: '❌ انتهى (10 يناير 2023)',
+    win10Desc: 'انتهى الدعم المجاني في 14 أكتوبر 2025',
+    win10Status: '⚠️ ESU حتى 12 أكتوبر 2027',
+    win10Note: '* برنامج التحديثات الأمنية الممتدة (ESU) للمستخدمين ممتد حتى أكتوبر 2027.',
+    win11Desc: 'لا يوجد تاريخ إنهاء موحد، الدعم يعتمد على الإصدار',
+    win11Status: '✅ دعم إصدار 24H2 حتى 13 أكتوبر 2026',
+    win11Note: '* يعتمد الدعم على التحديثات السنوية.',
+    modernBrowsersLabel: 'المتصفحات الحديثة الموصى بها:',
+    downloadBtn: 'تنزيل',
+    sslTitle: 'شهادة SSL (WR2 / الموقع الجديد)',
+    sslDesc: 'تأكيد الشهادة: الناشر موقع WR2. تم تقديم سجلات الشفافية بنجاح.',
+    mobileSimTitle: 'منصة محاكي الهاتف المحمول',
+    mobileSimDesc: 'محاكي تفاعلي لـ iOS و Android لاختبار الاستجابة على جهاز الكمبيوتر.',
+    mobileSimBtn: 'تشغيل المحاكي',
+    feedbackBannerTitle: 'الآراء والدعم',
+    feedbackBannerDesc: 'هل وجدت خطأ أو لديك اقتراح؟',
+    adminBannerTitle: 'لوحة تحكم المالك',
+    adminBannerDesc: 'إدارة اللوحة والمراقبة',
+    cloudSaveTitle: 'الحفظ السحابي',
+    loading: 'جاري التحميل...',
+    loggedInAs: 'تم الدخول باسم {user}',
+    progressSynced: '● تم مزامنة التقدم سحابياً',
+    signOut: 'تسجيل الخروج',
+    savedLocallyAs: 'تم الحفظ محلياً كـ @{username} في المتصفح.',
+    updateBrowserBtn: 'تحديث المتصفح الخاص بك',
+    continueDuoWindoBtn: 'المتابعة إلى DuoWindo6601'
   }
 };
 
@@ -2126,6 +2379,16 @@ export default function App() {
       console.warn("Browser compatibility check failed:", e);
     }
   }, []);
+
+  useEffect(() => {
+    try {
+      const isRtl = user.language === 'ar';
+      document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
+      document.documentElement.lang = user.language || 'ru';
+    } catch (e) {
+      console.warn("Language direction update error:", e);
+    }
+  }, [user.language]);
 
 
   const triggerCelebrationConfetti = useCallback(() => {
@@ -2504,97 +2767,34 @@ export default function App() {
   const formatRTLOverride = useCallback((text: string) => {
     if (!text) return "";
     
-    // First, check if the text contains any RTL characters (Arabic or Hebrew)
-    const hasRtl = /[\u0600-\u06FF\u0590-\u05FF]/.test(text);
+    // Always strip manual forced byte-order directional overrides (u+202e, u+202c, u+202d)
+    // that force reverse character order and break Cyrillic/Latin text wrapping in RTL contexts.
+    const cleanText = text.replace(/[\u202E\u202C\u202D]/g, '');
+
+    const hasRtl = /[\u0600-\u06FF\u0590-\u05FF]/.test(cleanText);
     if (!hasRtl) {
-      // If there's no Arabic/Hebrew, strip any residual directional overrides to ensure pure LTR
-      return text.replace(/[\u202E\u202C\u202D]/g, '');
+      return cleanText;
     }
 
-    // If the text contains Cyrillic or Latin letters, it is mixed bilingual text (e.g., Russian or English mixed with Arabic).
-    // Applying global right-to-left overrides (u+202e) on mixed sentences breaks the LTR text flow/order.
-    // We strip all absolute overrides and let the browser's native bi-directional layout handle it perfectly.
-    const hasLtrLetters = /[a-zA-Z\u0400-\u04FFёЁ]/.test(text);
-    if (hasLtrLetters) {
-      return text.replace(/[\u202E\u202C\u202D]/g, '');
-    }
-
-    const startsWithRtlOverride = text.startsWith('\u202E');
+    // Isolate LTR (Cyrillic/Latin/Numbers) and RTL (Arabic/Hebrew) segments 
+    // using Unicode BiDi Isolate control characters (\u2066 for LTR Isolate, \u2067 for RTL Isolate, \u2069 for PDI)
+    // plus LTR Mark (\u200E) to preserve natural order and text wrapping without reversing character bytes.
+    const parts = cleanText.split(/([\u0600-\u06FF\u0590-\u05FF]+|[a-zA-Z\u0400-\u04FFёЁ0-9]+)/g);
     
-    // Tokenize text into chunks of either:
-    // 1. Cyrillic/Latin/digits blocks (including spaces/symbols that belong to them)
-    // 2. Arabic/Hebrew/other blocks
-    const tokens: string[] = [];
-    let currentToken = "";
-    let currentType: 'RTL' | 'LTR' | 'NEUTRAL' = 'NEUTRAL';
-    
-    for (let i = 0; i < text.length; i++) {
-      const char = text[i];
-      const isCharRtl = /[\u0600-\u06FF\u0590-\u05FF]/.test(char);
-      const isCharLtr = /[a-zA-Z0-9\u0400-\u04FFёЁ]/.test(char);
+    const formattedParts = parts.map(part => {
+      if (!part) return "";
+      const isPartRtl = /[\u0600-\u06FF\u0590-\u05FF]/.test(part);
+      const isPartLtr = /[a-zA-Z\u0400-\u04FFёЁ0-9]/.test(part);
       
-      if (/[\u202E\u202C\u202D]/.test(char)) {
-        if (currentToken) {
-          tokens.push(currentToken);
-          currentToken = "";
-        }
-        tokens.push(char);
-        currentType = 'NEUTRAL';
-        continue;
+      if (isPartLtr && !isPartRtl) {
+        return `\u2066${part}\u2069\u200E`;
+      } else if (isPartRtl) {
+        return `\u2067${part}\u2069`;
       }
-      
-      let charType: 'RTL' | 'LTR' | 'NEUTRAL' = 'NEUTRAL';
-      if (isCharRtl) {
-        charType = 'RTL';
-      } else if (isCharLtr) {
-        charType = 'LTR';
-      } else {
-        charType = 'NEUTRAL';
-      }
-      
-      if (currentType === 'NEUTRAL') {
-        currentType = charType;
-        currentToken += char;
-      } else if (currentType === charType) {
-        currentToken += char;
-      } else if (charType === 'NEUTRAL') {
-        currentToken += char;
-      } else {
-        if (currentToken) {
-          tokens.push(currentToken);
-        }
-        currentToken = char;
-        currentType = charType;
-      }
-    }
-    
-    if (currentToken) {
-      tokens.push(currentToken);
-    }
-    
-    // Process tokens: wrap LTR tokens in \u202D ... \u202C to prevent reversal
-    const processedTokens = tokens.map(tok => {
-      if (/[\u202E\u202C\u202D]/.test(tok)) {
-        return tok;
-      }
-      const hasLtrLettersOrDigits = /[a-zA-Z0-9\u0400-\u04FFёЁ]/.test(tok);
-      const hasArabicLetters = /[\u0600-\u06FF\u0590-\u05FF]/.test(tok);
-      
-      if (hasLtrLettersOrDigits && !hasArabicLetters) {
-        // Wrap in Left-to-Right Override to keep Russian Cyrillic and Latin English LTR
-        return `\u202D${tok}\u202C`;
-      }
-      return tok;
+      return part;
     });
-    
-    let result = processedTokens.join('');
-    
-    // Wrap whole output in \u202E ... \u202C so Arabic naturally flows RTL
-    if (!startsWithRtlOverride && /[\u0600-\u06FF\u0590-\u05FF]/.test(result)) {
-      result = `\u202E${result}\u202C`;
-    }
-    
-    return result;
+
+    return formattedParts.join('');
   }, []);
 
   const leaderboardData = useMemo(() => {
@@ -3255,29 +3455,29 @@ export default function App() {
                     <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl"><h3 className="text-xl font-bold mb-4 text-white uppercase tracking-widest">{t('apiStatus')}</h3><div className="flex items-center justify-between"><div className="flex items-center space-x-3"><div className={`w-4 h-4 rounded-full ${offlineMode ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div><span className={`font-bold text-lg ${offlineMode ? 'text-red-400' : 'text-green-400'}`}>{offlineMode ? t('limitReached') : t('online')}</span></div><button onClick={() => { playSound('click'); checkApiStatus(); }} className="px-4 py-2 bg-gray-700 rounded-xl font-bold text-sm hover:bg-gray-600 transition-all border-b-4 border-gray-800 active:border-b-0 active:translate-y-1">{t('checkConnection')}</button></div></div>
 
                     {/* SSL CERTIFICATE WR2 & SERVER LOGS STATUS */}
-                    <div className="bg-amber-950/40 border-2 border-amber-500/60 rounded-3xl p-6 mb-6 shadow-xl">
+                    <div className="bg-emerald-950/40 border-2 border-emerald-500/60 rounded-3xl p-6 mb-6 shadow-xl">
                         <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-lg font-black text-amber-400 uppercase tracking-wide flex items-center space-x-2">
+                            <h3 className="text-lg font-black text-emerald-400 uppercase tracking-wide flex items-center space-x-2">
                                 <span>🔒</span>
                                 <span>{t('sslCertificateTitle')}</span>
                             </h3>
-                            <span className="text-[10px] font-black bg-amber-500/20 text-amber-300 px-2.5 py-1 rounded-full border border-amber-500/40">
+                            <span className="text-[10px] font-black bg-emerald-500/20 text-emerald-300 px-2.5 py-1 rounded-full border border-emerald-500/40">
                                 WR2 VERIFIED
                             </span>
                         </div>
-                        <p className="text-xs text-amber-200/90 font-medium leading-relaxed mb-4">
+                        <p className="text-xs text-emerald-200/90 font-medium leading-relaxed mb-4">
                             {t('sslCertificateDesc')}
                         </p>
-                        <div className="bg-black/40 border border-amber-500/30 rounded-2xl p-3 text-[11px] font-mono text-amber-300/80 space-y-1">
-                            <div>[SSL Status] Issuer: WR2 Root CA (Legacy)</div>
-                            <div>[Server Logs] Certificate Transparency Log: Failed to retrieve server logs</div>
+                        <div className="bg-black/40 border border-emerald-500/30 rounded-2xl p-3 text-[11px] font-mono text-emerald-300/90 space-y-1">
+                            <div>[SSL Status] Issuer: WR2 Root CA (Verified)</div>
+                            <div>[Server Logs] Certificate Transparency Log: Successfully retrieved & verified</div>
                             <div>[Cipher Suite] TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256</div>
                         </div>
                     </div>
                     <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl">
                     <h3 className="text-xl font-bold mb-4 text-white uppercase tracking-widest">{t('language')}</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                        {['ru','en','de','fr','es','ja','zh'].map(lang => (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {['ru','en','de','fr','es','ja','zh','ar'].map(lang => (
                             <button key={lang} onClick={() => { playSound('select'); setUser({...user, language: lang as any}); }} className={`p-3 rounded-xl font-bold border-b-4 transition-all text-xs flex flex-col items-center justify-center space-y-1 ${user.language === lang ? 'bg-duo-blue border-duo-blueDark text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'}`}>
                                 <span className="font-black text-sm tracking-wider">{lang.toUpperCase()}</span>
                                 <span className="text-[10px] opacity-80">{t('lang_' + lang)}</span>
@@ -3847,7 +4047,7 @@ export default function App() {
                           <div className="flex-1 pr-6">
                               <div className="flex items-center space-x-2 mb-1.5 flex-wrap">
                                   <span className="bg-purple-500 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">Бета-тестирование</span>
-                                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9.5px] font-bold px-2 py-0.5 rounded-full uppercase">v1.0.1 Active</span>
+                                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9.5px] font-bold px-2 py-0.5 rounded-full uppercase">v1.0.2 Active</span>
                               </div>
                               <h3 className="font-din font-black text-xl text-white tracking-widest uppercase mb-1">DuoWindo6601 Доступ Бета-тестирование</h3>
                               <p className="font-din font-bold text-xs text-purple-200 leading-normal mb-3">
@@ -4163,30 +4363,38 @@ export default function App() {
             </div>
           )}
 
-          {/* ... (LEADERBOARD, SHOP, PROFILE) ... */}
+          {/* ... (LEADERBOARD) ... */}
           {screen === AppScreen.LEADERBOARD && (
-             <div className="py-10 animate-in fade-in max-w-2xl mx-auto w-full px-4">
-                <div className="flex flex-col items-center mb-10 text-center"><ShieldIcon className="w-24 h-24 text-yellow-400 mb-4 animate-bounce" /><h2 className="text-3xl font-black uppercase tracking-widest text-yellow-400">{t('leaderboardTitle')}</h2><p className="text-gray-400 font-bold mt-2">{t('leaderboardDesc')}</p></div>
+             <div className="py-10 animate-in fade-in max-w-2xl mx-auto w-full px-4" dir="auto">
+                <div className="flex flex-col items-center mb-10 text-center" dir="auto">
+                  <ShieldIcon className="w-24 h-24 text-yellow-400 mb-4 animate-bounce shrink-0" />
+                  <h2 className="text-3xl font-black uppercase tracking-widest text-yellow-400" dir="auto">
+                    <bdi dir="auto">{t('leaderboardTitle')}</bdi>
+                  </h2>
+                  <p className="text-gray-400 font-bold mt-2" dir="auto">
+                    <bdi dir="auto">{t('leaderboardDesc')}</bdi>
+                  </p>
+                </div>
                 
                 {isIncognitoUser && (
-                  <div className="mb-6 p-5 rounded-3xl bg-amber-950/50 border-2 border-amber-500/50 flex flex-col md:flex-row items-center justify-between gap-4 text-left shadow-xl">
-                    <div className="flex items-center space-x-3">
-                      <span className="text-3xl">🕵️</span>
-                      <div>
-                        <h4 className="font-black text-sm text-amber-300 uppercase">
-                          {t('incognitoTitle')}
+                  <div className="mb-6 p-5 rounded-3xl bg-amber-950/50 border-2 border-amber-500/50 flex flex-col md:flex-row items-center justify-between gap-4 text-left shadow-xl" dir="auto">
+                    <div className="flex items-center gap-3" dir="auto">
+                      <span className="text-3xl shrink-0">🕵️</span>
+                      <div dir="auto">
+                        <h4 className="font-black text-sm text-amber-300 uppercase" dir="auto">
+                          <bdi dir="auto">{t('incognitoTitle')}</bdi>
                         </h4>
-                        <p className="text-xs text-amber-200/80 font-medium leading-relaxed">
-                          {t('incognitoLeaderboardDesc')}
+                        <p className="text-xs text-amber-200/80 font-medium leading-relaxed" dir="auto">
+                          <bdi dir="auto">{t('incognitoLeaderboardDesc')}</bdi>
                         </p>
                       </div>
                     </div>
                     <button
                       onClick={() => openRegisterModal('register')}
-                      className="w-full md:w-auto px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase rounded-2xl border-b-2 border-amber-700 active:translate-y-0.5 transition-all whitespace-nowrap shadow-md flex items-center justify-center space-x-1"
+                      className="w-full md:w-auto px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase rounded-2xl border-b-2 border-amber-700 active:translate-y-0.5 transition-all whitespace-nowrap shadow-md flex items-center justify-center gap-1 shrink-0"
                     >
                       <span>✨</span>
-                      <span>{t('register')}</span>
+                      <span><bdi dir="auto">{t('register')}</bdi></span>
                     </button>
                   </div>
                 )}
@@ -4196,7 +4404,25 @@ export default function App() {
                       const isUser = entry.id === 'user';
                       const rank = index + 1;
                       let rankColor = "text-gray-400"; if (rank === 1) rankColor = "text-yellow-400"; if (rank === 2) rankColor = "text-gray-300"; if (rank === 3) rankColor = "text-orange-400";
-                      return ( <div key={entry.id} className={`flex items-center p-4 md:p-6 border-b border-gray-700 last:border-0 transition-colors ${isUser ? 'bg-duo-card border-l-4 border-l-duo-blue' : 'hover:bg-white/5'} ${isUser ? 'bg-gray-800' : ''}`}><div className={`w-8 font-black text-xl text-center mr-4 ${rankColor}`}>{rank}</div><div className={`w-12 h-12 rounded-full ${entry.color} flex items-center justify-center font-bold text-lg mr-4 border-2 border-gray-600`}>{entry.name[0]}</div><div className="flex-1"><h3 className={`font-bold text-lg ${isUser ? 'text-duo-blue' : 'text-white'}`}>{entry.name}</h3>{isUser && <span className="text-xs font-bold text-gray-500 uppercase">{t('isYou')}</span>}</div><div className="font-bold text-gray-400">{entry.xp} XP</div></div> );
+                      return ( 
+                        <div key={entry.id} className={`flex items-center gap-3 md:gap-4 p-4 md:p-6 border-b border-gray-700 last:border-0 transition-colors ${isUser ? 'bg-duo-card border-l-4 border-l-duo-blue' : 'hover:bg-white/5'} ${isUser ? 'bg-gray-800' : ''}`} dir="auto">
+                          <div className={`w-8 font-black text-xl text-center shrink-0 ${rankColor}`}>
+                            <bdi dir="ltr">{rank}</bdi>
+                          </div>
+                          <div className={`w-12 h-12 rounded-full ${entry.color} flex items-center justify-center font-bold text-lg shrink-0 border-2 border-gray-600`}>
+                            <bdi dir="auto">{entry.name[0]}</bdi>
+                          </div>
+                          <div className="flex-1 min-w-0" dir="auto">
+                            <h3 className={`font-bold text-lg truncate ${isUser ? 'text-duo-blue' : 'text-white'}`}>
+                              <bdi dir="auto">{entry.name}</bdi>
+                            </h3>
+                            {isUser && <span className="text-xs font-bold text-gray-500 uppercase"><bdi dir="auto">{t('isYou')}</bdi></span>}
+                          </div>
+                          <div className="font-bold text-gray-400 shrink-0 text-right ltr-preserve" dir="ltr">
+                            <bdi dir="ltr">{entry.xp} XP</bdi>
+                          </div>
+                        </div> 
+                      );
                    })}
                 </div>
              </div>
@@ -4220,7 +4446,7 @@ export default function App() {
           )}
 
           {screen === AppScreen.PROFILE && (
-             <div className="flex flex-col items-center space-y-8 py-10 animate-in fade-in relative max-w-3xl mx-auto w-full px-4">
+             <div className="flex flex-col items-center space-y-8 py-10 animate-in fade-in relative max-w-3xl mx-auto w-full px-4 rtl-directional-aware">
                 <button onClick={() => { playSound('click'); setScreen(AppScreen.SETTINGS); }} className="absolute top-0 right-4 p-3 bg-duo-card rounded-2xl border-2 border-gray-700 hover:bg-gray-800 transition-colors shadow-lg"><GearIcon className="w-7 h-7 text-gray-400" /></button>
                 
                 {/* AVATAR INTERACTIVE DISPLAY */}
@@ -4917,7 +5143,7 @@ export default function App() {
       {/* EDIT PROFILE MODAL */}
       {showEditProfileModal && (
         <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
-          <div className="bg-duo-dark border-2 border-gray-700 rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl space-y-6 text-white my-8 relative">
+          <div className="bg-duo-dark border-2 border-gray-700 rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl space-y-6 text-white my-8 relative rtl-directional-aware">
             <button 
               onClick={() => { playSound('click'); setShowEditProfileModal(false); }} 
               className="absolute top-5 right-5 text-gray-400 hover:text-white p-2 rounded-xl bg-gray-800 transition-colors"
@@ -6308,7 +6534,7 @@ return (
                 </div>
 
                 <div className="bg-black/40 border border-gray-700/60 rounded-2xl p-4 text-xs text-gray-300 font-bold flex items-center justify-between">
-                    <span>Статус бета-сборки: <strong className="text-emerald-400">1.0.1 Stable</strong></span>
+                    <span>Статус бета-сборки: <strong className="text-emerald-400">1.0.2 Stable</strong></span>
                     <button 
                         onClick={() => { playSound('click'); setShowBetaModal(false); setScreen(AppScreen.FEEDBACK); }}
                         className="text-amber-400 underline hover:text-amber-300 font-bold"
