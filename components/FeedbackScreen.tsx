@@ -12,6 +12,7 @@ interface FeedbackScreenProps {
   onOpenAdminDashboard?: () => void;
   courses?: Course[];
   currentCourse?: Course;
+  t?: (key: string) => string;
 }
 
 export const DEFAULT_FEEDBACK_COURSES = [
@@ -70,6 +71,18 @@ interface ReviewTemplate {
 const GOOD_REVIEWS_POOL: ReviewTemplate[] = [
   {
     rating: 5,
+    category: '💻 Поддержка Windows',
+    comment: 'Очень удобно, что в раздел проверки браузера и ОС добавили подробные сроки поддержки Windows! Теперь сразу видно: Windows 7 прекращена 14 января 2020 г., Windows 8/8.1 прекращена 10 января 2023 г., по Windows 10 бесплатная завершилась 14 октября 2025 г. (платная ESU продлена до 12 октября 2027 г.), а по Windows 11 всё зависит от версий (актуальная 24H2 поддерживается до 13 октября 2026 г.).',
+    adminReply: 'Спасибо за отзыв! Мы добавили подробную информацию о жизненном цикле ОС Windows (7, 8/8.1, 10, 11), чтобы пользователи своевременно обновляли свои системы для безопасной работы с DuoWindo6601 и встроенными ИИ-технологиями! 💻🚀'
+  },
+  {
+    rating: 5,
+    category: '✨ Новая функция',
+    comment: 'Новая проверка браузера и операционных систем (Windows / Linux / macOS / Android) на https://duowindo6601.ai.studio/ работает безупречно! Сразу показывает статус совместимости и защищает от сбоев Gemini API.',
+    adminReply: 'Спасибо за отзыв! Интегрированная проверка браузеров и ОС (Windows, Linux, macOS, Android) создана для максимальной стабильности DuoWindo6601! 🚀'
+  },
+  {
+    rating: 5,
     category: '🏛️ Языки СНГ (казахский, узбекский, армянский и др.)',
     comment: 'Курсы языков СНГ на https://duowindo6601.ai.studio/ просто супер! Очень качественно проработана тренажёрная часть письменности и озвучка для казахского, узбекского, армянского, кыргызского и грузинского языков.',
     adminReply: 'Спасибо за отзыв! Поддержка и развитие курсов языков СНГ на https://duowindo6601.ai.studio/ — один из наших главных приоритетов! 🇰🇿🇺🇿🇦🇲🇰🇬🇬🇪'
@@ -107,6 +120,12 @@ const GOOD_REVIEWS_POOL: ReviewTemplate[] = [
 ];
 
 const BAD_REVIEWS_POOL: ReviewTemplate[] = [
+  {
+    rating: 2,
+    category: '✨ Новая функция',
+    comment: 'На очень старых ОС и браузерах (например, Windows XP или устаревших версиях) предупреждение срабатывает корректно, но хотелось бы более плавной работы Gemini API на слабых ПК.',
+    adminReply: 'Спасибо! Мы учли это: для старых систем предусмотрены расширенные подсказки и режим офлайн-фоллбека.'
+  },
   {
     rating: 2,
     category: '🏛️ Языки СНГ (казахский, узбекский, армянский и др.)',
@@ -281,7 +300,8 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
   setToast,
   onOpenAdminDashboard,
   courses = [],
-  currentCourse
+  currentCourse,
+  t
 }) => {
   const [reviews, setReviews] = useState<FeedbackItem[]>(INITIAL_REVIEWS);
   const [loading, setLoading] = useState(true);
@@ -845,7 +865,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
           <div>
             <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight mb-1 flex items-center gap-2">
               <MessageSquareIcon className="w-8 h-8 text-duo-yellow" />
-              Отзывы о DuoWindo6601
+              {t ? t('reviews_duowindo6601') : 'Отзывы о DuoWindo6601'}
             </h1>
             <p className="text-gray-300 text-xs md:text-sm">
               Оставьте отзыв или задайте вопрос Администратору DuoWindo6601!
@@ -1646,7 +1666,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
                     >
                       <MessageSquareIcon className="w-4 h-4" />
                       <span>
-                        Комментарии {repliesList.length > 0 && `(${repliesList.length})`}
+                        {t ? t('comments_access') : 'Комментарии'} {repliesList.length > 0 && `(${repliesList.length})`}
                       </span>
                     </button>
 
@@ -1694,7 +1714,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
                 {isExpanded && (
                   <div className="mt-4 pt-4 border-t border-gray-800 animate-in fade-in slide-in-from-top-2">
                     <h5 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                      💬 Комментарии ({repliesList.length})
+                      💬 {t ? t('comments_access') : 'Комментарии'} ({repliesList.length})
                     </h5>
 
                     {/* Replies Feed */}

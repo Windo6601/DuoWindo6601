@@ -382,6 +382,315 @@ const COUNTRIES = [
 
 const STORAGE_KEY = 'duowindo6601_v26_chess_fix';
 
+const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
+  "home": {
+    "ru": "Главная",
+    "en": "Home",
+    "de": "Startseite",
+    "fr": "Accueil",
+    "es": "Inicio",
+    "ja": "ホーム",
+    "zh": "主页"
+  },
+  "play_chess": {
+    "ru": "Сыграем в Шахматы",
+    "en": "Play Chess",
+    "de": "Schach spielen",
+    "fr": "Jouer aux échecs",
+    "es": "Jugar ajedrez",
+    "ja": "チェスをする",
+    "zh": "下棋"
+  },
+  "playChess": {
+    "ru": "Сыграем в Шахматы",
+    "en": "Play Chess",
+    "de": "Schach spielen",
+    "fr": "Jouer aux échecs",
+    "es": "Jugar ajedrez",
+    "ja": "チェスをする",
+    "zh": "下棋"
+  },
+  "practice": {
+    "ru": "Практика",
+    "en": "Practice",
+    "de": "Übung",
+    "fr": "Pratique",
+    "es": "Práctica",
+    "ja": "練習",
+    "zh": "练习"
+  },
+  "video_call": {
+    "ru": "ВидеоЗвонок",
+    "en": "Video Call",
+    "de": "Videoanruf",
+    "fr": "Appel vidéo",
+    "es": "Videollamada",
+    "ja": "ビデオ通話",
+    "zh": "视频通话"
+  },
+  "videoCall": {
+    "ru": "ВидеоЗвонок",
+    "en": "Video Call",
+    "de": "Videoanruf",
+    "fr": "Appel vidéo",
+    "es": "Videollamada",
+    "ja": "ビデオ通話",
+    "zh": "视频通话"
+  },
+  "rating": {
+    "ru": "Рейтинг",
+    "en": "Rating",
+    "de": "Bewertung",
+    "fr": "Classement",
+    "es": "Clasificación",
+    "ja": "評価",
+    "zh": "评分"
+  },
+  "leaderboard": {
+    "ru": "Рейтинг",
+    "en": "Rating",
+    "de": "Bewertung",
+    "fr": "Classement",
+    "es": "Clasificación",
+    "ja": "評価",
+    "zh": "评分"
+  },
+  "store": {
+    "ru": "Магазин",
+    "en": "Store",
+    "de": "Shop",
+    "fr": "Boutique",
+    "es": "Tienda",
+    "ja": "ストア",
+    "zh": "商店"
+  },
+  "shop": {
+    "ru": "Магазин",
+    "en": "Store",
+    "de": "Shop",
+    "fr": "Boutique",
+    "es": "Tienda",
+    "ja": "ストア",
+    "zh": "商店"
+  },
+  "profile": {
+    "ru": "Профиль",
+    "en": "Profile",
+    "de": "Profil",
+    "fr": "Profil",
+    "es": "Perfil",
+    "ja": "プロフィール",
+    "zh": "个人资料"
+  },
+  "full_access": {
+    "ru": "Полный доступ",
+    "en": "Full Access",
+    "de": "Voller Zugriff",
+    "fr": "Accès complet",
+    "es": "Acceso completo",
+    "ja": "フルアクセス",
+    "zh": "完全访问"
+  },
+  "fullAccess": {
+    "ru": "Полный доступ",
+    "en": "Full Access",
+    "de": "Voller Zugriff",
+    "fr": "Accès complet",
+    "es": "Acceso completo",
+    "ja": "フルアクセス",
+    "zh": "完全访问"
+  },
+  "languages": {
+    "ru": "Язык стран",
+    "en": "Languages",
+    "de": "Sprachen",
+    "fr": "Langues",
+    "es": "Idiomas",
+    "ja": "言語",
+    "zh": "语言"
+  },
+  "section": {
+    "ru": "Раздел",
+    "en": "Section",
+    "de": "Abschnitt",
+    "fr": "Section",
+    "es": "Sección",
+    "ja": "セクション",
+    "zh": "部分"
+  },
+  "feedback": {
+    "ru": "Отзыв",
+    "en": "Feedback",
+    "de": "Feedback",
+    "fr": "Retour",
+    "es": "Opinión",
+    "ja": "フィードバック",
+    "zh": "反馈"
+  },
+  "translator": {
+    "ru": "Переводчик",
+    "en": "Translator",
+    "de": "Übersetzer",
+    "fr": "Traducteur",
+    "es": "Traductor",
+    "ja": "翻訳",
+    "zh": "翻译"
+  },
+  "register": {
+    "ru": "Регистрация",
+    "en": "Register",
+    "de": "Registrieren",
+    "fr": "Inscription",
+    "es": "Registro",
+    "ja": "登録",
+    "zh": "注册"
+  },
+  "login": {
+    "ru": "Вход",
+    "en": "Login",
+    "de": "Anmelden",
+    "fr": "Connexion",
+    "es": "Iniciar sesión",
+    "ja": "ログイン",
+    "zh": "登录"
+  },
+  "guest_mode": {
+    "ru": "Войти как Гость",
+    "en": "Guest Mode",
+    "de": "Gastmodus",
+    "fr": "Mode invité",
+    "es": "Modo invitado",
+    "ja": "ゲストモード",
+    "zh": "访客模式"
+  },
+  "guestMode": {
+    "ru": "Войти как Гость",
+    "en": "Guest Mode",
+    "de": "Gastmodus",
+    "fr": "Mode invité",
+    "es": "Modo invitado",
+    "ja": "ゲストモード",
+    "zh": "访客模式"
+  },
+  "username": {
+    "ru": "Имя пользователя",
+    "en": "Username",
+    "de": "Benutzername",
+    "fr": "Nom d'utilisateur",
+    "es": "Nombre de usuario",
+    "ja": "ユーザー名",
+    "zh": "用户名"
+  },
+  "name": {
+    "ru": "Имя",
+    "en": "Name",
+    "de": "Name",
+    "fr": "Nom",
+    "es": "Nombre",
+    "ja": "名前",
+    "zh": "姓名"
+  },
+  "avatar": {
+    "ru": "Аватар",
+    "en": "Avatar",
+    "de": "Avatar",
+    "fr": "Avatar",
+    "es": "Avatar",
+    "ja": "Аバター",
+    "zh": "头像"
+  },
+  "color": {
+    "ru": "Цвет",
+    "en": "Color",
+    "de": "Farbe",
+    "fr": "Couleur",
+    "es": "Color",
+    "ja": "色",
+    "zh": "颜色"
+  },
+  "save": {
+    "ru": "Сохранить",
+    "en": "Save",
+    "de": "Speichern",
+    "fr": "Sauvegarder",
+    "es": "Guardar",
+    "ja": "保存",
+    "zh": "保存"
+  },
+  "cancel": {
+    "ru": "Отмена",
+    "en": "Cancel",
+    "de": "Abbrechen",
+    "fr": "Annuler",
+    "es": "Cancelar",
+    "ja": "キャンセル",
+    "zh": "取消"
+  },
+  "continue": {
+    "ru": "Продолжить",
+    "en": "Continue",
+    "de": "Weiter",
+    "fr": "Continuer",
+    "es": "Continuar",
+    "ja": "続ける",
+    "zh": "继续"
+  },
+  "loading": {
+    "ru": "Загрузка",
+    "en": "Loading",
+    "de": "Laden",
+    "fr": "Chargement",
+    "es": "Cargando",
+    "ja": "読み込み中",
+    "zh": "加载中"
+  },
+  "error": {
+    "ru": "Ошибка",
+    "en": "Error",
+    "de": "Fehler",
+    "fr": "Erreur",
+    "es": "Error",
+    "ja": "エラー",
+    "zh": "错误"
+  },
+  "no_internet": {
+    "ru": "Нет интернета",
+    "en": "No Internet",
+    "de": "Kein Internet",
+    "fr": "Pas d'internet",
+    "es": "Sin internet",
+    "ja": "インターネットなし",
+    "zh": "无网络"
+  },
+  "noInternet": {
+    "ru": "Нет интернета",
+    "en": "No Internet",
+    "de": "Kein Internet",
+    "fr": "Pas d'internet",
+    "es": "Sin internet",
+    "ja": "インターネットなし",
+    "zh": "无网络"
+  },
+  "reviews_duowindo6601": {
+    "ru": "Отзывы о DuoWindo6601",
+    "en": "Reviews about DuoWindo6601",
+    "de": "Bewertungen über DuoWindo6601",
+    "fr": "Avis sur DuoWindo6601",
+    "es": "Reseñas sobre DuoWindo6601",
+    "ja": "DuoWindo6601のレビュー",
+    "zh": "关于DuoWindo6601的评价"
+  },
+  "comments_access": {
+    "ru": "Доступ Комментарии",
+    "en": "Comments Access",
+    "de": "Kommentare Zugriff",
+    "fr": "Accès aux commentaires",
+    "es": "Acceso a comentarios",
+    "ja": "コメントアクセス",
+    "zh": "评论访问"
+  }
+};
+
 const TRANSLATIONS: Record<string, any> = {
   // ... (keeping translations concise for brevity, assume existing ones are here)
   ru: {
@@ -390,7 +699,39 @@ const TRANSLATIONS: Record<string, any> = {
     androidAlertBtn: 'УСТАНОВИТЬ',
     androidModalTitle: 'Инструкция по установке',
     androidModalClose: 'Закрыть',
+    coursesAndRegions: 'Курсы и Языковые регионы',
+    searchPlaceholder: '🔍 Поиск языка или региона...',
+    allCourses: 'Все курсы',
+    cisLanguages: 'СНГ языки (15)',
+    worldLanguages: 'Мировые языки',
+    subjectsAndGames: 'Предметы & Игры',
+    rfRegions: 'Регионы РФ',
+    searchResults: 'Результаты поиска',
+    cisSectionTitle: 'Языки СНГ и стран-соседей',
+    worldSectionTitle: 'Популярные мировые языки',
+    specialSectionTitle: 'Специальные предметы и Игры',
+    rfSectionTitle: 'Субъекты и регионы РФ',
+    regionalCourse: 'Региональный курс',
+    foreignLanguage: 'Иностранный язык',
+    specialSubject: 'Специальный предмет',
+    musicTheory: 'Музыкальная теория',
+    exactScience: 'Точная наука',
+    chessLogic: 'Шахматная игра & Логика',
+    betaTitle: 'DuoWindo6601 Доступ Бета-тестирование',
+    betaDesc: 'Все функции приложения доступны для проверки тестеров: языки СНГ и мира, Шахматы, Графика, AI Озвучка и Панель Управления.',
+    betaBtn: '🧪 Бета-Центр DuoWindo6601',
+    reviewsBtn: '⭐ Отзывы',
+    githubTitle: 'DuoWindo6601 уже доступен на GitHub',
+    githubDesc: 'Автоматическая сборка Android APK запущена через .github/workflows/build.yml.',
+    testAndroidBtn: '🤖 Тест Android',
     home: 'ГЛАВНАЯ', practice: 'ПРАКТИКА', leaderboard: 'РЕЙТИНГ', shop: 'МАГАЗИН', profile: 'ПРОФИЛЬ', feedback: 'ОТЗЫВЫ',
+    lang_ru: 'Русский', lang_en: 'Английский', lang_de: 'Немецкий', lang_fr: 'Французский', lang_es: 'Испанский', lang_ja: 'Японский', lang_zh: 'Китайский',
+    videoCallDesc: 'Живое общение с AI партнером', storiesAndWriting: 'Истории и Письмо', leaderboardDesc: 'Топ-3 переходят в Серебряную лигу',
+    sslCertificateTitle: 'Сертификат SSL (WR2 / Старый сайт)', sslCertificateDesc: 'Данный подтверждение что издатель сертификата сайт старый WR2. Сервер представил их журналы не удалось.',
+    edit: 'Изменить', mobileSimulatorBench: 'Тест-стенд Мобильный Симулятор', mobileSimulatorDesc: 'Интерактивный эмулятор iOS и Android для проверки адаптивности на ПК.',
+    launchSimulator: 'Запустить стенд', usernameNotSet: 'Юзернейм не указан', incognito: 'Инкогнито',
+    listenSpeech: 'Слушаю вашу речь...', typeMessage: 'Напишите сообщение...', send: 'Отправить', recordingSpeech: 'Запись речи... Нажмите микрофон еще раз для отправки',
+    activeWith: 'Активно с', change: 'Изменить', isYou: 'Это вы',
     unit: 'Раздел', start: 'НАЧАТЬ', check: 'ПРОВЕРИТЬ', continue: 'ПРОДОЛЖИТЬ', skip: 'ПРОПУСТИТЬ',
     module1: 'МОДУЛЬ 1, РАЗДЕЛ 1', chessUnitName: 'Движение фигур',
     settings: 'Настройки', language: 'Язык', country: 'Страна', back: 'Назад', save: 'Сохранить',
@@ -424,7 +765,102 @@ const TRANSLATIONS: Record<string, any> = {
     serverJsDesc: 'В проект DuoWindo официально добавлен собственный продакшн-сервер server.js с полной раздачей статики и поддержкой SPA-маршрутов!',
     serverJsBtn: 'Классно! 🚀',
     streakResume: 'Возобновить ударный режим',
-    streakResumed: '🔥 Ударный режим успешно возобновлен и сохранен!'
+    streakResumed: '🔥 Ударный режим успешно возобновлен и сохранен!',
+    browserBtn: 'Браузер',
+    eduBtn: '💡 Обучение',
+    eduWelcome: 'Добро пожаловать! Нажмите на любую белую фигуру, чтобы узнать, как она ходит.',
+    lessonWelcome: 'Режим урока. Бот отключен. Вы можете свободно передвигать фигуры за обе стороны.',
+    lessonBtn: 'Урок (без бота)',
+    playDuoBtn: 'Игра с DuoWindo6601 (Бот)',
+    chessStudyDesc: 'Режим урока (без бота). Готовьтесь и отрабатывайте ходы!',
+    chessTutorialDesc: 'Обучение! Нажмите на любую белую фигуру, чтобы узнать её правила.',
+    chessPlayDesc: 'Не бойтесь. Я буду играть вполсилы!',
+    incognitoTitle: 'Режим Инкогнито (Без аккаунта)',
+    incognitoLeaderboardDesc: 'Очки зачитываются локально. Зарегистрируйтесь, чтобы участвовать в глобальном рейтинге!',
+    register: 'Регистрация',
+    noUsername: 'Юзернейм не установлен',
+    editProfile: 'Редактировать профиль',
+    registerAuth: 'Регистрация / Вход',
+    streakAdjustment: 'Регулировка ударного режима: возобновление и настройка дней.',
+    toastStreakBack7: '⏪ Ударный режим: {streak} дн.',
+    toastStreakBack1: '◀ Назад: {streak} дн.',
+    toastStreakForward1: '▶ Вперёд: {streak} дн.',
+    toastStreakForward7: '⏩ Вперёд (+7): {streak} дн.',
+    days: 'дней',
+    registerAndLogin: 'Регистрация и Вход',
+    regLoginSubtitle: 'Зарегистрируйте аккаунт, войдите через Google или играйте Инкогнито без аккаунта',
+    incognitoTab: 'Инкогнито',
+    googleTab: 'Google',
+    displayNameLabel: 'Ваше Имя',
+    requiredLabel: '*Обязательно',
+    displayNamePlaceholder: 'Например: Анатолий',
+    usernameLabel: 'Имя пользователя (@username)',
+    uniqueHandleLabel: 'Уникальный ник',
+    profileLeaderboardVisible: 'Отображается в профиле и рейтинге',
+    selectAvatarLabel: 'Выбор аватарки',
+    registerAndStartBtn: 'Зарегистрироваться и Начать',
+    fullIncognitoTitle: 'Полная анонимность без ввода имени и почты',
+    noSignupPasswordsRule: 'Никакой регистрации и паролей',
+    allProgressLocalRule: 'Весь прогресс сохраняется в вашем браузере',
+    canRegisterAnytimeRule: 'Вы сможете зарегистрироваться в любой момент',
+    continueGuestBtn: 'Войти как Гость / Инкогнито',
+    firebaseCloudSyncTitle: 'Облачная синхронизация Firebase',
+    syncAllDevicesDesc: 'Сохраняйте свой прогресс на всех устройствах',
+    progressSyncNote: 'При входе ваш прогресс будет автоматически привязан к вашему Google-аккаунту.',
+    iframeWarning: '⚠️ Ограничение фрейма: Вход может блокироваться внутри фрейма.',
+    openNewTabBtn: 'Открыть в новой вкладке ↗',
+    signInGoogleBtn: 'Войти через Google',
+    skipContinueIncognitoBtn: 'Пропустить / Продолжить без аккаунта (Инкогнито) ↗',
+    uploadPhotoBtn: '📷 Загрузить фото',
+    deletePhotoBtn: '🗑️ Удалить фото',
+    avatarUrlLabel: 'Ссылка на фото (URL)',
+    avatarBgColorLabel: 'Цвет фона аватарки',
+    avatarIconLabel: 'Значок / Иконка',
+    cancelBtn: 'Отмена',
+    saveProfileBtn: 'Сохранить',
+    listeningPlaceholder: 'Слушаю вашу речь...',
+    typingPlaceholder: 'Напишите сообщение...',
+    sendBtn: 'Отправить',
+    recordingToastText: '🎙 Запись речи... Нажмите микрофон еще раз для отправки',
+    browserWarningTitle: 'Экран предупреждения: старый браузер не поддерживается',
+    browserWarningSub: 'Проверка совместимости платформы DuoWindo6601',
+    browserCompatibleTitle: 'Новый Браузер и современная ОС (Windows / Linux / macOS / Android):',
+    browserCompatibleDesc: 'Ваша система полностью совместима! Предупреждений нет. Все функции, Gemini API и голосовой ввод работают отлично.',
+    browserOutdatedTitle: 'Обнаружен устаревший браузер или неподдерживаемая ОС:',
+    browserOutdatedDesc: 'Ваша система устарела (устаревший браузер или Windows XP / Windows Vista).',
+    sysMessageLabel: 'Сообщение системы:',
+    sysMessageDesc: 'К сожалению, ваш текущий браузер больше не поддерживается. Чтобы продолжить использовать Duowindo6601 обновитесь до современного браузера или Windows XP/Windows Vista не поддерживается',
+    riskLabel: 'Риск:',
+    riskDesc: 'Могут некорректно работать Gemini API',
+    winOsSupportLabel: 'Сроки поддержки операционных систем Windows:',
+    win7Desc: 'Полное прекращение поддержки',
+    win7Status: '❌ Прекращена (14 января 2020 г.)',
+    win8Status: '❌ Прекращена (10 января 2023 г.)',
+    win10Desc: 'Бесплатная поддержка завершилась 14 октября 2025 г.',
+    win10Status: '⚠️ ESU до 12 октября 2027 г.',
+    win10Note: '* Платная программа расширенных обновлений (ESU) для обычных пользователей продлена до октября 2027 г.',
+    win11Desc: 'Общей даты закрытия проекта нет, поддержка зависит от версии',
+    win11Status: '✅ Версия 24H2 до 13 окт. 2026 г.',
+    win11Note: '* Срок поддержки зависит от ежегодных крупных обновлений. Версия 24H2 (Home/Pro) поддерживается до 13 октября 2026 года.',
+    modernBrowsersLabel: 'Рекомендуемые современные браузеры:',
+    downloadBtn: 'Скачать',
+    sslTitle: 'Сертификат SSL (WR2 / Старый сайт)',
+    sslDesc: 'Данный подтверждение что издатель сертификата сайт старый WR2. Сервер представил их журналы не удалось.',
+    mobileSimTitle: 'Тест-стенд Мобильный Симулятор',
+    mobileSimDesc: 'Интерактивный эмулятор iOS и Android для проверки адаптивности на ПК.',
+    mobileSimBtn: 'Запустить стенд',
+    feedbackBannerTitle: 'Отзывы и Поддержка',
+    feedbackBannerDesc: 'Нашли ошибку или хотите идею?',
+    adminBannerTitle: 'Панель Владельца',
+    adminBannerDesc: 'Модерация и мониторинг',
+    cloudSaveTitle: 'Облачное сохранение',
+    loading: 'Загрузка...',
+    loggedInAs: 'Вы вошли как {user}',
+    progressSynced: '● Прогресс синхронизирован с облаком',
+    signOut: 'Выйти из аккаунта',
+    savedLocallyAs: 'Вы зашли как @{username}. Данные сохраняются только в этом браузере.',
+    updateBrowserBtn: 'Обновите свой браузер',
+    continueDuoWindoBtn: 'Продолжить работу в DuoWindo6601'
   },
   en: {
     androidAlertTitle: 'Android App Available!',
@@ -432,7 +868,39 @@ const TRANSLATIONS: Record<string, any> = {
     androidAlertBtn: 'INSTALL NOW',
     androidModalTitle: 'Android Installation Guide',
     androidModalClose: 'Close',
+    coursesAndRegions: 'Courses & Language Regions',
+    searchPlaceholder: '🔍 Search language or region...',
+    allCourses: 'All Courses',
+    cisLanguages: 'CIS Languages (15)',
+    worldLanguages: 'World Languages',
+    subjectsAndGames: 'Subjects & Games',
+    rfRegions: 'RF Regions',
+    searchResults: 'Search Results',
+    cisSectionTitle: 'CIS & Neighboring Languages',
+    worldSectionTitle: 'World Popular Languages',
+    specialSectionTitle: 'Special Subjects & Games',
+    rfSectionTitle: 'Russian Regions',
+    regionalCourse: 'Regional Course',
+    foreignLanguage: 'Foreign Language',
+    specialSubject: 'Special Subject',
+    musicTheory: 'Music Theory',
+    exactScience: 'Exact Science',
+    chessLogic: 'Chess Game & Logic',
+    betaTitle: 'DuoWindo6601 Beta Testing Access',
+    betaDesc: 'All app features are available for testing: CIS & world languages, Chess, Graphics, AI Voiceover, and Control Panel.',
+    betaBtn: '🧪 DuoWindo6601 Beta Center',
+    reviewsBtn: '⭐ Reviews',
+    githubTitle: 'DuoWindo6601 is already available on GitHub',
+    githubDesc: 'Automatic Android APK build is launched via .github/workflows/build.yml.',
+    testAndroidBtn: '🤖 Test Android',
     home: 'HOME', practice: 'PRACTICE', leaderboard: 'LEADERBOARD', shop: 'SHOP', profile: 'PROFILE', feedback: 'FEEDBACK',
+    lang_ru: 'Russian', lang_en: 'English', lang_de: 'German', lang_fr: 'French', lang_es: 'Spanish', lang_ja: 'Japanese', lang_zh: 'Chinese',
+    videoCallDesc: 'Live communication with an AI partner', storiesAndWriting: 'Stories & Writing', leaderboardDesc: 'Top 3 advance to Silver League',
+    sslCertificateTitle: 'SSL Certificate (WR2 / Legacy)', sslCertificateDesc: 'Confirmation that certificate issuer is old WR2 site. Server failed to present their logs.',
+    edit: 'Edit', mobileSimulatorBench: 'Mobile Simulator Test Bench', mobileSimulatorDesc: 'Interactive iOS & Android emulator for testing layouts on PC.',
+    launchSimulator: 'Launch Simulator', usernameNotSet: 'No handle set', incognito: 'Incognito',
+    listenSpeech: 'Listening to speech...', typeMessage: 'Type a message...', send: 'Send', recordingSpeech: 'Recording speech... Tap mic again to send',
+    activeWith: 'Active with', change: 'Change', isYou: "It's you",
     unit: 'Unit', start: 'START', check: 'CHECK', continue: 'CONTINUE', skip: 'SKIP',
     module1: 'MODULE 1, UNIT 1', chessUnitName: 'Movement of pieces',
     settings: 'Settings', language: 'Language', country: 'Country', back: 'Back', save: 'Save',
@@ -465,7 +933,102 @@ const TRANSLATIONS: Record<string, any> = {
     serverJsDesc: 'The DuoWindo project has officially integrated its own production server.js with complete static assets distribution and SPA fallback handling!',
     serverJsBtn: 'Awesome! 🚀',
     streakResume: 'Resume Streak',
-    streakResumed: '🔥 Streak successfully resumed and saved!'
+    streakResumed: '🔥 Streak successfully resumed and saved!',
+    browserBtn: 'Browser',
+    eduBtn: '💡 Education',
+    eduWelcome: 'Welcome! Click on any white piece to see how it moves.',
+    lessonWelcome: 'Lesson Mode. Bot is disabled. You can move pieces for both sides.',
+    lessonBtn: 'Lesson (No Bot)',
+    playDuoBtn: 'Play with DuoWindo6601',
+    chessStudyDesc: 'Lesson mode (no bot). Practice your moves!',
+    chessTutorialDesc: 'Tutorial! Click on any white piece to learn its moves.',
+    chessPlayDesc: "Don't be afraid! I will play at half strength!",
+    incognitoTitle: 'Incognito Mode (No Account)',
+    incognitoLeaderboardDesc: 'Scores count locally. Register to join the global leaderboard!',
+    register: 'Register',
+    noUsername: 'No username set',
+    editProfile: 'Edit Profile',
+    registerAuth: 'Registration / Auth',
+    streakAdjustment: 'Adjust your streak days forward or backward.',
+    toastStreakBack7: '⏪ Streak: {streak} days',
+    toastStreakBack1: '◀ Backward: {streak} days',
+    toastStreakForward1: '▶ Forward: {streak} days',
+    toastStreakForward7: '⏩ Forward (+7): {streak} days',
+    days: 'days',
+    registerAndLogin: 'Registration & Login',
+    regLoginSubtitle: 'Register an account, sign in with Google or play Incognito without an account',
+    incognitoTab: 'Incognito',
+    googleTab: 'Google',
+    displayNameLabel: 'Display Name',
+    requiredLabel: '*Required',
+    displayNamePlaceholder: 'E.g. Anatoly',
+    usernameLabel: 'Username (@handle)',
+    uniqueHandleLabel: 'Unique handle',
+    profileLeaderboardVisible: 'Visible in profile and leaderboards',
+    selectAvatarLabel: 'Select Avatar',
+    registerAndStartBtn: 'Register & Get Started',
+    fullIncognitoTitle: 'Full privacy without entering email or name',
+    noSignupPasswordsRule: 'No signups or passwords required',
+    allProgressLocalRule: 'All progress is stored locally in browser',
+    canRegisterAnytimeRule: 'You can create an account at any time',
+    continueGuestBtn: 'Continue as Guest / Incognito',
+    firebaseCloudSyncTitle: 'Firebase Cloud Sync',
+    syncAllDevicesDesc: 'Sync your learning stats across devices',
+    progressSyncNote: 'Your progress will automatically sync with your Google account.',
+    iframeWarning: '⚠️ Frame limitation: Google sign-in might be blocked inside an iFrame.',
+    openNewTabBtn: 'Open in a new tab ↗',
+    signInGoogleBtn: 'Sign in with Google',
+    skipContinueIncognitoBtn: 'Skip / Continue without account (Incognito) ↗',
+    uploadPhotoBtn: '📷 Upload Photo',
+    deletePhotoBtn: '🗑️ Delete Photo',
+    avatarUrlLabel: 'Avatar Image URL',
+    avatarBgColorLabel: 'Avatar Color',
+    avatarIconLabel: 'Avatar Icon / Emoji',
+    cancelBtn: 'Cancel',
+    saveProfileBtn: 'Save Profile',
+    listeningPlaceholder: 'Listening to speech...',
+    typingPlaceholder: 'Type a message...',
+    sendBtn: 'Send',
+    recordingToastText: '🎙 Recording speech... Tap mic again to send',
+    browserWarningTitle: 'Warning Screen: Old browser not supported',
+    browserWarningSub: 'DuoWindo6601 platform compatibility check',
+    browserCompatibleTitle: 'Modern Browser & Current OS (Windows / Linux / macOS / Android):',
+    browserCompatibleDesc: 'Your system is fully compatible! No warnings. All features, Gemini API, and voice input work perfectly.',
+    browserOutdatedTitle: 'Outdated browser or unsupported OS detected:',
+    browserOutdatedDesc: 'Your system is outdated (legacy browser or Windows XP / Windows Vista).',
+    sysMessageLabel: 'System message:',
+    sysMessageDesc: 'Unfortunately, your current browser is no longer supported. To continue using Duowindo6601, please update to a modern browser. Windows XP/Windows Vista are not supported.',
+    riskLabel: 'Risk:',
+    riskDesc: 'Gemini API may not work correctly',
+    winOsSupportLabel: 'Windows Operating System Support Lifecycles:',
+    win7Desc: 'End of support lifecycle',
+    win7Status: '❌ Ended (January 14, 2020)',
+    win8Status: '❌ Ended (January 10, 2023)',
+    win10Desc: 'Free support ended on October 14, 2025.',
+    win10Status: '⚠️ ESU until October 12, 2027',
+    win10Note: '* Paid Extended Security Updates (ESU) program for retail users has been extended until October 2027.',
+    win11Desc: 'No general end date, support depends on the version',
+    win11Status: '✅ Version 24H2 until Oct 13, 2026',
+    win11Note: '* Support lifecycle depends on annual feature updates. Version 24H2 (Home/Pro) is supported until October 13, 2026.',
+    modernBrowsersLabel: 'Recommended modern browsers:',
+    downloadBtn: 'Download',
+    sslTitle: 'SSL Certificate (WR2 / Legacy Site)',
+    sslDesc: 'Confirmation that the certificate issuer is the legacy WR2 site. The server failed to present transparency logs.',
+    mobileSimTitle: 'Mobile Simulator Test Bench',
+    mobileSimDesc: 'Interactive iOS & Android emulator for testing responsive layouts on PC.',
+    mobileSimBtn: 'Launch Simulator',
+    feedbackBannerTitle: 'Feedback & Support',
+    feedbackBannerDesc: 'Found a bug or want to suggest an idea?',
+    adminBannerTitle: 'Owner Dashboard',
+    adminBannerDesc: 'Moderation & Monitoring',
+    cloudSaveTitle: 'Cloud Save',
+    loading: 'Loading...',
+    loggedInAs: 'You are logged in as {user}',
+    progressSynced: '● Progress is synchronized with the cloud',
+    signOut: 'Sign Out',
+    savedLocallyAs: 'Saved locally in browser as @{username}.',
+    updateBrowserBtn: 'Update your browser',
+    continueDuoWindoBtn: 'Continue using DuoWindo6601'
   },
   de: {
     androidAlertTitle: 'Android-App verfügbar!',
@@ -473,7 +1036,39 @@ const TRANSLATIONS: Record<string, any> = {
     androidAlertBtn: 'JETZT INSTALLIEREN',
     androidModalTitle: 'Installationsanleitung',
     androidModalClose: 'Schließen',
+    coursesAndRegions: 'Kurse & Sprachregionen',
+    searchPlaceholder: '🔍 Sprache oder Region suchen...',
+    allCourses: 'Alle Kurse',
+    cisLanguages: 'GUS-Sprachen (15)',
+    worldLanguages: 'Weltsprachen',
+    subjectsAndGames: 'Fächer & Spiele',
+    rfRegions: 'Russische Regionen',
+    searchResults: 'Suchergebnisse',
+    cisSectionTitle: 'GUS- und Nachbarsprachen',
+    worldSectionTitle: 'Beliebte Weltsprachen',
+    specialSectionTitle: 'Spezielle Fächer & Spiele',
+    rfSectionTitle: 'Subjekte und Regionen Russlands',
+    regionalCourse: 'Regionaler Kurs',
+    foreignLanguage: 'Fremdsprache',
+    specialSubject: 'Spezielles Fach',
+    musicTheory: 'Musiktheorie',
+    exactScience: 'Exakte Wissenschaft',
+    chessLogic: 'Schachspiel & Logik',
+    betaTitle: 'DuoWindo6601 Beta-Testzugang',
+    betaDesc: 'Alle App-Funktionen stehen zum Testen zur Verfügung: GUS- und Weltsprachen, Schach, Grafik, KI-Voiceover und Kontrollzentrum.',
+    betaBtn: '🧪 DuoWindo6601 Beta-Zentrum',
+    reviewsBtn: '⭐ Bewertungen',
+    githubTitle: 'DuoWindo6601 ist bereits auf GitHub verfügbar',
+    githubDesc: 'Automatisches Android APK Build wird über .github/workflows/build.yml gestartet.',
+    testAndroidBtn: '🤖 Android-Test',
     home: 'STARTSEITE', practice: 'ÜBEN', leaderboard: 'RANGLISTE', shop: 'SHOP', profile: 'PROFIL', feedback: 'BEWERTUNGEN',
+    lang_ru: 'Russisch', lang_en: 'Englisch', lang_de: 'Deutsch', lang_fr: 'Französisch', lang_es: 'Spanisch', lang_ja: 'Japanisch', lang_zh: 'Chinesisch',
+    videoCallDesc: 'Live-Kommunikation mit einem KI-Partner', storiesAndWriting: 'Geschichten & Schreiben', leaderboardDesc: 'Die Top 3 steigen in die Silber-Liga auf',
+    sslCertificateTitle: 'SSL-Zertifikat (WR2 / Legacy)', sslCertificateDesc: 'Bestätigung, dass der Zertifikatsaussteller die alte WR2-Website ist. Der Server konnte die Protokolle nicht bereitstellen.',
+    edit: 'Bearbeiten', mobileSimulatorBench: 'Mobiler Simulator-Teststand', mobileSimulatorDesc: 'Interaktiver iOS- und Android-Emulator zum Testen von Layouts auf dem PC.',
+    launchSimulator: 'Simulator starten', usernameNotSet: 'Kein Benutzername festgelegt', incognito: 'Inkognito',
+    listenSpeech: 'Zuhören...', typeMessage: 'Nachricht eingeben...', send: 'Senden', recordingSpeech: 'Sprachaufnahme... Tippen Sie erneut, um zu senden',
+    activeWith: 'Aktiv mit', change: 'Ändern', isYou: 'Das bist du',
     unit: 'Einheit', start: 'STARTEN', check: 'ÜBERPRÜFEN', continue: 'WEITER', skip: 'ÜBERSPRINGEN',
     module1: 'MODUL 1, EINHEIT 1', chessUnitName: 'Figurenbewegung',
     settings: 'Einstellungen', language: 'Sprache', country: 'Land', back: 'Zurück', save: 'Speichern',
@@ -505,7 +1100,104 @@ const TRANSLATIONS: Record<string, any> = {
     videoCall: "VIDEOANRUF", startInterview: "Interview starten", smartMode: "Smart-Modus", interviewer: "Interviewer", self: "Sie",
     serverJsTitle: 'server.js Unterstützung!',
     serverJsDesc: 'DuoWindo hat offiziell einen eigenen Produktionsserver server.js mit Statik- und SPA-Routing integriert!',
-    serverJsBtn: 'Fantastisch! 🚀'
+    serverJsBtn: 'Fantastisch! 🚀',
+    streakResume: 'Streak fortsetzen',
+    streakResumed: '🔥 Streak erfolgreich fortgesetzt und gespeichert!',
+    browserBtn: 'Browser',
+    eduBtn: '💡 Ausbildung',
+    eduWelcome: 'Willkommen! Klicken Sie auf eine beliebige weiße Figur, um zu sehen, wie sie sich bewegt.',
+    lessonWelcome: 'Lektionsmodus. Der Bot ist deaktiviert. Sie können Figuren für beide Seiten bewegen.',
+    lessonBtn: 'Lektion (kein Bot)',
+    playDuoBtn: 'Spielen mit DuoWindo6601',
+    chessStudyDesc: 'Lektionsmodus (kein Bot). Üben Sie Ihre Züge!',
+    chessTutorialDesc: 'Anleitung! Klicken Sie auf eine beliebige weiße Figur, um ihre Züge zu lernen.',
+    chessPlayDesc: 'Keine Sorge. Ich spiele mit halber Kraft!',
+    incognitoTitle: 'Inkognito-Modus (kein Konto)',
+    incognitoLeaderboardDesc: 'Punkte zählen lokal. Registrieren Sie sich, um an der globalen Rangliste teilzunehmen!',
+    register: 'Registrieren',
+    noUsername: 'Kein Benutzername festgelegt',
+    editProfile: 'Profil bearbeiten',
+    registerAuth: 'Registrierung / Login',
+    streakAdjustment: 'Passen Sie Ihre Streak-Tage an (vorwärts oder rückwärts).',
+    toastStreakBack7: '⏪ Streak: {streak} Tage',
+    toastStreakBack1: '◀ Zurück: {streak} Tage',
+    toastStreakForward1: '▶ Vorwärts: {streak} Tage',
+    toastStreakForward7: '⏩ Vorwärts (+7): {streak} Tage',
+    days: 'Tage',
+    registerAndLogin: 'Registrierung & Login',
+    regLoginSubtitle: 'Registrieren Sie ein Konto, melden Sie sich mit Google an oder spielen Sie anonym im Inkognito-Modus',
+    incognitoTab: 'Inkognito',
+    googleTab: 'Google',
+    displayNameLabel: 'Anzeigename',
+    requiredLabel: '*Erforderlich',
+    displayNamePlaceholder: 'Z.B. Anatoli',
+    usernameLabel: 'Benutzername (@handle)',
+    uniqueHandleLabel: 'Einzigartiger Name',
+    profileLeaderboardVisible: 'Sichtbar im Profil und auf Bestenlisten',
+    selectAvatarLabel: 'Avatar auswählen',
+    registerAndStartBtn: 'Registrieren & Loslegen',
+    fullIncognitoTitle: 'Volle Anonymität ohne Eingabe von E-Mail oder Name',
+    noSignupPasswordsRule: 'Keine Registrierung oder Passwörter erforderlich',
+    allProgressLocalRule: 'Der gesamte Fortschritt wird lokal im Browser gespeichert',
+    canRegisterAnytimeRule: 'Sie können sich jederzeit registrieren',
+    continueGuestBtn: 'Als Gast / Inkognito fortfahren',
+    firebaseCloudSyncTitle: 'Firebase Cloud-Synchronisierung',
+    syncAllDevicesDesc: 'Synchronisieren Sie Ihre Lernstatistiken geräteübergreifend',
+    progressSyncNote: 'Ihr Fortschritt wird automatisch mit Ihrem Google-Konto synchronisiert.',
+    iframeWarning: '⚠️ Frame-Einschränkung: Die Google-Anmeldung ist im iFrame möglicherweise blockiert.',
+    openNewTabBtn: 'In neuem Tab öffnen ↗',
+    signInGoogleBtn: 'Mit Google anmelden',
+    skipContinueIncognitoBtn: 'Überspringen / Ohne Konto fortfahren (Inkognito) ↗',
+    uploadPhotoBtn: '📷 Foto hochladen',
+    deletePhotoBtn: '🗑️ Foto löschen',
+    avatarUrlLabel: 'Avatar-Bild-URL',
+    avatarBgColorLabel: 'Avatar-Farbe',
+    avatarIconLabel: 'Avatar-Symbol / Emoji',
+    cancelBtn: 'Abbrechen',
+    saveProfileBtn: 'Profil speichern',
+    listeningPlaceholder: 'Zuhören...',
+    typingPlaceholder: 'Nachricht schreiben...',
+    sendBtn: 'Senden',
+    recordingToastText: '🎙 Sprache wird aufgenommen... Tippen Sie erneut, um zu senden',
+    browserWarningTitle: 'Warnbildschirm: Veralteter Browser nicht unterstützt',
+    browserWarningSub: 'DuoWindo6601 Plattform-Kompatibilitätsprüfung',
+    browserCompatibleTitle: 'Moderner Browser & aktuelles Betriebssystem (Windows / Linux / macOS / Android):',
+    browserCompatibleDesc: 'Ihr System ist vollständig kompatibel! Keine Warnungen. Alle Funktionen, Gemini-API und Spracheingabe funktionieren einwandfrei.',
+    browserOutdatedTitle: 'Veralteter Browser oder nicht unterstütztes Betriebssystem erkannt:',
+    browserOutdatedDesc: 'Ihr System ist veraltet (legacy Browser oder Windows XP / Windows Vista).',
+    sysMessageLabel: 'Systemmeldung:',
+    sysMessageDesc: 'Leider wird Ihr aktueller Browser nicht mehr unterstützt. Um Duowindo6601 weiterhin zu nutzen, aktualisieren Sie bitte auf einen modernen Browser. Windows XP/Windows Vista werden nicht unterstützt.',
+    riskLabel: 'Risiko:',
+    riskDesc: 'Gemini-API funktioniert möglicherweise nicht richtig',
+    winOsSupportLabel: 'Support-Lebenszyklen für Windows-Betriebssysteme:',
+    win7Desc: 'Support vollständig beendet',
+    win7Status: '❌ Beendet (14. Januar 2020)',
+    win8Status: '❌ Beendet (10. Januar 2023)',
+    win10Desc: 'Der kostenlose Support endete am 14. Oktober 2025.',
+    win10Status: '⚠️ ESU bis 12. Oktober 2027',
+    win10Note: '* Das kostenpflichtige Programm für erweiterte Sicherheitsupdates (ESU) für normale Benutzer wurde bis Oktober 2027 verlängert.',
+    win11Desc: 'Kein allgemeines Enddatum, der Support hängt von der Version ab',
+    win11Status: '✅ Version 24H2 bis 13. Okt. 2026',
+    win11Note: '* Die Supportdauer hängt von den jährlichen Funktionsupdates ab. Version 24H2 (Home/Pro) wird bis zum 13. Oktober 2026 unterstützt.',
+    modernBrowsersLabel: 'Empfohlene moderne Browser:',
+    downloadBtn: 'Herunterladen',
+    sslTitle: 'SSL-Zertifikat (WR2 / Veraltete Website)',
+    sslDesc: 'Bestätigung, dass der Zertifikatsaussteller die veraltete WR2-Website ist. Der Server konnte keine Transparenzprotokolle vorlegen.',
+    mobileSimTitle: 'Mobile Simulator Teststand',
+    mobileSimDesc: 'Interaktiver iOS- und Android-Emulator zum Testen reaktionsfähiger Layouts auf dem PC.',
+    mobileSimBtn: 'Simulator starten',
+    feedbackBannerTitle: 'Feedback & Support',
+    feedbackBannerDesc: 'Fehler gefunden oder Idee vorschlagen?',
+    adminBannerTitle: 'Besitzer-Dashboard',
+    adminBannerDesc: 'Moderation & Überwachung',
+    cloudSaveTitle: 'Wolken-Speicherung',
+    loading: 'Laden...',
+    loggedInAs: 'Eingeloggt als {user}',
+    progressSynced: '● Fortschritt mit der Cloud synchronisiert',
+    signOut: 'Abmelden',
+    savedLocallyAs: 'Lokal im Browser gespeichert als @{username}.',
+    updateBrowserBtn: 'Aktualisieren Sie Ihren Browser',
+    continueDuoWindoBtn: 'Mit DuoWindo6601 fortfahren'
   },
   fr: {
     androidAlertTitle: 'Application Android disponible !',
@@ -513,7 +1205,39 @@ const TRANSLATIONS: Record<string, any> = {
     androidAlertBtn: 'INSTALLER',
     androidModalTitle: "Guide d'installation",
     androidModalClose: 'Fermer',
+    coursesAndRegions: 'Cours et régions linguistiques',
+    searchPlaceholder: '🔍 Rechercher une langue ou une région...',
+    allCourses: 'Tous les cours',
+    cisLanguages: 'Langues de la CEI (15)',
+    worldLanguages: 'Langues du monde',
+    subjectsAndGames: 'Sujets et Jeux',
+    rfRegions: 'Régions russes',
+    searchResults: 'Résultats de recherche',
+    cisSectionTitle: 'CEI & Langues voisines',
+    worldSectionTitle: 'Langues mondiales populaires',
+    specialSectionTitle: 'Sujets spéciaux & Jeux',
+    rfSectionTitle: 'Régions de la Fédération de Russie',
+    regionalCourse: 'Cours régional',
+    foreignLanguage: 'Langue étrangère',
+    specialSubject: 'Sujet spécial',
+    musicTheory: 'Théorie de la musique',
+    exactScience: 'Science exacte',
+    chessLogic: 'Jeu d’échecs & Logique',
+    betaTitle: 'DuoWindo6601 Accès au bêta-test',
+    betaDesc: 'Toutes les fonctionnalités de l’application sont disponibles pour les tests : langues de la CEI et du monde, Échecs, Graphiques, Voix off IA et Panneau de configuration.',
+    betaBtn: '🧪 Centre Bêta DuoWindo6601',
+    reviewsBtn: '⭐ Avis',
+    githubTitle: 'DuoWindo6601 est déjà disponible sur GitHub',
+    githubDesc: 'La génération automatique de l’APK Android est lancée via .github/workflows/build.yml.',
+    testAndroidBtn: '🤖 Test Android',
     home: 'ACCUEIL', practice: 'PRATIQUE', leaderboard: 'CLASSEMENT', shop: 'BOUTIQUE', profile: 'PROFIL', feedback: 'AVIS',
+    lang_ru: 'Russe', lang_en: 'Anglais', lang_de: 'Allemand', lang_fr: 'Français', lang_es: 'Espagnol', lang_ja: 'Japonais', lang_zh: 'Chinois',
+    videoCallDesc: 'Communication en direct avec un partenaire IA', storiesAndWriting: 'Histoires & Écriture', leaderboardDesc: 'Les 3 premiers passent en Ligue Argent',
+    sslCertificateTitle: 'Certificat SSL (WR2 / Hérité)', sslCertificateDesc: 'Confirmation que l’émetteur du certificat est l’ancien site WR2. Le serveur n’a pas pu présenter ses journaux.',
+    edit: 'Modifier', mobileSimulatorBench: 'Banc d’essai du simulateur mobile', mobileSimulatorDesc: 'Émulateur interactif iOS et Android pour tester les mises en page sur PC.',
+    launchSimulator: 'Lancer le simulateur', usernameNotSet: 'Aucun identifiant défini', incognito: 'Incognito',
+    listenSpeech: 'Écoute de la parole...', typeMessage: 'Saisissez un message...', send: 'Envoyer', recordingSpeech: 'Enregistrement... Appuyez à nouveau pour envoyer',
+    activeWith: 'Actif avec', change: 'Modifier', isYou: "C'est vous",
     unit: 'Unité', start: 'COMMENCER', check: 'VÉRIFIER', continue: 'CONTINUER', skip: 'PASSER',
     module1: 'MODULE 1, UNITÉ 1', chessUnitName: 'Déplacement des pièces',
     settings: 'Paramètres', language: 'Langue', country: 'Pays', back: 'Retour', save: 'Enregistrer',
@@ -544,7 +1268,104 @@ const TRANSLATIONS: Record<string, any> = {
     videoCall: 'APPEL VIDÉO', startInterview: 'Commencer l’entretien', smartMode: 'Mode intelligent', interviewer: 'Interviewer', self: 'Vous',
     serverJsTitle: 'Support de server.js !',
     serverJsDesc: 'DuoWindo a officiellement intégré son propre serveur de production server.js avec distribution des assets et support SPA !',
-    serverJsBtn: 'Génial ! 🚀'
+    serverJsBtn: 'Génial ! 🚀',
+    streakResume: 'Reprendre la série',
+    streakResumed: '🔥 Série reprise avec succès et sauvegardée !',
+    browserBtn: 'Navigateur',
+    eduBtn: '💡 Éducation',
+    eduWelcome: 'Bienvenue ! Cliquez sur n\'importe quelle pièce blanche pour voir comment elle se déplace.',
+    lessonWelcome: 'Mode leçon. Le bot est désactivé. Vous pouvez déplacer les pièces pour les deux côtés.',
+    lessonBtn: 'Leçon (sans bot)',
+    playDuoBtn: 'Jouer avec DuoWindo6601',
+    chessStudyDesc: 'Mode leçon (sans bot). Entraînez-vous à vos mouvements !',
+    chessTutorialDesc: 'Tutoriel ! Cliquez sur n\'importe quelle pièce blanche pour apprendre ses mouvements.',
+    chessPlayDesc: 'N\'y allez pas de main morte, je jouerai à moitié de mes capacités !',
+    incognitoTitle: 'Mode incognito (sans compte)',
+    incognitoLeaderboardDesc: 'Les scores comptent localement. Inscrivez-vous pour rejoindre le classement mondial !',
+    register: 'S\'inscrire',
+    noUsername: 'Aucun nom d\'utilisateur défini',
+    editProfile: 'Modifier le profil',
+    registerAuth: 'Inscription / Connexion',
+    streakAdjustment: 'Ajustez vos jours de série en avant ou en arrière.',
+    toastStreakBack7: '⏪ Série : {streak} jours',
+    toastStreakBack1: '◀ En arrière : {streak} jours',
+    toastStreakForward1: '▶ En avant : {streak} jours',
+    toastStreakForward7: '⏩ En avant (+7) : {streak} jours',
+    days: 'jours',
+    registerAndLogin: 'Inscription & Connexion',
+    regLoginSubtitle: 'Créez un compte, connectez-vous avec Google ou jouez incognito sans compte',
+    incognitoTab: 'Incognito',
+    googleTab: 'Google',
+    displayNameLabel: 'Nom affiché',
+    requiredLabel: '*Requis',
+    displayNamePlaceholder: 'Ex : Anatole',
+    usernameLabel: 'Nom d\'utilisateur (@handle)',
+    uniqueHandleLabel: 'Pseudo unique',
+    profileLeaderboardVisible: 'Visible sur le profil et les classements',
+    selectAvatarLabel: 'Choisir un avatar',
+    registerAndStartBtn: 'S\'inscrire & Commencer',
+    fullIncognitoTitle: 'Anonymat complet sans entrer d\'e-mail ni de nom',
+    noSignupPasswordsRule: 'Aucune inscription ni mot de passe requis',
+    allProgressLocalRule: 'Toute la progression est stockée localement dans le navigateur',
+    canRegisterAnytimeRule: 'Vous pouvez créer un compte à tout moment',
+    continueGuestBtn: 'Continuer en tant qu\'invité / Incognito',
+    firebaseCloudSyncTitle: 'Synchronisation Cloud Firebase',
+    syncAllDevicesDesc: 'Synchronisez vos statistiques sur tous vos appareils',
+    progressSyncNote: 'Votre progression sera automatiquement synchronisée avec votre compte Google.',
+    iframeWarning: '⚠️ Limitation d\'iFrame : la connexion Google peut être bloquée à l\'intérieur d\'un iFrame.',
+    openNewTabBtn: 'Ouvrir dans un nouvel onglet ↗',
+    signInGoogleBtn: 'Se connecter avec Google',
+    skipContinueIncognitoBtn: 'Passer / Continuer sans compte (Incognito) ↗',
+    uploadPhotoBtn: '📷 Charger une photo',
+    deletePhotoBtn: '🗑️ Supprimer la photo',
+    avatarUrlLabel: 'URL de l\'image d\'avatar',
+    avatarBgColorLabel: 'Couleur d\'avatar',
+    avatarIconLabel: 'Icône d\'avatar / Émoticône',
+    cancelBtn: 'Annuler',
+    saveProfileBtn: 'Enregistrer',
+    listeningPlaceholder: 'Écoute en cours...',
+    typingPlaceholder: 'Écrire un message...',
+    sendBtn: 'Envoyer',
+    recordingToastText: '🎙 Enregistrement vocal... Appuyez à nouveau pour envoyer',
+    browserWarningTitle: 'Écran d’avertissement : navigateur obsolète non pris en charge',
+    browserWarningSub: 'Vérification de la compatibilité de la plateforme DuoWindo6601',
+    browserCompatibleTitle: 'Navigateur moderne & système d\'exploitation actuel (Windows / Linux / macOS / Android) :',
+    browserCompatibleDesc: 'Votre système est entièrement compatible ! Aucun avertissement. Toutes les fonctionnalités, l\'API Gemini et la saisie vocale fonctionnent parfaitement.',
+    browserOutdatedTitle: 'Navigateur obsolète ou système d\'exploitation non pris en charge détecté :',
+    browserOutdatedDesc: 'Votre système est obsolète (navigateur hérité ou Windows XP / Windows Vista).',
+    sysMessageLabel: 'Message système :',
+    sysMessageDesc: 'Malheureusement, votre navigateur actuel n\'est plus pris en charge. Pour continuer à utiliser Duowindo6601, veuillez mettre à jour vers un navigateur moderne. Windows XP/Windows Vista ne sont pas pris en charge.',
+    riskLabel: 'Risque :',
+    riskDesc: 'L\'API Gemini peut ne pas fonctionner correctement',
+    winOsSupportLabel: 'Cycles de vie du support des systèmes d\'exploitation Windows :',
+    win7Desc: 'Fin du support',
+    win7Status: '❌ Terminé (14 janvier 2020)',
+    win8Status: '❌ Terminé (10 janvier 2023)',
+    win10Desc: 'Le support gratuit s\'est terminé le 14 octobre 2025.',
+    win10Status: '⚠️ ESU jusqu\'au 12 octobre 2027',
+    win10Note: '* Le programme payant de mises à jour de sécurité étendues (ESU) pour les utilisateurs grand public a été prolongé jusqu\'en octobre 2027.',
+    win11Desc: 'Pas de date de fin générale, le support dépend de la version',
+    win11Status: '✅ Version 24H2 jusqu\'au 13 oct. 2026',
+    win11Note: '* Le cycle de vie du support dépend des mises à jour annuelles. La version 24H2 (Home/Pro) est prise en charge jusqu\'au 13 octobre 2026.',
+    modernBrowsersLabel: 'Navigateurs modernes recommandés :',
+    downloadBtn: 'Télécharger',
+    sslTitle: 'Certificat SSL (WR2 / Site hérité)',
+    sslDesc: 'Confirmation que l\'émetteur du certificat est le site hérité WR2. Le serveur n\'a pas réussi à présenter les journaux de transparence.',
+    mobileSimTitle: 'Banc d\'essai du simulateur mobile',
+    mobileSimDesc: 'Émulateur interactif iOS et Android pour tester les mises en page réactives sur PC.',
+    mobileSimBtn: 'Lancer le simulateur',
+    feedbackBannerTitle: 'Avis & Support',
+    feedbackBannerDesc: 'Un bug trouvé ou une idée à suggérer ?',
+    adminBannerTitle: 'Tableau de bord propriétaire',
+    adminBannerDesc: 'Modération & Surveillance',
+    cloudSaveTitle: 'Sauvegarde Cloud',
+    loading: 'Chargement...',
+    loggedInAs: 'Connecté en tant que {user}',
+    progressSynced: '● Progrès synchronisé avec le cloud',
+    signOut: 'Se déconnecter',
+    savedLocallyAs: 'Enregistré localement dans le navigateur en tant que @{username}.',
+    updateBrowserBtn: 'Mettez à jour votre navigateur',
+    continueDuoWindoBtn: 'Continuer à utiliser DuoWindo6601'
   },
   es: {
     androidAlertTitle: '¡Aplicación de Android disponible!',
@@ -552,7 +1373,39 @@ const TRANSLATIONS: Record<string, any> = {
     androidAlertBtn: 'INSTALAR AHORA',
     androidModalTitle: 'Guía de instalación',
     androidModalClose: 'Cerrar',
+    coursesAndRegions: 'Cursos y regiones lingüísticas',
+    searchPlaceholder: '🔍 Buscar idioma o región...',
+    allCourses: 'Todos los cursos',
+    cisLanguages: 'Idiomas de la CEI (15)',
+    worldLanguages: 'Idiomas del mundo',
+    subjectsAndGames: 'Materias y Juegos',
+    rfRegions: 'Regiones rusas',
+    searchResults: 'Resultados de búsqueda',
+    cisSectionTitle: 'Idiomas de la CEI y vecinos',
+    worldSectionTitle: 'Idiomas del mundo populares',
+    specialSectionTitle: 'Materias especiales y Juegos',
+    rfSectionTitle: 'Regiones de la Federación de Rusia',
+    regionalCourse: 'Curso regional',
+    foreignLanguage: 'Idioma extranjero',
+    specialSubject: 'Materia especial',
+    musicTheory: 'Teoría musical',
+    exactScience: 'Ciencia exacta',
+    chessLogic: 'Juego de ajedrez y Lógica',
+    betaTitle: 'DuoWindo6601 Acceso a la prueba beta',
+    betaDesc: 'Todas las funciones de la aplicación están disponibles para pruebas: idiomas de la CEI y del mundo, Ajedrez, Gráficos, Locución de IA y Panel de control.',
+    betaBtn: '🧪 Centro Beta DuoWindo6601',
+    reviewsBtn: '⭐ Reseñas',
+    githubTitle: 'DuoWindo6601 ya está disponible en GitHub',
+    githubDesc: 'La compilación automática de APK de Android se inicia a través de .github/workflows/build.yml.',
+    testAndroidBtn: '🤖 Prueba Android',
     home: 'INICIO', practice: 'PRÁCTICA', leaderboard: 'CLASIFICACIÓN', shop: 'TIENDA', profile: 'PERFIL', feedback: 'OPINIONES',
+    lang_ru: 'Ruso', lang_en: 'Inglés', lang_de: 'Alemán', lang_fr: 'Francés', lang_es: 'Español', lang_ja: 'Japonés', lang_zh: 'Chino',
+    videoCallDesc: 'Comunicación en vivo con un socio de IA', storiesAndWriting: 'Historias y Escritura', leaderboardDesc: 'Los 3 mejores ascienden a la Liga de Plata',
+    sslCertificateTitle: 'Certificado SSL (WR2 / Heredado)', sslCertificateDesc: 'Confirmación de que el emisor del certificado es el antiguo sitio WR2. El servidor no pudo presentar sus registros.',
+    edit: 'Editar', mobileSimulatorBench: 'Banco de pruebas del simulador móvil', mobileSimulatorDesc: 'Emulador interactivo de iOS y Android para probar diseños en PC.',
+    launchSimulator: 'Iniciar simulador', usernameNotSet: 'Sin nombre de usuario establecido', incognito: 'Incógnito',
+    listenSpeech: 'Escuchando voz...', typeMessage: 'Escribe un mensaje...', send: 'Enviar', recordingSpeech: 'Grabando voz... Toca el micrófono otra vez para enviar',
+    activeWith: 'Activo con', change: 'Cambiar', isYou: 'Eres tú',
     unit: 'Unidad', start: 'EMPEZAR', check: 'COMPROBAR', continue: 'CONTINUAR', skip: 'OMITIR',
     module1: 'MÓDULO 1, UNIDAD 1', chessUnitName: 'Movimiento de piezas',
     settings: 'Ajustes', language: 'Idioma', country: 'País', back: 'Atrás', save: 'Guardar',
@@ -583,7 +1436,104 @@ const TRANSLATIONS: Record<string, any> = {
     videoCall: 'VIDEOCALL', startInterview: 'Iniciar entrevista', smartMode: 'Modo inteligente', interviewer: 'Entrevistador', self: 'Tú',
     serverJsTitle: '¡Soporte de server.js!',
     serverJsDesc: '¡DuoWindo ha integrado oficialmente su propio servidor server.js con distribución de estáticos y SPA!',
-    serverJsBtn: '¡Genial! 🚀'
+    serverJsBtn: '¡Genial! 🚀',
+    streakResume: 'Reanudar racha',
+    streakResumed: '🔥 ¡Racha reanudada con éxito y guardada!',
+    browserBtn: 'Navegador',
+    eduBtn: '💡 Educación',
+    eduWelcome: '¡Bienvenido! Haz clic en cualquier pieza blanca para ver cómo se mueve.',
+    lessonWelcome: 'Modo lección. El bot está desactivado. Puedes mover piezas para ambos lados.',
+    lessonBtn: 'Lección (sin bot)',
+    playDuoBtn: 'Jugar con DuoWindo6601',
+    chessStudyDesc: 'Modo lección (sin bot). ¡Practica tus movimientos!',
+    chessTutorialDesc: '¡Tutorial! Haz clic en cualquier pieza blanca para aprender sus movimientos.',
+    chessPlayDesc: '¡No tengas miedo! ¡Jugaré a media fuerza!',
+    incognitoTitle: 'Modo incógnito (sin cuenta)',
+    incognitoLeaderboardDesc: 'Las puntuaciones cuentan localmente. ¡Regístrate para unirte a la clasificación global!',
+    register: 'Registrarse',
+    noUsername: 'Sin nombre de usuario',
+    editProfile: 'Editar perfil',
+    registerAuth: 'Registro / Iniciar sesión',
+    streakAdjustment: 'Ajusta tus días de racha hacia adelante o hacia atrás.',
+    toastStreakBack7: '⏪ Racha: {streak} días',
+    toastStreakBack1: '◀ Atrás: {streak} días',
+    toastStreakForward1: '▶ Adelante: {streak} días',
+    toastStreakForward7: '⏩ Adelante (+7): {streak} días',
+    days: 'días',
+    registerAndLogin: 'Registro y Acceso',
+    regLoginSubtitle: 'Registra una cuenta, inicia sesión con Google o juega en incógnito sin cuenta',
+    incognitoTab: 'Incógnito',
+    googleTab: 'Google',
+    displayNameLabel: 'Nombre para mostrar',
+    requiredLabel: '*Obligatorio',
+    displayNamePlaceholder: 'Ej: Anatolio',
+    usernameLabel: 'Nombre de usuario (@handle)',
+    uniqueHandleLabel: 'Apodo único',
+    profileLeaderboardVisible: 'Visible en perfil y tablas de clasificación',
+    selectAvatarLabel: 'Elegir avatar',
+    registerAndStartBtn: 'Registrarse y Comenzar',
+    fullIncognitoTitle: 'Privacidad total sin ingresar correo ni nombre',
+    noSignupPasswordsRule: 'No se requieren registros ni contraseñas',
+    allProgressLocalRule: 'Todo el progreso se almacena localmente en el navegador',
+    canRegisterAnytimeRule: 'Puedes crear una cuenta en cualquier momento',
+    continueGuestBtn: 'Continuar como Invitado / Incógnito',
+    firebaseCloudSyncTitle: 'Sincronización en la nube de Firebase',
+    syncAllDevicesDesc: 'Sincroniza tus estadísticas en todos tus dispositivos',
+    progressSyncNote: 'Tu progreso se sincronizará automáticamente con tu cuenta de Google.',
+    iframeWarning: '⚠️ Limitación del marco: el inicio de sesión de Google puede estar bloqueado dentro de un iFrame.',
+    openNewTabBtn: 'Abrir en pestaña nueva ↗',
+    signInGoogleBtn: 'Iniciar sesión con Google',
+    skipContinueIncognitoBtn: 'Omitir / Continuar sin cuenta (Incógnito) ↗',
+    uploadPhotoBtn: '📷 Subir foto',
+    deletePhotoBtn: '🗑️ Eliminar foto',
+    avatarUrlLabel: 'URL de la imagen del avatar',
+    avatarBgColorLabel: 'Color de avatar',
+    avatarIconLabel: 'Icono de avatar / Emoji',
+    cancelBtn: 'Cancelar',
+    saveProfileBtn: 'Guardar',
+    listeningPlaceholder: 'Escuchando tu voz...',
+    typingPlaceholder: 'Escribe un mensaje...',
+    sendBtn: 'Enviar',
+    recordingToastText: '🎙 Grabando voz... Toca el micrófono otra vez para enviar',
+    browserWarningTitle: 'Pantalla de advertencia: navegador antiguo no compatible',
+    browserWarningSub: 'Comprobación de compatibilidad de la plataforma DuoWindo6601',
+    browserCompatibleTitle: 'Navegador moderno y sistema operativo actual (Windows / Linux / macOS / Android):',
+    browserCompatibleDesc: '¡Tu sistema es totalmente compatible! Sin advertencias. Todas las funciones, la API de Gemini y la entrada de voz funcionan perfectamente.',
+    browserOutdatedTitle: 'Se detectó un navegador antiguo o un sistema operativo no compatible:',
+    browserOutdatedDesc: 'Tu sistema está desactualizado (navegador heredado o Windows XP / Windows Vista).',
+    sysMessageLabel: 'Mensaje del sistema:',
+    sysMessageDesc: 'Lamentablemente, tu navegador actual ya no es compatible. Para continuar usando Duowindo6601, actualízalo a un navegador moderno. Windows XP/Windows Vista no son compatibles.',
+    riskLabel: 'Riesgo:',
+    riskDesc: 'La API de Gemini puede no funcionar correctamente',
+    winOsSupportLabel: 'Ciclos de vida de soporte del sistema operativo Windows:',
+    win7Desc: 'Fin del ciclo de vida de soporte',
+    win7Status: '❌ Finalizado (14 de enero de 2020)',
+    win8Status: '❌ Finalizado (10 de enero de 2023)',
+    win10Desc: 'El soporte gratuito finalizó el 14 de octubre de 2025.',
+    win10Status: '⚠️ ESU hasta el 12 de octubre de 2027',
+    win10Note: '* El programa de Actualizaciones de seguridad extendidas (ESU) de pago para usuarios minoristas se ha extendido hasta octubre de 2027.',
+    win11Desc: 'Sin fecha de finalización general, el soporte depende de la versión',
+    win11Status: '✅ Versión 24H2 hasta el 13 de oct de 2026',
+    win11Note: '* El ciclo de vida de soporte depende de las actualizaciones anuales de funciones. La versión 24H2 (Home/Pro) es compatible hasta el 13 de octubre de 2026.',
+    modernBrowsersLabel: 'Navegadores modernos recomendados:',
+    downloadBtn: 'Descargar',
+    sslTitle: 'Certificado SSL (WR2 / Sitio heredado)',
+    sslDesc: 'Confirmación de que el emisor del certificado es el sitio heredado WR2. El servidor no pudo presentar los registros de transparencia.',
+    mobileSimTitle: 'Banco de pruebas del simulador móvil',
+    mobileSimDesc: 'Emulador interactivo de iOS y Android para probar diseños adaptables en PC.',
+    mobileSimBtn: 'Iniciar simulador',
+    feedbackBannerTitle: 'Comentarios y Soporte',
+    feedbackBannerDesc: '¿Encontraste un error o quieres sugerir una idea?',
+    adminBannerTitle: 'Panel del propietario',
+    adminBannerDesc: 'Moderación y Monitoreo',
+    cloudSaveTitle: 'Guardado en la Nube',
+    loading: 'Cargando...',
+    loggedInAs: 'Sesión iniciada como {user}',
+    progressSynced: '● Progreso sincronizado con la nube',
+    signOut: 'Cerrar sesión',
+    savedLocallyAs: 'Guardado localmente en el navegador como @{username}.',
+    updateBrowserBtn: 'Actualiza tu navegador',
+    continueDuoWindoBtn: 'Continuar usando DuoWindo6601'
   },
   ja: {
     androidAlertTitle: 'Androidアプリ利用可能！',
@@ -591,7 +1541,39 @@ const TRANSLATIONS: Record<string, any> = {
     androidAlertBtn: '今すぐインストール',
     androidModalTitle: 'インストール手順',
     androidModalClose: '閉じる',
+    coursesAndRegions: 'コースと言語地域',
+    searchPlaceholder: '🔍 言語または地域を検索...',
+    allCourses: 'すべてのコース',
+    cisLanguages: '独立国家共同体言語（15）',
+    worldLanguages: '世界の言語',
+    subjectsAndGames: '科目とゲーム',
+    rfRegions: 'ロシアの地域',
+    searchResults: '検索結果',
+    cisSectionTitle: '独立国家共同体と近隣の言語',
+    worldSectionTitle: '世界の人気言語',
+    specialSectionTitle: '特別科目とゲーム',
+    rfSectionTitle: 'ロシア連邦の地域',
+    regionalCourse: '地域コース',
+    foreignLanguage: '外国語',
+    specialSubject: '特別科目',
+    musicTheory: '音楽理論',
+    exactScience: '精密科学',
+    chessLogic: 'チェスゲームとロジック',
+    betaTitle: 'DuoWindo6601 ベータテストアクセス',
+    betaDesc: 'すべてのアプリ機能がテスト可能です：独立国家共同体と言語、チェス、グラフィック、AI音声、コントロールパネル。',
+    betaBtn: '🧪 DuoWindo6601 ベータセンター',
+    reviewsBtn: '⭐ レビュー',
+    githubTitle: 'DuoWindo6601はすでにGitHubで利用可能です',
+    githubDesc: '.github/workflows/build.yml経由で自動Android APKビルドが実行されます。',
+    testAndroidBtn: '🤖 Androidテスト',
     home: 'ホーム', practice: '練習', leaderboard: 'ランキング', shop: 'ショップ', profile: 'プロフィール', feedback: 'フィードバック',
+    lang_ru: 'ロシア語', lang_en: '英語', lang_de: 'ドイツ語', lang_fr: 'フランス語', lang_es: 'スペイン語', lang_ja: '日本語', lang_zh: '中国語',
+    videoCallDesc: 'AIパートナーとのライブコミュニケーション', storiesAndWriting: 'ストーリーと執筆', leaderboardDesc: 'トップ3がシルバーリーグに進出',
+    sslCertificateTitle: 'SSL証明書 (WR2 / レガシー)', sslCertificateDesc: '証明書の発行元が古いWR2サイトであることの確認。サーバーがログの提示に失敗しました。',
+    edit: '編集', mobileSimulatorBench: 'モバイルシミュレータテストベンチ', mobileSimulatorDesc: 'PCでレイアウトをテストするためのインタラクティブなiOSおよびAndroidエミュレータ。',
+    launchSimulator: 'シミュレータを起動', usernameNotSet: 'ユーザー名が設定されていません', incognito: 'シークレット',
+    listenSpeech: '音声を聞いています...', typeMessage: 'メッセージを入力...', send: '送信', recordingSpeech: '音声を録音中... マイクをもう一度タップして送信',
+    activeWith: 'アクティブ：', change: '変更', isYou: 'あなたです',
     unit: 'セクション', start: 'スタート', check: '確認', continue: '続ける', skip: 'スキップ',
     module1: 'モジュール 1, セクション 1', chessUnitName: '駒の動き',
     settings: '設定', language: '言語', country: '国', back: '戻る', save: '保存',
@@ -622,7 +1604,104 @@ const TRANSLATIONS: Record<string, any> = {
     videoCall: "ビデオ通話", startInterview: "面接を開始", smartMode: "スマートモード", interviewer: "面接官", self: "あなた",
     serverJsTitle: 'server.js サポート！',
     serverJsDesc: 'DuoWindoプロジェクトに独自のプロダクションサーバー server.js が統合され、静的配信とSPAルーティングが有効になりました！',
-    serverJsBtn: '最高！ 🚀'
+    serverJsBtn: '最高！ 🚀',
+    streakResume: 'ストリークを再開',
+    streakResumed: '🔥 ストリークの再開に成功し、保存されました！',
+    browserBtn: 'ブラウザ',
+    eduBtn: '💡 学習',
+    eduWelcome: 'ようこそ！白い駒をクリックすると、その動き方を確認できます。',
+    lessonWelcome: 'レッスンモード。ボットは無効です。両方の駒を自由に動かせます。',
+    lessonBtn: 'レッスン（ボットなし）',
+    playDuoBtn: 'DuoWindo6601と対局',
+    chessStudyDesc: 'レッスンモード（ボットなし）。自分のペースで駒を動かして練習しましょう！',
+    chessTutorialDesc: 'チュートリアル！白い駒をクリックするとルールが表示されます。',
+    chessPlayDesc: '怖がらないで。手加減してあげるからね！',
+    incognitoTitle: 'シークレットモード（アカウントなし）',
+    incognitoLeaderboardDesc: 'スコアはローカルに保存されます。グローバルランキングに参加するには登録してください！',
+    register: '登録',
+    noUsername: 'ユーザー名未設定',
+    editProfile: 'プロフィール編集',
+    registerAuth: '登録 / ログイン',
+    streakAdjustment: 'ストリーク（連続学習日数）の調整：日数の巻き戻し・追加。',
+    toastStreakBack7: '⏪ ストリーク：{streak}日',
+    toastStreakBack1: '◀ 戻る：{streak}日',
+    toastStreakForward1: '▶ 進む：{streak}日',
+    toastStreakForward7: '⏩ 進む（+7）：{streak}日',
+    days: '日',
+    registerAndLogin: 'アカウント登録 & ログイン',
+    regLoginSubtitle: 'アカウント登録、Google ログイン、またはアカウントなしでプレイできるシークレットモード',
+    incognitoTab: 'シークレット',
+    googleTab: 'Google',
+    displayNameLabel: '表示名',
+    requiredLabel: '*必須',
+    displayNamePlaceholder: '例: アナトリー',
+    usernameLabel: 'ユーザー名 (@username)',
+    uniqueHandleLabel: '固有ハンドル',
+    profileLeaderboardVisible: 'プロフィールやランキングに表示されます',
+    selectAvatarLabel: 'アバター選択',
+    registerAndStartBtn: '登録して開始',
+    fullIncognitoTitle: 'メールや名前を入力しない完全なプライバシー',
+    noSignupPasswordsRule: '会員登録やパスワードは不要です',
+    allProgressLocalRule: 'すべての進行状況はブラウザにローカル保存されます',
+    canRegisterAnytimeRule: 'いつでもアカウントを作成できます',
+    continueGuestBtn: 'ゲスト / 匿名で続ける',
+    firebaseCloudSyncTitle: 'Firebase クラウド同期',
+    syncAllDevicesDesc: 'すべてのデバイスで学習状況を同期します',
+    progressSyncNote: 'ログインすると、進行状況が Google アカウントに自動同期されます。',
+    iframeWarning: '⚠️ フレーム制限：iFrame内ではGoogleログインがブロックされる場合があります。',
+    openNewTabBtn: '新しいタブで開く ↗',
+    signInGoogleBtn: 'Google でログイン',
+    skipContinueIncognitoBtn: 'スキップ / アカウントなしで進む ↗',
+    uploadPhotoBtn: '📷 写真をアップロード',
+    deletePhotoBtn: '🗑️ 写真を削除',
+    avatarUrlLabel: 'アバター画像URL',
+    avatarBgColorLabel: '背景カラー',
+    avatarIconLabel: 'アバターアイコン / 絵文字',
+    cancelBtn: 'キャンセル',
+    saveProfileBtn: '保存',
+    listeningPlaceholder: '音声を聞き取っています...',
+    typingPlaceholder: 'メッセージを入力...',
+    sendBtn: '送信',
+    recordingToastText: '🎙 音声を録音中... もう一度マイクをタップして送信',
+    browserWarningTitle: '警告画面：古いブラウザはサポートされていません',
+    browserWarningSub: 'DuoWindo6601 プラットフォーム互換性チェック',
+    browserCompatibleTitle: 'モダンなブラウザと最新のOS (Windows / Linux / macOS / Android):',
+    browserCompatibleDesc: 'お使いのシステムは完全に互換性があります！警告はありません。すべての機能、Gemini API、および音声入力が正常に動作します。',
+    browserOutdatedTitle: '古いブラウザまたはサポートされていないOSが検出されました：',
+    browserOutdatedDesc: 'システムが古くなっています（レガシーブラウザまたは Windows XP / Windows Vista）。',
+    sysMessageLabel: 'システムメッセージ：',
+    sysMessageDesc: '申し訳ありませんが、現在お使いのブラウザはサポートされていません。DuoWindo6601を使い続けるには、モダンなブラウザにアップデートしてください。Windows XP/Windows Vistaはサポートされていません。',
+    riskLabel: 'リスク：',
+    riskDesc: 'Gemini API が正しく動作しない可能性があります',
+    winOsSupportLabel: 'Windowsオペレーティングシステムのサポート有効期限：',
+    win7Desc: 'サポート終了',
+    win7Status: '❌ サポート終了 (2020年1月14日)',
+    win8Status: '❌ サポート終了 (2023年1月10日)',
+    win10Desc: '無料サポートは2025年10月14日に終了しました',
+    win10Status: '⚠️ ESUは2027年10月12日まで',
+    win10Note: '* 一般ユーザー向けの有料の拡張セキュリティ更新（ESU）プログラムは2027年10月まで延長されました。',
+    win11Desc: 'サポート終了日は未定、バージョンによって異なります',
+    win11Status: '✅ バージョン 24H2は2026年10月13日まで',
+    win11Note: '* サポートライフサイクルは、毎年的機能アップデートによって異なります。バージョン 24H2（Home/Pro）は2026年10月13日までサポートされます。',
+    modernBrowsersLabel: '推奨されるモダンなブラウザ：',
+    downloadBtn: 'ダウンロード',
+    sslTitle: 'SSL証明書 (WR2 / レガシーサイト)',
+    sslDesc: '証明書の発行元がレガシーなWR2サイトであることの確認。サーバーは透明性ログの提示に失敗しました。',
+    mobileSimTitle: 'モバイルシミュレータテストベンチ',
+    mobileSimDesc: 'PCでレスポンシブレイアウトをテストするためのインタラクティブなiOSおよびAndroidエミュレータ。',
+    mobileSimBtn: 'シミュレータを起動',
+    feedbackBannerTitle: 'フィードバックとサポート',
+    feedbackBannerDesc: 'バグを見つけたか、アイデアを提案したいですか？',
+    adminBannerTitle: 'オーナーダッシュボード',
+    adminBannerDesc: 'モデレーションと監視',
+    cloudSaveTitle: 'クラウド保存',
+    loading: '読み込み中...',
+    loggedInAs: '{user} としてログイン中',
+    progressSynced: '● 進捗状況がクラウドと同期されました',
+    signOut: 'ログアウト',
+    savedLocallyAs: 'ブラウザにローカル保存中: @{username}',
+    updateBrowserBtn: 'ブラウザを更新する',
+    continueDuoWindoBtn: 'DuoWindo6601 の使用を継続する'
   },
   zh: {
     androidAlertTitle: 'Android 应用可用！',
@@ -630,7 +1709,39 @@ const TRANSLATIONS: Record<string, any> = {
     androidAlertBtn: '立即安装',
     androidModalTitle: '安装指南',
     androidModalClose: '关闭',
+    coursesAndRegions: '课程与语言地区',
+    searchPlaceholder: '🔍 搜索语言或地区...',
+    allCourses: '所有课程',
+    cisLanguages: '独联体语言 (15)',
+    worldLanguages: '世界语言',
+    subjectsAndGames: '科目与游戏',
+    rfRegions: '俄罗斯地区',
+    searchResults: '搜索结果',
+    cisSectionTitle: '独联体及邻国语言',
+    worldSectionTitle: '热门世界语言',
+    specialSectionTitle: '特色科目与游戏',
+    rfSectionTitle: '俄罗斯联邦地区',
+    regionalCourse: '地区课程',
+    foreignLanguage: '外语',
+    specialSubject: '特色科目',
+    musicTheory: '音乐理论',
+    exactScience: '精密科学',
+    chessLogic: '国际象棋游戏与逻辑',
+    betaTitle: 'DuoWindo6601 Beta 测试访问',
+    betaDesc: '所有应用功能均可用于测试：独联体和世界语言、国际象棋、图形、AI配音和控制面板。',
+    betaBtn: '🧪 DuoWindo6601 Beta 中心',
+    reviewsBtn: '⭐ 评价',
+    githubTitle: 'DuoWindo6601 已在 GitHub 上可用',
+    githubDesc: '通过 .github/workflows/build.yml 启动自动 Android APK 构建。',
+    testAndroidBtn: '🤖 Android 测试',
     home: '首页', practice: '练习', leaderboard: '排行榜', shop: '商店', profile: '个人资料', feedback: '反馈',
+    lang_ru: '俄语', lang_en: '英语', lang_de: '德语', lang_fr: '法语', lang_es: '西班牙语', lang_ja: '日语', lang_zh: '中文',
+    videoCallDesc: '与人工智能伙伴的实时交流', storiesAndWriting: '故事与写作', leaderboardDesc: '前3名晋级白银联赛',
+    sslCertificateTitle: 'SSL 证书 (WR2 / 传统)', sslCertificateDesc: '确认证书颁发者是旧的 WR2 网站。服务器未能提供其日志。',
+    edit: '编辑', mobileSimulatorBench: '移动模拟器测试台', mobileSimulatorDesc: '用于在 PC 上测试布局的交互式 iOS 和 Android 模拟器。',
+    launchSimulator: '启动模拟器', usernameNotSet: '未设置用户名', incognito: '无痕',
+    listenSpeech: '正在聆听语音...', typeMessage: '输入消息...', send: '发送', recordingSpeech: '正在录制语音... 再次点击麦克风发送',
+    activeWith: '启用：', change: '修改', isYou: '是你',
     unit: '单元', start: '开始', check: '检查', continue: '继续', skip: '跳过',
     module1: '模块 1，单元 1', chessUnitName: '棋子走法',
     settings: '设置', language: '语言', country: '国家', back: '返回', save: '保存',
@@ -661,7 +1772,104 @@ const TRANSLATIONS: Record<string, any> = {
     videoCall: "视频通话", startInterview: "开始面试", smartMode: "智能模式", interviewer: "面试官", self: "你",
     serverJsTitle: 'server.js 支持！',
     serverJsDesc: 'DuoWindo 项目已正式集成专属生产服务器 server.js，完美支持静态托管与 SPA 路由！',
-    serverJsBtn: '太棒了！ 🚀'
+    serverJsBtn: '太棒了！ 🚀',
+    streakResume: '恢复连续天数',
+    streakResumed: '🔥 连续天数已成功恢复并保存！',
+    browserBtn: '浏览器',
+    eduBtn: '💡 学习',
+    eduWelcome: '欢迎！点击任意白棋查看其移动方式。',
+    lessonWelcome: '课堂模式。机器人已禁用。你可以自由移动双方的棋子。',
+    lessonBtn: '课堂（无机器人）',
+    playDuoBtn: '与 DuoWindo6601 对弈',
+    chessStudyDesc: '课堂模式（无机器人）。练习你的走法！',
+    chessTutorialDesc: '教程！点击任意白棋学习其移动规则。',
+    chessPlayDesc: '别怕，我会手下留情的！',
+    incognitoTitle: '无痕模式（无账户）',
+    incognitoLeaderboardDesc: '分数将保存在本地。注册以加入全球排行榜！',
+    register: '注册',
+    noUsername: '未设置用户名',
+    editProfile: '编辑个人资料',
+    registerAuth: '注册 / 登录',
+    streakAdjustment: '调整你的连续天数。',
+    toastStreakBack7: '⏪ 连续：{streak} 天',
+    toastStreakBack1: '◀ 后退：{streak} 天',
+    toastStreakForward1: '▶ 前进：{streak} 天',
+    toastStreakForward7: '⏩ 前进（+7）：{streak} 天',
+    days: '天',
+    registerAndLogin: '注册与登录',
+    regLoginSubtitle: '注册账号、通过 Google 登录，或在无痕模式下匿名游玩',
+    incognitoTab: '无痕模式',
+    googleTab: 'Google',
+    displayNameLabel: '显示名称',
+    requiredLabel: '*必填',
+    displayNamePlaceholder: '例如：阿纳托利',
+    usernameLabel: '用户名 (@username)',
+    uniqueHandleLabel: '唯一昵称',
+    profileLeaderboardVisible: '显示在个人资料和排行榜中',
+    selectAvatarLabel: '选择头像',
+    registerAndStartBtn: '注册并开始',
+    fullIncognitoTitle: '无需输入邮箱或姓名的完全隐私模式',
+    noSignupPasswordsRule: '无需注册或密码',
+    allProgressLocalRule: '所有进度均保存在本地浏览器中',
+    canRegisterAnytimeRule: '您可以随时进行注册',
+    continueGuestBtn: '作为访客 / 无痕继续',
+    firebaseCloudSyncTitle: 'Firebase 云端同步',
+    syncAllDevicesDesc: '在所有设备间同步您的学习统计数据',
+    progressSyncNote: '登录后，您的进度将自动与 Google 账号同步。',
+    iframeWarning: '⚠️ 框架限制：Google 登录可能在 iFrame 中被拦截。',
+    openNewTabBtn: '在新标签页中打开 ↗',
+    signInGoogleBtn: '通过 Google 登录',
+    skipContinueIncognitoBtn: '跳过 / 无账号继续（无痕）↗',
+    uploadPhotoBtn: '📷 上传照片',
+    deletePhotoBtn: '🗑️ 删除照片',
+    avatarUrlLabel: '头像图片网址 (URL)',
+    avatarBgColorLabel: '头像背景颜色',
+    avatarIconLabel: '头像图标 / 表情',
+    cancelBtn: '取消',
+    saveProfileBtn: '保存',
+    listeningPlaceholder: '正在聆听您的语音...',
+    typingPlaceholder: '输入消息...',
+    sendBtn: '发送',
+    recordingToastText: '🎙 正在录音... 再次点击麦克风发送',
+    browserWarningTitle: '警告页面：不支持旧版浏览器',
+    browserWarningSub: 'DuoWindo6601 平台兼容性检查',
+    browserCompatibleTitle: '现代浏览器与当前操作系统 (Windows / Linux / macOS / Android):',
+    browserCompatibleDesc: '您的系统完全兼容！无任何警告。所有功能、Gemini API 和语音输入均能完美运行。',
+    browserOutdatedTitle: '检测到旧版浏览器或不被支持的操作系统：',
+    browserOutdatedDesc: '您的系统已过时（旧版浏览器或 Windows XP / Windows Vista）。',
+    sysMessageLabel: '系统信息：',
+    sysMessageDesc: '很抱歉，您当前使用的浏览器已不再受支持。要继续使用 Duowindo6601，请更新到现代浏览器。不支持 Windows XP/Windows Vista。',
+    riskLabel: '风险：',
+    riskDesc: 'Gemini API 可能无法正常运行',
+    winOsSupportLabel: 'Windows 操作系统支持生命周期：',
+    win7Desc: '停止全部支持',
+    win7Status: '❌ 已结束 (2020年1月14日)',
+    win8Status: '❌ 已结束 (2023年1月10日)',
+    win10Desc: '免费支持已于 2025 年 10 月 14 日结束',
+    win10Status: '⚠️ ESU 持续至 2027 年 10 月 12 日',
+    win10Note: '* 面向零售用户的付费扩展安全更新 (ESU) 计划已延长至 2027 年 10 月。',
+    win11Desc: '没有统一结束日期，支持取决于具体版本',
+    win11Status: '✅ 24H2 版本支持至 2026 年 10 月 13 日',
+    win11Note: '* 支持周期取决于年度功能更新。24H2 版本 (家庭版/专业版) 的支持持续至 2026 年 10 月 13 日。',
+    modernBrowsersLabel: '推荐的现代浏览器：',
+    downloadBtn: '下载',
+    sslTitle: 'SSL 证书 (WR2 / 历史旧版网站)',
+    sslDesc: '确认证书颁发者是旧版 WR2 网站。服务器未能提供透明度日志。',
+    mobileSimTitle: '移动模拟器测试台',
+    mobileSimDesc: '用于在电脑端测试响应式布局的交互式 iOS 和 Android 模拟器。',
+    mobileSimBtn: '启动模拟器',
+    feedbackBannerTitle: '意见反馈与支持',
+    feedbackBannerDesc: '发现 Bug 或想提出建议？',
+    adminBannerTitle: '所有者仪表板',
+    adminBannerDesc: '版面管理与监控',
+    cloudSaveTitle: '云端保存',
+    loading: '加载中...',
+    loggedInAs: '已登录为 {user}',
+    progressSynced: '● 进度已同步至云端',
+    signOut: '退出登录',
+    savedLocallyAs: '已作为 @{username} 仅在浏览器本地保存。',
+    updateBrowserBtn: '更新您的浏览器',
+    continueDuoWindoBtn: '继续使用 DuoWindo6601'
   }
 };
 
@@ -723,7 +1931,60 @@ export default function App() {
 
   const t = (key: string) => {
     const lang = TRANSLATIONS[user.language] ? user.language : 'en';
+    if (USER_TRANSLATIONS[key] && USER_TRANSLATIONS[key][lang]) {
+      return USER_TRANSLATIONS[key][lang];
+    }
     return TRANSLATIONS[lang]?.[key] || TRANSLATIONS['en'][key] || TRANSLATIONS['ru'][key] || key;
+  };
+
+  const getLocalizedCourseName = (c: any) => {
+    if (!c) return '';
+    const lang = TRANSLATIONS[user.language] ? user.language : 'en';
+    const directKey = `lang_${c.id}`;
+    if (TRANSLATIONS[lang]?.[directKey]) {
+      return TRANSLATIONS[lang][directKey];
+    }
+    if (c.id === 'chess') return t('playChess');
+    if (c.id === 'math') {
+      if (lang === 'ru') return 'Математика';
+      if (lang === 'de') return 'Mathematik';
+      if (lang === 'fr') return 'Mathématiques';
+      if (lang === 'es') return 'Matemáticas';
+      if (lang === 'ja') return '数学';
+      if (lang === 'zh') return '数学';
+      return 'Mathematics';
+    }
+    if (c.id === 'music') {
+      if (lang === 'ru') return 'Музыка';
+      if (lang === 'de') return 'Musik';
+      if (lang === 'fr') return 'Musique';
+      if (lang === 'es') return 'Música';
+      if (lang === 'ja') return '音楽';
+      if (lang === 'zh') return '音乐';
+      return 'Music';
+    }
+    const cisTranslations: Record<string, Record<string, string>> = {
+      ru: { en: 'Russian', de: 'Russisch', fr: 'Russe', es: 'Ruso', ja: 'ロシア語', zh: '俄语', ru: 'Русский' },
+      be: { en: 'Belarusian', de: 'Weißrussisch', fr: 'Biélorusse', es: 'Bielorruso', ja: 'ベラルーシ語', zh: '白俄罗斯语', ru: 'Белорусский' },
+      uk: { en: 'Ukrainian', de: 'Ukrainisch', fr: 'Ukrainien', es: 'Ucraniano', ja: 'ウクライナ語', zh: '乌克兰语', ru: 'Украинский' },
+      mo: { en: 'Moldavian', de: 'Moldauisch', fr: 'Moldave', es: 'Moldavo', ja: 'モルドバ語', zh: '摩尔多瓦语', ru: 'Молдавский' },
+      lt: { en: 'Lithuanian', de: 'Litauisch', fr: 'Lituanien', es: 'Lituano', ja: 'リトアニア語', zh: '立陶宛语', ru: 'Литовский' },
+      lv: { en: 'Latvian', de: 'Lettisch', fr: 'Letton', es: 'Letón', ja: 'ラトビア語', zh: '拉脱维亚语', ru: 'Латышский' },
+      et: { en: 'Estonian', de: 'Estnisch', fr: 'Estonien', es: 'Estonio', ja: 'エストニア語', zh: '爱沙尼亚语', ru: 'Эстонский' },
+      ka: { en: 'Georgian', de: 'Georgisch', fr: 'Géorgien', es: 'Georgiano', ja: 'グルジア語', zh: '格鲁吉亚语', ru: 'Грузинский' },
+      hy: { en: 'Armenian', de: 'Armenisch', fr: 'Arménien', es: 'Armenio', ja: 'アルメニア語', zh: '亚美尼亚语', ru: 'Армянский' },
+      az: { en: 'Azerbaijani', de: 'Aserbaidschanisch', fr: 'Azerbaïdjanais', es: 'Azerbaiyano', ja: 'アゼルバイジャン語', zh: '阿塞拜疆语', ru: 'Азербайджанский' },
+      kk: { en: 'Kazakh', de: 'Kasachisch', fr: 'Kazakh', es: 'Kazajo', ja: 'カザフ語', zh: '哈萨克语', ru: 'Казахский' },
+      uz: { en: 'Uzbek', de: 'Usbekisch', fr: 'Ouzbek', es: 'Uzbeko', ja: 'ウズベク語', zh: '乌兹别克语', ru: 'Узбекский' },
+      tk: { en: 'Turkmen', de: 'Turkmenisch', fr: 'Turkmène', es: 'Turcomano', ja: 'トルクメン語', zh: '土库曼语', ru: 'Туркменский' },
+      ky: { en: 'Kyrgyz', de: 'Kirgisisch', fr: 'Kirghize', es: 'Kirguís', ja: 'キルギス語', zh: '吉尔吉斯语', ru: 'Киргизский' },
+      tg: { en: 'Tajik', de: 'Tadschikisch', fr: 'Tadjik', es: 'Tayiko', ja: 'タジк语', zh: '塔吉克语', ru: 'Таджикский' }
+    };
+    if (cisTranslations[c.id]?.[lang]) {
+      return cisTranslations[c.id][lang];
+    }
+    if (lang === 'ru') return c.localName || c.name;
+    return c.name;
   };
 
   const [currentCourse, setCurrentCourse] = useState<Course>(() => {
@@ -850,15 +2111,16 @@ export default function App() {
   useEffect(() => {
     try {
       const ua = navigator.userAgent || '';
-      const isOldOS = /Windows NT 5\.1|Windows NT 5\.2|Windows NT 6\.0/i.test(ua); // Windows XP / Vista
-      const isOldUA = /MSIE|Trident|Chrome\/[1-8][0-9]\.|Firefox\/[1-8][0-9]\.|Safari\/[1-9]\.|Version\/[1-9]\.|Version\/1[0-3]\./i.test(ua);
-      const isMissingFeatures = !(window.fetch && window.Promise && window.crypto && window.MediaRecorder && window.AudioContext);
-      if (isOldOS || isOldUA || isMissingFeatures) {
+      const isOldOS = /Windows NT 5\.1|Windows NT 5\.2|Windows NT 6\.0/i.test(ua); // Windows XP / Vista specifically
+      const isVeryOldIE = /MSIE|Trident/i.test(ua);
+      const isVeryOldChrome = /Chrome\/([1-8][0-9])\./i.test(ua);
+      const isVeryOldFirefox = /Firefox\/([1-8][0-9])\./i.test(ua);
+      
+      const isOutdated = isOldOS || isVeryOldIE || isVeryOldChrome || isVeryOldFirefox;
+      if (isOutdated) {
         setIsOutdatedBrowserDetected(true);
-        const dismissed = sessionStorage.getItem('duo_browser_warning_dismissed');
-        if (!dismissed) {
-          setShowBrowserModal(true);
-        }
+      } else {
+        setIsOutdatedBrowserDetected(false);
       }
     } catch (e) {
       console.warn("Browser compatibility check failed:", e);
@@ -1241,8 +2503,98 @@ export default function App() {
 
   const formatRTLOverride = useCallback((text: string) => {
     if (!text) return "";
-    // Clean up any stray legacy \u202E / \u202C characters so connected script works naturally
-    return text.replace(/[\u202E\u202C]/g, '');
+    
+    // First, check if the text contains any RTL characters (Arabic or Hebrew)
+    const hasRtl = /[\u0600-\u06FF\u0590-\u05FF]/.test(text);
+    if (!hasRtl) {
+      // If there's no Arabic/Hebrew, strip any residual directional overrides to ensure pure LTR
+      return text.replace(/[\u202E\u202C\u202D]/g, '');
+    }
+
+    // If the text contains Cyrillic or Latin letters, it is mixed bilingual text (e.g., Russian or English mixed with Arabic).
+    // Applying global right-to-left overrides (u+202e) on mixed sentences breaks the LTR text flow/order.
+    // We strip all absolute overrides and let the browser's native bi-directional layout handle it perfectly.
+    const hasLtrLetters = /[a-zA-Z\u0400-\u04FFёЁ]/.test(text);
+    if (hasLtrLetters) {
+      return text.replace(/[\u202E\u202C\u202D]/g, '');
+    }
+
+    const startsWithRtlOverride = text.startsWith('\u202E');
+    
+    // Tokenize text into chunks of either:
+    // 1. Cyrillic/Latin/digits blocks (including spaces/symbols that belong to them)
+    // 2. Arabic/Hebrew/other blocks
+    const tokens: string[] = [];
+    let currentToken = "";
+    let currentType: 'RTL' | 'LTR' | 'NEUTRAL' = 'NEUTRAL';
+    
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      const isCharRtl = /[\u0600-\u06FF\u0590-\u05FF]/.test(char);
+      const isCharLtr = /[a-zA-Z0-9\u0400-\u04FFёЁ]/.test(char);
+      
+      if (/[\u202E\u202C\u202D]/.test(char)) {
+        if (currentToken) {
+          tokens.push(currentToken);
+          currentToken = "";
+        }
+        tokens.push(char);
+        currentType = 'NEUTRAL';
+        continue;
+      }
+      
+      let charType: 'RTL' | 'LTR' | 'NEUTRAL' = 'NEUTRAL';
+      if (isCharRtl) {
+        charType = 'RTL';
+      } else if (isCharLtr) {
+        charType = 'LTR';
+      } else {
+        charType = 'NEUTRAL';
+      }
+      
+      if (currentType === 'NEUTRAL') {
+        currentType = charType;
+        currentToken += char;
+      } else if (currentType === charType) {
+        currentToken += char;
+      } else if (charType === 'NEUTRAL') {
+        currentToken += char;
+      } else {
+        if (currentToken) {
+          tokens.push(currentToken);
+        }
+        currentToken = char;
+        currentType = charType;
+      }
+    }
+    
+    if (currentToken) {
+      tokens.push(currentToken);
+    }
+    
+    // Process tokens: wrap LTR tokens in \u202D ... \u202C to prevent reversal
+    const processedTokens = tokens.map(tok => {
+      if (/[\u202E\u202C\u202D]/.test(tok)) {
+        return tok;
+      }
+      const hasLtrLettersOrDigits = /[a-zA-Z0-9\u0400-\u04FFёЁ]/.test(tok);
+      const hasArabicLetters = /[\u0600-\u06FF\u0590-\u05FF]/.test(tok);
+      
+      if (hasLtrLettersOrDigits && !hasArabicLetters) {
+        // Wrap in Left-to-Right Override to keep Russian Cyrillic and Latin English LTR
+        return `\u202D${tok}\u202C`;
+      }
+      return tok;
+    });
+    
+    let result = processedTokens.join('');
+    
+    // Wrap whole output in \u202E ... \u202C so Arabic naturally flows RTL
+    if (!startsWithRtlOverride && /[\u0600-\u06FF\u0590-\u05FF]/.test(result)) {
+      result = `\u202E${result}\u202C`;
+    }
+    
+    return result;
   }, []);
 
   const leaderboardData = useMemo(() => {
@@ -1721,7 +3073,7 @@ export default function App() {
         </nav>
       </aside>
 
-      <main className={isSimulatingMobile ? "flex-1 relative pb-28 min-h-screen w-full" : "flex-1 lg:ml-64 relative pb-28 lg:pb-0 min-h-screen"}>
+      <main className={isSimulatingMobile ? "flex-1 relative pb-44 min-h-screen w-full" : "flex-1 lg:ml-64 relative pb-44 lg:pb-0 min-h-screen"}>
         {/* HEADER */}
         {screen !== AppScreen.LESSON && screen !== AppScreen.VIDEO_CALL && (
           <header className="sticky top-0 z-40 bg-duo-dark/95 backdrop-blur-md p-4 border-b border-gray-800 flex flex-col space-y-4 shadow-xl">
@@ -1740,7 +3092,7 @@ export default function App() {
                       >
                         <span>🕵️</span>
                         <span className="hidden sm:inline">
-                          {user.language === 'ru' ? 'Инкогнито' : 'Incognito'}
+                          {t('incognito')}
                         </span>
                         <span className="text-[10px] bg-emerald-500/30 text-emerald-200 px-1.5 py-0.5 rounded-md font-bold">
                           {user.username ? `@${user.username}` : 'Гость'}
@@ -1754,7 +3106,7 @@ export default function App() {
                       >
                         <span>👤</span>
                         <span className="hidden sm:inline">
-                          {user.username ? `@${user.username}` : user.name !== "Ученик 6601" ? user.name : (user.language === 'ru' ? 'Регистрация' : 'Register')}
+                          {user.username ? `@${user.username}` : user.name !== "Ученик 6601" ? user.name : t('register')}
                         </span>
                       </button>
                     )}
@@ -1771,7 +3123,7 @@ export default function App() {
                       className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider ${isOutdatedBrowserDetected ? 'bg-amber-950 text-amber-300 border border-amber-500/80 animate-pulse' : 'bg-gray-800/80 text-gray-300 border border-gray-700 hover:text-white'} hover:scale-105 transition-all flex items-center space-x-1 shadow-md cursor-pointer`}
                       title="Предупреждение о браузере / Поддержка"
                     >
-                      <span>⚠️</span>
+                      <span>{isOutdatedBrowserDetected ? '⚠️' : '🌐'}</span>
                       <span className="hidden md:inline">Браузер</span>
                     </button>
                     <button onClick={() => { playSound('click'); setScreen(AppScreen.SUBSCRIPTION); }} className={`px-4 py-1.5 rounded-xl text-[12px] font-black border-b-4 uppercase tracking-widest transition-transform hover:scale-105 ${user.subscription === 'max' ? 'bg-black border-gray-700 text-duo-blue shadow-[0_0_10px_rgba(28,176,246,0.5)]' : user.subscription === 'super' ? 'bg-gradient-to-r from-blue-500 to-purple-500 border-purple-700 text-white' : 'bg-duo-blue border-blue-800 text-white'}`}>{user.subscription === 'free' ? t('free') : user.subscription === 'super' ? 'SUPER' : 'MAX'}</button>
@@ -1791,7 +3143,7 @@ export default function App() {
             <div className="p-4 md:p-10 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-5">
                 <div className="flex flex-col items-center mb-6">
                     <h2 className="text-3xl font-black uppercase tracking-widest text-white mb-2">{t('alphabet')}</h2>
-                    <p className="text-gray-400 font-bold text-lg">{user.language === 'en' ? currentCourse.name : currentCourse.localName}</p>
+                    <p className="text-gray-400 font-bold text-lg">{getLocalizedCourseName(currentCourse)}</p>
                 </div>
 
                 {/* CATEGORY TABS for CJK or multi-script languages (e.g. Chinese Hanzi/Pinyin, Japanese Hiragana/Katakana, Korean) */}
@@ -1870,12 +3222,12 @@ export default function App() {
                                 <h4 className="font-black text-lg text-white flex items-center gap-2">
                                     <span>{user.name}</span>
                                 </h4>
-                                <p className="text-xs text-gray-400 font-bold">{user.username ? `@${user.username}` : (user.language === 'ru' ? 'Юзернейм не указан' : 'No handle set')}</p>
+                                <p className="text-xs text-gray-400 font-bold">{user.username ? `@${user.username}` : t('usernameNotSet')}</p>
                             </div>
                         </div>
                         <button onClick={openEditProfile} className="px-4 py-2.5 bg-duo-blue hover:brightness-110 text-white rounded-2xl font-black text-xs uppercase tracking-wider border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all shadow-md flex items-center space-x-1.5">
                             <PenIcon className="w-4 h-4" />
-                            <span>{user.language === 'ru' ? 'Изменить' : 'Edit'}</span>
+                            <span>{t('edit')}</span>
                         </button>
                     </div>
 
@@ -1885,27 +3237,51 @@ export default function App() {
                             <div>
                                 <h3 className="text-xl font-black text-emerald-400 uppercase tracking-widest flex items-center space-x-2">
                                     <span>📱</span>
-                                    <span>{user.language === 'ru' ? 'Тест-стенд Мобильный Симулятор' : 'Mobile Simulator Test Bench'}</span>
+                                    <span>{t('mobileSimulatorBench')}</span>
                                 </h3>
                                 <p className="text-xs text-gray-400 font-bold mt-1">
-                                    {user.language === 'ru' ? 'Интерактивный эмулятор iOS и Android для проверки адаптивности на ПК.' : 'Interactive iOS & Android emulator for testing layouts on PC.'}
+                                    {t('mobileSimulatorDesc')}
                                 </p>
                             </div>
                             <button 
                                 onClick={() => { playSound('click'); setSimulatorMode('android'); setScreen(AppScreen.PATH); }}
                                 className="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all shadow-md"
                             >
-                                {user.language === 'ru' ? 'Запустить стенд' : 'Launch Simulator'}
+                                {t('launchSimulator')}
                             </button>
                         </div>
                     </div>
 
                     <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl"><h3 className="text-xl font-bold mb-4 text-white uppercase tracking-widest">{t('apiStatus')}</h3><div className="flex items-center justify-between"><div className="flex items-center space-x-3"><div className={`w-4 h-4 rounded-full ${offlineMode ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div><span className={`font-bold text-lg ${offlineMode ? 'text-red-400' : 'text-green-400'}`}>{offlineMode ? t('limitReached') : t('online')}</span></div><button onClick={() => { playSound('click'); checkApiStatus(); }} className="px-4 py-2 bg-gray-700 rounded-xl font-bold text-sm hover:bg-gray-600 transition-all border-b-4 border-gray-800 active:border-b-0 active:translate-y-1">{t('checkConnection')}</button></div></div>
+
+                    {/* SSL CERTIFICATE WR2 & SERVER LOGS STATUS */}
+                    <div className="bg-amber-950/40 border-2 border-amber-500/60 rounded-3xl p-6 mb-6 shadow-xl">
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-lg font-black text-amber-400 uppercase tracking-wide flex items-center space-x-2">
+                                <span>🔒</span>
+                                <span>{t('sslCertificateTitle')}</span>
+                            </h3>
+                            <span className="text-[10px] font-black bg-amber-500/20 text-amber-300 px-2.5 py-1 rounded-full border border-amber-500/40">
+                                WR2 VERIFIED
+                            </span>
+                        </div>
+                        <p className="text-xs text-amber-200/90 font-medium leading-relaxed mb-4">
+                            {t('sslCertificateDesc')}
+                        </p>
+                        <div className="bg-black/40 border border-amber-500/30 rounded-2xl p-3 text-[11px] font-mono text-amber-300/80 space-y-1">
+                            <div>[SSL Status] Issuer: WR2 Root CA (Legacy)</div>
+                            <div>[Server Logs] Certificate Transparency Log: Failed to retrieve server logs</div>
+                            <div>[Cipher Suite] TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256</div>
+                        </div>
+                    </div>
                     <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl">
                     <h3 className="text-xl font-bold mb-4 text-white uppercase tracking-widest">{t('language')}</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                         {['ru','en','de','fr','es','ja','zh'].map(lang => (
-                            <button key={lang} onClick={() => { playSound('select'); setUser({...user, language: lang as any}); }} className={`p-4 rounded-xl font-bold border-b-4 transition-all ${user.language === lang ? 'bg-duo-blue border-duo-blueDark text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'}`}>{lang.toUpperCase()}</button>
+                            <button key={lang} onClick={() => { playSound('select'); setUser({...user, language: lang as any}); }} className={`p-3 rounded-xl font-bold border-b-4 transition-all text-xs flex flex-col items-center justify-center space-y-1 ${user.language === lang ? 'bg-duo-blue border-duo-blueDark text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'}`}>
+                                <span className="font-black text-sm tracking-wider">{lang.toUpperCase()}</span>
+                                <span className="text-[10px] opacity-80">{t('lang_' + lang)}</span>
+                            </button>
                         ))}
                     </div>
                     </div>
@@ -1932,7 +3308,7 @@ export default function App() {
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-gray-800 pb-4">
                         <div className="flex items-center space-x-4">
                             <button onClick={() => { playSound('click'); setScreen(AppScreen.PATH); }} className="text-gray-400 hover:text-white transition-colors p-2 rounded-xl bg-gray-800"><CloseIcon className="w-8 h-8"/></button>
-                            <h2 className="text-2xl md:text-3xl font-black uppercase tracking-widest text-white">{user.language === 'ru' ? 'Курсы и Языковые регионы' : 'Courses & Language Regions'}</h2>
+                            <h2 className="text-2xl md:text-3xl font-black uppercase tracking-widest text-white">{t('coursesAndRegions')}</h2>
                         </div>
                         {/* SEARCH FIELD */}
                         <div className="relative w-full md:w-80">
@@ -1940,7 +3316,7 @@ export default function App() {
                                 type="text"
                                 value={courseSearch}
                                 onChange={(e) => setCourseSearch(e.target.value)}
-                                placeholder={user.language === 'ru' ? '🔍 Поиск языка или региона...' : '🔍 Search language or region...'}
+                                placeholder={t('searchPlaceholder')}
                                 className="w-full bg-gray-800 border-2 border-gray-700 focus:border-duo-blue text-white rounded-2xl px-4 py-2 text-sm font-bold focus:outline-none transition-colors placeholder-gray-400"
                             />
                             {courseSearch && (
@@ -1956,31 +3332,31 @@ export default function App() {
                                 onClick={() => { playSound('click'); setCourseRegionTab('all'); }}
                                 className={`px-4 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider whitespace-nowrap transition-all border-b-4 ${courseRegionTab === 'all' ? 'bg-duo-blue border-duo-blueDark text-white' : 'bg-gray-800 border-gray-900 text-gray-400 hover:bg-gray-700'}`}
                             >
-                                🌐 {user.language === 'ru' ? 'Все курсы' : 'All Courses'}
+                                🌐 {t('allCourses')}
                             </button>
                             <button 
                                 onClick={() => { playSound('click'); setCourseRegionTab('cis'); }}
                                 className={`px-4 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider whitespace-nowrap transition-all border-b-4 ${courseRegionTab === 'cis' ? 'bg-emerald-600 border-emerald-800 text-white' : 'bg-gray-800 border-gray-900 text-gray-400 hover:bg-gray-700'}`}
                             >
-                                🏛️ {user.language === 'ru' ? 'СНГ языки (15)' : 'CIS Languages (15)'}
+                                🏛️ {t('cisLanguages')}
                             </button>
                             <button 
                                 onClick={() => { playSound('click'); setCourseRegionTab('world'); }}
                                 className={`px-4 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider whitespace-nowrap transition-all border-b-4 ${courseRegionTab === 'world' ? 'bg-indigo-600 border-indigo-800 text-white' : 'bg-gray-800 border-gray-900 text-gray-400 hover:bg-gray-700'}`}
                             >
-                                🌍 {user.language === 'ru' ? 'Мировые языки' : 'World Languages'}
+                                🌍 {t('worldLanguages')}
                             </button>
                             <button 
                                 onClick={() => { playSound('click'); setCourseRegionTab('special'); }}
                                 className={`px-4 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider whitespace-nowrap transition-all border-b-4 ${courseRegionTab === 'special' ? 'bg-amber-600 border-amber-800 text-white' : 'bg-gray-800 border-gray-900 text-gray-400 hover:bg-gray-700'}`}
                             >
-                                🧩 {user.language === 'ru' ? 'Предметы & Игры' : 'Subjects & Games'}
+                                🧩 {t('subjectsAndGames')}
                             </button>
                             <button 
                                 onClick={() => { playSound('click'); setCourseRegionTab('rf'); }}
                                 className={`px-4 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider whitespace-nowrap transition-all border-b-4 ${courseRegionTab === 'rf' ? 'bg-rose-600 border-rose-800 text-white' : 'bg-gray-800 border-gray-900 text-gray-400 hover:bg-gray-700'}`}
                             >
-                                🇷🇺 {user.language === 'ru' ? 'Регионы РФ' : 'RF Regions'}
+                                🇷🇺 {t('rfRegions')}
                             </button>
                         </div>
                     )}
@@ -1989,7 +3365,7 @@ export default function App() {
                     {courseSearch ? (
                         <div>
                             <h3 className="text-xl font-black text-duo-blue uppercase tracking-widest mb-4">
-                                {user.language === 'ru' ? 'Результаты поиска' : 'Search Results'}
+                                {t('searchResults')}
                             </h3>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                 {COURSES.filter(c => 
@@ -2009,7 +3385,7 @@ export default function App() {
                                             <img src={`https://flagcdn.com/w80/${c.flagCode}.png`} className="w-12 h-8 rounded-md object-cover shadow-md group-hover:scale-110 transition-transform" alt={c.name} />
                                         )}
                                         <div className="flex-1 min-w-0">
-                                            <h3 className="font-bold text-base text-white truncate">{user.language === 'ru' ? c.localName : c.name}</h3>
+                                            <h3 className="font-bold text-base text-white truncate">{getLocalizedCourseName(c)}</h3>
                                             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{c.name}</p>
                                         </div>
                                         {currentCourse.id === c.id && <div className="bg-duo-green rounded-full p-1"><CheckCircleIcon className="w-5 h-5 text-white"/></div>}
@@ -2025,7 +3401,7 @@ export default function App() {
                                     <div className="flex items-center space-x-3 mb-4">
                                         <span className="text-2xl">🏛️</span>
                                         <h3 className="text-xl font-black text-emerald-400 uppercase tracking-widest">
-                                            {user.language === 'ru' ? 'Языки СНГ и стран-соседей' : 'CIS & Neighboring Languages'}
+                                            {t('cisSectionTitle')}
                                         </h3>
                                     </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -2037,7 +3413,7 @@ export default function App() {
                                             >
                                                 <img src={`https://flagcdn.com/w80/${c.flagCode}.png`} className="w-12 h-8 rounded-md object-cover shadow-md group-hover:scale-110 transition-transform" alt={c.name} />
                                                 <div className="flex-1 min-w-0">
-                                                    <h3 className="font-bold text-base text-white truncate">{c.localName}</h3>
+                                                    <h3 className="font-bold text-base text-white truncate">{getLocalizedCourseName(c)}</h3>
                                                     <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">{c.name}</p>
                                                 </div>
                                                 {currentCourse.id === c.id && <div className="bg-duo-green rounded-full p-1"><CheckCircleIcon className="w-5 h-5 text-white"/></div>}
@@ -2053,7 +3429,7 @@ export default function App() {
                                     <div className="flex items-center space-x-3 mb-4">
                                         <span className="text-2xl">🌍</span>
                                         <h3 className="text-xl font-black text-duo-blue uppercase tracking-widest">
-                                            {user.language === 'ru' ? 'Популярные мировые языки' : 'World Popular Languages'}
+                                            {t('worldSectionTitle')}
                                         </h3>
                                     </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -2065,8 +3441,8 @@ export default function App() {
                                             >
                                                 <img src={`https://flagcdn.com/w80/${c.flagCode}.png`} className="w-12 h-8 rounded-md object-cover shadow-md group-hover:scale-110 transition-transform" alt={c.name} />
                                                 <div className="flex-1 min-w-0">
-                                                    <h3 className="font-bold text-base text-white truncate">{user.language === 'ru' ? c.localName : c.name}</h3>
-                                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{user.language === 'ru' ? 'Иностранный язык' : 'Foreign Language'}</p>
+                                                    <h3 className="font-bold text-base text-white truncate">{getLocalizedCourseName(c)}</h3>
+                                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{t('foreignLanguage')}</p>
                                                 </div>
                                                 {currentCourse.id === c.id && <div className="bg-duo-green rounded-full p-1"><CheckCircleIcon className="w-5 h-5 text-white"/></div>}
                                             </div>
@@ -2081,7 +3457,7 @@ export default function App() {
                                     <div className="flex items-center space-x-3 mb-4">
                                         <span className="text-2xl">🧩</span>
                                         <h3 className="text-xl font-black text-amber-400 uppercase tracking-widest">
-                                            {user.language === 'ru' ? 'Специальные предметы и Игры' : 'Special Subjects & Games'}
+                                            {t('specialSectionTitle')}
                                         </h3>
                                     </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -2095,15 +3471,15 @@ export default function App() {
                                                     {c.id === 'math' ? 'Σ' : c.id === 'music' ? '♫' : c.id === 'chess' ? '♔' : '🚀'}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <h3 className="font-black text-lg text-white truncate">{user.language === 'ru' ? c.localName : c.name}</h3>
+                                                    <h3 className="font-black text-lg text-white truncate">{getLocalizedCourseName(c)}</h3>
                                                     <p className="text-[11px] text-amber-400 font-bold uppercase tracking-wider">
                                                         {c.id === 'chess' 
-                                                            ? (user.language === 'ru' ? 'Шахматная игра & Логика' : 'Chess Game & Logic') 
+                                                            ? t('chessLogic') 
                                                             : c.id === 'math'
-                                                            ? (user.language === 'ru' ? 'Точная наука' : 'Exact Science')
+                                                            ? t('exactScience')
                                                             : c.id === 'music'
-                                                            ? (user.language === 'ru' ? 'Музыкальная теория' : 'Music Theory')
-                                                            : (user.language === 'ru' ? 'Специальный предмет' : 'Special Subject')}
+                                                            ? t('musicTheory')
+                                                            : t('specialSubject')}
                                                     </p>
                                                 </div>
                                                 {currentCourse.id === c.id && <div className="bg-duo-green rounded-full p-1"><CheckCircleIcon className="w-6 h-6 text-white"/></div>}
@@ -2119,7 +3495,7 @@ export default function App() {
                                     <div className="flex items-center space-x-3 mb-4">
                                         <span className="text-2xl">🇷🇺</span>
                                         <h3 className="text-xl font-black text-rose-400 uppercase tracking-widest">
-                                            {user.language === 'ru' ? 'Субъекты и регионы РФ' : 'Russian Regions'}
+                                            {t('rfSectionTitle')}
                                         </h3>
                                     </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -2131,8 +3507,8 @@ export default function App() {
                                             >
                                                 <img src={`https://flagcdn.com/w80/${c.flagCode}.png`} className="w-12 h-8 rounded-md object-cover shadow-md group-hover:scale-110 transition-transform" alt={c.name} />
                                                 <div className="flex-1 min-w-0">
-                                                    <h3 className="font-bold text-sm text-white truncate">{c.localName}</h3>
-                                                    <p className="text-[10px] text-rose-400 font-bold uppercase tracking-wider">{user.language === 'ru' ? 'Региональный курс' : 'Regional Course'}</p>
+                                                    <h3 className="font-bold text-sm text-white truncate">{getLocalizedCourseName(c)}</h3>
+                                                    <p className="text-[10px] text-rose-400 font-bold uppercase tracking-wider">{t('regionalCourse')}</p>
                                                 </div>
                                                 {currentCourse.id === c.id && <div className="bg-duo-green rounded-full p-1"><CheckCircleIcon className="w-5 h-5 text-white"/></div>}
                                             </div>
@@ -2653,7 +4029,7 @@ export default function App() {
                   </div>
               ) : (
                   <>
-                  <div className={`${currentCourse.themeColor} w-full max-w-md p-8 rounded-[2.5rem] border-b-8 ${currentCourse.themeBorder} mb-16 flex justify-between items-center shadow-2xl transition-transform hover:scale-[1.02]`}><div><p className="text-xs font-bold opacity-80 uppercase tracking-widest mb-1">{t('unit')} {user.currentUnit}</p><h2 className="text-3xl font-bold">{user.language === 'en' ? currentCourse.name : (user.language === 'ru' ? currentCourse.localName : currentCourse.name)}</h2></div>{currentCourse.id === 'chess' ? <span className="text-5xl">♔</span> : <ActivityIcon className="w-12 h-12 text-white" />}</div>
+                  <div className={`${currentCourse.themeColor} w-full max-w-md p-8 rounded-[2.5rem] border-b-8 ${currentCourse.themeBorder} mb-16 flex justify-between items-center shadow-2xl transition-transform hover:scale-[1.02]`}><div><p className="text-xs font-bold opacity-80 uppercase tracking-widest mb-1">{t('unit')} {user.currentUnit}</p><h2 className="text-3xl font-bold">{getLocalizedCourseName(currentCourse)}</h2></div>{currentCourse.id === 'chess' ? <span className="text-5xl">♔</span> : <ActivityIcon className="w-12 h-12 text-white" />}</div>
                   <div className="flex flex-col items-center space-y-16">
                     <button onClick={() => startTraining('translation')} className="w-28 h-28 rounded-full bg-duo-green border-b-8 border-duo-greenDark active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center shadow-2xl hover:brightness-110 group"><StarIcon className="w-14 h-14 text-white group-hover:scale-110 transition-transform" /></button>
                     <div className="w-3 h-16 bg-gray-800 rounded-full"></div>
@@ -2703,17 +4079,17 @@ export default function App() {
                     </div>
                     
                     <div className="flex flex-col w-full space-y-3">
-                        <button onClick={() => { setChessMode('tutorial'); setTutorialMessage(user.language === 'ru' ? "Добро пожаловать! Нажмите на любую белую фигуру, чтобы узнать, как она ходит." : "Welcome! Click on any white piece to see how it moves."); startTraining('chess'); }} className="w-full py-4 bg-duo-blue text-white rounded-2xl font-black uppercase tracking-widest border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all shadow-xl hover:bg-blue-400 flex items-center justify-center space-x-2">
+                        <button onClick={() => { setChessMode('tutorial'); setTutorialMessage(t('eduWelcome')); startTraining('chess'); }} className="w-full py-4 bg-duo-blue text-white rounded-2xl font-black uppercase tracking-widest border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all shadow-xl hover:bg-blue-400 flex items-center justify-center space-x-2">
                             <span className="text-2xl">💡</span>
-                            <span>{user.language === 'ru' ? '💡 Обучение' : '💡 Education'}</span>
+                            <span>{t('eduBtn')}</span>
                         </button>
-                        <button onClick={() => { setChessMode('study'); setTutorialMessage(user.language === 'ru' ? "Режим урока. Бот отключен. Вы можете свободно передвигать фигуры за обе стороны." : "Lesson Mode. Bot is disabled. You can move pieces for both sides."); startTraining('chess'); }} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest border-b-4 border-indigo-800 active:border-b-0 active:translate-y-1 transition-all shadow-xl hover:bg-indigo-500 flex items-center justify-center space-x-2">
+                        <button onClick={() => { setChessMode('study'); setTutorialMessage(t('lessonWelcome')); startTraining('chess'); }} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest border-b-4 border-indigo-800 active:border-b-0 active:translate-y-1 transition-all shadow-xl hover:bg-indigo-500 flex items-center justify-center space-x-2">
                             <BookIcon className="w-6 h-6 text-white" />
-                            <span>{user.language === 'ru' ? 'Урок (без бота)' : 'Lesson (No Bot)'}</span>
+                            <span>{t('lessonBtn')}</span>
                         </button>
                         <button onClick={() => { setChessMode('pve'); startTraining('chess'); }} className="w-full py-4 bg-gray-900 text-[#00cd9c] rounded-2xl font-black uppercase tracking-widest border-b-4 border-black active:border-b-0 active:translate-y-1 transition-all shadow-xl hover:bg-gray-800 flex items-center justify-center space-x-2">
                             <ChessPieceIcon type="p" color="w" className="w-6 h-6" />
-                            <span>{user.language === 'ru' ? 'Игра с DuoWindo6601 (Бот)' : 'Play with DuoWindo6601'}</span>
+                            <span>{t('playDuoBtn')}</span>
                         </button>
                     </div>
                 </div>
@@ -2735,7 +4111,7 @@ export default function App() {
               {/* VIDEO CALL & ROLEPLAY FEATURED CARDS */}
               <div className="md:col-span-2 grid sm:grid-cols-2 gap-4">
                   <button 
-                      onClick={() => startVideoCall("Видеозвонок DuoWindo6601")} 
+                      onClick={() => startVideoCall(t('videoCall'))} 
                       className="bg-gradient-to-r from-purple-700 via-indigo-700 to-blue-700 p-6 md:p-8 rounded-[2.5rem] border-b-8 border-purple-900 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center justify-between shadow-2xl group relative overflow-hidden"
                   >
                       <div className="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest animate-pulse border border-white/20">
@@ -2747,10 +4123,10 @@ export default function App() {
                           </div>
                           <div>
                               <div className="flex items-center space-x-2 mb-1">
-                                  <h3 className="text-2xl md:text-3xl font-black text-white">Видеозвонок</h3>
+                                  <h3 className="text-2xl md:text-3xl font-black text-white">{t('videoCall')}</h3>
                               </div>
                               <p className="opacity-90 font-bold text-xs md:text-sm text-purple-200">
-                                  Живое общение с AI партнером
+                                  {t('videoCallDesc')}
                               </p>
                           </div>
                       </div>
@@ -2778,7 +4154,7 @@ export default function App() {
               <button onClick={() => startTraining('listening')} className="bg-duo-blue p-12 rounded-[3rem] border-b-8 border-blue-800 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center space-x-8 shadow-2xl"><div className="bg-white/20 p-5 rounded-3xl"><VolumeIcon className="w-14 h-14 text-white" /></div><div><h3 className="text-3xl font-bold mb-1">{t('audio')}</h3><p className="opacity-80 font-bold uppercase tracking-widest text-xs">{t('whatHeard')}</p></div></button>
               <button onClick={() => startTraining('speech')} className="bg-duo-orange p-12 rounded-[3rem] border-b-8 border-orange-700 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center space-x-8 shadow-2xl"><div className="bg-white/20 p-5 rounded-3xl"><MicIcon className="w-14 h-14 text-white" /></div><div><h3 className="text-3xl font-bold mb-1">{t('speech')}</h3><p className="opacity-80 font-bold uppercase tracking-widest text-xs">{t('speakForDuo')}</p></div></button>
               <button onClick={() => startTraining('translation')} className="bg-duo-green p-12 rounded-[3rem] border-b-8 border-duo-greenDark text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center space-x-8 shadow-2xl"><div className="bg-white/20 p-5 rounded-3xl"><BookIcon className="w-14 h-14 text-white" /></div><div><h3 className="text-3xl font-bold mb-1">{t('translate')}</h3><p className="opacity-80 font-bold uppercase tracking-widest text-xs">{t('readPractice')}</p></div></button>
-              <button onClick={() => startTraining('reading')} className="bg-teal-500 p-12 rounded-[3rem] border-b-8 border-teal-700 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center space-x-8 shadow-2xl"><div className="bg-white/20 p-5 rounded-3xl"><BookIcon className="w-14 h-14 text-white" /></div><div><h3 className="text-3xl font-bold mb-1">Reading</h3><p className="opacity-80 font-bold uppercase tracking-widest text-xs">Stories & Writing</p></div></button>
+              <button onClick={() => startTraining('reading')} className="bg-teal-500 p-12 rounded-[3rem] border-b-8 border-teal-700 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center space-x-8 shadow-2xl"><div className="bg-white/20 p-5 rounded-3xl"><BookIcon className="w-14 h-14 text-white" /></div><div><h3 className="text-3xl font-bold mb-1">{t('practice')}</h3><p className="opacity-80 font-bold uppercase tracking-widest text-xs">{t('storiesAndWriting')}</p></div></button>
               <button onClick={() => setScreen(AppScreen.TRANSLATOR)} className="bg-gray-700 p-12 rounded-[3rem] border-b-8 border-gray-900 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center space-x-8 shadow-2xl"><div className="bg-white/20 p-5 rounded-3xl"><BookIcon className="w-14 h-14 text-white" /></div><div><h3 className="text-3xl font-bold mb-1 text-white">{t('translator')}</h3><p className="opacity-80 font-bold uppercase tracking-widest text-xs text-white">{t('aiTrans')}</p></div></button>
               <button onClick={() => startTraining('illusion')} className="bg-indigo-600 p-12 rounded-[3rem] border-b-8 border-indigo-800 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center space-x-8 shadow-2xl"><div className="bg-white/20 p-5 rounded-3xl"><EarIcon className="w-14 h-14 text-white" /></div><div><h3 className="text-3xl font-bold mb-1">{t('illusion')}</h3><p className="opacity-80 font-bold uppercase tracking-widest text-xs">{t('realOrNot')}</p></div></button>
               <button onClick={() => startTraining('drawing')} className="bg-pink-600 p-12 rounded-[3rem] border-b-8 border-pink-800 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center space-x-8 shadow-2xl"><div className="bg-white/20 p-5 rounded-3xl"><PenIcon className="w-14 h-14 text-white" /></div><div><h3 className="text-3xl font-bold mb-1">{t('drawing')}</h3><p className="opacity-80 font-bold uppercase tracking-widest text-xs">{t('writePractice')}</p></div></button>
@@ -2790,7 +4166,7 @@ export default function App() {
           {/* ... (LEADERBOARD, SHOP, PROFILE) ... */}
           {screen === AppScreen.LEADERBOARD && (
              <div className="py-10 animate-in fade-in max-w-2xl mx-auto w-full px-4">
-                <div className="flex flex-col items-center mb-10 text-center"><ShieldIcon className="w-24 h-24 text-yellow-400 mb-4 animate-bounce" /><h2 className="text-3xl font-black uppercase tracking-widest text-yellow-400">{t('leaderboardTitle')}</h2><p className="text-gray-400 font-bold mt-2">Топ-3 переходят в Серебряную лигу</p></div>
+                <div className="flex flex-col items-center mb-10 text-center"><ShieldIcon className="w-24 h-24 text-yellow-400 mb-4 animate-bounce" /><h2 className="text-3xl font-black uppercase tracking-widest text-yellow-400">{t('leaderboardTitle')}</h2><p className="text-gray-400 font-bold mt-2">{t('leaderboardDesc')}</p></div>
                 
                 {isIncognitoUser && (
                   <div className="mb-6 p-5 rounded-3xl bg-amber-950/50 border-2 border-amber-500/50 flex flex-col md:flex-row items-center justify-between gap-4 text-left shadow-xl">
@@ -2798,12 +4174,10 @@ export default function App() {
                       <span className="text-3xl">🕵️</span>
                       <div>
                         <h4 className="font-black text-sm text-amber-300 uppercase">
-                          {user.language === 'ru' ? 'Режим Инкогнито (Без аккаунта)' : 'Incognito Mode (No Account)'}
+                          {t('incognitoTitle')}
                         </h4>
                         <p className="text-xs text-amber-200/80 font-medium leading-relaxed">
-                          {user.language === 'ru' 
-                            ? 'Очки зачитываются локально. Зарегистрируйтесь, чтобы участвовать в глобальном рейтинге!' 
-                            : 'Scores count locally. Register to join the global leaderboard!'}
+                          {t('incognitoLeaderboardDesc')}
                         </p>
                       </div>
                     </div>
@@ -2812,7 +4186,7 @@ export default function App() {
                       className="w-full md:w-auto px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase rounded-2xl border-b-2 border-amber-700 active:translate-y-0.5 transition-all whitespace-nowrap shadow-md flex items-center justify-center space-x-1"
                     >
                       <span>✨</span>
-                      <span>{user.language === 'ru' ? 'Регистрация' : 'Register'}</span>
+                      <span>{t('register')}</span>
                     </button>
                   </div>
                 )}
@@ -2822,7 +4196,7 @@ export default function App() {
                       const isUser = entry.id === 'user';
                       const rank = index + 1;
                       let rankColor = "text-gray-400"; if (rank === 1) rankColor = "text-yellow-400"; if (rank === 2) rankColor = "text-gray-300"; if (rank === 3) rankColor = "text-orange-400";
-                      return ( <div key={entry.id} className={`flex items-center p-4 md:p-6 border-b border-gray-700 last:border-0 transition-colors ${isUser ? 'bg-duo-card border-l-4 border-l-duo-blue' : 'hover:bg-white/5'} ${isUser ? 'bg-gray-800' : ''}`}><div className={`w-8 font-black text-xl text-center mr-4 ${rankColor}`}>{rank}</div><div className={`w-12 h-12 rounded-full ${entry.color} flex items-center justify-center font-bold text-lg mr-4 border-2 border-gray-600`}>{entry.name[0]}</div><div className="flex-1"><h3 className={`font-bold text-lg ${isUser ? 'text-duo-blue' : 'text-white'}`}>{entry.name}</h3>{isUser && <span className="text-xs font-bold text-gray-500 uppercase">Это вы</span>}</div><div className="font-bold text-gray-400">{entry.xp} XP</div></div> );
+                      return ( <div key={entry.id} className={`flex items-center p-4 md:p-6 border-b border-gray-700 last:border-0 transition-colors ${isUser ? 'bg-duo-card border-l-4 border-l-duo-blue' : 'hover:bg-white/5'} ${isUser ? 'bg-gray-800' : ''}`}><div className={`w-8 font-black text-xl text-center mr-4 ${rankColor}`}>{rank}</div><div className={`w-12 h-12 rounded-full ${entry.color} flex items-center justify-center font-bold text-lg mr-4 border-2 border-gray-600`}>{entry.name[0]}</div><div className="flex-1"><h3 className={`font-bold text-lg ${isUser ? 'text-duo-blue' : 'text-white'}`}>{entry.name}</h3>{isUser && <span className="text-xs font-bold text-gray-500 uppercase">{t('isYou')}</span>}</div><div className="font-bold text-gray-400">{entry.xp} XP</div></div> );
                    })}
                 </div>
              </div>
@@ -2833,7 +4207,7 @@ export default function App() {
                 <h2 className="text-4xl font-bold text-center mb-10 tracking-tight uppercase">{t('shopTitle')}</h2>
                 {user.subscription === 'free' && (<div onClick={() => { playSound('click'); setScreen(AppScreen.SUBSCRIPTION); }} className="bg-gradient-to-r from-blue-600 to-purple-600 p-8 rounded-3xl border-b-8 border-purple-800 cursor-pointer hover:scale-[1.02] transition-all shadow-2xl mb-10 flex items-center justify-between"><div><h3 className="text-2xl font-black text-white mb-2">{t('trySuperTitle')}</h3><p className="text-white/80 font-bold">{t('trySuperDesc')}</p></div><SuperIcon className="w-16 h-16" /></div>)}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   {user.subscription === 'free' ? (<div onClick={() => { playSound('success'); setUser(u => ({...u, energy: 25, gems: Math.max(0, u.gems - 100)})); setToast(t('t_buy_energy')); }} className="bg-duo-card p-8 rounded-3xl border-2 border-b-8 border-duo-red cursor-pointer hover:scale-[1.02] transition-all flex items-center justify-between shadow-xl"><div><h4 className="font-bold text-xl mb-1 uppercase">{t('energy25')}</h4><p className="text-gray-400 font-bold">{t('refill')}</p></div><div className="text-duo-red font-bold text-lg">100 💎</div></div>) : (<div className="bg-duo-card p-8 rounded-3xl border-2 border-b-8 border-gray-700 opacity-80 flex items-center justify-between shadow-xl cursor-default"><div><h4 className="font-bold text-xl mb-1 uppercase text-gray-400">{t('infEnergy')}</h4><p className="text-gray-500 font-bold">Активно с {user.subscription === 'super' ? 'Super' : 'Max'}</p></div><InfiniteEnergyIcon className="w-10 h-10 text-yellow-400" /></div>)}
+                   {user.subscription === 'free' ? (<div onClick={() => { playSound('success'); setUser(u => ({...u, energy: 25, gems: Math.max(0, u.gems - 100)})); setToast(t('t_buy_energy')); }} className="bg-duo-card p-8 rounded-3xl border-2 border-b-8 border-duo-red cursor-pointer hover:scale-[1.02] transition-all flex items-center justify-between shadow-xl"><div><h4 className="font-bold text-xl mb-1 uppercase">{t('energy25')}</h4><p className="text-gray-400 font-bold">{t('refill')}</p></div><div className="text-duo-red font-bold text-lg">100 💎</div></div>) : (<div className="bg-duo-card p-8 rounded-3xl border-2 border-b-8 border-gray-700 opacity-80 flex items-center justify-between shadow-xl cursor-default"><div><h4 className="font-bold text-xl mb-1 uppercase text-gray-400">{t('infEnergy')}</h4><p className="text-gray-500 font-bold">{t('activeWith')} {user.subscription === 'super' ? 'Super' : 'Max'}</p></div><InfiniteEnergyIcon className="w-10 h-10 text-yellow-400" /></div>)}
                    <div className="bg-duo-card p-8 rounded-3xl border-2 border-b-8 border-duo-green cursor-pointer hover:scale-[1.02] transition-all flex items-center justify-between shadow-xl" onClick={() => { playSound('click'); setToast(t('t_freeze_used')); }}><div><h4 className="font-bold text-xl mb-1 uppercase">{t('freeze')}</h4><p className="text-gray-400 font-bold">{t('freezeDesc')}</p></div><div className="text-duo-green font-bold text-lg">500 💎</div></div>
                 </div>
                 <h3 className="text-2xl font-bold text-gray-400 mb-6 uppercase tracking-wider mt-12 border-t-2 border-gray-800 pt-8">{t('refillGems')}</h3>
@@ -2861,7 +4235,7 @@ export default function App() {
                       )}
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white">
                          <CameraIcon className="w-10 h-10 mb-1" />
-                         <span className="text-xs font-black uppercase tracking-wider">Изменить</span>
+                         <span className="text-xs font-black uppercase tracking-wider">{t('change')}</span>
                       </div>
                    </div>
                 </div>
@@ -2874,16 +4248,16 @@ export default function App() {
                       {user.subscription === 'max' && <span className="px-3 py-1 bg-black border border-duo-blue rounded-lg text-xs font-black text-duo-blue">MAX</span>}
                    </h2>
                    <p className="text-gray-400 font-bold text-sm md:text-base">
-                      {user.username ? `@${user.username}` : (user.language === 'ru' ? 'Юзернейм не установлен' : 'No username set')}
+                      {user.username ? `@${user.username}` : t('noUsername')}
                    </p>
                    <div className="flex flex-wrap justify-center gap-3 mt-3">
                       <button onClick={openEditProfile} className="px-5 py-2.5 bg-duo-blue hover:brightness-110 text-white rounded-2xl font-black text-xs uppercase tracking-wider border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all flex items-center space-x-2 shadow-lg">
                          <PenIcon className="w-4 h-4" />
-                         <span>{user.language === 'ru' ? 'Редактировать профиль' : 'Edit Profile'}</span>
+                         <span>{t('editProfile')}</span>
                       </button>
                       <button onClick={() => openRegisterModal('register')} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-wider border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all flex items-center space-x-2 shadow-lg">
                          <span>👤</span>
-                         <span>{user.language === 'ru' ? 'Регистрация / Вход' : 'Registration / Auth'}</span>
+                         <span>{t('registerAuth')}</span>
                       </button>
                    </div>
                 </div>
@@ -2910,9 +4284,7 @@ export default function App() {
                             <h3 className="text-sm md:text-base font-black text-white uppercase tracking-wider">{t('streakResume')}</h3>
                          </div>
                          <p className="text-xs text-gray-400 font-bold">
-                            {user.language === 'ru' 
-                               ? 'Регулировка ударного режима: возобновление и настройка дней.' 
-                               : 'Adjust your streak days forward or backward.'}
+                            {t('streakAdjustment')}
                          </p>
 
                          {/* Stepper Display */}
@@ -2923,7 +4295,7 @@ export default function App() {
                                      playSound('click');
                                      const newStreak = Math.max(0, user.streak - 7);
                                      setUser(u => ({ ...u, streak: newStreak }));
-                                     setToast(user.language === 'ru' ? `⏪ Ударный режим: ${newStreak} дн.` : `⏪ Streak: ${newStreak} days`);
+                                     setToast(t('toastStreakBack7').replace('{streak}', String(newStreak)));
                                   }}
                                   className="w-10 h-10 bg-gray-800 hover:bg-gray-700 active:scale-95 text-red-400 font-black rounded-xl border-b-2 border-gray-700 text-xs transition-all flex items-center justify-center"
                                   title="Назад (-7 дней)"
@@ -2935,11 +4307,11 @@ export default function App() {
                                      playSound('click');
                                      const newStreak = Math.max(0, user.streak - 1);
                                      setUser(u => ({ ...u, streak: newStreak }));
-                                     setToast(user.language === 'ru' ? `◀ Назад: ${newStreak} дн.` : `◀ Backward: ${newStreak} days`);
+                                     setToast(t('toastStreakBack1').replace('{streak}', String(newStreak)));
                                   }}
                                   className="w-10 h-10 bg-gray-800 hover:bg-gray-700 active:scale-95 text-red-400 font-black rounded-xl border-b-2 border-gray-700 text-xs transition-all flex items-center justify-center"
                                   title="Назад (-1 день)"
-                               >
+                                >
                                   -1
                                </button>
                             </div>
@@ -2949,7 +4321,7 @@ export default function App() {
                                   {user.streak}
                                </span>
                                <span className="block text-[10px] text-gray-400 font-bold uppercase">
-                                  {user.language === 'ru' ? 'дней' : 'days'}
+                                  {t('days')}
                                </span>
                             </div>
 
@@ -2959,7 +4331,7 @@ export default function App() {
                                      playSound('success');
                                      const newStreak = user.streak + 1;
                                      setUser(u => ({ ...u, streak: newStreak }));
-                                     setToast(user.language === 'ru' ? `▶ Вперёд: ${newStreak} дн.` : `▶ Forward: ${newStreak} days`);
+                                     setToast(t('toastStreakForward1').replace('{streak}', String(newStreak)));
                                   }}
                                   className="w-10 h-10 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black rounded-xl border-b-2 border-emerald-800 text-xs transition-all flex items-center justify-center"
                                   title="Вперёд (+1 день)"
@@ -2971,7 +4343,7 @@ export default function App() {
                                      playSound('success');
                                      const newStreak = user.streak + 7;
                                      setUser(u => ({ ...u, streak: newStreak }));
-                                     setToast(user.language === 'ru' ? `⏩ Вперёд (+7): ${newStreak} дн.` : `⏩ Forward (+7): ${newStreak} days`);
+                                     setToast(t('toastStreakForward7').replace('{streak}', String(newStreak)));
                                   }}
                                   className="w-10 h-10 bg-duo-red hover:bg-red-600 active:scale-95 text-white font-black rounded-xl border-b-2 border-red-800 text-xs transition-all flex items-center justify-center"
                                   title="Вперёд (+7 дней)"
@@ -2992,7 +4364,7 @@ export default function App() {
                             className="w-full py-3 bg-duo-red hover:bg-red-600 text-white font-black rounded-2xl border-b-4 border-red-800 active:translate-y-1 transition-all uppercase text-xs tracking-wider shadow-md flex items-center justify-center space-x-2"
                          >
                             <span>🚀</span>
-                            <span>{t('streakResume')} (+7 дн)</span>
+                            <span>{t('streakResume')} (+7 {t('days')})</span>
                          </button>
                       </div>
                    </div>
@@ -3003,21 +4375,23 @@ export default function App() {
                          <div className="w-full space-y-3">
                             <div className="flex items-center justify-center space-x-2">
                                <span className="text-2xl">☁️</span>
-                               <h3 className="text-lg font-bold text-white uppercase tracking-wider">Облачное сохранение</h3>
+                               <h3 className="text-lg font-bold text-white uppercase tracking-wider">{t('cloudSaveTitle')}</h3>
                             </div>
                             {authLoading ? (
-                               <p className="text-sm text-gray-500 font-bold">Загрузка...</p>
+                               <p className="text-sm text-gray-500 font-bold">{t('loading')}</p>
                             ) : firebaseUser ? (
                                <div className="space-y-3 w-full">
                                   <div className="text-sm text-gray-400 font-bold">
-                                     Вы вошли как <span className="text-duo-blue">{firebaseUser.displayName || firebaseUser.email}</span>
+                                     {t('loggedInAs').split('{user}')[0]}
+                                     <span className="text-duo-blue">{firebaseUser.displayName || firebaseUser.email}</span>
+                                     {t('loggedInAs').split('{user}')[1]}
                                   </div>
-                                  <p className="text-xs text-green-400 font-medium">● Прогресс синхронизирован с облаком</p>
+                                  <p className="text-xs text-green-400 font-medium">{t('progressSynced')}</p>
                                   <button 
                                      onClick={handleSignOut} 
                                      className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-2xl border-b-4 border-red-800 active:border-b-0 active:translate-y-1 transition-all text-xs uppercase"
                                   >
-                                     Выйти из аккаунта
+                                     {t('signOut')}
                                   </button>
                                </div>
                             ) : (
@@ -3026,24 +4400,22 @@ export default function App() {
                                      <div className="flex items-center space-x-2">
                                         <span className="text-base">🕵️</span>
                                         <span className="font-black text-xs text-emerald-300 uppercase">
-                                           {user.language === 'ru' ? 'Режим Инкогнито (Без аккаунта)' : 'Incognito Mode (No Account)'}
+                                           {t('incognitoTitle')}
                                         </span>
                                      </div>
                                      <p className="text-[11px] text-emerald-200/80 font-bold leading-normal">
-                                        {user.language === 'ru' 
-                                           ? `Вы зашли как @${user.username || 'incognito'}. Данные сохраняются только в этом браузере.` 
-                                           : `Saved locally in browser as @${user.username || 'incognito'}.`}
+                                        {t('savedLocallyAs').replace('{username}', user.username || 'incognito')}
                                      </p>
                                   </div>
 
                                   {isIframe && (
                                      <div className="bg-amber-950/40 border border-amber-800/60 p-3 rounded-2xl text-xs text-amber-200 font-medium space-y-2 mb-2 text-left">
-                                        <p>⚠️ <strong>Ограничение фрейма:</strong> Вход может блокироваться внутри фрейма.</p>
+                                        <p>{t('iframeWarning')}</p>
                                         <button 
                                            onClick={() => { playSound('click'); window.open(window.location.href, '_blank'); }} 
                                            className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-black font-bold rounded-xl active:translate-y-0.5 transition-all uppercase text-[10px] tracking-wider text-center"
                                         >
-                                           Открыть в новой вкладке ↗
+                                           {t('openNewTabBtn')}
                                         </button>
                                      </div>
                                   )}
@@ -3054,7 +4426,7 @@ export default function App() {
                                         className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all text-xs uppercase flex items-center justify-center space-x-1 shadow-lg"
                                      >
                                         <span>👤</span>
-                                        <span>{user.language === 'ru' ? 'Регистрация' : 'Register'}</span>
+                                        <span>{t('register')}</span>
                                      </button>
 
                                      <button 
@@ -3079,8 +4451,8 @@ export default function App() {
                                <ChatBubbleIcon className="w-5 h-5" />
                              </div>
                              <div>
-                               <h4 className="font-bold text-xs uppercase text-white tracking-wider">Отзывы и Поддержка</h4>
-                               <p className="text-[10px] text-gray-300 font-bold">Нашли ошибку или хотите идею?</p>
+                               <h4 className="font-bold text-xs uppercase text-white tracking-wider">{t('feedbackBannerTitle')}</h4>
+                               <p className="text-[10px] text-gray-300 font-bold">{t('feedbackBannerDesc')}</p>
                              </div>
                            </div>
                            <ArrowRightIcon className="w-5 h-5 text-duo-yellow group-hover:translate-x-1 transition-transform" />
@@ -3096,8 +4468,8 @@ export default function App() {
                                👑
                              </div>
                              <div>
-                               <h4 className="font-bold text-xs text-amber-400 uppercase tracking-wider">Панель Владельца</h4>
-                               <p className="text-[10px] text-gray-300 font-bold">Модерация и мониторинг</p>
+                               <h4 className="font-bold text-xs text-amber-400 uppercase tracking-wider">{t('adminBannerTitle')}</h4>
+                               <p className="text-[10px] text-gray-300 font-bold">{t('adminBannerDesc')}</p>
                              </div>
                            </div>
                            <ArrowRightIcon className="w-5 h-5 text-amber-400 group-hover:translate-x-1 transition-transform" />
@@ -3111,6 +4483,7 @@ export default function App() {
           {screen === AppScreen.FEEDBACK && (
             <FeedbackScreen
               user={user}
+              t={t}
               onBack={() => setScreen(AppScreen.PATH)}
               playSound={playSound}
               setToast={setToast}
@@ -3152,10 +4525,10 @@ export default function App() {
                   </div>
                   <div>
                     <h1 className="text-2xl md:text-3xl font-black text-amber-400 uppercase tracking-wide leading-tight">
-                      Экран предупреждения: старый браузер не поддерживается
+                      {t('browserWarningTitle')}
                     </h1>
                     <p className="text-xs text-amber-200/80 font-bold uppercase tracking-wider mt-1">
-                      Проверка совместимости платформы DuoWindo6601
+                      {t('browserWarningSub')}
                     </p>
                   </div>
                 </div>
@@ -3164,39 +4537,98 @@ export default function App() {
                   <div className="bg-emerald-950/70 border-2 border-emerald-500/70 p-4 rounded-2xl flex items-center space-x-3 text-emerald-200 text-xs md:text-sm font-bold shadow-md">
                     <span className="text-2xl">✅</span>
                     <div>
-                      <span className="text-emerald-300 font-black uppercase block">Современный браузер обнаружен:</span>
-                      <span>Ваше устройство поддерживает все функции DuoWindo6601, включая Gemini API и голосовой ввод.</span>
+                      <span className="text-emerald-300 font-black uppercase block">{t('browserCompatibleTitle')}</span>
+                      <span>{t('browserCompatibleDesc')}</span>
                     </div>
                   </div>
                 ) : (
                   <div className="bg-rose-950/70 border-2 border-rose-500/70 p-4 rounded-2xl flex items-center space-x-3 text-rose-200 text-xs md:text-sm font-bold shadow-md">
                     <span className="text-2xl">🛑</span>
                     <div>
-                      <span className="text-rose-300 font-black uppercase block">Обнаружен устаревший браузер или неподдерживаемая ОС:</span>
-                      <span>Ваша система устарела (устаревший браузер или Windows XP / Windows Vista).</span>
+                      <span className="text-rose-300 font-black uppercase block">{t('browserOutdatedTitle')}</span>
+                      <span>{t('browserOutdatedDesc')}</span>
                     </div>
                   </div>
                 )}
 
                 <div className="bg-amber-950/60 border-2 border-amber-500/60 p-5 rounded-2xl text-amber-100 text-sm md:text-base font-bold leading-relaxed shadow-inner">
-                  <p className="text-xs uppercase text-amber-400 font-black mb-1.5 tracking-wider">Сообщение системы:</p>
+                  <p className="text-xs uppercase text-amber-400 font-black mb-1.5 tracking-wider">{t('sysMessageLabel')}</p>
                   <p>
-                    К сожалению, ваш текущий браузер больше не поддерживается. Чтобы продолжить использовать Duowindo6601 обновитесь до современного браузера или Windows XP/Windows Vista не поддерживается
+                    {t('sysMessageDesc')}
                   </p>
                 </div>
 
                 <div className="bg-rose-950/70 border-2 border-rose-500/60 p-5 rounded-2xl flex items-start space-x-3.5 text-rose-200 text-xs md:text-sm font-bold leading-relaxed shadow-lg">
                   <span className="text-2xl shrink-0">🚨</span>
                   <div>
-                    <span className="text-rose-300 font-black uppercase block text-xs tracking-wider mb-1">Риск:</span>
-                    <span>Могут некорректно работать Gemini API</span>
+                    <span className="text-rose-300 font-black uppercase block text-xs tracking-wider mb-1">{t('riskLabel')}</span>
+                    <span>{t('riskDesc')}</span>
+                  </div>
+                </div>
+
+                {/* Windows OS Lifecycle & Support Status */}
+                <div className="bg-gray-900/60 border border-gray-800 p-5 rounded-2xl space-y-3.5">
+                  <h3 className="font-black text-xs text-white uppercase tracking-wider flex items-center gap-2">
+                    <span>💻</span>
+                    <span>{t('winOsSupportLabel')}</span>
+                  </h3>
+                  <div className="space-y-2.5 text-xs">
+                    <div className="p-3 bg-red-950/20 border border-red-900/40 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <span className="font-black text-white text-sm">Windows 7</span>
+                        <p className="text-gray-400 text-[11px] mt-0.5">{t('win7Desc')}</p>
+                      </div>
+                      <span className="text-[10px] bg-red-500/20 text-red-300 px-2.5 py-1 rounded-full border border-red-500/30 font-black uppercase whitespace-nowrap self-start sm:self-center">
+                        {t('win7Status')}
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-red-950/20 border border-red-900/40 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <span className="font-black text-white text-sm">Windows 8 / 8.1</span>
+                        <p className="text-gray-400 text-[11px] mt-0.5">{t('win7Desc')}</p>
+                      </div>
+                      <span className="text-[10px] bg-red-500/20 text-red-300 px-2.5 py-1 rounded-full border border-red-500/30 font-black uppercase whitespace-nowrap self-start sm:self-center">
+                        {t('win8Status')}
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-amber-950/20 border border-amber-900/40 rounded-xl space-y-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                          <span className="font-black text-white text-sm">Windows 10</span>
+                          <p className="text-gray-400 text-[11px] mt-0.5">{t('win10Desc')}</p>
+                        </div>
+                        <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2.5 py-1 rounded-full border border-amber-500/30 font-black uppercase whitespace-nowrap self-start sm:self-center">
+                          {t('win10Status')}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-amber-200/70 leading-relaxed italic">
+                        {t('win10Note')}
+                      </p>
+                    </div>
+
+                    <div className="p-3 bg-emerald-950/20 border border-emerald-900/40 rounded-xl space-y-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                          <span className="font-black text-white text-sm">Windows 11</span>
+                          <p className="text-gray-400 text-[11px] mt-0.5">{t('win11Desc')}</p>
+                        </div>
+                        <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2.5 py-1 rounded-full border border-emerald-500/30 font-black uppercase whitespace-nowrap self-start sm:self-center">
+                          {t('win11Status')}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-emerald-200/70 leading-relaxed italic">
+                        {t('win11Note')}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
                 <div className="bg-gray-900/80 border border-gray-700/80 p-5 rounded-2xl space-y-3">
                   <h3 className="font-black text-xs text-white uppercase tracking-wider flex items-center gap-2">
                     <span>🌐</span>
-                    <span>Рекомендуемые современные браузеры:</span>
+                    <span>{t('modernBrowsersLabel')}</span>
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-bold">
                     <a href="https://www.google.com/chrome/" target="_blank" rel="noopener noreferrer" className="p-3 bg-gray-800 hover:bg-gray-700 rounded-xl flex items-center justify-between text-blue-300 transition-colors border border-gray-700">
@@ -3204,7 +4636,7 @@ export default function App() {
                         <span className="text-xl">🌐</span>
                         <span>Google Chrome</span>
                       </div>
-                      <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded uppercase font-black">Скачать</span>
+                      <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded uppercase font-black">{t('downloadBtn')}</span>
                     </a>
 
                     <a href="https://www.mozilla.org/firefox/" target="_blank" rel="noopener noreferrer" className="p-3 bg-gray-800 hover:bg-gray-700 rounded-xl flex items-center justify-between text-amber-300 transition-colors border border-gray-700">
@@ -3212,7 +4644,7 @@ export default function App() {
                         <span className="text-xl">🦊</span>
                         <span>Mozilla Firefox</span>
                       </div>
-                      <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded uppercase font-black">Скачать</span>
+                      <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded uppercase font-black">{t('downloadBtn')}</span>
                     </a>
 
                     <a href="https://browser.yandex.ru/" target="_blank" rel="noopener noreferrer" className="p-3 bg-gray-800 hover:bg-gray-700 rounded-xl flex items-center justify-between text-red-300 transition-colors border border-gray-700">
@@ -3220,7 +4652,7 @@ export default function App() {
                         <span className="text-xl">🔴</span>
                         <span>Яндекс Браузер</span>
                       </div>
-                      <span className="text-[10px] bg-red-500/20 text-red-300 px-2 py-0.5 rounded uppercase font-black">Скачать</span>
+                      <span className="text-[10px] bg-red-500/20 text-red-300 px-2 py-0.5 rounded uppercase font-black">{t('downloadBtn')}</span>
                     </a>
 
                     <a href="https://www.microsoft.com/edge" target="_blank" rel="noopener noreferrer" className="p-3 bg-gray-800 hover:bg-gray-700 rounded-xl flex items-center justify-between text-teal-300 transition-colors border border-gray-700">
@@ -3228,7 +4660,7 @@ export default function App() {
                         <span className="text-xl">🌀</span>
                         <span>Microsoft Edge</span>
                       </div>
-                      <span className="text-[10px] bg-teal-500/20 text-teal-300 px-2 py-0.5 rounded uppercase font-black">Скачать</span>
+                      <span className="text-[10px] bg-teal-500/20 text-teal-300 px-2 py-0.5 rounded uppercase font-black">{t('downloadBtn')}</span>
                     </a>
                   </div>
                 </div>
@@ -3241,7 +4673,7 @@ export default function App() {
                     className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-sm uppercase tracking-widest rounded-2xl border-b-4 border-amber-700 active:translate-y-0.5 transition-all flex items-center justify-center space-x-2 shadow-xl text-center block"
                   >
                     <span>🚀</span>
-                    <span>Обновите свой браузер</span>
+                    <span>{t('updateBrowserBtn')}</span>
                   </a>
 
                   <button
@@ -3251,7 +4683,7 @@ export default function App() {
                     }}
                     className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold text-xs uppercase rounded-xl transition-all border border-gray-700"
                   >
-                    Продолжить работу в DuoWindo6601
+                    {t('continueDuoWindoBtn')}
                   </button>
                 </div>
               </div>
@@ -3261,14 +4693,16 @@ export default function App() {
       </main>
 
       {/* MOBILE NAV */}
-      <nav className={isSimulatingMobile
-        ? "fixed bottom-0 left-0 w-full bg-duo-dark/95 backdrop-blur-xl border-t border-gray-800 p-3 sm:p-4 flex justify-around z-50 pb-6 shadow-2xl"
-        : "lg:hidden fixed bottom-0 left-0 w-full bg-duo-dark/95 backdrop-blur-xl border-t border-gray-800 p-3 sm:p-4 flex justify-around z-50 pb-6 shadow-2xl"
-      }>
-        {NAV_ITEMS.map(item => (
-          <button key={item.screen} onClick={() => handleNavigation(item.screen)} className={`transition-all duration-300 ${screen === item.screen ? 'text-duo-blue scale-125 -translate-y-2' : 'text-gray-500'}`}><item.icon className="w-8 h-8" /></button>
-        ))}
-      </nav>
+      {screen !== AppScreen.LESSON && screen !== AppScreen.VIDEO_CALL && (
+        <nav className={isSimulatingMobile
+          ? "fixed bottom-0 left-0 w-full bg-duo-dark/95 backdrop-blur-xl border-t border-gray-800 p-3 sm:p-4 flex justify-around z-50 pb-8 sm:pb-6 shadow-2xl safe-bottom"
+          : "lg:hidden fixed bottom-0 left-0 w-full bg-duo-dark/95 backdrop-blur-xl border-t border-gray-800 p-3 sm:p-4 flex justify-around z-50 pb-8 sm:pb-6 shadow-2xl safe-bottom"
+        }>
+          {NAV_ITEMS.map(item => (
+            <button key={item.screen} onClick={() => handleNavigation(item.screen)} className={`transition-all duration-300 ${screen === item.screen ? 'text-duo-blue scale-125 -translate-y-2' : 'text-gray-500'}`}><item.icon className="w-8 h-8" /></button>
+          ))}
+        </nav>
+      )}
 
       {/* REGISTRATION & INCOGNITO AUTH MODAL */}
       {showRegisterModal && (
@@ -3326,14 +4760,14 @@ export default function App() {
                 {/* NAME INPUT */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center justify-between">
-                    <span>{user.language === 'ru' ? 'Ваше Имя' : 'Display Name'}</span>
-                    <span className="text-[10px] text-duo-green font-black">{user.language === 'ru' ? '*Обязательно' : '*Required'}</span>
+                    <span>{t('displayNameLabel')}</span>
+                    <span className="text-[10px] text-duo-green font-black">{t('requiredLabel')}</span>
                   </label>
                   <input 
                     type="text" 
                     value={regName}
                     onChange={(e) => setRegName(e.target.value)}
-                    placeholder={user.language === 'ru' ? 'Например: Анатолий' : 'E.g. Anatoly'}
+                    placeholder={t('displayNamePlaceholder')}
                     maxLength={40}
                     className="w-full bg-gray-800 border-2 border-gray-700 focus:border-duo-blue text-white rounded-2xl px-4 py-3 text-sm font-bold focus:outline-none transition-colors"
                   />
@@ -3342,8 +4776,8 @@ export default function App() {
                 {/* USERNAME (@HANDLE) INPUT */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center justify-between">
-                    <span>{user.language === 'ru' ? 'Имя пользователя (@username)' : 'Username (@handle)'}</span>
-                    <span className="text-[10px] text-duo-blue font-black">{user.language === 'ru' ? 'Уникальный ник' : 'Unique handle'}</span>
+                    <span>{t('usernameLabel')}</span>
+                    <span className="text-[10px] text-duo-blue font-black">{t('uniqueHandleLabel')}</span>
                   </label>
                   <div className="relative">
                     <span className="absolute left-4 top-3.5 text-duo-blue font-black text-sm">@</span>
@@ -3357,14 +4791,14 @@ export default function App() {
                     />
                   </div>
                   <p className="text-[11px] text-gray-400 font-bold pl-1">
-                    {user.language === 'ru' ? 'Отображается в профиле и рейтинге' : 'Visible in profile and leaderboards'}
+                    {t('profileLeaderboardVisible')}
                   </p>
                 </div>
 
                 {/* AVATAR COLOR & EMOJI QUICK SELECT */}
                 <div className="space-y-2 pt-1">
                   <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">
-                    {user.language === 'ru' ? 'Выбор аватарки' : 'Select Avatar'}
+                    {t('selectAvatarLabel')}
                   </label>
                   <div className="flex items-center space-x-3">
                     <div className={`w-14 h-14 rounded-2xl ${regAvatarColor} border-2 border-white flex items-center justify-center text-2xl shadow-md flex-shrink-0`}>
@@ -3390,7 +4824,7 @@ export default function App() {
                   className="w-full py-4 bg-duo-green hover:brightness-110 text-white font-black rounded-2xl border-b-4 border-duo-greenDark active:border-b-0 active:translate-y-1 transition-all uppercase text-xs tracking-wider shadow-lg flex items-center justify-center space-x-2 mt-2"
                 >
                   <span>🚀</span>
-                  <span>{user.language === 'ru' ? 'Зарегистрироваться и Начать' : 'Register & Get Started'}</span>
+                  <span>{t('registerAndStartBtn')}</span>
                 </button>
               </div>
             )}
@@ -3402,17 +4836,17 @@ export default function App() {
                     <span className="text-3xl">🕵️</span>
                     <div>
                       <h4 className="font-black text-base text-emerald-300 uppercase">
-                        {user.language === 'ru' ? 'Режим Инкогнито (Без аккаунта)' : 'Incognito Mode (No Account)'}
+                        {t('incognitoTitle')}
                       </h4>
                       <p className="text-xs text-emerald-200/80 font-bold">
-                        {user.language === 'ru' ? 'Полная анонимность без ввода имени и почты' : 'Full privacy without entering email or name'}
+                        {t('fullIncognitoTitle')}
                       </p>
                     </div>
                   </div>
                   <ul className="text-xs text-gray-300 font-bold space-y-1.5 pl-2 list-disc list-inside">
-                    <li>{user.language === 'ru' ? 'Никакой регистрации и паролей' : 'No signups or passwords required'}</li>
-                    <li>{user.language === 'ru' ? 'Весь прогресс сохраняется в вашем браузере' : 'All progress is stored locally in browser'}</li>
-                    <li>{user.language === 'ru' ? 'Вы сможете зарегистрироваться в любой момент' : 'You can create an account at any time'}</li>
+                    <li>{t('noSignupPasswordsRule')}</li>
+                    <li>{t('allProgressLocalRule')}</li>
+                    <li>{t('canRegisterAnytimeRule')}</li>
                   </ul>
                 </div>
 
@@ -3421,7 +4855,7 @@ export default function App() {
                   className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all uppercase text-xs tracking-wider shadow-lg flex items-center justify-center space-x-2"
                 >
                   <span>🕵️</span>
-                  <span>{user.language === 'ru' ? 'Войти как Гость / Инкогнито' : 'Continue as Guest / Incognito'}</span>
+                  <span>{t('continueGuestBtn')}</span>
                 </button>
               </div>
             )}
@@ -3433,28 +4867,26 @@ export default function App() {
                     <span className="text-3xl">🌐</span>
                     <div>
                       <h4 className="font-black text-base text-purple-300 uppercase">
-                        {user.language === 'ru' ? 'Облачная синхронизация Firebase' : 'Firebase Cloud Sync'}
+                        {t('firebaseCloudSyncTitle')}
                       </h4>
                       <p className="text-xs text-purple-200/80 font-bold">
-                        {user.language === 'ru' ? 'Сохраняйте свой прогресс на всех устройствах' : 'Sync your learning stats across devices'}
+                        {t('syncAllDevicesDesc')}
                       </p>
                     </div>
                   </div>
                   <p className="text-xs text-gray-300 font-bold">
-                    {user.language === 'ru' 
-                      ? 'При входе ваш прогресс будет автоматически привязан к вашему Google-аккаунту.' 
-                      : 'Your progress will automatically sync with your Google account.'}
+                    {t('progressSyncNote')}
                   </p>
                 </div>
 
                 {isIframe && (
                   <div className="bg-amber-950/40 border border-amber-800/60 p-3 rounded-2xl text-xs text-amber-200 font-medium space-y-2 text-left">
-                    <p>⚠️ <strong>Ограничение фрейма:</strong> Вход Google может блокироваться в iFrame.</p>
+                    <p>⚠️ <strong>{t('iframeWarning')}</strong></p>
                     <button 
                       onClick={() => { playSound('click'); window.open(window.location.href, '_blank'); }} 
                       className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-black font-bold rounded-xl active:translate-y-0.5 transition-all uppercase text-[10px] tracking-wider text-center"
                     >
-                      Открыть в новой вкладке ↗
+                      {t('openNewTabBtn')}
                     </button>
                   </div>
                 )}
@@ -3464,7 +4896,7 @@ export default function App() {
                   className="w-full py-4 bg-duo-blue hover:brightness-110 text-white font-black rounded-2xl border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all uppercase text-xs tracking-wider shadow-lg flex items-center justify-center space-x-2"
                 >
                   <span>🌐</span>
-                  <span>{user.language === 'ru' ? 'Войти через Google' : 'Sign in with Google'}</span>
+                  <span>{t('signInGoogleBtn')}</span>
                 </button>
               </div>
             )}
@@ -3475,7 +4907,7 @@ export default function App() {
                 onClick={handleContinueIncognito} 
                 className="text-xs font-bold text-gray-400 hover:text-white transition-colors underline"
               >
-                {user.language === 'ru' ? 'Пропустить / Продолжить без аккаунта (Инкогнито) ↗' : 'Skip / Continue without account (Incognito) ↗'}
+                {t('skipContinueIncognitoBtn')}
               </button>
             </div>
           </div>
@@ -3494,7 +4926,7 @@ export default function App() {
             </button>
 
             <h2 className="text-2xl md:text-3xl font-black uppercase tracking-wider text-white">
-              {user.language === 'ru' ? 'Редактировать профиль' : 'Edit Profile'}
+              {t('editProfile')}
             </h2>
 
             {/* AVATAR PREVIEW & EDIT SECTION */}
@@ -3531,14 +4963,14 @@ export default function App() {
                   onClick={() => avatarFileInputRef.current?.click()} 
                   className="px-3 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl text-xs font-bold transition-all flex items-center space-x-1"
                 >
-                  <span>📷 Загрузить фото</span>
+                  <span>{t('uploadPhotoBtn')}</span>
                 </button>
                 {editAvatarUrl && (
                   <button 
-                    onClick={() => { setEditAvatarUrl(''); setToast("Фото сброшено"); }} 
+                    onClick={() => { setEditAvatarUrl(''); setToast("Photo cleared"); }} 
                     className="px-3 py-2 bg-red-900/40 hover:bg-red-800/60 text-red-300 border border-red-700 rounded-xl text-xs font-bold transition-all"
                   >
-                    <span>🗑️ Удалить фото</span>
+                    <span>{t('deletePhotoBtn')}</span>
                   </button>
                 )}
               </div>
@@ -3546,7 +4978,7 @@ export default function App() {
               {/* OR IMAGE URL INPUT */}
               <div className="w-full space-y-1">
                 <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-                  {user.language === 'ru' ? 'Ссылка на фото (URL)' : 'Avatar Image URL'}
+                  {t('avatarUrlLabel')}
                 </label>
                 <input 
                   type="text" 
@@ -3561,7 +4993,7 @@ export default function App() {
             {/* COLOR SELECTOR */}
             <div className="space-y-2">
               <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">
-                {user.language === 'ru' ? 'Цвет фона аватарки' : 'Avatar Color'}
+                {t('avatarBgColorLabel')}
               </label>
               <div className="flex flex-wrap gap-2">
                 {[
@@ -3586,7 +5018,7 @@ export default function App() {
             {/* EMOJI / ICON SELECTOR */}
             <div className="space-y-2">
               <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">
-                {user.language === 'ru' ? 'Значок / Иконка' : 'Avatar Icon / Emoji'}
+                {t('avatarIconLabel')}
               </label>
               <div className="flex flex-wrap gap-2">
                 {['', '🦉', '👑', '🚀', '⚡', '🏆', '♟️', '🎨', '🌟', '🦊', '🐯', '🔥', '🎓'].map(icon => (
@@ -3604,13 +5036,13 @@ export default function App() {
             {/* NAME INPUT */}
             <div className="space-y-1">
               <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">
-                {user.language === 'ru' ? 'Имя' : 'Display Name'}
+                {t('displayNameLabel')}
               </label>
               <input 
                 type="text" 
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
-                placeholder={user.language === 'ru' ? 'Ваше имя' : 'Your name'}
+                placeholder={t('displayNamePlaceholder')}
                 maxLength={50}
                 className="w-full bg-gray-800 border-2 border-gray-700 focus:border-duo-blue text-white rounded-2xl px-4 py-3 text-sm font-bold focus:outline-none transition-colors"
               />
@@ -3619,7 +5051,7 @@ export default function App() {
             {/* USERNAME INPUT */}
             <div className="space-y-1">
               <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">
-                {user.language === 'ru' ? 'Имя пользователя (@username)' : 'Username (@handle)'}
+                {t('usernameLabel')}
               </label>
               <div className="relative">
                 <span className="absolute left-4 top-3.5 text-gray-400 font-black">@</span>
@@ -3640,13 +5072,13 @@ export default function App() {
                 onClick={() => { playSound('click'); setShowEditProfileModal(false); }}
                 className="flex-1 py-3.5 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded-2xl border-b-4 border-gray-900 active:border-b-0 active:translate-y-1 transition-all uppercase text-xs"
               >
-                {user.language === 'ru' ? 'Отмена' : 'Cancel'}
+                {t('cancelBtn')}
               </button>
               <button 
                 onClick={handleSaveProfile}
                 className="flex-1 py-3.5 bg-duo-green hover:brightness-110 text-white font-black rounded-2xl border-b-4 border-duo-greenDark active:border-b-0 active:translate-y-1 transition-all uppercase text-xs shadow-lg"
               >
-                {user.language === 'ru' ? 'Сохранить' : 'Save Profile'}
+                {t('saveProfileBtn')}
               </button>
             </div>
           </div>
@@ -4919,8 +6351,8 @@ return (
                         <div className="bg-emerald-950/60 border border-emerald-500/60 p-3.5 rounded-2xl flex items-center space-x-3 text-emerald-200 text-xs font-bold">
                             <span className="text-xl">✅</span>
                             <div>
-                                <span className="text-emerald-300 font-black uppercase block">Ваш браузер современный:</span>
-                                <span>Все функции, в том числе Gemini API и озвучка, работают отлично!</span>
+                                <span className="text-emerald-300 font-black uppercase block">Новый Браузер и современная ОС (Windows / Linux / macOS / Android):</span>
+                                <span>Предупреждения нет! Все функции, Gemini API и озвучка работают идеально.</span>
                             </div>
                         </div>
                     ) : (
