@@ -3041,7 +3041,20 @@ export default function App() {
 
   // ... (API and Logic handlers) ...
   const checkApiStatus = async () => { setLoading(true); try { const res = await checkAnswerWithAI('Test', 'Test', 'Test'); if (res.isFallback) throw new Error("Limit Reached"); setOfflineMode(false); setToast(t('t_api_online')); } catch (e) { setOfflineMode(true); setToast(t('t_offline_limit')); } finally { setLoading(false); } };
-  const handleTranslator = async () => { if (!translatorInput.trim()) return; setLoading(true); try { const targetLangName = user.language === 'en' ? transTarget.name : (user.language === 'ru' ? transTarget.localName : transTarget.name); const result = await translateText(translatorInput, targetLangName); setTranslatorOutput(result); playSound('success'); } catch (e) { setTranslatorOutput("Error."); } finally { setLoading(false); } }
+  const handleTranslator = async (targetLangOverride?: string) => {
+    if (!translatorInput.trim()) return;
+    setLoading(true);
+    try {
+      const targetLangName = targetLangOverride || (user.language === 'en' ? transTarget.name : (user.language === 'ru' ? (transTarget.localName || transTarget.name) : transTarget.name));
+      const result = await translateText(translatorInput, targetLangName);
+      setTranslatorOutput(result);
+      playSound('success');
+    } catch (e) {
+      setTranslatorOutput(user.language === 'ru' ? "Ошибка перевода. Пожалуйста, повторите попытку." : "Translation error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
   
   const updateChessStats = (result: 'win' | 'loss') => {
       setUser(prev => {
@@ -3310,6 +3323,22 @@ export default function App() {
                         </span>
                       </button>
                     )}
+                    {/* QUICK LANGUAGE SWITCHER */}
+                    <div className="relative group">
+                      <button 
+                        onClick={() => {
+                          playSound('click');
+                          const langs = ['ru', 'en', 'de', 'fr', 'es', 'ja', 'zh', 'ar'];
+                          const nextIdx = (langs.indexOf(user.language) + 1) % langs.length;
+                          setUser({ ...user, language: langs[nextIdx] as any });
+                        }}
+                        className="px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider bg-duo-blue/20 hover:bg-duo-blue/30 text-duo-blue border border-duo-blue/50 hover:scale-105 transition-all flex items-center space-x-1 shadow-md cursor-pointer"
+                        title="Переключить язык интерфейса (RU, EN, DE, FR, ES, JA, ZH, AR)"
+                      >
+                        <span>🌐</span>
+                        <span className="font-black">{user.language.toUpperCase()}</span>
+                      </button>
+                    </div>
                     <button 
                       onClick={() => { playSound('click'); setShowBetaModal(true); }} 
                       className="px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-500/50 hover:scale-105 transition-all flex items-center space-x-1 shadow-md cursor-pointer"
@@ -3778,13 +3807,167 @@ export default function App() {
         {/* TRANSLATOR OVERLAY */}
         {screen === AppScreen.TRANSLATOR && (
             <div className="fixed inset-0 z-[100] bg-duo-dark overflow-y-auto">
-                <div className="p-4 md:p-10 max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-5">
-                    <button onClick={() => { playSound('click'); setScreen(AppScreen.PRACTICE); }} className="mb-6 text-gray-500 hover:text-white flex items-center font-bold"><CloseIcon className="w-8 h-8 mr-2"/> {t('back')}</button>
-                    <div className="flex items-center space-x-4 mb-8"><BookIcon className="w-10 h-10 text-duo-blue" /><h2 className="text-3xl font-black">{t('translator')}</h2></div>
+                <div className="p-4 md:p-10 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-5">
+                    <button onClick={() => { playSound('click'); setScreen(AppScreen.PRACTICE); }} className="mb-6 text-gray-400 hover:text-white flex items-center font-bold transition-colors">
+                        <CloseIcon className="w-8 h-8 mr-2"/> {t('back')}
+                    </button>
+                    
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center space-x-4">
+                            <div className="p-3 bg-duo-blue/20 rounded-2xl border border-duo-blue/40">
+                                <BookIcon className="w-8 h-8 text-duo-blue" />
+                            </div>
+                            <div>
+                                <h2 className="text-3xl font-black text-white">{t('translator')}</h2>
+                                <p className="text-xs text-gray-400 font-bold">{t('aiTrans')}</p>
+                            </div>
+                        </div>
+                        <div className="text-2xl animate-bounce">🦉</div>
+                    </div>
+
                     <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 shadow-xl space-y-6 relative">
-                        <textarea value={translatorInput} onChange={(e) => setTranslatorInput(e.target.value)} placeholder="Type here..." className="w-full h-32 bg-gray-800 border-2 border-gray-700 rounded-2xl p-4 text-lg font-bold text-white focus:border-duo-blue focus:outline-none resize-none placeholder-gray-600"/>
-                        <div className="flex justify-center"><button onClick={handleTranslator} disabled={loading || !translatorInput} className={`px-8 py-4 rounded-2xl font-black text-white uppercase tracking-widest transition-all ${loading || !translatorInput ? 'bg-gray-700 cursor-not-allowed' : 'bg-duo-green border-b-4 border-duo-greenDark active:border-b-0 active:translate-y-1'}`}>{loading ? "Translating..." : "Translate"}</button></div>
-                        {translatorOutput && (<div className="animate-in fade-in slide-in-from-bottom-2"><p className="text-xl font-bold text-duo-blue pr-10">{translatorOutput}</p><button onClick={() => speakText(translatorOutput, transTarget.id, false, user.preferredVoice, user.voiceProvider)} className="absolute top-4 right-4 text-duo-blue hover:scale-110 transition-transform p-2 bg-duo-blue/20 rounded-xl"><VolumeIcon className="w-6 h-6" /></button></div>)}
+                        {/* TARGET LANGUAGE SELECTOR */}
+                        <div>
+                            <label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-2">
+                                {user.language === 'ru' ? 'Язык перевода:' : 'Target Language:'}
+                            </label>
+                            <div className="flex flex-wrap gap-2">
+                                {[
+                                    { id: 'ru', name: 'Русский', flag: 'ru' },
+                                    { id: 'en', name: 'English', flag: 'gb' },
+                                    { id: 'de', name: 'Deutsch', flag: 'de' },
+                                    { id: 'fr', name: 'Français', flag: 'fr' },
+                                    { id: 'es', name: 'Español', flag: 'es' },
+                                    { id: 'ja', name: '日本語', flag: 'jp' },
+                                    { id: 'zh', name: '中文', flag: 'cn' },
+                                    { id: 'ar', name: 'العربية', flag: 'sa' },
+                                ].map(lang => {
+                                    const isSelected = transTarget.id === lang.id || (transTarget.name === lang.name);
+                                    return (
+                                        <button
+                                            key={lang.id}
+                                            onClick={() => {
+                                                playSound('select');
+                                                const matchCourse = COURSES.find(c => c.id === lang.id) || {
+                                                    id: lang.id,
+                                                    name: lang.name,
+                                                    localName: lang.name,
+                                                    flagCode: lang.flag,
+                                                    themeColor: 'bg-duo-blue',
+                                                    mascotVariant: 'owl'
+                                                } as any;
+                                                setTransTarget(matchCourse);
+                                            }}
+                                            className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center space-x-2 border-b-2 transition-all cursor-pointer ${
+                                                isSelected 
+                                                    ? 'bg-duo-blue text-white border-duo-blueDark shadow-md scale-105' 
+                                                    : 'bg-gray-800 text-gray-400 border-gray-700 hover:bg-gray-750 hover:text-white'
+                                            }`}
+                                        >
+                                            <img src={`https://flagcdn.com/w40/${lang.flag}.png`} className="w-5 h-3.5 rounded-sm object-cover" alt={lang.name}/>
+                                            <span>{lang.name}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* INPUT AREA */}
+                        <div className="relative">
+                            <textarea 
+                                value={translatorInput} 
+                                onChange={(e) => setTranslatorInput(e.target.value)} 
+                                placeholder={user.language === 'ru' ? "Введите текст для перевода..." : "Type text here to translate..."} 
+                                className="w-full h-32 bg-gray-800 border-2 border-gray-700 rounded-2xl p-4 text-base md:text-lg font-bold text-white focus:border-duo-blue focus:outline-none resize-none placeholder-gray-500"
+                            />
+                            {translatorInput && (
+                                <button 
+                                    onClick={() => setTranslatorInput("")} 
+                                    className="absolute top-3 right-3 p-1.5 bg-gray-700/80 hover:bg-gray-600 rounded-lg text-gray-300 hover:text-white text-xs font-bold transition-all"
+                                    title="Очистить"
+                                >
+                                    ✕
+                                </button>
+                            )}
+                        </div>
+
+                        {/* SAMPLE PRESETS */}
+                        <div>
+                            <p className="text-[11px] font-bold text-gray-400 mb-2">
+                                {user.language === 'ru' ? 'Быстрые фразы:' : 'Quick phrases:'}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                                {[
+                                    user.language === 'ru' ? 'Привет, как твои дела?' : 'Hello, how are you?',
+                                    user.language === 'ru' ? 'Спасибо большое за помощь!' : 'Thank you very much for your help!',
+                                    user.language === 'ru' ? 'Где находится ближайший музей?' : 'Where is the nearest museum?',
+                                    user.language === 'ru' ? 'Сколько это стоит?' : 'How much does this cost?'
+                                ].map((phrase, idx) => (
+                                    <button 
+                                        key={idx}
+                                        onClick={() => {
+                                            playSound('click');
+                                            setTranslatorInput(phrase);
+                                        }}
+                                        className="px-2.5 py-1 bg-gray-800/80 hover:bg-gray-700 text-gray-300 text-[11px] font-bold rounded-lg border border-gray-700 transition-colors"
+                                    >
+                                        "{phrase}"
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* ACTION BUTTON */}
+                        <div className="flex justify-center pt-2">
+                            <button 
+                                onClick={() => handleTranslator()} 
+                                disabled={loading || !translatorInput.trim()} 
+                                className={`px-10 py-4 rounded-2xl font-black text-white uppercase tracking-widest transition-all shadow-lg text-sm md:text-base flex items-center space-x-2 ${
+                                    loading || !translatorInput.trim() 
+                                        ? 'bg-gray-700 cursor-not-allowed opacity-60' 
+                                        : 'bg-duo-green hover:brightness-110 border-b-4 border-duo-greenDark active:border-b-0 active:translate-y-1'
+                                }`}
+                            >
+                                <span>{loading ? '⏳' : '⚡'}</span>
+                                <span>{loading ? (user.language === 'ru' ? "Перевод..." : "Translating...") : (user.language === 'ru' ? "Перевести" : "Translate")}</span>
+                            </button>
+                        </div>
+
+                        {/* OUTPUT RESULT */}
+                        {translatorOutput && (
+                            <div className="bg-gray-800/90 border-2 border-duo-blue/40 rounded-2xl p-5 relative animate-in fade-in slide-in-from-bottom-2 shadow-xl space-y-3">
+                                <div className="flex items-center justify-between border-b border-gray-700/60 pb-2">
+                                    <span className="text-[11px] font-black uppercase tracking-wider text-duo-blue flex items-center space-x-1.5">
+                                        <span>✨</span>
+                                        <span>{user.language === 'ru' ? 'Результат' : 'Translation Result'} ({transTarget.name || transTarget.localName})</span>
+                                    </span>
+                                    <div className="flex items-center space-x-2">
+                                        <button 
+                                            onClick={() => {
+                                                navigator.clipboard?.writeText(translatorOutput);
+                                                playSound('success');
+                                                setToast(user.language === 'ru' ? "Скопировано в буфер!" : "Copied to clipboard!");
+                                            }}
+                                            className="px-2.5 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-xs font-bold transition-all flex items-center space-x-1"
+                                            title="Скопировать"
+                                        >
+                                            <span>📋</span>
+                                            <span>{user.language === 'ru' ? 'Копировать' : 'Copy'}</span>
+                                        </button>
+                                        <button 
+                                            onClick={() => speakText(translatorOutput, transTarget.id, false, user.preferredVoice, user.voiceProvider)} 
+                                            className="p-2 bg-duo-blue/20 hover:bg-duo-blue/40 text-duo-blue rounded-xl transition-transform hover:scale-110 active:scale-95"
+                                            title="Озвучить"
+                                        >
+                                            <VolumeIcon className="w-5 h-5" />
+                                        </button>
+                                    </div>
+                                </div>
+                                <p className="text-xl font-black text-white pr-4 leading-relaxed font-din select-text">
+                                    {translatorOutput}
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
