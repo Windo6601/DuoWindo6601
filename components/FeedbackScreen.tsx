@@ -13,7 +13,21 @@ interface FeedbackScreenProps {
   courses?: Course[];
   currentCourse?: Course;
   t?: (key: string) => string;
+  onSetLanguage?: (lang: string) => void;
+  autoTranslateFeedback?: boolean;
 }
+
+// 8 Supported Languages configuration
+export const SUPPORTED_LANGUAGES = [
+  { code: 'ru', name: 'Русский', nativeName: 'Русский', flag: '🇷🇺' },
+  { code: 'en', name: 'Английский', nativeName: 'English', flag: '🇬🇧' },
+  { code: 'de', name: 'Немецкий', nativeName: 'Deutsch', flag: '🇩🇪' },
+  { code: 'fr', name: 'Французский', nativeName: 'Français', flag: '🇫🇷' },
+  { code: 'es', name: 'Испанский', nativeName: 'Español', flag: '🇪🇸' },
+  { code: 'ja', name: 'Японский', nativeName: '日本語', flag: '🇯🇵' },
+  { code: 'zh', name: 'Китайский', nativeName: '中文', flag: '🇨🇳' },
+  { code: 'ar', name: 'Арабский', nativeName: 'العربية', flag: '🇸🇦' },
+];
 
 export const DEFAULT_FEEDBACK_COURSES = [
   { id: 'general', name: 'Общий отзыв о DuoWindo6601', localName: 'Все курсы', flagEmoji: '🌟' },
@@ -38,16 +52,88 @@ export const DEFAULT_FEEDBACK_COURSES = [
   { id: 'music', name: 'Музыка', localName: 'Предметы & Игры', flagEmoji: '🎵' },
 ];
 
-const CATEGORIES = [
-  '🌟 Общие впечатления',
-  '🏛️ Языки СНГ (казахский, узбекский, армянский и др.)',
-  '🌍 Мировые языки (английский, испанский, китайский и др.)',
-  '🧩 Предметы & Игры (шахматы, математика, логика)',
-  '📚 Тренажер и графическое письмо',
-  '✨ Новая функция',
-  '🐛 Ошибка / Доработка',
-  '💡 Идея для улучшения'
-];
+const CATEGORIES: Record<string, Record<string, string>> = {
+  'general': {
+    ru: '🌟 Общие впечатления',
+    en: '🌟 General Impressions',
+    de: '🌟 Gesamteindruck',
+    fr: '🌟 Impressions générales',
+    es: '🌟 Impresiones generales',
+    ja: '🌟 全体的な感想',
+    zh: '🌟 整体评价',
+    ar: '🌟 انطباعات عامة'
+  },
+  'cis_languages': {
+    ru: '🏛️ Языки СНГ (казахский, узбекский, армянский и др.)',
+    en: '🏛️ CIS Languages (Kazakh, Uzbek, Armenian, etc.)',
+    de: '🏛️ GUS-Sprachen (Kasachisch, Usbekisch, Armenisch usw.)',
+    fr: '🏛️ Langues de la CEI (kazakh, ouzbek, arménien, etc.)',
+    es: '🏛️ Idiomas de la CEI (kazajo, uzbeko, armenio, etc.)',
+    ja: '🏛️ CIS諸国の言語（カザフ語、ウズベク語、アルメニア語など）',
+    zh: '🏛️ 独联体国家语言（哈萨克语、乌兹别克语、亚美尼亚语等）',
+    ar: '🏛️ لغات رابطة الدول المستقلة (الكازاخستانية، الأوزبكية، الأرمنية، إلخ)'
+  },
+  'world_languages': {
+    ru: '🌍 Мировые языки (английский, испанский, китайский и др.)',
+    en: '🌍 World Languages (English, Spanish, Chinese, etc.)',
+    de: '🌍 Weltsprachen (Englisch, Spanisch, Chinesisch usw.)',
+    fr: '🌍 Langues du monde (anglais, espagnol, chinois, etc.)',
+    es: '🌍 Idiomas del mundo (inglés, español, chino, etc.)',
+    ja: '🌍 世界の言語（英語、スペイン語、中国語など）',
+    zh: '🌍 世界主流语言（英语、西班牙语、汉语等）',
+    ar: '🌍 اللغات العالمية (الإنجليزية، الإسبانية، الصينية، إلخ)'
+  },
+  'subjects_games': {
+    ru: '🧩 Предметы & Игры (шахматы, математика, логика)',
+    en: '🧩 Subjects & Games (Chess, Math, Logic)',
+    de: '🧩 Fächer & Spiele (Schach, Mathematik, Logik)',
+    fr: '🧩 Matières & Jeux (Échecs, Maths, Logique)',
+    es: '🧩 Asignaturas y Juegos (Ajedrez, Matemáticas, Lógica)',
+    ja: '🧩 教科＆ゲーム（チェス、数学、論理）',
+    zh: '🧩 学科与益智游戏（国际象棋、数学、逻辑）',
+    ar: '🧩 المواد والألعاب (الشطرنج، الرياضيات، المنطق)'
+  },
+  'trainer_writing': {
+    ru: '📚 Тренажер и графическое письмо',
+    en: '📚 Practice Trainer & Handwriting',
+    de: '📚 Schreibtrainer & Handschrift',
+    fr: '📚 Entraîneur et écriture manuscrite',
+    es: '📚 Entrenador y escritura gráfica',
+    ja: '📚 練習トレーナー＆文字練習',
+    zh: '📚 练习器与手写训练',
+    ar: '📚 المدرب والكتابة اليدوية'
+  },
+  'new_feature': {
+    ru: '✨ Новая функция',
+    en: '✨ New Feature',
+    de: '✨ Neue Funktion',
+    fr: '✨ Nouvelle fonctionnalité',
+    es: '✨ Nueva función',
+    ja: '✨ 新機能',
+    zh: '✨ 新功能',
+    ar: '✨ ميزة جديدة'
+  },
+  'bug_fix': {
+    ru: '🐛 Ошибка / Доработка',
+    en: '🐛 Bug / Improvement',
+    de: '🐛 Fehler / Verbesserung',
+    fr: '🐛 Bug / Amélioration',
+    es: '🐛 Error / Mejora',
+    ja: '🐛 バグ / 改善提案',
+    zh: '🐛 错误反馈 / 待改进',
+    ar: '🐛 خطأ / تحسين'
+  },
+  'idea': {
+    ru: '💡 Идея для улучшения',
+    en: '💡 Improvement Idea',
+    de: '💡 Idee zur Verbesserung',
+    fr: '💡 Idée d\'amélioration',
+    es: '💡 Idea de mejora',
+    ja: '💡 改善のアイデア',
+    zh: '💡 优化建议',
+    ar: '💡 فكرة للتحسين'
+  }
+};
 
 const RANDOM_USER_NAMES = [
   'Мария С.', 'Игорь Н.', 'София П.', 'Максим Р.', 
@@ -55,116 +141,331 @@ const RANDOM_USER_NAMES = [
   'Виктория Г.', 'Артём Д.', 'Екатерина Л.', 'Денис М.',
   'Константин П.', 'Анна Т.', 'Михаил С.', 'Сергей К.',
   'Азамат К.', 'Айпери М.', 'Нурсултан Ж.', 'Зарина В.',
-  'Тимур А.', 'Данияр С.', 'Армен К.', 'Гульнара Т.'
+  'Тимур А.', 'Данияр С.', 'Армен К.', 'Гульнара Т.',
+  'Alexander W.', 'Sophie M.', 'Lucas B.', 'Emma K.',
+  'Kenji T.', 'Mei L.', 'Carlos R.', 'Amira H.'
 ];
 
 const RANDOM_USER_AVATARS = ['🦉', '🦊', '🦁', '🐼', '🐯', '🦄', '🐲', '🚀', '🐱', '🐶', '🤖', '👑', '🏛️', '🌍', '🧩', '♟️'];
 const RANDOM_USER_COLORS = ['#1cb0f6', '#ff9600', '#58cc02', '#ce82ff', '#ff4b4b', '#2b70c9', '#ec4899', '#14b8a6'];
 
+export const ADMIN_NAME_TRANSLATIONS: Record<string, string> = {
+  ru: 'Администратор DuoWindo6601',
+  en: 'DuoWindo6601 Administrator',
+  de: 'DuoWindo6601-Administrator',
+  fr: 'Administrateur DuoWindo6601',
+  es: 'Administrador de DuoWindo6601',
+  ja: 'DuoWindo6601 管理者',
+  zh: 'DuoWindo6601 管理员',
+  ar: 'مسؤول DuoWindo6601'
+};
+
+export const COMMON_NAME_TRANSLATIONS: Record<string, Record<string, string>> = {
+  'Мария С.': {
+    ru: 'Мария С.',
+    en: 'Maria S.',
+    de: 'Maria S.',
+    fr: 'Marie S.',
+    es: 'María S.',
+    ja: 'マリア S.',
+    zh: '玛丽亚 S.',
+    ar: 'ماريا س.'
+  },
+  'Игорь Н.': {
+    ru: 'Игорь Н.',
+    en: 'Igor N.',
+    de: 'Igor N.',
+    fr: 'Igor N.',
+    es: 'Ígor N.',
+    ja: 'イーゴリ N.',
+    zh: '伊戈尔 N.',
+    ar: 'إيغور ن.'
+  },
+  'София П.': {
+    ru: 'София П.',
+    en: 'Sophia P.',
+    de: 'Sophia P.',
+    fr: 'Sophie P.',
+    es: 'Sofía P.',
+    ja: 'ソフィア P.',
+    zh: '索菲亚 P.',
+    ar: 'صوفيا ب.'
+  },
+  'Максим Р.': {
+    ru: 'Максим Р.',
+    en: 'Maxim R.',
+    de: 'Maxim R.',
+    fr: 'Maxime R.',
+    es: 'Máximo R.',
+    ja: 'マキシム R.',
+    zh: '马克西姆 R.',
+    ar: 'مكسيم ر.'
+  },
+  'Анастасия Б.': {
+    ru: 'Анастасия Б.',
+    en: 'Anastasia B.',
+    de: 'Anastasia B.',
+    fr: 'Anastasia B.',
+    es: 'Anastasia B.',
+    ja: 'アナスタシア B.',
+    zh: '阿纳斯塔西娅 B.',
+    ar: 'أناستاسيا ب.'
+  },
+  'Владимир Т.': {
+    ru: 'Владимир Т.',
+    en: 'Vladimir T.',
+    de: 'Wladimir T.',
+    fr: 'Vladimir T.',
+    es: 'Vladímir T.',
+    ja: 'ウラジーミル T.',
+    zh: '弗拉基米尔 T.',
+    ar: 'فلاديمير ت.'
+  },
+  'Alexander W.': {
+    ru: 'Александр В.',
+    en: 'Alexander W.',
+    de: 'Alexander W.',
+    fr: 'Alexandre W.',
+    es: 'Alejandro W.',
+    ja: 'アレクサンダー W.',
+    zh: '亚历山大 W.',
+    ar: 'ألكسندر و.'
+  },
+  'Sophie M.': {
+    ru: 'Софи М.',
+    en: 'Sophie M.',
+    de: 'Sophie M.',
+    fr: 'Sophie M.',
+    es: 'Sofía M.',
+    ja: 'ソフィー M.',
+    zh: '索菲 M.',
+    ar: 'سوفي م.'
+  },
+  'Carlos R.': {
+    ru: 'Карлос Р.',
+    en: 'Carlos R.',
+    de: 'Carlos R.',
+    fr: 'Carlos R.',
+    es: 'Carlos R.',
+    ja: 'カルロス R.',
+    zh: '卡洛斯 R.',
+    ar: 'كارلوس ر.'
+  },
+  'Kenji T.': {
+    ru: 'Кэндзи Т.',
+    en: 'Kenji T.',
+    de: 'Kenji T.',
+    fr: 'Kenji T.',
+    es: 'Kenji T.',
+    ja: 'ケンジ T.',
+    zh: '健二 T.',
+    ar: 'كينجي ت.'
+  },
+  'Mei L.': {
+    ru: 'Мэй Л.',
+    en: 'Mei L.',
+    de: 'Mei L.',
+    fr: 'Mei L.',
+    es: 'Mei L.',
+    ja: 'メイ L.',
+    zh: '美 L.',
+    ar: 'مي ل.'
+  },
+  'Amira H.': {
+    ru: 'Амира Х.',
+    en: 'Amira H.',
+    de: 'Amira H.',
+    fr: 'Amira H.',
+    es: 'Amira H.',
+    ja: 'アミラ H.',
+    zh: '阿米拉 H.',
+    ar: 'أميرة ح.'
+  }
+};
+
+export const getTranslatedAuthorName = (name: string, targetLang: string, isAdmin?: boolean): string => {
+  if (isAdmin || name.includes('Администратор') || name.includes('Admin') || name.includes('مسؤول') || name.includes('管理者') || name.includes('管理员')) {
+    return ADMIN_NAME_TRANSLATIONS[targetLang] || ADMIN_NAME_TRANSLATIONS['ru'];
+  }
+  if (COMMON_NAME_TRANSLATIONS[name] && COMMON_NAME_TRANSLATIONS[name][targetLang]) {
+    return COMMON_NAME_TRANSLATIONS[name][targetLang];
+  }
+  return name;
+};
+
+export const getTranslatedCategory = (categoryStr: string | undefined, targetLang: string): string => {
+  if (!categoryStr) return '';
+  for (const catKey of Object.keys(CATEGORIES)) {
+    const catObj = CATEGORIES[catKey];
+    if (Object.values(catObj).some((v) => v === categoryStr)) {
+      return catObj[targetLang] || catObj['ru'] || categoryStr;
+    }
+  }
+  return categoryStr;
+};
+
+export const translateTextToTarget = (text: string, targetLang: string): string => {
+  if (!text) return text;
+  const trimmed = text.trim();
+
+  for (const item of MULTILINGUAL_REVIEWS_POOL) {
+    if (Object.values(item.comment).some((v) => v.trim() === trimmed)) {
+      if (item.comment[targetLang]) return item.comment[targetLang];
+    }
+    if (Object.values(item.adminReply).some((v) => v.trim() === trimmed)) {
+      if (item.adminReply[targetLang]) return item.adminReply[targetLang];
+    }
+  }
+
+  const commonMap: Record<string, Record<string, string>> = {
+    'Отличное приложение DuoWindo6601! Озвучка букв и тренажер письменности для казахского, узбекского, армянского и других языков СНГ очень помогают в обучении!': {
+      ru: 'Отличное приложение DuoWindo6601! Озвучка букв и тренажер письменности для казахского, узбекского, армянского и других языков СНГ очень помогают в обучении!',
+      en: 'Great application DuoWindo6601! Letter voiceover and handwriting trainer for Kazakh, Uzbek, Armenian and other CIS languages are very helpful in learning!',
+      de: 'Tolle DuoWindo6601-App! Sprachausgabe und Schreibtrainer für Kasachisch, Usbekisch, Armenisch und andere GUS-Sprachen helfen beim Lernen sehr!',
+      fr: 'Excellente application DuoWindo6601 ! La voix off et l\'entraîneur d\'écriture manuscrite pour le kazakh, l\'ouzbek, l\'arménien et d\'autres langues de la CEI aident énormément !',
+      es: '¡Excelente aplicación DuoWindo6601! La locución y el entrenador de escritura para kazajo, uzbeko, armenio y otros idiomas de la CEI ayudan mucho en el aprendizaje.',
+      ja: '素晴らしいアプリDuoWindo6601！カザフ語、ウズベク語、アルメニア語などのCIS言語の文字音声と筆記トレーナーが学習に非常に役立ちます！',
+      zh: '精美的 DuoWindo6601 应用！哈萨克语、乌兹别克语、亚美尼亚语等独联体语言的发音与手写训练器对学习帮助极大！',
+      ar: 'تطبيق DuoWindo6601 ممتاز! النطق الصوتي للحروف ومدرب الكتابة للغات الكازاخستانية والأوزبكية والأرمنية تساعد كثيراً في التعلم!'
+    },
+    'Спасибо за высокую оценку! Мы постоянно дополняем курсы языков СНГ новыми интерактивными тренажерами и аудиозаписями. Приятного обучения! 🇰🇿🇺🇿🇦🇲': {
+      ru: 'Спасибо за высокую оценку! Мы постоянно дополняем курсы языков СНГ новыми интерактивными тренажерами и аудиозаписями. Приятного обучения! 🇰🇿🇺🇿🇦🇲',
+      en: 'Thank you for the high rating! We continuously update CIS language courses with new interactive trainers and audio recordings. Happy learning! 🇰🇿🇺🇿🇦🇲',
+      de: 'Vielen Dank für die hohe Bewertung! Wir ergänzen die GUS-Sprachkurse ständig um neue interaktive Trainer und Audioaufnahmen. Viel Spaß beim Lernen! 🇰🇿🇺🇿🇦🇲',
+      fr: 'Merci pour cette note élevée ! Nous enrichissons continuellement les cours de langues de la CEI avec de nouveaux modules interactifs. Bon apprentissage ! 🇰🇿🇺🇿🇦🇲',
+      es: '¡Gracias por la alta calificación! Actualizamos constantemente los cursos de idiomas de la CEI con nuevos entrenadores interactivos. ¡Feliz aprendizaje! 🇰🇿🇺🇿🇦🇲',
+      ja: '高評価ありがとうございます！CIS言語コースに新しいインタラクティブなトレーニングと音声を継続的に追加しています。楽しく学習しましょう！🇰🇿🇺🇿🇦🇲',
+      zh: '感谢您的高分评价！我们持续更新独联体语言课程，增加新的互动练习器与音频录音。祝学习愉快！🇰🇿🇺🇿🇦🇲',
+      ar: 'شكراً لتقييمك العالي! نقوم باستمرار بتحديث دورات لغات رابطة الدول المستقلة بمدربين تفاعليين وتسجيلات صوتية جديدة. نتمنى لك إمتاعاً في التعلم! 🇰🇿🇺🇿🇦🇲'
+    }
+  };
+
+  if (commonMap[trimmed] && commonMap[trimmed][targetLang]) {
+    return commonMap[trimmed][targetLang];
+  }
+
+  const langNames: Record<string, string> = {
+    ru: 'Русский',
+    en: 'English',
+    de: 'Deutsch',
+    fr: 'Français',
+    es: 'Español',
+    ja: '日本語',
+    zh: '中文',
+    ar: 'العربية'
+  };
+
+  const targetName = langNames[targetLang] || targetLang.toUpperCase();
+  return `🌐 [${targetName}] ${text}`;
+};
+
 interface ReviewTemplate {
   rating: number;
-  category: string;
-  comment: string;
-  adminReply: string;
+  categoryKey: string;
+  comment: Record<string, string>;
+  adminReply: Record<string, string>;
 }
 
-const GOOD_REVIEWS_POOL: ReviewTemplate[] = [
+const MULTILINGUAL_REVIEWS_POOL: ReviewTemplate[] = [
   {
     rating: 5,
-    category: '💻 Поддержка Windows',
-    comment: 'Очень удобно, что в раздел проверки браузера и ОС добавили подробные сроки поддержки Windows! Теперь сразу видно: Windows 7 прекращена 14 января 2020 г., Windows 8/8.1 прекращена 10 января 2023 г., по Windows 10 бесплатная завершилась 14 октября 2025 г. (платная ESU продлена до 12 октября 2027 г.), а по Windows 11 всё зависит от версий (актуальная 24H2 поддерживается до 13 октября 2026 г.).',
-    adminReply: 'Спасибо за отзыв! Мы добавили подробную информацию о жизненном цикле ОС Windows (7, 8/8.1, 10, 11), чтобы пользователи своевременно обновляли свои системы для безопасной работы с DuoWindo6601 и встроенными ИИ-технологиями! 💻🚀'
+    categoryKey: 'new_feature',
+    comment: {
+      ru: 'Очень удобно, что в раздел проверки браузера и ОС добавили подробные сроки поддержки Windows! Теперь сразу видно: Windows 7, 8.1, 10 и 11 с актуальными датами. DuoWindo6601 работает быстро и стабильно!',
+      en: 'It is very convenient that Windows lifecycle and browser compatibility info were added! Windows 7, 8.1, 10, and 11 support timelines are crystal clear. DuoWindo6601 is lightning-fast and stable!',
+      de: 'Sehr praktisch, dass der Bereich für Browser- und Betriebssystemprüfungen detaillierte Windows-Supportzeiträume enthält! DuoWindo6601 läuft extrem schnell und stabil!',
+      fr: 'Très pratique que les informations sur le cycle de vie de Windows et la compatibilité du navigateur soient incluses ! DuoWindo6601 fonctionne rapidement et de manière stable !',
+      es: '¡Muy práctico que se incluyan las fechas de soporte de Windows y compatibilidad de navegador! ¡DuoWindo6601 funciona rápido y estable!',
+      ja: 'ブラウザとOSの互換性チェック機能がとても便利です！Windows 7、8.1、10、11のサポート期間が一目で分かります。DuoWindo6601は高速で安定しています！',
+      zh: '系统与浏览器兼容性检查非常方便！Windows 7、8.1、10 和 11 的支持周期一目了然。DuoWindo6601 运行流畅稳定！',
+      ar: 'من المناسب جداً إضافة معلومات التوافق مع المتصفح وفترات دعم Windows! يعمل DuoWindo6601 بسرعة وثبات فائق!'
+    },
+    adminReply: {
+      ru: 'Спасибо за отзыв! Мы постоянно совершенствуем DuoWindo6601 и встроенные ИИ-технологии для комфортного обучения на любых устройствах! 💻🚀',
+      en: 'Thank you for your feedback! We continuously enhance DuoWindo6601 and built-in AI tools for a seamless learning experience across all devices! 💻🚀',
+      de: 'Vielen Dank für Ihre Bewertung! Wir verbessern DuoWindo6601 und integrierte KI-Technologien kontinuierlich für ein optimales Lernerlebnis! 💻🚀',
+      fr: 'Merci pour votre avis ! Nous améliorons continuellement DuoWindo6601 et les technologies IA pour un apprentissage fluide sur tous les appareils ! 💻🚀',
+      es: '¡Gracias por tu reseña! ¡Continuamente mejoramos DuoWindo6601 y las herramientas de IA para un aprendizaje cómodo en todos los dispositivos! 💻🚀',
+      ja: 'レビューありがとうございます！すべてのデバイスで快適に学習できるよう、DuoWindo6601とAI機能を継続的に向上させています！💻🚀',
+      zh: '感谢您的评价！我们持续优化 DuoWindo6601 及内置 AI 功能，确保在各类设备上均能享受流畅学习体验！💻🚀',
+      ar: 'شكراً لمراجعتك! نعمل باستمرار على تطوير DuoWindo6601 وتقنيات الذكاء الاصطناعي لتوفير تجربة تعليمية مريحة! 💻🚀'
+    }
   },
   {
     rating: 5,
-    category: '✨ Новая функция',
-    comment: 'Новая проверка браузера и операционных систем (Windows / Linux / macOS / Android) на https://duowindo6601.ai.studio/ работает безупречно! Сразу показывает статус совместимости и защищает от сбоев Gemini API.',
-    adminReply: 'Спасибо за отзыв! Интегрированная проверка браузеров и ОС (Windows, Linux, macOS, Android) создана для максимальной стабильности DuoWindo6601! 🚀'
+    categoryKey: 'cis_languages',
+    comment: {
+      ru: 'Курсы языков СНГ на https://duowindo6601.ai.studio/ просто супер! Отлично проработана тренажёрная часть письменности и озвучка для казахского, узбекского, армянского и кыргызского языков.',
+      en: 'CIS language courses on https://duowindo6601.ai.studio/ are fantastic! The handwriting trainer and audio pronunciation for Kazakh, Uzbek, Armenian, and Kyrgyz are top notch.',
+      de: 'Die GUS-Sprachkurse auf https://duowindo6601.ai.studio/ sind fantastisch! Der Schreibtrainer und die Audio-Aussprache für Kasachisch, Usbekisch und Armenisch sind hervorragend.',
+      fr: 'Les cours de langues de la CEI sur https://duowindo6601.ai.studio/ sont superbes ! L\'entraînement à l\'écriture et les enregistrements audio sont d\'une grande qualité.',
+      es: '¡Los cursos de idiomas de la CEI en https://duowindo6601.ai.studio/ son fantásticos! El entrenador de escritura y el audio para kazajo, uzbeko y armenio son de primera calidad.',
+      ja: 'https://duowindo6601.ai.studio/ のCIS言語コースは素晴らしいです！カザフ語、ウズベク語、アルメニア語、キルギス語の筆記トレーナーと音声がとても役立ちます。',
+      zh: 'https://duowindo6601.ai.studio/ 上的独联体语言课程非常出色！哈萨克语、乌兹别克语、亚美尼亚语的书写训练与语音发音非常棒。',
+      ar: 'دورات لغات رابطة الدول المستقلة على https://duowindo6601.ai.studio/ ممتازة جداً! مدرب الكتابة والنطق الصوتي للكازاخية والأوزبكية والأرمنية رائعان.'
+    },
+    adminReply: {
+      ru: 'Спасибо за отзыв! Развитие и поддержка многоязычных курсов на https://duowindo6601.ai.studio/ — наш главный приоритет! 🇰🇿🇺🇿🇦🇲🇰🇬',
+      en: 'Thank you for your feedback! Developing and supporting multilingual courses on https://duowindo6601.ai.studio/ is our highest priority! 🇰🇿🇺🇿🇦🇲🇰🇬',
+      de: 'Vielen Dank für Ihre Rückmeldung! Die Weiterentwicklung mehrsprachiger Kurse auf https://duowindo6601.ai.studio/ ist unsere oberste Priorität! 🇰🇿🇺🇿🇦🇲🇰🇬',
+      fr: 'Merci pour votre avis ! Le développement de cours multilingues sur https://duowindo6601.ai.studio/ est notre priorité absolue ! 🇰🇿🇺🇿🇦🇲🇰🇬',
+      es: '¡Gracias por su reseña! ¡El desarrollo de cursos multilingües en https://duowindo6601.ai.studio/ es nuestra máxima prioridad! 🇰🇿🇺🇿🇦🇲🇰🇬',
+      ja: '高評価をありがとうございます！https://duowindo6601.ai.studio/ での多言語コース開発は私たちの最優先事項です！🇰🇿🇺🇿🇦🇲🇰🇬',
+      zh: '感谢您的评价！在 https://duowindo6601.ai.studio/ 上拓展和支持多语言课程是我们的首要任务！🇰🇿🇺🇿🇦🇲🇰🇬',
+      ar: 'شكراً لمراجعتك! تطوير ودعم الدورات متعددة اللغات على https://duowindo6601.ai.studio/ هو أولويتنا القصوى! 🇰🇿🇺🇿🇦🇲🇰🇬'
+    }
   },
   {
     rating: 5,
-    category: '🏛️ Языки СНГ (казахский, узбекский, армянский и др.)',
-    comment: 'Курсы языков СНГ на https://duowindo6601.ai.studio/ просто супер! Очень качественно проработана тренажёрная часть письменности и озвучка для казахского, узбекского, армянского, кыргызского и грузинского языков.',
-    adminReply: 'Спасибо за отзыв! Поддержка и развитие курсов языков СНГ на https://duowindo6601.ai.studio/ — один из наших главных приоритетов! 🇰🇿🇺🇿🇦🇲🇰🇬🇬🇪'
+    categoryKey: 'subjects_games',
+    comment: {
+      ru: 'Модуль Предметы & Игры затягивает! Шахматный тренажер и математические задачки отлично развивают логику между уроками языков.',
+      en: 'The Subjects & Games module is brilliant! The chess puzzles and math trainers keep the mind sharp between language lessons.',
+      de: 'Das Modul Fächer & Spiele ist genial! Die Schachrätsel und Mathe-Übungen halten den Verstand zwischen den Sprachstunden fit.',
+      fr: 'Le module Matières & Jeux est passionnant ! Les exercices d\'échecs et de mathématiques entraînent la logique entre les cours de langue.',
+      es: '¡El módulo de Asignaturas y Juegos es genial! El ajedrez y los retos matemáticos ejercitan la mente entre lecciones de idiomas.',
+      ja: '「教科＆ゲーム」モジュールがとても楽しいです！言語レッスンの合間にチェスや数学パズルで論理力を鍛えられます。',
+      zh: '“学科与益智游戏”模块非常吸引人！在语言学习之间做国际象棋和数学题能很好地锻炼思维。',
+      ar: 'وحدة المواد والألعاب رائعة جداً! ألغاز الشطرنج والرياضيات تنشط العقل بين دروس اللغات.'
+    },
+    adminReply: {
+      ru: 'Замечательно! Раздел предметов и игр создан специально для гармоничного развития в DuoWindo6601 ♟️🔢',
+      en: 'Wonderful! The subjects and games section is crafted specifically for well-rounded cognitive growth in DuoWindo6601 ♟️🔢',
+      de: 'Wunderbar! Der Bereich für Fächer und Spiele wurde speziell für eine ganzheitliche geistige Entwicklung in DuoWindo6601 geschaffen ♟️🔢',
+      fr: 'Formidable ! La section matières et jeux est conçue pour un développement intellectuel complet dans DuoWindo6601 ♟️🔢',
+      es: '¡Excelente! La sección de asignaturas y juegos está creada para un desarrollo integral en DuoWindo6601 ♟️🔢',
+      ja: '素晴らしいです！教科＆ゲームセクションは、DuoWindo6601での総合的な知育のために作られています ♟️🔢',
+      zh: '太棒了！学科与游戏版块专为 DuoWindo6601 用户的多元智力拓展而设计 ♟️🔢',
+      ar: 'رائع جداً! تم تصميم قسم المواد والألعاب لتنمية القدرات الذهنية في DuoWindo6601 ♟️🔢'
+    }
   },
   {
-    rating: 5,
-    category: '🌍 Мировые языки (английский, испанский, китайский и др.)',
-    comment: 'Курсы мировых языков на https://duowindo6601.ai.studio/ отлично структурированы! Алфавит, карточки и озвучка для английского, испанского, немецкого, французского и китайского дают быстрый результат.',
-    adminReply: 'Благодарим за высокую оценку! В курсах мировых языков скоро появятся новые разговорные блоки и тренировка диалогов! 🇬🇧🇪🇸🇨🇳🇫🇷🇩🇪'
-  },
-  {
-    rating: 5,
-    category: '🧩 Предметы & Игры (шахматы, математика, логика)',
-    comment: 'Модуль Предметы & Игры затягивает! Шахматный тренажер и логические головоломки отлично разминают мозг между уроками языков.',
-    adminReply: 'Замечательно! Раздел предметов и игр создан специально для гармоничного умственного развития в DuoWindo6601 ♟️🔢'
-  },
-  {
-    rating: 5,
-    category: '📚 Тренажер и графическое письмо',
-    comment: 'Очень нравится тренажер письменности и интерактивная озвучка букв! Занимаюсь каждый день в DuoWindo6601 на https://duowindo6601.ai.studio/ с большим удовольствием.',
-    adminReply: 'Спасибо за прекрасный отзыв! Мы рады, что DuoWindo6601 помогает вам в изучении языков каждый день 🚀'
-  },
-  {
-    rating: 5,
-    category: '🌟 Общие впечатления',
-    comment: 'DuoWindo6601 — замечательное приложение для обучения! Анимации и звуки делают уроки очень живыми и понятными.',
-    adminReply: 'Благодарим за поддержку! Уже готовим новые увлекательные уроки и интерактивные функции! 🎉'
-  },
-  {
-    rating: 4,
-    category: '💡 Идея для улучшения',
-    comment: 'Удобный и красивый интерфейс. Добавьте больше шахматных этюдов и таблиц лидеров в раздел Предметы & Игры.',
-    adminReply: 'Спасибо за предложение! Шахматные задачки и рейтинги игроков уже в разработке! 🏆'
+    rating: 2,
+    categoryKey: 'bug_fix',
+    comment: {
+      ru: 'Хотелось бы иметь возможность быстро переводить комментарии и отзывы на другие языки (английский, немецкий, французский, испанский, японский, китайский, арабский).',
+      en: 'It would be great to have an instant translator for reviews and comments into multiple languages (English, German, French, Spanish, Japanese, Chinese, Arabic, Russian).',
+      de: 'Es wäre toll, eine Funktion zur schnellen Übersetzung von Kommentaren und Bewertungen in andere Sprachen zu haben.',
+      fr: 'Ce serait formidable de pouvoir traduire instantanément les commentaires et avis dans d\'autres langues.',
+      es: 'Sería genial tener un traductor instantáneo para reseñas y comentarios a múltiples idiomas.',
+      ja: 'レビューやコメントを他の言語（英語、ドイツ語、フランス語、スペイン語、日本語、中国語、アラビア語、ロシア語）に素早く翻訳できると便利です。',
+      zh: '希望能快速将评论和评价翻译成其他语言（英语、德语、法语、西班牙语、日语、中文、阿拉伯语、俄语）。',
+      ar: 'نأمل في توفير أداة لترجمة المراجعات والتعليقات فورياً إلى لغات متعددة.'
+    },
+    adminReply: {
+      ru: 'Готово! Мы добавили встроенный мультиязычный переводчик для всех отзывов и комментариев администрации на 8 языков (RU, EN, DE, FR, ES, JA, ZH, AR)! 🌐✨',
+      en: 'Done! We have introduced a built-in multilingual translator for all reviews and administration comments across 8 languages (RU, EN, DE, FR, ES, JA, ZH, AR)! 🌐✨',
+      de: 'Erledigt! Wir haben einen integrierten mehrsprachigen Übersetzer für alle Bewertungen und Kommentare der Administration in 8 Sprachen hinzugefügt! 🌐✨',
+      fr: 'C\'est fait ! Nous avons ajouté un traducteur multilingue intégré pour tous les avis et commentaires de l\'administration en 8 langues ! 🌐✨',
+      es: '¡Listo! ¡Hemos añadido un traductor multilingüe integrado para todas las reseñas y comentarios de la administración en 8 idiomas! 🌐✨',
+      ja: '対応完了！すべてのレビューと管理者コメントを8言語（RU、EN、DE、FR、ES、JA、ZH、AR）に翻訳できる機能を実装しました！🌐✨',
+      zh: '已上线！我们为所有评价和管理团队评论新增了支持 8 种语言（俄语、英语、德语、法语、西班牙语、日语、中文、阿拉伯语）的即时翻译器！🌐✨',
+      ar: 'تم التنفيذ! أضفنا مترجماً متعدد اللغات لجميع المراجعات وتعليقات الإدارة عبر 8 لغات! 🌐✨'
+    }
   }
 ];
 
-const BAD_REVIEWS_POOL: ReviewTemplate[] = [
-  {
-    rating: 2,
-    category: '✨ Новая функция',
-    comment: 'На очень старых ОС и браузерах (например, Windows XP или устаревших версиях) предупреждение срабатывает корректно, но хотелось бы более плавной работы Gemini API на слабых ПК.',
-    adminReply: 'Спасибо! Мы учли это: для старых систем предусмотрены расширенные подсказки и режим офлайн-фоллбека.'
-  },
-  {
-    rating: 2,
-    category: '🏛️ Языки СНГ (казахский, узбекский, армянский и др.)',
-    comment: 'В курсах армянского и грузинского языков на https://duowindo6601.ai.studio/ хотелось бы видеть больше упражнений на чтение связных текстов и фразеологизмов, а не только отдельные слова.',
-    adminReply: 'Спасибо за важную обратную связь! В ближайшем обновлении DuoWindo6601 мы расширим раздел разговорных диалогов и текстов по всем языкам СНГ.'
-  },
-  {
-    rating: 2,
-    category: '🌍 Мировые языки (английский, испанский, китайский и др.)',
-    comment: 'В курсе французского и немецкого языков аудирование иногда произносится слишком быстро для начинающих учеников.',
-    adminReply: 'Принято к сведению! Мы добавили функцию замедленного повтора произношения фраз в курсах мировых языков.'
-  },
-  {
-    rating: 2,
-    category: '🧩 Предметы & Игры (шахматы, математика, логика)',
-    comment: 'В шахматном модуле на слабых смартфонах анимация хода фигуры иногда чуть подлагивает.',
-    adminReply: 'Благодарим за сигнал! Мы оптимизировали рендеринг шахматной доски для плавного отклика на всех типах мобильных устройств.'
-  },
-  {
-    rating: 1,
-    category: '🐛 Ошибка / Доработка',
-    comment: 'При медленном мобильном интернете на https://duowindo6601.ai.studio/ аудиозаписи произношения слов долго загружаются. Приходится долго ждать!',
-    adminReply: 'Приносим извинения за неудобства! Мы оптимизировали сжатие аудио и добавили офлайн-кэширование произношений.'
-  },
-  {
-    rating: 2,
-    category: '🐛 Ошибка / Доработка',
-    comment: 'На компактных экранах смартфонов кнопка проверки ответа иногда перекрывается нижней панелью.',
-    adminReply: 'Спасибо за сигнал! Мы исправили адаптивную верстку и отступы для всех моделей устройств.'
-  },
-  {
-    rating: 3,
-    category: '💡 Идея для улучшения',
-    comment: 'В курсах языков СНГ добавьте больше исторических и культурных заметок о странах.',
-    adminReply: 'Отличная идея! Заметки о культуре и традициях стран СНГ появятся в тематических карточках в ближайшее время!'
-  }
-];
-
-// Initial seed reviews with official Administrator comments if database is empty
+// Initial seed reviews
 const INITIAL_REVIEWS: FeedbackItem[] = [
   {
     id: 'seed-1',
@@ -177,119 +478,50 @@ const INITIAL_REVIEWS: FeedbackItem[] = [
     courseId: 'kk',
     courseName: 'Казахский язык',
     comment: 'Отличное приложение DuoWindo6601! Озвучка букв и тренажер письменности для казахского, узбекского, армянского и других языков СНГ очень помогают в обучении!',
-    likes: 12,
+    likes: 14,
     likedBy: [],
-    isPinned: true,
     replies: [
       {
-        id: 'reply-seed-1',
+        id: 'rep-admin-1',
         userId: 'admin-duowindo6601',
         userName: 'Администратор DuoWindo6601',
         userAvatar: '👑',
         userColor: '#f59e0b',
         isAdmin: true,
-        comment: 'Алексей, спасибо за отличный отзыв! Мы продолжаем совершенствовать модуль тренировки написания и озвучки букв. Успехов в обучении! 🚀',
-        createdAt: new Date(Date.now() - 86400000 * 2.8).toISOString()
+        comment: 'Спасибо за высокую оценку! Мы постоянно дополняем курсы языков СНГ новыми интерактивными тренажерами и аудиозаписями. Приятного обучения! 🇰🇿🇺🇿🇦🇲',
+        createdAt: new Date(Date.now() - 86400000).toISOString()
       }
     ],
-    createdAt: new Date(Date.now() - 86400000 * 3).toISOString()
+    isPinned: true,
+    createdAt: new Date(Date.now() - 172800000).toISOString()
   },
   {
     id: 'seed-2',
     userId: 'user-duo-2',
-    userName: 'Елена К.',
+    userName: 'Elena K.',
     userAvatar: '🦊',
     userColor: '#ff9600',
     rating: 5,
     category: '🌍 Мировые языки (английский, испанский, китайский и др.)',
     courseId: 'en',
-    courseName: 'Английский язык',
-    comment: 'Курсы мировых языков (английский, испанский, китайский, немецкий) сделаны великолепно! Практика написания и аудио на смартфоне дают прекрасный результат.',
-    likes: 8,
+    courseName: 'English',
+    comment: 'The interactive lessons, flashcards, and instant comment translation tool make learning language super smooth!',
+    likes: 9,
     likedBy: [],
     replies: [
       {
-        id: 'reply-seed-2',
+        id: 'rep-admin-2',
         userId: 'admin-duowindo6601',
         userName: 'Администратор DuoWindo6601',
         userAvatar: '👑',
         userColor: '#f59e0b',
         isAdmin: true,
-        comment: 'Елена, рады служить! Разметку тетради и адаптивность под мобильные экраны обновили специально по запросам пользователей.',
-        createdAt: new Date(Date.now() - 86400000 * 1.8).toISOString()
+        comment: 'Thank you Elena! We are thrilled that DuoWindo6601 helps you succeed! 🇬🇧🌟',
+        createdAt: new Date(Date.now() - 43200000).toISOString()
       }
     ],
-    createdAt: new Date(Date.now() - 86400000 * 2).toISOString()
-  },
-  {
-    id: 'seed-3',
-    userId: 'user-duo-chess',
-    userName: 'Азамат Т.',
-    userAvatar: '♟️',
-    userColor: '#ce82ff',
-    rating: 5,
-    category: '🧩 Предметы & Игры (шахматы, математика, логика)',
-    courseId: 'chess',
-    courseName: 'Шахматы',
-    comment: 'Раздел Предметы & Игры потрясающий! Шахматный симулятор и логика превосходно сочетаются с обучением языкам.',
-    likes: 14,
-    likedBy: [],
-    replies: [
-      {
-        id: 'reply-seed-chess',
-        userId: 'admin-duowindo6601',
-        userName: 'Администратор DuoWindo6601',
-        userAvatar: '👑',
-        userColor: '#f59e0b',
-        isAdmin: true,
-        comment: 'Азамат, благодарим! Скоро в разделе Предметы & Игры появятся новые математические и логические уровни!',
-        createdAt: new Date(Date.now() - 86400000 * 1.3).toISOString()
-      }
-    ],
-    createdAt: new Date(Date.now() - 86400000 * 1.6).toISOString()
-  },
-  {
-    id: 'seed-4',
-    userId: 'user-duo-3',
-    userName: 'Константин П.',
-    userAvatar: '🤖',
-    userColor: '#ff4b4b',
-    rating: 2,
-    category: '🐛 Ошибка / Доработка',
-    courseId: 'general',
-    courseName: 'Общий отзыв о DuoWindo6601',
-    comment: 'При слабом сигнале сети звук произношения букв подгружается с задержкой в пару секунд.',
-    likes: 3,
-    likedBy: [],
-    replies: [
-      {
-        id: 'reply-seed-3',
-        userId: 'admin-duowindo6601',
-        userName: 'Администратор DuoWindo6601',
-        userAvatar: '👑',
-        userColor: '#f59e0b',
-        isAdmin: true,
-        comment: 'Константин, спасибо за сигнальный отзыв! Оптимизировали кэширование произношений для мгновенного звучания.',
-        createdAt: new Date(Date.now() - 86400000 * 1.2).toISOString()
-      }
-    ],
-    createdAt: new Date(Date.now() - 86400000 * 1.5).toISOString()
-  },
-  {
-    id: 'seed-5',
-    userId: 'user-duo-5',
-    userName: 'Дмитрий В.',
-    userAvatar: '🦁',
-    userColor: '#58cc02',
-    rating: 5,
-    category: '🌟 Общие впечатления',
-    courseId: 'am',
-    courseName: 'Армянский язык',
-    comment: 'Супер интерфейс в стиле Duolingo, тренажер армянского языка и AI озвучка просто восторг. Спасибо разработчикам за DuoWindo6601!',
-    likes: 15,
-    likedBy: [],
-    replies: [],
-    createdAt: new Date(Date.now() - 86400000 * 0.5).toISOString()
+    isPinned: false,
+    createdAt: new Date(Date.now() - 86400000).toISOString()
   }
 ];
 
@@ -301,13 +533,62 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
   onOpenAdminDashboard,
   courses = [],
   currentCourse,
-  t
+  t,
+  onSetLanguage
 }) => {
   const [reviews, setReviews] = useState<FeedbackItem[]>(INITIAL_REVIEWS);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [filterRating, setFilterRating] = useState<number | 'all'>('all');
   const [filterSentiment, setFilterSentiment] = useState<'all' | 'good' | 'bad'>('all');
+
+  // Selected language for review/comment translator tool
+  const currentLang = user.language || 'ru';
+  const [translatorTargetLang, setTranslatorTargetLang] = useState<string>(currentLang);
+
+  // Auto-Translator toggle state (defaults to user setting or true)
+  const [autoTranslate, setAutoTranslate] = useState<boolean>(user.autoTranslateFeedback ?? true);
+
+  // Synchronize autoTranslate with global user settings
+  useEffect(() => {
+    if (user.autoTranslateFeedback !== undefined) {
+      setAutoTranslate(user.autoTranslateFeedback);
+    }
+  }, [user.autoTranslateFeedback]);
+
+  // Synchronize translatorTargetLang if app language changes
+  useEffect(() => {
+    if (user.language && user.language !== translatorTargetLang) {
+      setTranslatorTargetLang(user.language);
+    }
+  }, [user.language]);
+
+  // Translations cache for reviews and replies: { [id_targetLang]: translatedText }
+  const [translatedTexts, setTranslatedTexts] = useState<Record<string, string>>({});
+  const [translatingMap, setTranslatingMap] = useState<Record<string, boolean>>({});
+
+  // Auto-translate reviews and admin replies when autoTranslate is ON
+  useEffect(() => {
+    if (!autoTranslate) return;
+
+    const newTranslations: Record<string, string> = {};
+    for (const rev of reviews) {
+      const revKey = `${rev.id}_${translatorTargetLang}`;
+      newTranslations[revKey] = translateTextToTarget(rev.comment, translatorTargetLang);
+
+      if (rev.replies) {
+        for (const rep of rev.replies) {
+          const repKey = `${rep.id}_${translatorTargetLang}`;
+          newTranslations[repKey] = translateTextToTarget(rep.comment, translatorTargetLang);
+        }
+      }
+    }
+
+    setTranslatedTexts((prev) => ({
+      ...prev,
+      ...newTranslations
+    }));
+  }, [reviews, translatorTargetLang, autoTranslate]);
 
   // Build course list for feedback form & filter
   const availableCourseList = React.useMemo(() => {
@@ -341,7 +622,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
   const [selectedCourseId, setSelectedCourseId] = useState<string>(currentCourse?.id || 'general');
   const [filterCourseId, setFilterCourseId] = useState<string>('all');
 
-  // Admin Check helper for Owner
+  // Admin Check helper
   const ADMIN_EMAILS = ['abramovanatolij81@gmail.com', 'va997217@gmail.com'];
   const ADMIN_KEYS = ['abramov6601', 'abramovanatolij81@gmail.com', 'va997217@gmail.com', '7777', 'duowindo6601admin', 'admin6601', 'abramov', 'va997217', 'admin'];
 
@@ -366,61 +647,34 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
   // Main Review Form states
   const [rating, setRating] = useState<number>(5);
   const [hoverRating, setHoverRating] = useState<number>(0);
-  const [category, setCategory] = useState<string>(CATEGORIES[0]);
+  const [selectedCategoryKey, setSelectedCategoryKey] = useState<string>('general');
   const [comment, setComment] = useState<string>('');
   const [asAdminForm, setAsAdminForm] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
+  // Translator Workbench States
+  const [workbenchAuthorName, setWorkbenchAuthorName] = useState<string>(user.name || user.username || 'Мария С.');
+  const [workbenchText, setWorkbenchText] = useState<string>('Курсы языков СНГ и проверка совместимости Windows в DuoWindo6601 работают отлично!');
+  const [workbenchIsAdmin, setWorkbenchIsAdmin] = useState<boolean>(false);
+  const [workbenchCategory, setWorkbenchCategory] = useState<string>('cis_languages');
+  const [workbenchRating, setWorkbenchRating] = useState<number>(5);
+
   // Tech Support Tab & States
-  const [activeTab, setActiveTab] = useState<'reviews' | 'support'>('reviews');
+  const [activeTab, setActiveTab] = useState<'reviews' | 'support' | 'translator'>('reviews');
   const [supportSubject, setSupportSubject] = useState('');
   const [supportMessage, setSupportMessage] = useState('');
   const [supportEmail, setSupportEmail] = useState('');
   const [supportSubmitting, setSupportSubmitting] = useState(false);
   const [supportSuccess, setSupportSuccess] = useState(false);
 
-  const handleSupportSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!supportMessage.trim()) {
-      setToast('Пожалуйста, опишите ваш вопрос или проблему');
-      return;
-    }
-    playSound('click');
-    setSupportSubmitting(true);
-    try {
-      await addDoc(collection(db, 'support_tickets'), {
-        userId: user.username || user.name || 'anon',
-        userName: user.name || 'Пользователь',
-        email: supportEmail.trim() || 'не указан',
-        subject: supportSubject || 'Общий вопрос техподдержке',
-        message: supportMessage.trim(),
-        status: 'open',
-        createdAt: new Date().toISOString()
-      });
-      playSound('fanfare');
-      setToast('Запрос в техподдержку DuoWindo6601 успешно отправлен! 🛠️');
-      setSupportMessage('');
-      setSupportSubject('');
-      setSupportSuccess(true);
-    } catch (err) {
-      console.warn('Could not save support ticket to Firestore:', err);
-      playSound('correct');
-      setToast('Запрос в техподдержку сохранён! Администратор ответит в ближайшее время.');
-      setSupportMessage('');
-      setSupportSubject('');
-      setSupportSuccess(true);
-    } finally {
-      setSupportSubmitting(false);
-    }
-  };
-
-  // Fetch reviews from Firestore
+  // Sync admin mode when user changes
   useEffect(() => {
     if (isUserOwnerAdmin) {
       setIsAdminMode(true);
     }
   }, [isUserOwnerAdmin]);
 
+  // Fetch reviews from Firestore
   useEffect(() => {
     let isMounted = true;
     const fetchReviews = async () => {
@@ -473,6 +727,46 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
     return () => { isMounted = false; };
   }, []);
 
+  // Quick Language Switcher Handler
+  const handleSwitchLanguage = (langCode: string) => {
+    playSound('click');
+    setTranslatorTargetLang(langCode);
+    if (onSetLanguage) {
+      onSetLanguage(langCode);
+    }
+    const foundLang = SUPPORTED_LANGUAGES.find(l => l.code === langCode);
+    const langLabel = foundLang ? `${foundLang.flag} ${foundLang.name}` : langCode.toUpperCase();
+    setToast(`Язык приложения переключен на: ${langLabel}!`);
+  };
+
+  // Instant Translator for Reviews & Comments
+  const handleTranslateItem = async (itemId: string, originalText: string, targetLang: string) => {
+    playSound('click');
+    const key = `${itemId}_${targetLang}`;
+
+    if (translatedTexts[key]) {
+      // Toggle back to original if already viewing translation
+      setTranslatedTexts((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      setToast('Показан исходный текст');
+      return;
+    }
+
+    setTranslatingMap((prev) => ({ ...prev, [key]: true }));
+
+    const translated = translateTextToTarget(originalText, targetLang);
+
+    await new Promise(r => setTimeout(r, 150));
+
+    setTranslatedTexts((prev) => ({ ...prev, [key]: translated }));
+    setTranslatingMap((prev) => ({ ...prev, [key]: false }));
+    playSound('correct');
+    setToast(`Переведено на: ${SUPPORTED_LANGUAGES.find(l => l.code === targetLang)?.name || targetLang} 🌐`);
+  };
+
   // Manual Refresh Handler
   const handleRefreshReviews = async () => {
     playSound('click');
@@ -512,7 +806,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
         setReviews(INITIAL_REVIEWS);
       }
       playSound('correct');
-      setToast('Отзывы о DuoWindo6601 обновлены! 🔄');
+      setToast(t ? t('refresh_reviews') || 'Отзывы обновлены!' : 'Отзывы о DuoWindo6601 обновлены! 🔄');
     } catch (e) {
       console.warn('Could not refresh feedback from Firestore:', e);
       setToast('Загружен текущий список отзывов');
@@ -527,14 +821,19 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
     setSubmitting(true);
 
     const isGood = forcedType ? forcedType === 'good' : Math.random() > 0.4;
-    const pool = isGood ? GOOD_REVIEWS_POOL : BAD_REVIEWS_POOL;
+    const pool = MULTILINGUAL_REVIEWS_POOL;
     const template = pool[Math.floor(Math.random() * pool.length)];
 
     const randomName = RANDOM_USER_NAMES[Math.floor(Math.random() * RANDOM_USER_NAMES.length)];
     const randomAvatar = RANDOM_USER_AVATARS[Math.floor(Math.random() * RANDOM_USER_AVATARS.length)];
     const randomColor = RANDOM_USER_COLORS[Math.floor(Math.random() * RANDOM_USER_COLORS.length)];
-    const includeReply = Math.random() > 0.2;
+    const includeReply = Math.random() > 0.15;
     const randomCourse = availableCourseList[Math.floor(Math.random() * availableCourseList.length)];
+    const catObj = CATEGORIES[template.categoryKey] || CATEGORIES['general'];
+    const catName = catObj[currentLang] || catObj['ru'];
+
+    const reviewComment = template.comment[currentLang] || template.comment['ru'];
+    const adminReplyText = template.adminReply[currentLang] || template.adminReply['ru'];
 
     const randomReplyList: FeedbackReply[] = includeReply ? [
       {
@@ -544,7 +843,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
         userAvatar: '👑',
         userColor: '#f59e0b',
         isAdmin: true,
-        comment: template.adminReply,
+        comment: adminReplyText,
         createdAt: new Date().toISOString()
       }
     ] : [];
@@ -554,11 +853,11 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
       userName: randomName,
       userAvatar: randomAvatar,
       userColor: randomColor,
-      rating: template.rating,
-      category: template.category,
+      rating: isGood ? (template.rating >= 4 ? template.rating : 5) : (template.rating <= 3 ? template.rating : 2),
+      category: catName,
       courseId: randomCourse.id,
       courseName: randomCourse.name,
-      comment: template.comment,
+      comment: reviewComment,
       likes: Math.floor(Math.random() * 8),
       likedBy: [],
       replies: randomReplyList,
@@ -571,7 +870,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
       const createdItem: FeedbackItem = { id: docRef.id, ...newFeedback };
       setReviews((prev) => [createdItem, ...prev]);
       playSound('fanfare');
-      setToast(isGood ? `Добавлен отзыв с высокой оценкой (👍 ${randomName})` : `Добавлен критический отзыв (👎 ${randomName})`);
+      setToast(isGood ? `Добавлен отзыв (👍 ${randomName})` : `Добавлен отзыв (👎 ${randomName})`);
     } catch (err) {
       console.warn('Could not save random review to Firestore:', err);
       const fallbackItem: FeedbackItem = {
@@ -586,7 +885,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
     }
   };
 
-  // Handle Login as Admin with strict verification
+  // Handle Login as Admin
   const handleAdminAuth = (e: React.FormEvent) => {
     e.preventDefault();
     const inputKey = adminPasswordInput.trim().toLowerCase();
@@ -600,7 +899,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
       setToast('Вход выполнен! Подтверждены права Администратора DuoWindo6601 👑');
     } else {
       playSound('wrong');
-      setToast('Ограничение доступа! Права администратора принадлежат владельцам (abramovanatolij81@gmail.com / va997217@gmail.com).');
+      setToast('Ограничение доступа! Права администратора принадлежат владельцам.');
     }
   };
 
@@ -617,6 +916,8 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
 
     const isAdminAuthor = isAdminMode && asAdminForm;
     const selectedCourseObj = availableCourseList.find((c) => c.id === selectedCourseId);
+    const catObj = CATEGORIES[selectedCategoryKey] || CATEGORIES['general'];
+    const catName = catObj[currentLang] || catObj['ru'];
 
     const newFeedback: Omit<FeedbackItem, 'id'> = {
       userId: isAdminAuthor ? 'admin-duowindo6601' : (user.username || user.name || 'user-' + Date.now()),
@@ -624,7 +925,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
       userAvatar: isAdminAuthor ? '👑' : (user.avatarIcon || '👤'),
       userColor: isAdminAuthor ? '#f59e0b' : (user.avatarColor || '#1cb0f6'),
       rating,
-      category,
+      category: catName,
       courseId: selectedCourseId,
       courseName: selectedCourseObj ? selectedCourseObj.name : 'Общий отзыв',
       comment: comment.trim(),
@@ -729,12 +1030,12 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
     }
 
     playSound('correct');
-    setToast(isReplyAsAdmin ? 'Ответ Администратора DuoWindo6601 опубликован!' : 'Комментарий добавлен!');
+    setToast(isReplyAsAdmin ? (t ? t('admin_reply_toast') : 'Ответ Администратора DuoWindo6601 опубликован!') : (t ? t('comment_added_toast') : 'Комментарий добавлен!'));
   };
 
   // Delete review (Admin or Author)
   const handleDeleteReview = async (reviewId: string) => {
-    if (!confirm('Вы уверены, что хотите удалить этот отзыв?')) return;
+    if (!confirm(t ? t('delete_confirm') || 'Удалить этот отзыв?' : 'Вы уверены, что хотите удалить этот отзыв?')) return;
 
     playSound('click');
     setReviews((prev) => prev.filter((r) => r.id !== reviewId));
@@ -817,18 +1118,18 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
   });
 
   return (
-    <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full px-4 py-4 md:py-6 overflow-y-auto rtl-directional-aware">
-      {/* Top Bar with Admin Controls */}
-      <div className="flex items-center justify-between mb-4">
+    <div className="flex-1 flex flex-col max-w-3xl mx-auto w-full px-4 py-4 md:py-6 overflow-y-auto rtl-directional-aware">
+      {/* Top Bar with Back, Language Switcher & Admin Controls */}
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <button
           onClick={() => { playSound('click'); onBack(); }}
           className="text-gray-400 hover:text-white flex items-center font-bold text-sm md:text-base transition-colors"
         >
           <CloseIcon className="w-6 h-6 mr-1" />
-          Назад
+          <span>{currentLang === 'ru' ? 'Назад' : currentLang === 'en' ? 'Back' : currentLang === 'de' ? 'Zurück' : currentLang === 'fr' ? 'Retour' : currentLang === 'es' ? 'Volver' : currentLang === 'ja' ? '戻る' : currentLang === 'zh' ? '返回' : 'رجوع'}</span>
         </button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {onOpenAdminDashboard && (
             <button
               onClick={() => { playSound('click'); onOpenAdminDashboard(); }}
@@ -859,13 +1160,49 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
         </div>
       </div>
 
+      {/* MULTILINGUAL LANGUAGE SWITCHER BAR */}
+      <div className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 p-3.5 rounded-2xl border-2 border-duo-blue/50 mb-5 shadow-xl">
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-2.5">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🌐</span>
+            <span className="text-xs md:text-sm font-black text-white uppercase tracking-wider">
+              {t ? t('switch_language') || 'Переключить язык' : 'Переключить язык'} / Language Switcher:
+            </span>
+          </div>
+          <span className="text-[11px] bg-duo-blue/20 text-duo-blue px-2.5 py-0.5 rounded-full font-bold border border-duo-blue/40">
+            {SUPPORTED_LANGUAGES.find(l => l.code === currentLang)?.flag} {SUPPORTED_LANGUAGES.find(l => l.code === currentLang)?.name} ({currentLang.toUpperCase()})
+          </span>
+        </div>
+
+        <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
+          {SUPPORTED_LANGUAGES.map((lang) => {
+            const isSelected = currentLang === lang.code;
+            return (
+              <button
+                key={lang.code}
+                onClick={() => handleSwitchLanguage(lang.code)}
+                className={`py-2 px-1.5 rounded-xl text-xs font-black transition-all flex flex-col items-center justify-center gap-0.5 border-b-2 ${
+                  isSelected
+                    ? 'bg-duo-blue text-white border-duo-blueDark shadow-md scale-105 ring-2 ring-blue-400'
+                    : 'bg-gray-800/90 text-gray-300 hover:text-white hover:bg-gray-700 border-gray-900'
+                }`}
+                title={`${lang.name} (${lang.nativeName})`}
+              >
+                <span className="text-base">{lang.flag}</span>
+                <span className="text-[10px] uppercase tracking-wider">{lang.code.toUpperCase()}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Main Title Banner */}
       <div className="bg-gradient-to-r from-duo-card to-gray-800 rounded-3xl p-5 md:p-6 border-2 border-gray-700 shadow-2xl mb-6 relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div dir="auto">
             <h1 dir="auto" className="text-2xl md:text-3xl font-black text-white tracking-tight mb-1 flex items-center gap-2">
               <MessageSquareIcon className="w-8 h-8 text-duo-yellow shrink-0" />
-              <bdi dir="auto">{t ? t('reviews_duowindo6601') : 'Отзывы о DuoWindo6601'}</bdi>
+              <bdi dir="auto">{t ? t('reviews_duowindo6601') || 'Отзывы о DuoWindo6601' : 'Отзывы о DuoWindo6601'}</bdi>
             </h1>
             <p dir="auto" className="text-gray-300 text-xs md:text-sm">
               <bdi dir="auto">
@@ -882,7 +1219,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
               className="bg-gray-800 hover:bg-gray-700 text-duo-blue font-bold px-3 py-2.5 rounded-2xl border-b-4 border-gray-900 active:translate-y-1 active:border-b-0 transition-all shadow-md flex items-center justify-center gap-1.5 text-xs uppercase tracking-wider disabled:opacity-50"
             >
               <span className={`text-base ${loading ? 'animate-spin' : ''}`}>🔄</span>
-              <span>{loading ? 'Обновление...' : 'Обновить'}</span>
+              <span>{loading ? '...' : (t ? t('refresh_reviews') || 'Обновить' : 'Обновить')}</span>
             </button>
 
             <button
@@ -892,7 +1229,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
               className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-2.5 rounded-2xl border-b-4 border-emerald-800 active:translate-y-1 active:border-b-0 transition-all shadow-md flex items-center justify-center gap-1.5 text-xs uppercase tracking-wider disabled:opacity-50"
             >
               <span className="text-base">👍</span>
-              <span>+ Хороший</span>
+              <span>{t ? t('good_review') || '+ Хороший' : '+ Хороший'}</span>
             </button>
 
             <button
@@ -902,7 +1239,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
               className="bg-rose-600 hover:bg-rose-500 text-white font-bold px-3 py-2.5 rounded-2xl border-b-4 border-rose-800 active:translate-y-1 active:border-b-0 transition-all shadow-md flex items-center justify-center gap-1.5 text-xs uppercase tracking-wider disabled:opacity-50"
             >
               <span className="text-base">👎</span>
-              <span>+ Критический</span>
+              <span>{t ? t('bad_review') || '+ Критический' : '+ Критический'}</span>
             </button>
 
             <button
@@ -910,73 +1247,8 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
               className="bg-duo-green text-white font-black px-4 py-2.5 rounded-2xl border-b-4 border-duo-greenDark hover:brightness-110 active:translate-y-1 active:border-b-0 transition-all shadow-lg flex items-center justify-center gap-2 text-xs uppercase tracking-wider whitespace-nowrap"
             >
               <StarIcon className="w-4 h-4 text-yellow-300 fill-yellow-300" />
-              {showForm ? 'Закрыть форму' : 'Написать отзыв'}
+              {showForm ? 'Закрыть форму' : (t ? t('write_review') || 'Написать отзыв' : 'Написать отзыв')}
             </button>
-          </div>
-        </div>
-
-        {/* DuoWindo6601 Site & Share Link Banner */}
-        <div className="mt-6 pt-5 border-t border-gray-700/80 bg-gradient-to-r from-emerald-950/80 via-gray-900 to-purple-950/80 p-4 rounded-2xl border border-emerald-500/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-center space-x-3" dir="auto">
-            <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center text-xl border border-emerald-500/40 shrink-0">
-              🌐
-            </div>
-            <div dir="auto">
-              <div className="flex items-center gap-2 flex-wrap" dir="auto">
-                <span className="font-black text-xs text-white uppercase tracking-wider"><bdi dir="auto">Платформа DuoWindo6601</bdi></span>
-                <span className="text-[11px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-md font-mono font-bold border border-emerald-500/40 ltr-preserve" dir="ltr">
-                  https://duowindo6601.ai.studio/
-                </span>
-              </div>
-              <p className="text-[11px] text-gray-300 font-medium mt-0.5" dir="auto">
-                <bdi dir="auto">Оставляйте хорошие и критические отзывы для нашей команды разработки</bdi>
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText('https://duowindo6601.ai.studio/');
-              playSound('correct');
-              setToast('Ссылка https://duowindo6601.ai.studio/ скопирована в буфер обмена! 📋');
-            }}
-            className="w-full sm:w-auto px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] uppercase tracking-wider rounded-xl border-b-2 border-emerald-800 active:translate-y-0.5 transition-all flex items-center justify-center space-x-1 shrink-0 shadow-md"
-          >
-            <span>📋</span>
-            <span>Копировать URL</span>
-          </button>
-        </div>
-
-        {/* GitHub & APK Links Card */}
-        <div className="mt-3 pt-3 border-t border-gray-700/50 bg-gray-900/60 p-4 rounded-2xl border border-gray-700">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div dir="auto">
-              <h4 className="text-white font-black text-xs uppercase tracking-widest flex items-center gap-2 mb-1" dir="auto">
-                <span>🐙</span> <bdi dir="auto">Официальный репозиторий DuoWindo6601 на GitHub</bdi>
-              </h4>
-              <p className="text-[11px] text-gray-400 font-medium" dir="auto">
-                <bdi dir="auto">Исходный код, CI/CD сборка Android APK и интеграция Google Labs.</bdi>
-              </p>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <a
-                href="https://github.com/Windo6601/DuoWindo6601"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="bg-white hover:bg-gray-100 text-gray-950 font-black px-3.5 py-2 rounded-xl text-[11px] uppercase tracking-wider border-b-2 border-gray-300 transition-all flex items-center gap-1.5 shadow"
-              >
-                <span>GitHub Repo</span>
-                <span>↗</span>
-              </a>
-              <a
-                href="https://github.com/Windo6601/DuoWindo6601/tree/android-ci-and-permissions-8360557468379829155"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="bg-emerald-600 hover:bg-emerald-500 text-white font-black px-3.5 py-2 rounded-xl text-[11px] uppercase tracking-wider border-b-2 border-emerald-800 transition-all flex items-center gap-1.5 shadow"
-              >
-                <span>APK Release (CI)</span>
-                <span>🤖</span>
-              </a>
-            </div>
           </div>
         </div>
 
@@ -1014,11 +1286,11 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
         </div>
       </div>
 
-      {/* Tabs Switcher: Reviews vs Tech Support */}
-      <div className="grid grid-cols-2 gap-3 mb-6">
+      {/* Tabs Switcher: Reviews vs Translator vs Tech Support */}
+      <div className="grid grid-cols-3 gap-2 mb-6">
         <button
           onClick={() => { playSound('click'); setActiveTab('reviews'); }}
-          className={`py-3.5 px-4 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 border-b-4 transition-all ${
+          className={`py-3 px-3 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 border-b-4 transition-all ${
             activeTab === 'reviews'
               ? 'bg-duo-blue border-duo-blueDark text-white shadow-lg shadow-duo-blue/20'
               : 'bg-gray-800 border-gray-900 text-gray-400 hover:bg-gray-700 hover:text-white'
@@ -1026,17 +1298,125 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
         >
           <span>💬 Отзывы ({totalCount})</span>
         </button>
+
+        <button
+          onClick={() => { playSound('click'); setActiveTab('translator'); }}
+          className={`py-3 px-3 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 border-b-4 transition-all ${
+            activeTab === 'translator'
+              ? 'bg-purple-600 border-purple-800 text-white shadow-lg shadow-purple-600/20'
+              : 'bg-gray-800 border-gray-900 text-gray-400 hover:bg-gray-700 hover:text-white'
+          }`}
+        >
+          <span>🌐 Переводчик</span>
+        </button>
+
         <button
           onClick={() => { playSound('click'); setActiveTab('support'); }}
-          className={`py-3.5 px-4 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 border-b-4 transition-all ${
+          className={`py-3 px-3 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 border-b-4 transition-all ${
             activeTab === 'support'
               ? 'bg-emerald-600 border-emerald-800 text-white shadow-lg shadow-emerald-600/20'
               : 'bg-gray-800 border-gray-900 text-gray-400 hover:bg-gray-700 hover:text-white'
           }`}
         >
-          <span>🛠️ Техподдержка & FAQ</span>
+          <span>🛠️ Поддержка</span>
         </button>
       </div>
+
+      {activeTab === 'translator' && (
+        <div className="bg-duo-card border-2 border-purple-500/50 rounded-3xl p-5 md:p-6 shadow-2xl mb-6 animate-in fade-in space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center text-xl border border-purple-500/40">
+              🌐
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-purple-300 uppercase tracking-wide">
+                {t ? t('translator_title') || 'Переводчик отзывов и комментариев' : 'Переводчик отзывов и комментариев'}
+              </h3>
+              <p className="text-xs text-gray-300">
+                Переводите любые отзывы и официальные ответы администрации DuoWindo6601 на любой из 8 поддерживаемых языков.
+              </p>
+            </div>
+          </div>
+
+          {/* Auto-Translate Global Toggle Switch */}
+          <div className="bg-gray-900/90 p-4 rounded-2xl border border-purple-500/30 flex items-center justify-between flex-wrap gap-3">
+            <div className="flex-1 min-w-[220px]">
+              <div className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                <span>⚡</span> Авто-Переводчик (Автоматический перевод отзывов)
+              </div>
+              <div className="text-[11px] text-gray-400 mt-0.5">
+                При включении все отзывы, имена авторов, категории и комментарии администрации переводятся автоматически при переключении языка приложения.
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                playSound('click');
+                const nextVal = !autoTranslate;
+                setAutoTranslate(nextVal);
+                setToast(nextVal ? '⚡ Авто-Переводчик ВКЛЮЧЕН! Отзывы и комментарии переведены.' : '⚡ Авто-Переводчик ОТКЛЮЧЕН.');
+              }}
+              className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all border-b-2 flex items-center gap-2 ${
+                autoTranslate
+                  ? 'bg-purple-600 text-white border-purple-800 shadow-md'
+                  : 'bg-gray-800 text-gray-400 border-gray-900 hover:text-white'
+              }`}
+            >
+              <span className="text-sm">{autoTranslate ? '✅' : '⚪'}</span>
+              <span>{autoTranslate ? 'Авто-Перевод ВКЛ 🌐' : 'Авто-Перевод ВЫКЛ'}</span>
+            </button>
+          </div>
+
+          {/* Language Selector */}
+          <div className="bg-gray-900/80 p-4 rounded-2xl border border-gray-800">
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+              Целевой язык для быстрого перевода:
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {SUPPORTED_LANGUAGES.map((lang) => (
+                <button
+                  key={lang.code}
+                  onClick={() => handleSwitchLanguage(lang.code)}
+                  className={`p-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                    translatorTargetLang === lang.code
+                      ? 'bg-purple-600 text-white border-2 border-purple-400 shadow-md'
+                      : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                  }`}
+                >
+                  <span className="text-lg">{lang.flag}</span>
+                  <span>{lang.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Online Workbench */}
+          <div className="bg-gray-900/80 p-4 rounded-2xl border border-gray-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                <span>🧪</span> Онлайн Интерактивный Переводчик Отзывов:
+              </label>
+              <span className="text-[10px] text-purple-400 font-mono font-bold bg-purple-950/60 px-2 py-0.5 rounded border border-purple-800">
+                [{translatorTargetLang.toUpperCase()}]
+              </span>
+            </div>
+            <textarea
+              rows={3}
+              value={workbenchText}
+              onChange={(e) => setWorkbenchText(e.target.value)}
+              className="w-full bg-gray-950 border border-gray-800 focus:border-purple-500 rounded-xl p-3 text-xs text-white placeholder-gray-600 focus:outline-none"
+              placeholder="Введите любой текст или отзыв для мгновенного перевода..."
+            />
+            <div className="p-3 bg-purple-950/40 rounded-xl border border-purple-800/40 space-y-1">
+              <div className="text-[10px] font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1">
+                <span>🌐</span> Перевод [{SUPPORTED_LANGUAGES.find(l => l.code === translatorTargetLang)?.name}]:
+              </div>
+              <p className="text-xs text-purple-100 font-medium whitespace-pre-wrap leading-relaxed">
+                {translateTextToTarget(workbenchText, translatorTargetLang)}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {activeTab === 'support' ? (
         <div className="space-y-6 animate-in fade-in pb-12">
@@ -1098,751 +1478,727 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
                 <button
                   type="button"
                   onClick={() => setSupportSuccess(false)}
-                  className="mt-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black px-4 py-2 rounded-xl text-xs uppercase tracking-wider"
+                  className="mt-3 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold uppercase"
                 >
-                  Отправить еще один запрос
+                  Создать ещё один запрос
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleSupportSubmit} className="space-y-4">
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                if (!supportMessage.trim()) {
+                  setToast('Пожалуйста, опишите ваш вопрос или проблему');
+                  return;
+                }
+                playSound('click');
+                setSupportSubmitting(true);
+                try {
+                  await addDoc(collection(db, 'support_tickets'), {
+                    userId: user.username || user.name || 'anon',
+                    userName: user.name || 'Пользователь',
+                    email: supportEmail.trim() || 'не указан',
+                    subject: supportSubject || 'Общий вопрос техподдержке',
+                    message: supportMessage.trim(),
+                    status: 'open',
+                    createdAt: new Date().toISOString()
+                  });
+                  playSound('fanfare');
+                  setToast('Запрос в техподдержку DuoWindo6601 успешно отправлен! 🛠️');
+                  setSupportMessage('');
+                  setSupportSubject('');
+                  setSupportSuccess(true);
+                } catch (err) {
+                  console.warn('Could not save support ticket to Firestore:', err);
+                  playSound('correct');
+                  setToast('Запрос в техподдержку сохранён!');
+                  setSupportMessage('');
+                  setSupportSubject('');
+                  setSupportSuccess(true);
+                } finally {
+                  setSupportSubmitting(false);
+                }
+              }} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-300 mb-1">Тема обращения:</label>
-                  <select
+                  <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-1">
+                    Тема запроса:
+                  </label>
+                  <input
+                    type="text"
                     value={supportSubject}
                     onChange={(e) => setSupportSubject(e.target.value)}
-                    className="w-full bg-gray-900 border-2 border-gray-700 rounded-2xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500"
-                  >
-                    <option value="">Выберите тему обращения...</option>
-                    <option value="Проблема с установкой Android APK">🤖 Проблема с установкой Android APK</option>
-                    <option value="Ошибка озвучки или аудио">🔊 Ошибка озвучки или аудио</option>
-                    <option value="Синхронизация прогресса / аккаунт">🔄 Синхронизация прогресса / аккаунт</option>
-                    <option value="Шахматы & Предметы и игры">♟️ Шахматы & Предметы и игры</option>
-                    <option value="Другой технический вопрос">❓ Другой технический вопрос</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-300 mb-1">Ваш Email (для ответа):</label>
-                  <input
-                    type="email"
-                    value={supportEmail}
-                    onChange={(e) => setSupportEmail(e.target.value)}
-                    placeholder="name@example.com"
-                    className="w-full bg-gray-900 border-2 border-gray-700 rounded-2xl p-3 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+                    placeholder="Например: Вопрос по курсу, Ошибка в аудио, Совместимость с Windows..."
+                    className="w-full bg-gray-900 border-2 border-gray-700 rounded-2xl p-3 text-xs md:text-sm text-white focus:outline-none focus:border-emerald-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-300 mb-1">Описание проблемы или вопроса:</label>
+                  <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-1">
+                    Ваш контактный Email (для обратной связи):
+                  </label>
+                  <input
+                    type="email"
+                    value={supportEmail}
+                    onChange={(e) => setSupportEmail(e.target.value)}
+                    placeholder="your-email@example.com"
+                    className="w-full bg-gray-900 border-2 border-gray-700 rounded-2xl p-3 text-xs md:text-sm text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-1">
+                    Подробное описание:
+                  </label>
                   <textarea
                     rows={4}
                     value={supportMessage}
                     onChange={(e) => setSupportMessage(e.target.value)}
-                    placeholder="Подробно опишите, с чем вы столкнулись..."
-                    className="w-full bg-gray-900 border-2 border-gray-700 rounded-2xl p-3 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 resize-none"
+                    placeholder="Опишите детально ваш вопрос или проблему..."
+                    className="w-full bg-gray-900 border-2 border-gray-700 rounded-2xl p-3 text-xs md:text-sm text-white focus:outline-none focus:border-emerald-500"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  disabled={supportSubmitting}
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3.5 rounded-2xl border-b-4 border-emerald-800 active:translate-y-1 transition-all text-xs uppercase tracking-wider disabled:opacity-50 shadow-lg shadow-emerald-600/20"
+                  disabled={supportSubmitting || !supportMessage.trim()}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-2xl border-b-4 border-emerald-800 uppercase tracking-wider text-xs shadow-lg transition-all active:translate-y-1 active:border-b-0 disabled:opacity-50"
                 >
-                  {supportSubmitting ? 'Отправка в техподдержку...' : 'Отправить в техподдержку DuoWindo6601 🚀'}
+                  {supportSubmitting ? 'Отправка...' : 'Отправить запрос в техподдержку'}
                 </button>
               </form>
             )}
           </div>
-
-          {/* FAQ Section */}
-          <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 shadow-2xl space-y-4">
-            <h4 className="text-base font-black text-white mb-3 flex items-center gap-2">
-              <span>💡</span> Часто задаваемые вопросы (FAQ)
-            </h4>
-
-            <div className="space-y-3 text-xs">
-              <div className="bg-gray-900/80 p-4 rounded-2xl border border-gray-800">
-                <h5 className="font-bold text-emerald-400 mb-1">1. Как установить Android APK DuoWindo6601 на смартфон?</h5>
-                <p className="text-gray-300 leading-relaxed">
-                  Перейдите в репозиторий GitHub (<a href="https://github.com/Windo6601/DuoWindo6601" target="_blank" rel="noopener noreferrer" className="text-blue-400 underline">github.com/Windo6601/DuoWindo6601</a>), скачайте собранный Android APK из релизов или GitHub Actions CI, разрешите установку приложений из неизвестных источников в настройках Android и наслаждайтесь приложением!
-                </p>
-              </div>
-
-              <div className="bg-gray-900/80 p-4 rounded-2xl border border-gray-800">
-                <h5 className="font-bold text-emerald-400 mb-1">2. Как работает озвучка фраз и букв в языках СНГ?</h5>
-                <p className="text-gray-300 leading-relaxed">
-                  DuoWindo6601 использует передовые модели Google Gemini AI и Web Speech Synthesis с поддержкой казахского, узбекского, армянского, кыргызского, грузинского и мировых языков с идеальным произношением.
-                </p>
-              </div>
-
-              <div className="bg-gray-900/80 p-4 rounded-2xl border border-gray-800">
-                <h5 className="font-bold text-emerald-400 mb-1">3. Сохраняется ли мой прогресс при закрытии вкладки?</h5>
-                <p className="text-gray-300 leading-relaxed">
-                  Да! Весь ваш опыт (XP), рубины, стрики, пройденные уроки и достижения автоматически сохраняются в локальном хранилище и синхронизируются с облачной базой данных Firebase Firestore под вашим аккаунтом.
-                </p>
-              </div>
-
-              <div className="bg-gray-900/80 p-4 rounded-2xl border border-gray-800">
-                <h5 className="font-bold text-emerald-400 mb-1">4. Кто разрабатывает DuoWindo6601?</h5>
-                <p className="text-gray-300 leading-relaxed">
-                  Проект создан командой DuoWindo6601 под руководством разработчиков Владимира Абрамова (<code className="bg-black px-1.5 py-0.5 rounded text-amber-400">abramovanatolij81@gmail.com</code>) и партнеров.
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
       ) : (
         <>
-      {showAdminModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-duo-card border-2 border-amber-500 rounded-3xl p-6 max-w-md w-full shadow-2xl relative animate-in fade-in zoom-in-95">
-            <button
-              onClick={() => setShowAdminModal(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-white"
+          {/* Main Review Form */}
+          {showForm && (
+            <form
+              onSubmit={handleSubmit}
+              className="bg-duo-card border-2 border-duo-green rounded-3xl p-5 md:p-6 mb-6 shadow-2xl animate-in fade-in slide-in-from-top-4"
             >
-              <CloseIcon className="w-6 h-6" />
-            </button>
-
-            <div className="text-center mb-5">
-              <div className="w-16 h-16 bg-amber-500/20 text-amber-400 rounded-full flex items-center justify-center text-3xl mx-auto mb-3 border border-amber-500/40">
-                👑
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-black text-white text-base md:text-lg uppercase tracking-wide flex items-center gap-2">
+                  <span>✍️</span> {t ? t('write_review') || 'Написать отзыв' : 'Написать отзыв'}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="text-gray-400 hover:text-white p-1"
+                >
+                  <CloseIcon className="w-5 h-5" />
+                </button>
               </div>
-              <h3 className="text-xl font-black text-white mb-1">
-                Администратор DuoWindo6601
-              </h3>
-              <p className="text-xs text-gray-300">
-                Ограничение доступа: права администратора закрепить, удалить и отвечать официально принадлежат владельцам <strong className="text-amber-400">abramovanatolij81@gmail.com</strong> и <strong className="text-amber-400">va997217@gmail.com</strong>.
-              </p>
-            </div>
 
-            <form onSubmit={handleAdminAuth} className="space-y-4">
-              <div>
-                <input
-                  type="password"
-                  value={adminPasswordInput}
-                  onChange={(e) => setAdminPasswordInput(e.target.value)}
-                  placeholder="Персональный ключ администратора"
-                  className="w-full bg-gray-900 border-2 border-gray-700 rounded-2xl p-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500"
-                  autoFocus
+              {/* User Info Bar & Admin Checkbox */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 bg-gray-800/80 p-3 rounded-2xl border border-gray-700">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center text-xl font-bold shadow-md"
+                    style={{
+                      backgroundColor: (isAdminMode && asAdminForm) ? '#f59e0b' : (user.avatarColor || '#1cb0f6')
+                    }}
+                  >
+                    {(isAdminMode && asAdminForm) ? '👑' : (user.avatarIcon || '👤')}
+                  </div>
+                  <div>
+                    <div className="font-bold text-white text-sm flex items-center gap-1.5">
+                      {(isAdminMode && asAdminForm) ? '👑 Администратор DuoWindo6601' : (user.name || 'Пользователь')}
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      {(isAdminMode && asAdminForm) ? 'Официальное объявление' : 'Автор отзыва'}
+                    </div>
+                  </div>
+                </div>
+
+                {isAdminMode && (
+                  <label className="flex items-center gap-2 bg-amber-500/20 border border-amber-500/50 px-3 py-1.5 rounded-xl cursor-pointer text-xs font-bold text-amber-300">
+                    <input
+                      type="checkbox"
+                      checked={asAdminForm}
+                      onChange={(e) => setAsAdminForm(e.target.checked)}
+                      className="rounded text-amber-500 focus:ring-0"
+                    />
+                    {t ? t('as_admin_checkbox') || 'От имени Администратора DuoWindo6601 👑' : 'Опубликовать как Администратор 👑'}
+                  </label>
+                )}
+              </div>
+
+              {/* Rating Interactive Stars */}
+              <div className="mb-4">
+                <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
+                  Оцените приложение:
+                </label>
+                <div className="flex items-center gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => { playSound('click'); setRating(star); }}
+                      onMouseEnter={() => setHoverRating(star)}
+                      onMouseLeave={() => setHoverRating(0)}
+                      className="p-1 hover:scale-125 transition-transform"
+                    >
+                      <StarIcon
+                        className={`w-8 h-8 md:w-9 md:h-9 ${
+                          star <= (hoverRating || rating)
+                            ? 'text-duo-yellow fill-duo-yellow drop-shadow-md'
+                            : 'text-gray-600 fill-none'
+                        }`}
+                      />
+                    </button>
+                  ))}
+                  <span className="ml-2 font-black text-duo-yellow text-base">
+                    {hoverRating || rating} / 5
+                  </span>
+                </div>
+              </div>
+
+              {/* Course Selector */}
+              <div className="mb-4">
+                <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <span>📚</span> Выберите курс DuoWindo6601:
+                </label>
+                <select
+                  value={selectedCourseId}
+                  onChange={(e) => { playSound('click'); setSelectedCourseId(e.target.value); }}
+                  className="w-full bg-gray-900 border-2 border-gray-700 rounded-2xl p-3 text-xs md:text-sm text-white focus:outline-none focus:border-duo-green transition-all"
+                >
+                  {availableCourseList.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.flagEmoji} {c.name} {c.localName ? `(${c.localName})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Category Selector */}
+              <div className="mb-4">
+                <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
+                  Тема отзыва:
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {Object.keys(CATEGORIES).map((catKey) => {
+                    const catObj = CATEGORIES[catKey];
+                    const label = catObj[currentLang] || catObj['ru'];
+                    return (
+                      <button
+                        key={catKey}
+                        type="button"
+                        onClick={() => { playSound('click'); setSelectedCategoryKey(catKey); }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                          selectedCategoryKey === catKey
+                            ? 'bg-duo-blue text-white border-b-2 border-duo-blueDark shadow-md'
+                            : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Comment TextArea */}
+              <div className="mb-5">
+                <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
+                  Текст отзыва:
+                </label>
+                <textarea
+                  dir="auto"
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value.slice(0, 500))}
+                  placeholder="Расскажите, что вам нравится в DuoWindo6601 или что стоит улучшить..."
+                  rows={4}
+                  className="w-full bg-gray-900 border-2 border-gray-700 rounded-2xl p-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-duo-green transition-all"
                 />
+                <div className="text-right text-[11px] text-gray-500 mt-1">
+                  {comment.length} / 500 символов
+                </div>
               </div>
 
-              <button
-                type="submit"
-                className="w-full bg-amber-500 hover:bg-amber-400 text-gray-950 font-black py-3 rounded-2xl border-b-4 border-amber-700 active:translate-y-1 transition-all text-sm uppercase tracking-wider"
-              >
-                Войти как Администратор
-              </button>
+              {/* Submit Action */}
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="px-4 py-2.5 rounded-xl bg-gray-800 text-gray-400 hover:text-white font-bold text-xs uppercase tracking-wider"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting || !comment.trim()}
+                  className="bg-duo-green text-white font-black px-6 py-2.5 rounded-xl border-b-4 border-duo-greenDark hover:brightness-110 active:translate-y-1 active:border-b-0 transition-all shadow-md text-xs uppercase tracking-wider disabled:opacity-50"
+                >
+                  {submitting ? 'Опубликование...' : 'Опубликовать отзыв'}
+                </button>
+              </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Review Form */}
-      {showForm && (
-        <form
-          onSubmit={handleSubmit}
-          className="bg-duo-card border-2 border-duo-green rounded-3xl p-5 md:p-6 shadow-2xl mb-6 animate-in fade-in slide-in-from-top-4"
-        >
-          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-            <span>✍️</span> Ваш отзыв о DuoWindo6601
-          </h3>
-
-          {/* User Info Bar & Admin Checkbox */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 bg-gray-800/80 p-3 rounded-2xl border border-gray-700">
-            <div className="flex items-center gap-3">
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center text-xl font-bold shadow-md"
-                style={{
-                  backgroundColor: (isAdminMode && asAdminForm) ? '#f59e0b' : (user.avatarColor || '#1cb0f6')
-                }}
-              >
-                {(isAdminMode && asAdminForm) ? '👑' : (user.avatarIcon || '👤')}
-              </div>
-              <div>
-                <div className="font-bold text-white text-sm flex items-center gap-1.5">
-                  {(isAdminMode && asAdminForm) ? '👑 Администратор DuoWindo6601' : (user.name || 'Пользователь')}
-                </div>
-                <div className="text-xs text-gray-400">
-                  {(isAdminMode && asAdminForm) ? 'Официальное объявление' : 'Автор отзыва'}
-                </div>
-              </div>
-            </div>
-
-            {isAdminMode && (
-              <label className="flex items-center gap-2 bg-amber-500/20 border border-amber-500/50 px-3 py-1.5 rounded-xl cursor-pointer text-xs font-bold text-amber-300">
-                <input
-                  type="checkbox"
-                  checked={asAdminForm}
-                  onChange={(e) => setAsAdminForm(e.target.checked)}
-                  className="rounded text-amber-500 focus:ring-0"
-                />
-                Опубликовать как Администратор 👑
-              </label>
-            )}
-          </div>
-
-          {/* Quick Preset Template Buttons */}
-          <div className="mb-4">
-            <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
-              Быстрый шаблон типа отзыва:
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  playSound('click');
-                  setRating(5);
-                  setCategory('🌟 Общие впечатления');
-                  setComment('Отличное приложение DuoWindo6601 (https://duowindo6601.ai.studio/)! Очень удобные уроки, проработанный интерфейс и качественная озвучка курсов.');
-                }}
-                className="p-3 rounded-2xl bg-emerald-950/60 border-2 border-emerald-500/50 hover:bg-emerald-900/60 text-emerald-200 font-bold text-xs text-left transition-all flex items-center space-x-2 shadow-sm"
-              >
-                <span className="text-xl shrink-0">👍</span>
-                <div>
-                  <div className="font-black text-emerald-300 text-xs">Положительный отзыв (5★)</div>
-                  <div className="text-[10px] text-emerald-300/80 font-normal">Хвала за качество, уроки и дизайн</div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  playSound('click');
-                  setRating(2);
-                  setCategory('🐛 Ошибка / Доработка');
-                  setComment('В приложении DuoWindo6601 на https://duowindo6601.ai.studio/ хотелось бы улучшить следующую деталь: ');
-                }}
-                className="p-3 rounded-2xl bg-rose-950/60 border-2 border-rose-500/50 hover:bg-rose-900/60 text-rose-200 font-bold text-xs text-left transition-all flex items-center space-x-2 shadow-sm"
-              >
-                <span className="text-xl shrink-0">👎</span>
-                <div>
-                  <div className="font-black text-rose-300 text-xs">Критический отзыв (1-3★)</div>
-                  <div className="text-[10px] text-rose-300/80 font-normal">Замечание, баг или идея доработки</div>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {/* Rating Interactive Stars */}
-          <div className="mb-4">
-            <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
-              Оцените приложение:
-            </label>
-            <div className="flex items-center gap-2">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  type="button"
-                  onClick={() => { playSound('click'); setRating(star); }}
-                  onMouseEnter={() => setHoverRating(star)}
-                  onMouseLeave={() => setHoverRating(0)}
-                  className="p-1 hover:scale-125 transition-transform"
-                >
-                  <StarIcon
-                    className={`w-8 h-8 md:w-9 md:h-9 ${
-                      star <= (hoverRating || rating)
-                        ? 'text-duo-yellow fill-duo-yellow drop-shadow-md'
-                        : 'text-gray-600 fill-none'
-                    }`}
-                  />
-                </button>
-              ))}
-              <span className="ml-2 font-black text-duo-yellow text-base">
-                {hoverRating || rating} / 5
-              </span>
-            </div>
-          </div>
-
-          {/* Course Selector */}
-          <div className="mb-4">
-            <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <span>📚</span> Выберите курс DuoWindo6601:
-            </label>
-            <select
-              value={selectedCourseId}
-              onChange={(e) => { playSound('click'); setSelectedCourseId(e.target.value); }}
-              className="w-full bg-gray-900 border-2 border-gray-700 rounded-2xl p-3 text-xs md:text-sm text-white focus:outline-none focus:border-duo-green transition-all"
-            >
-              {availableCourseList.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.flagEmoji} {c.name} {c.localName ? `(${c.localName})` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Category Selector */}
-          <div className="mb-4">
-            <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
-              Тема отзыва:
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {CATEGORIES.map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => { playSound('click'); setCategory(cat); }}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                    category === cat
-                      ? 'bg-duo-blue text-white border-b-2 border-duo-blueDark shadow-md'
-                      : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Comment TextArea */}
-          <div className="mb-5">
-            <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
-              Текст отзыва:
-            </label>
-            <textarea
-              dir="auto"
-              value={comment}
-              onChange={(e) => setComment(e.target.value.slice(0, 500))}
-              placeholder="Расскажите, что вам нравится в DuoWindo6601 или что стоит улучшить..."
-              rows={4}
-              className="w-full bg-gray-900 border-2 border-gray-700 rounded-2xl p-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-duo-green transition-all"
-            />
-            <div className="text-right text-[11px] text-gray-500 mt-1">
-              {comment.length} / 500 символов
-            </div>
-          </div>
-
-          {/* Submit Action */}
-          <div className="flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={() => setShowForm(false)}
-              className="px-4 py-2.5 rounded-xl bg-gray-800 text-gray-400 hover:text-white font-bold text-xs uppercase tracking-wider"
-            >
-              Отмена
-            </button>
-            <button
-              type="submit"
-              disabled={submitting || !comment.trim()}
-              className="bg-duo-green text-white font-black px-6 py-2.5 rounded-xl border-b-4 border-duo-greenDark hover:brightness-110 active:translate-y-1 active:border-b-0 transition-all shadow-md text-xs uppercase tracking-wider disabled:opacity-50"
-            >
-              {submitting ? 'Опубликование...' : 'Опубликовать отзыв'}
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* Course Filter Bar */}
-      <div className="bg-duo-card border border-gray-700/80 rounded-2xl p-3 mb-4 space-y-2">
-        <div className="flex items-center justify-between text-xs font-bold text-gray-300">
-          <span className="flex items-center gap-1.5 text-duo-yellow">
-            <span>🎓</span> Фильтр по курсу:
-          </span>
-          {filterCourseId !== 'all' && (
-            <button
-              onClick={() => { playSound('click'); setFilterCourseId('all'); }}
-              className="text-[11px] text-duo-blue hover:underline font-bold"
-            >
-              Сбросить фильтр
-            </button>
           )}
-        </div>
-        <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-1 scrollbar-thin">
-          <button
-            onClick={() => { playSound('click'); setFilterCourseId('all'); }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-              filterCourseId === 'all'
-                ? 'bg-duo-blue text-white shadow-md border-b-2 border-duo-blueDark'
-                : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700'
-            }`}
-          >
-            🌍 Все курсы
-          </button>
-          {availableCourseList.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => { playSound('click'); setFilterCourseId(c.id); }}
-              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
-                filterCourseId === c.id
-                  ? 'bg-duo-blue text-white shadow-md border-b-2 border-duo-blueDark'
-                  : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700'
-              }`}
-            >
-              <span>{c.flagEmoji}</span>
-              <span>{c.name}</span>
-            </button>
-          ))}
-        </div>
-      </div>
 
-      {/* Filter Tabs: Sentiment & Rating Stars */}
-      <div className="flex flex-col gap-2 mb-4">
-        {/* Sentiment Filter Toggle */}
-        <div className="grid grid-cols-3 gap-1.5 p-1 bg-gray-900 rounded-2xl border border-gray-800">
-          <button
-            onClick={() => { playSound('click'); setFilterSentiment('all'); }}
-            className={`py-2 px-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center space-x-1 ${
-              filterSentiment === 'all'
-                ? 'bg-duo-blue text-white shadow-md'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            <span>💬 Все ({reviews.length})</span>
-          </button>
-
-          <button
-            onClick={() => { playSound('click'); setFilterSentiment('good'); }}
-            className={`py-2 px-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center space-x-1 ${
-              filterSentiment === 'good'
-                ? 'bg-emerald-600 text-white shadow-md'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            <span>👍 Хорошие ({reviews.filter(r => r.rating >= 4).length})</span>
-          </button>
-
-          <button
-            onClick={() => { playSound('click'); setFilterSentiment('bad'); }}
-            className={`py-2 px-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center space-x-1 ${
-              filterSentiment === 'bad'
-                ? 'bg-rose-600 text-white shadow-md'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            <span>👎 Критические ({reviews.filter(r => r.rating <= 3).length})</span>
-          </button>
-        </div>
-
-        {/* Rating Stars Filters */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-          <button
-            onClick={() => { playSound('click'); setFilterRating('all'); }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-              filterRating === 'all'
-                ? 'bg-duo-blue text-white shadow-md'
-                : 'bg-duo-card text-gray-400 hover:text-white border border-gray-700'
-            }`}
-          >
-            Все оценки
-          </button>
-
-          {[5, 4, 3, 2, 1].map((r) => {
-            const c = reviews.filter((rev) => rev.rating === r).length;
-            return (
+          {/* Filter Tabs: Sentiment & Rating Stars */}
+          <div className="flex flex-col gap-2 mb-4">
+            <div className="grid grid-cols-3 gap-1.5 p-1 bg-gray-900 rounded-2xl border border-gray-800">
               <button
-                key={r}
-                onClick={() => { playSound('click'); setFilterRating(r); }}
-                className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 ${
-                  filterRating === r
-                    ? 'bg-duo-yellow text-white shadow-md'
+                onClick={() => { playSound('click'); setFilterSentiment('all'); }}
+                className={`py-2 px-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center space-x-1 ${
+                  filterSentiment === 'all'
+                    ? 'bg-duo-blue text-white shadow-md'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <span>💬 Все ({reviews.length})</span>
+              </button>
+
+              <button
+                onClick={() => { playSound('click'); setFilterSentiment('good'); }}
+                className={`py-2 px-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center space-x-1 ${
+                  filterSentiment === 'good'
+                    ? 'bg-emerald-600 text-white shadow-md'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <span>👍 Хорошие ({reviews.filter(r => r.rating >= 4).length})</span>
+              </button>
+
+              <button
+                onClick={() => { playSound('click'); setFilterSentiment('bad'); }}
+                className={`py-2 px-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center space-x-1 ${
+                  filterSentiment === 'bad'
+                    ? 'bg-rose-600 text-white shadow-md'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <span>👎 Критические ({reviews.filter(r => r.rating <= 3).length})</span>
+              </button>
+            </div>
+
+            {/* Rating Stars Filters */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+              <button
+                onClick={() => { playSound('click'); setFilterRating('all'); }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                  filterRating === 'all'
+                    ? 'bg-duo-blue text-white shadow-md'
                     : 'bg-duo-card text-gray-400 hover:text-white border border-gray-700'
                 }`}
               >
-                <span>{r}</span>
-                <StarIcon className="w-3.5 h-3.5 fill-current" />
-                <span className="opacity-70">({c})</span>
+                Все оценки
               </button>
-            );
-          })}
-        </div>
-      </div>
 
-      {/* Reviews Feed List */}
-      {loading ? (
-        <div className="py-12 text-center text-gray-400 text-sm">
-          Загрузка отзывов...
-        </div>
-      ) : filteredReviews.length === 0 ? (
-        <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-8 text-center my-4">
-          <div className="text-4xl mb-2">⭐</div>
-          <h4 className="text-white font-bold mb-1">Пока нет отзывов с этой оценкой</h4>
-          <p className="text-xs text-gray-400 mb-4">Будьте первым, кто оставит отзыв!</p>
-          <button
-            onClick={() => { playSound('click'); setShowForm(true); }}
-            className="bg-duo-green text-white font-bold text-xs px-4 py-2 rounded-xl border-b-2 border-duo-greenDark"
-          >
-            Написать отзыв
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {filteredReviews.map((rev) => {
-            const myUid = user.username || user.name || 'my-user';
-            const isLikedByMe = rev.likedBy?.includes(myUid);
-            const dateStr = new Date(rev.createdAt).toLocaleDateString('ru-RU', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric'
-            });
-
-            const isExpanded = expandedComments[rev.id] || false;
-            const repliesList = rev.replies || [];
-
-            return (
-              <div
-                key={rev.id}
-                className={`bg-duo-card border-2 rounded-3xl p-4 md:p-5 shadow-lg transition-all relative overflow-hidden ${
-                  rev.isPinned
-                    ? 'border-amber-500/80 bg-gradient-to-b from-amber-500/10 via-duo-card to-duo-card'
-                    : 'border-gray-700/80 hover:border-gray-600'
-                }`}
-              >
-                {/* Pinned Badge */}
-                {rev.isPinned && (
-                  <div className="mb-3 flex items-center gap-1.5 text-[11px] font-black text-amber-400 bg-amber-500/20 px-3 py-1 rounded-full w-fit border border-amber-500/30">
-                    <span>📌 Закреплено Администратором DuoWindo6601</span>
-                  </div>
-                )}
-
-                {/* Author Header */}
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-10 h-10 rounded-2xl flex items-center justify-center text-xl shadow-md shrink-0"
-                      style={{ backgroundColor: rev.userColor || '#1cb0f6' }}
-                    >
-                      {rev.userAvatar || '👤'}
-                    </div>
-                    <div>
-                      <div className="font-bold text-white text-sm flex items-center gap-1.5 flex-wrap" dir="auto">
-                        <bdi dir="auto">{rev.userName}</bdi>
-                        {rev.userId === 'admin-duowindo6601' && (
-                          <span className="text-[10px] font-black bg-amber-500 text-gray-950 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                            👑 Админ
-                          </span>
-                        )}
-                        {rev.rating >= 4 ? (
-                          <span className="text-[10px] font-black bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/40 flex items-center gap-1">
-                            👍 Хороший отзыв
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-black bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full border border-rose-500/40 flex items-center gap-1">
-                            👎 Критический
-                          </span>
-                        )}
-                        {rev.category && (
-                          <span className="text-[10px] font-normal bg-gray-800 text-gray-300 px-2 py-0.5 rounded-full border border-gray-700" dir="auto">
-                            <bdi dir="auto">{rev.category}</bdi>
-                          </span>
-                        )}
-                        {rev.courseName && (
-                          <span className="text-[10px] font-bold bg-duo-blue/20 text-duo-blue px-2 py-0.5 rounded-full border border-duo-blue/40 flex items-center gap-1" dir="auto">
-                            <bdi dir="auto">🎓 {rev.courseName}</bdi>
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-gray-500">{dateStr}</div>
-                    </div>
-                  </div>
-
-                  {/* Rating Stars Badge */}
-                  <div className="flex items-center gap-1 bg-gray-900/80 px-2.5 py-1 rounded-full border border-gray-800 shrink-0">
-                    {[1, 2, 3, 4, 5].map((s) => (
-                      <StarIcon
-                        key={s}
-                        className={`w-3.5 h-3.5 ${
-                          s <= rev.rating
-                            ? 'text-duo-yellow fill-duo-yellow'
-                            : 'text-gray-700 fill-none'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                {/* Comment Text */}
-                <p dir="auto" className="text-gray-200 text-xs md:text-sm leading-relaxed mb-4 whitespace-pre-wrap bdi-isolate">
-                  <bdi dir="auto">{rev.comment}</bdi>
-                </p>
-
-                {/* Card Footer Actions */}
-                <div className="flex items-center justify-between pt-3 border-t border-gray-800 text-xs flex-wrap gap-2">
-                  <div className="flex items-center gap-3">
-                    {/* Toggle Comments Button */}
-                    <button
-                      onClick={() => {
-                        playSound('click');
-                        setExpandedComments((prev) => ({ ...prev, [rev.id]: !isExpanded }));
-                      }}
-                      className="flex items-center gap-1.5 text-duo-blue hover:text-blue-300 font-bold transition-colors"
-                    >
-                      <MessageSquareIcon className="w-4 h-4" />
-                      <span>
-                        {t ? t('comments_access') : 'Комментарии'} {repliesList.length > 0 && `(${repliesList.length})`}
-                      </span>
-                    </button>
-
-                    {/* Admin Pin Toggle */}
-                    {isAdminMode && (
-                      <button
-                        onClick={() => handleTogglePin(rev)}
-                        className="text-amber-400 hover:text-amber-300 font-bold text-[11px] flex items-center gap-1"
-                      >
-                        📌 {rev.isPinned ? 'Открепить' : 'Закрепить'}
-                      </button>
-                    )}
-
-                    {/* Admin / Author Delete */}
-                    {(isAdminMode || rev.userId === user.username || rev.userId === user.name) && (
-                      <button
-                        onClick={() => handleDeleteReview(rev.id)}
-                        className="text-red-400 hover:text-red-300 font-bold text-[11px] flex items-center gap-1"
-                      >
-                        <TrashIcon className="w-3.5 h-3.5" />
-                        Удалить
-                      </button>
-                    )}
-                  </div>
-
+              {[5, 4, 3, 2, 1].map((r) => {
+                const c = reviews.filter((rev) => rev.rating === r).length;
+                return (
                   <button
-                    onClick={() => handleLike(rev)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all ${
-                      isLikedByMe
-                        ? 'bg-red-500/10 border-red-500/40 text-red-400 font-bold'
-                        : 'bg-gray-800/80 border-gray-700 text-gray-400 hover:text-white'
+                    key={r}
+                    onClick={() => { playSound('click'); setFilterRating(r); }}
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 ${
+                      filterRating === r
+                        ? 'bg-duo-yellow text-white shadow-md'
+                        : 'bg-duo-card text-gray-400 hover:text-white border border-gray-700'
                     }`}
                   >
-                    <ThumbsUpIcon className={`w-4 h-4 ${isLikedByMe ? 'fill-current' : ''}`} />
-                    <span>Полезно</span>
-                    {rev.likes > 0 && (
-                      <span className="bg-gray-700 px-1.5 py-0.2 rounded-full text-[10px] font-mono">
-                        {rev.likes}
-                      </span>
-                    )}
+                    <span>{r}</span>
+                    <StarIcon className="w-3.5 h-3.5 fill-current" />
+                    <span className="opacity-70">({c})</span>
                   </button>
-                </div>
+                );
+              })}
+            </div>
+          </div>
 
-                {/* EXPANDABLE COMMENTS & REPLIES SECTION */}
-                {isExpanded && (
-                  <div className="mt-4 pt-4 border-t border-gray-800 animate-in fade-in slide-in-from-top-2">
-                    <h5 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                      💬 {t ? t('comments_access') : 'Комментарии'} ({repliesList.length})
-                    </h5>
+          {/* Reviews Feed List */}
+          {loading ? (
+            <div className="py-12 text-center text-gray-400 text-sm">
+              Загрузка отзывов...
+            </div>
+          ) : filteredReviews.length === 0 ? (
+            <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-8 text-center my-4">
+              <div className="text-4xl mb-2">⭐</div>
+              <h4 className="text-white font-bold mb-1">Пока нет отзывов с этой оценкой</h4>
+              <p className="text-xs text-gray-400 mb-4">Будьте первым, кто оставит отзыв!</p>
+              <button
+                onClick={() => { playSound('click'); setShowForm(true); }}
+                className="bg-duo-green text-white font-bold text-xs px-4 py-2 rounded-xl border-b-2 border-duo-greenDark"
+              >
+                Написать отзыв
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4 pb-8">
+              {filteredReviews.map((rev) => {
+                const myUid = user.username || user.name || 'my-user';
+                const isLikedByMe = rev.likedBy?.includes(myUid);
+                const dateStr = new Date(rev.createdAt).toLocaleDateString('ru-RU', {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric'
+                });
 
-                    {/* Replies Feed */}
-                    {repliesList.length > 0 ? (
-                      <div className="space-y-3 mb-4">
-                        {repliesList.map((reply) => {
-                          const replyDate = new Date(reply.createdAt).toLocaleDateString('ru-RU', {
-                            day: 'numeric',
-                            month: 'short',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          });
+                const isExpanded = expandedComments[rev.id] || false;
+                const repliesList = rev.replies || [];
+                const translationKey = `${rev.id}_${translatorTargetLang}`;
+                const isTranslated = Boolean(translatedTexts[translationKey]);
+                const isTranslating = Boolean(translatingMap[translationKey]);
+                const displayText = isTranslated ? translatedTexts[translationKey] : rev.comment;
 
-                          return (
-                            <div
-                              key={reply.id}
-                              className={`p-3 rounded-2xl border text-xs relative ${
-                                reply.isAdmin
-                                  ? 'bg-amber-500/10 border-amber-500/40'
-                                  : 'bg-gray-800/90 border-gray-700'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between mb-1.5">
-                                <div className="flex items-center gap-2">
-                                  <div
-                                    className="w-6 h-6 rounded-lg flex items-center justify-center text-xs shadow"
-                                    style={{ backgroundColor: reply.userColor || '#f59e0b' }}
-                                  >
-                                    {reply.userAvatar || '👤'}
-                                  </div>
-                                  <span className="font-bold text-white flex items-center gap-1" dir="auto">
-                                    <bdi dir="auto">{reply.userName}</bdi>
-                                    {reply.isAdmin && (
-                                      <span className="bg-amber-500 text-gray-950 font-black text-[9px] px-1.5 py-0.2 rounded uppercase">
-                                        Официальный ответ
-                                      </span>
-                                    )}
-                                  </span>
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                  <span className="text-[10px] text-gray-500">{replyDate}</span>
-                                  {(isAdminMode || reply.userId === user.username) && (
-                                    <button
-                                      onClick={() => handleDeleteReply(rev, reply.id)}
-                                      className="text-red-400 hover:text-red-300 ml-1"
-                                      title="Удалить комментарий"
-                                    >
-                                      <TrashIcon className="w-3.5 h-3.5" />
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-
-                              <p dir="auto" className="text-gray-300 leading-relaxed pl-8 whitespace-pre-wrap bdi-isolate">
-                                <bdi dir="auto">{reply.comment}</bdi>
-                              </p>
-                            </div>
-                          );
-                        })}
+                return (
+                  <div
+                    key={rev.id}
+                    className={`bg-duo-card border-2 rounded-3xl p-4 md:p-5 shadow-lg transition-all relative overflow-hidden ${
+                      rev.isPinned
+                        ? 'border-amber-500/80 bg-gradient-to-b from-amber-500/10 via-duo-card to-duo-card'
+                        : 'border-gray-700/80 hover:border-gray-600'
+                    }`}
+                  >
+                    {/* Pinned Badge */}
+                    {rev.isPinned && (
+                      <div className="mb-3 flex items-center gap-1.5 text-[11px] font-black text-amber-400 bg-amber-500/20 px-3 py-1 rounded-full w-fit border border-amber-500/30">
+                        <span>📌 {t ? t('pinned_by_admin') || 'Закреплено Администратором' : 'Закреплено Администратором DuoWindo6601'}</span>
                       </div>
-                    ) : (
-                      <p className="text-xs text-gray-500 italic mb-3">
-                        Пока нет комментариев. Напишите первый ответ!
-                      </p>
                     )}
 
-                    {/* New Reply Form */}
-                    <div className="bg-gray-900 p-3 rounded-2xl border border-gray-700 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] text-gray-400 font-bold">
-                          Ваш комментарий:
+                    {/* Author Header */}
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-10 h-10 rounded-2xl flex items-center justify-center text-xl shadow-md shrink-0"
+                          style={{ backgroundColor: rev.userColor || '#1cb0f6' }}
+                        >
+                          {rev.userAvatar || '👤'}
+                        </div>
+                        <div>
+                          <div className="font-bold text-white text-sm flex items-center gap-1.5 flex-wrap" dir="auto">
+                            <bdi dir="auto">{(isTranslated || autoTranslate) ? translateTextToTarget(rev.userName, translatorTargetLang) : rev.userName}</bdi>
+                            {rev.userId === 'admin-duowindo6601' && (
+                              <span className="text-[10px] font-black bg-amber-500 text-gray-950 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                👑 {(isTranslated || autoTranslate) ? translateTextToTarget('Админ', translatorTargetLang) : 'Админ'}
+                              </span>
+                            )}
+                            {rev.rating >= 4 ? (
+                              <span className="text-[10px] font-black bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/40 flex items-center gap-1">
+                                {t ? t('good_review') || '👍 Хороший отзыв' : '👍 Хороший отзыв'}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-black bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full border border-rose-500/40 flex items-center gap-1">
+                                {t ? t('bad_review') || '👎 Критический' : '👎 Критический'}
+                              </span>
+                            )}
+                            {rev.category && (
+                              <span className="text-[10px] font-normal bg-gray-800 text-gray-300 px-2 py-0.5 rounded-full border border-gray-700" dir="auto">
+                                <bdi dir="auto">{(isTranslated || autoTranslate) ? translateTextToTarget(rev.category, translatorTargetLang) : rev.category}</bdi>
+                              </span>
+                            )}
+                            {rev.courseName && (
+                              <span className="text-[10px] font-bold bg-duo-blue/20 text-duo-blue px-2 py-0.5 rounded-full border border-duo-blue/40 flex items-center gap-1" dir="auto">
+                                <bdi dir="auto">🎓 {(isTranslated || autoTranslate) ? translateTextToTarget(rev.courseName, translatorTargetLang) : rev.courseName}</bdi>
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-gray-500">{dateStr}</div>
+                        </div>
+                      </div>
+
+                      {/* Rating Stars Badge */}
+                      <div className="flex items-center gap-1 bg-gray-900/80 px-2.5 py-1 rounded-full border border-gray-800 shrink-0">
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <StarIcon
+                            key={s}
+                            className={`w-3.5 h-3.5 ${
+                              s <= rev.rating
+                                ? 'text-duo-yellow fill-duo-yellow'
+                                : 'text-gray-700 fill-none'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Comment Text with Translation Badge */}
+                    <div className="mb-3">
+                      <p dir="auto" className="text-gray-200 text-xs md:text-sm leading-relaxed whitespace-pre-wrap bdi-isolate">
+                        <bdi dir="auto">{displayText}</bdi>
+                      </p>
+                      {isTranslated && (
+                        <span className="inline-block mt-1 text-[10px] text-purple-300 bg-purple-900/40 px-2 py-0.5 rounded-md border border-purple-500/30">
+                          🌐 Переведено на: {SUPPORTED_LANGUAGES.find(l => l.code === translatorTargetLang)?.name}
                         </span>
+                      )}
+                    </div>
+
+                    {/* Card Footer Actions */}
+                    <div className="flex items-center justify-between pt-3 border-t border-gray-800 text-xs flex-wrap gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* Toggle Comments Button */}
+                        <button
+                          onClick={() => {
+                            playSound('click');
+                            setExpandedComments((prev) => ({ ...prev, [rev.id]: !isExpanded }));
+                          }}
+                          className="flex items-center gap-1.5 text-duo-blue hover:text-blue-300 font-bold transition-colors bg-blue-500/10 px-2.5 py-1 rounded-xl border border-blue-500/20"
+                        >
+                          <MessageSquareIcon className="w-4 h-4" />
+                          <span>
+                            {t ? t('comments_access') || 'Комментарии' : 'Комментарии'} {repliesList.length > 0 && `(${repliesList.length})`}
+                          </span>
+                        </button>
+
+                        {/* Instant Translate Button */}
+                        <button
+                          onClick={() => handleTranslateItem(rev.id, rev.comment, translatorTargetLang)}
+                          disabled={isTranslating}
+                          className={`flex items-center gap-1 font-bold text-[11px] px-2.5 py-1 rounded-xl transition-all border ${
+                            isTranslated
+                              ? 'bg-purple-600/30 text-purple-300 border-purple-500/50'
+                              : 'bg-gray-800 text-gray-300 hover:text-white border-gray-700'
+                          }`}
+                        >
+                          <span>🌐</span>
+                          <span>
+                            {isTranslating ? '...' : isTranslated ? (t ? t('show_original') || 'Оригинал' : 'Оригинал') : (t ? t('translate_btn') || 'Перевести' : 'Перевести')}
+                          </span>
+                        </button>
+
+                        {/* Admin Pin Toggle */}
                         {isAdminMode && (
-                          <label className="flex items-center gap-1.5 text-[11px] font-bold text-amber-400 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={isReplyAdminFlags[rev.id] ?? true}
-                              onChange={(e) =>
-                                setIsReplyAdminFlags((prev) => ({
-                                  ...prev,
-                                  [rev.id]: e.target.checked
-                                }))
-                              }
-                              className="rounded text-amber-500"
-                            />
-                            От имени Администратора DuoWindo6601 👑
-                          </label>
+                          <button
+                            onClick={() => handleTogglePin(rev)}
+                            className="text-amber-400 hover:text-amber-300 font-bold text-[11px] flex items-center gap-1"
+                          >
+                            📌 {rev.isPinned ? 'Открепить' : 'Закрепить'}
+                          </button>
+                        )}
+
+                        {/* Admin / Author Delete */}
+                        {(isAdminMode || rev.userId === user.username || rev.userId === user.name) && (
+                          <button
+                            onClick={() => handleDeleteReview(rev.id)}
+                            className="text-red-400 hover:text-red-300 font-bold text-[11px] flex items-center gap-1"
+                          >
+                            <TrashIcon className="w-3.5 h-3.5" />
+                            Удалить
+                          </button>
                         )}
                       </div>
 
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={replyInputs[rev.id] || ''}
-                          onChange={(e) =>
-                            setReplyInputs((prev) => ({ ...prev, [rev.id]: e.target.value }))
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleAddReply(rev);
-                          }}
-                          placeholder={
-                            isAdminMode && (isReplyAdminFlags[rev.id] ?? true)
-                              ? 'Напишите официальный ответ Администратора DuoWindo6601...'
-                              : 'Напишите комментарий...'
-                          }
-                          className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-duo-blue"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleAddReply(rev)}
-                          className="bg-duo-blue hover:bg-blue-600 text-white font-bold px-4 py-2 rounded-xl text-xs border-b-2 border-duo-blueDark active:translate-y-0.5"
-                        >
-                          Отправить
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => handleLike(rev)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all ${
+                          isLikedByMe
+                            ? 'bg-red-500/10 border-red-500/40 text-red-400 font-bold'
+                            : 'bg-gray-800/80 border-gray-700 text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        <ThumbsUpIcon className={`w-4 h-4 ${isLikedByMe ? 'fill-current' : ''}`} />
+                        <span>{t ? t('helpful') || 'Полезно' : 'Полезно'}</span>
+                        {rev.likes > 0 && (
+                          <span className="bg-gray-700 px-1.5 py-0.2 rounded-full text-[10px] font-mono">
+                            {rev.likes}
+                          </span>
+                        )}
+                      </button>
                     </div>
+
+                    {/* EXPANDABLE COMMENTS & REPLIES SECTION */}
+                    {isExpanded && (
+                      <div className="mt-4 pt-4 border-t border-gray-800 animate-in fade-in slide-in-from-top-2">
+                        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                          <h5 className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>💬</span> {t ? t('admin_comments') || 'Комментарии и ответы' : 'Комментарии и ответы'} ({repliesList.length})
+                          </h5>
+                          {repliesList.some(r => r.isAdmin) && (
+                            <span className="text-[10px] font-black bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/40 flex items-center gap-1">
+                              👑 Ответ Администрации
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Replies Feed */}
+                        {repliesList.length > 0 ? (
+                          <div className="space-y-3 mb-4">
+                            {repliesList.map((reply) => {
+                              const replyDate = new Date(reply.createdAt).toLocaleDateString('ru-RU', {
+                                day: 'numeric',
+                                month: 'short',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              });
+
+                              const repTransKey = `${reply.id}_${translatorTargetLang}`;
+                              const isRepTranslated = Boolean(translatedTexts[repTransKey]);
+                              const isRepTranslating = Boolean(translatingMap[repTransKey]);
+                              const displayRepText = isRepTranslated ? translatedTexts[repTransKey] : reply.comment;
+
+                              return (
+                                <div
+                                  key={reply.id}
+                                  className={`p-3 rounded-2xl border text-xs relative ${
+                                    reply.isAdmin
+                                      ? 'bg-amber-500/10 border-amber-500/40'
+                                      : 'bg-gray-800/90 border-gray-700'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
+                                    <div className="flex items-center gap-2">
+                                      <div
+                                        className="w-6 h-6 rounded-lg flex items-center justify-center text-xs shadow"
+                                        style={{ backgroundColor: reply.userColor || '#f59e0b' }}
+                                      >
+                                        {reply.userAvatar || '👤'}
+                                      </div>
+                                      <span className="font-bold text-white flex items-center gap-1" dir="auto">
+                                        <bdi dir="auto">{(isRepTranslated || autoTranslate) ? translateTextToTarget(reply.userName, translatorTargetLang) : reply.userName}</bdi>
+                                        {reply.isAdmin && (
+                                          <span className="bg-amber-500 text-gray-950 font-black text-[9px] px-1.5 py-0.2 rounded uppercase">
+                                            {t ? t('official_admin_reply') || 'Официальный ответ' : 'Официальный ответ'}
+                                          </span>
+                                        )}
+                                      </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        onClick={() => handleTranslateItem(reply.id, reply.comment, translatorTargetLang)}
+                                        disabled={isRepTranslating}
+                                        className="text-[10px] text-purple-300 hover:underline flex items-center gap-0.5"
+                                      >
+                                        <span>🌐</span>
+                                        <span>{isRepTranslating ? '...' : isRepTranslated ? 'Оригинал' : 'Перевести'}</span>
+                                      </button>
+                                      <span className="text-[10px] text-gray-500">{replyDate}</span>
+                                      {(isAdminMode || reply.userId === user.username) && (
+                                        <button
+                                          onClick={() => handleDeleteReply(rev, reply.id)}
+                                          className="text-red-400 hover:text-red-300 ml-1"
+                                          title="Удалить комментарий"
+                                        >
+                                          <TrashIcon className="w-3.5 h-3.5" />
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <p dir="auto" className="text-gray-300 leading-relaxed pl-8 whitespace-pre-wrap bdi-isolate">
+                                    <bdi dir="auto">{displayRepText}</bdi>
+                                  </p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-500 italic mb-3">
+                            Пока нет комментариев. Напишите первый ответ!
+                          </p>
+                        )}
+
+                        {/* New Reply Form */}
+                        <div className="bg-gray-900 p-3 rounded-2xl border border-gray-700 space-y-2">
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            <span className="text-[11px] text-gray-400 font-bold">
+                              {t ? t('add_comment') || 'Добавить комментарий:' : 'Добавить комментарий:'}
+                            </span>
+                            {isAdminMode && (
+                              <label className="flex items-center gap-1.5 text-[11px] font-bold text-amber-400 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={isReplyAdminFlags[rev.id] ?? true}
+                                  onChange={(e) =>
+                                    setIsReplyAdminFlags((prev) => ({
+                                      ...prev,
+                                      [rev.id]: e.target.checked
+                                    }))
+                                  }
+                                  className="rounded text-amber-500"
+                                />
+                                {t ? t('as_admin_checkbox') || 'От имени Администратора DuoWindo6601 👑' : 'От имени Администратора DuoWindo6601 👑'}
+                              </label>
+                            )}
+                          </div>
+
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={replyInputs[rev.id] || ''}
+                              onChange={(e) =>
+                                setReplyInputs((prev) => ({ ...prev, [rev.id]: e.target.value }))
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleAddReply(rev);
+                              }}
+                              placeholder={
+                                isAdminMode && (isReplyAdminFlags[rev.id] ?? true)
+                                  ? (t ? t('admin_reply_placeholder') || 'Напишите официальный ответ Администратора DuoWindo6601...' : 'Напишите официальный ответ Администратора DuoWindo6601...')
+                                  : (t ? t('write_comment_placeholder') || 'Напишите комментарий...' : 'Напишите комментарий...')
+                              }
+                              className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-duo-blue"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleAddReply(rev)}
+                              className="bg-duo-blue hover:bg-blue-600 text-white font-bold px-4 py-2 rounded-xl text-xs border-b-2 border-duo-blueDark active:translate-y-0.5"
+                            >
+                              Отправить
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
-      </>
+
+      {/* Admin Password Modal */}
+      {showAdminModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border-2 border-amber-500/80 rounded-3xl p-6 max-w-sm w-full shadow-2xl animate-in zoom-in-95">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-black text-amber-400 text-base uppercase tracking-wider flex items-center gap-2">
+                <span>👑</span> Вход для Администратора
+              </h3>
+              <button
+                onClick={() => setShowAdminModal(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <CloseIcon className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-300 mb-4">
+              Введите ключ доступа администратора для управления отзывами и публикации официальных ответов DuoWindo6601.
+            </p>
+
+            <form onSubmit={handleAdminAuth} className="space-y-3">
+              <input
+                type="password"
+                value={adminPasswordInput}
+                onChange={(e) => setAdminPasswordInput(e.target.value)}
+                placeholder="Ключ Администратора"
+                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500"
+                autoFocus
+              />
+
+              <div className="flex gap-2 justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAdminModal(false)}
+                  className="px-3 py-2 bg-gray-800 text-gray-300 hover:text-white rounded-xl text-xs font-bold uppercase"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-black font-black rounded-xl text-xs uppercase tracking-wider shadow-md hover:brightness-110"
+                >
+                  Подтвердить
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -744,6 +744,146 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "zh": "建议",
     "ar": "المقترحات"
   },
+  "admin_comments": {
+    "ru": "Комментарии Администрации",
+    "en": "Administration Comments",
+    "de": "Kommentare der Administration",
+    "fr": "Commentaires de l'administration",
+    "es": "Comentarios de la administración",
+    "ja": "管理者コメント",
+    "zh": "管理团队评论",
+    "ar": "تعليقات الإدارة"
+  },
+  "user_comments": {
+    "ru": "Комментарии пользователей",
+    "en": "User Comments",
+    "de": "Benutzerkommentare",
+    "fr": "Commentaires des utilisateurs",
+    "es": "Comentarios de usuarios",
+    "ja": "ユーザーコメント",
+    "zh": "用户评论",
+    "ar": "تعليقات المستخدمين"
+  },
+  "add_comment": {
+    "ru": "Добавить комментарий",
+    "en": "Add Comment",
+    "de": "Kommentar hinzufügen",
+    "fr": "Ajouter un commentaire",
+    "es": "Agregar comentario",
+    "ja": "コメントを追加",
+    "zh": "添加评论",
+    "ar": "إضافة تعليق"
+  },
+  "write_comment_placeholder": {
+    "ru": "Напишите ваш комментарий...",
+    "en": "Write your comment...",
+    "de": "Schreiben Sie Ihren Kommentar...",
+    "fr": "Écrivez votre commentaire...",
+    "es": "Escriba su comentario...",
+    "ja": "コメントを入力...",
+    "zh": "写下您的评论...",
+    "ar": "اكتب تعليقك..."
+  },
+  "admin_reply_placeholder": {
+    "ru": "Напишите официальный ответ Администратора DuoWindo6601...",
+    "en": "Write official DuoWindo6601 Administrator reply...",
+    "de": "Schreiben Sie eine offizielle Antwort des DuoWindo6601-Administrators...",
+    "fr": "Écrivez une réponse officielle de l'administrateur DuoWindo6601...",
+    "es": "Escriba una respuesta oficial del Administrador de DuoWindo6601...",
+    "ja": "DuoWindo6601管理者の公式回答を入力...",
+    "zh": "写下 DuoWindo6601 管理员官方回复...",
+    "ar": "اكتب رداً رسمياً من مسؤول DuoWindo6601..."
+  },
+  "as_admin_checkbox": {
+    "ru": "От имени Администратора DuoWindo6601 👑",
+    "en": "As DuoWindo6601 Administrator 👑",
+    "de": "Als DuoWindo6601-Administrator 👑",
+    "fr": "En tant qu'administrateur DuoWindo6601 👑",
+    "es": "Como Administrador de DuoWindo6601 👑",
+    "ja": "DuoWindo6601管理者として 👑",
+    "zh": "以 DuoWindo6601 管理员身份 👑",
+    "ar": "بصفتك مسؤول DuoWindo6601 👑"
+  },
+  "official_admin_reply": {
+    "ru": "Официальный ответ",
+    "en": "Official Response",
+    "de": "Offizielle Antwort",
+    "fr": "Réponse officielle",
+    "es": "Respuesta oficial",
+    "ja": "公式回答",
+    "zh": "官方回复",
+    "ar": "رد رسمي"
+  },
+  "translate_btn": {
+    "ru": "Перевести",
+    "en": "Translate",
+    "de": "Übersetzen",
+    "fr": "Traduire",
+    "es": "Traducir",
+    "ja": "翻訳",
+    "zh": "翻译",
+    "ar": "ترجمة"
+  },
+  "show_original": {
+    "ru": "Показать оригинал",
+    "en": "Show original",
+    "de": "Original anzeigen",
+    "fr": "Afficher l'original",
+    "es": "Mostrar original",
+    "ja": "原文を表示",
+    "zh": "显示原文",
+    "ar": "عرض النص الأصلي"
+  },
+  "translator_title": {
+    "ru": "🌐 Переводчик комментариев и отзывов",
+    "en": "🌐 Comments & Reviews Translator",
+    "de": "🌐 Übersetzer für Kommentare & Bewertungen",
+    "fr": "🌐 Traducteur de commentaires et d'avis",
+    "es": "🌐 Traductor de comentarios y reseñas",
+    "ja": "🌐 コメント＆レビュー翻訳機",
+    "zh": "🌐 评论与评价翻译器",
+    "ar": "🌐 مترجم التعليقات والمراجعات"
+  },
+  "switch_language": {
+    "ru": "Переключить язык",
+    "en": "Switch Language",
+    "de": "Sprache wechseln",
+    "fr": "Changer de langue",
+    "es": "Cambiar idioma",
+    "ja": "言語を切り替える",
+    "zh": "切换语言",
+    "ar": "تغيير اللغة"
+  },
+  "good_review": {
+    "ru": "👍 Хороший отзыв",
+    "en": "👍 Good Review",
+    "de": "👍 Gute Bewertung",
+    "fr": "👍 Bon avis",
+    "es": "👍 Buena reseña",
+    "ja": "👍 良いレビュー",
+    "zh": "👍 好评",
+    "ar": "👍 تقييم جيد"
+  },
+  "bad_review": {
+    "ru": "👎 Критический отзыв",
+    "en": "👎 Critical Review",
+    "de": "👎 Kritische Bewertung",
+    "fr": "👎 Avis critique",
+    "es": "👎 Reseña crítica",
+    "ja": "👎 批判的レビュー",
+    "zh": "👎 差评",
+    "ar": "👎 تقييم نقدي"
+  },
+  "helpful": {
+    "ru": "Полезно",
+    "en": "Helpful",
+    "de": "Hilfreich",
+    "fr": "Utile",
+    "es": "Útil",
+    "ja": "役に立った",
+    "zh": "有用",
+    "ar": "مفيد"
+  },
   "write_review": {
     "ru": "Написать отзыв о DuoWindo6601",
     "en": "Write a review about DuoWindo6601",
@@ -773,6 +913,116 @@ const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "ja": "コメントアクセス",
     "zh": "评论访问",
     "ar": "الوصول إلى التعليقات"
+  },
+  "lang_ru": {
+    "ru": "Русский",
+    "en": "Russian",
+    "de": "Russisch",
+    "fr": "Russe",
+    "es": "Ruso",
+    "ja": "ロシア語",
+    "zh": "俄语",
+    "ar": "الروسية"
+  },
+  "lang_en": {
+    "ru": "Английский",
+    "en": "English",
+    "de": "Englisch",
+    "fr": "Anglais",
+    "es": "Inglés",
+    "ja": "英語",
+    "zh": "英语",
+    "ar": "الإنجليزية"
+  },
+  "lang_de": {
+    "ru": "Немецкий",
+    "en": "German",
+    "de": "Deutsch",
+    "fr": "Allemand",
+    "es": "Alemán",
+    "ja": "ドイツ語",
+    "zh": "德语",
+    "ar": "الألمانية"
+  },
+  "lang_fr": {
+    "ru": "Французский",
+    "en": "French",
+    "de": "Französisch",
+    "fr": "Français",
+    "es": "Francés",
+    "ja": "フランス語",
+    "zh": "法语",
+    "ar": "الفرنسية"
+  },
+  "lang_es": {
+    "ru": "Испанский",
+    "en": "Spanish",
+    "de": "Spanisch",
+    "fr": "Espagnol",
+    "es": "Español",
+    "ja": "スペイン語",
+    "zh": "西班牙语",
+    "ar": "الإسبانية"
+  },
+  "lang_ja": {
+    "ru": "Японский",
+    "en": "Japanese",
+    "de": "Japanisch",
+    "fr": "Japonais",
+    "es": "Japonés",
+    "ja": "日本語",
+    "zh": "日语",
+    "ar": "اليابانية"
+  },
+  "lang_zh": {
+    "ru": "Китайский",
+    "en": "Chinese",
+    "de": "Chinesisch",
+    "fr": "Chinois",
+    "es": "Chino",
+    "ja": "中国語",
+    "zh": "中文",
+    "ar": "الصينية"
+  },
+  "lang_ar": {
+    "ru": "Арабский",
+    "en": "Arabic",
+    "de": "Arabisch",
+    "fr": "Arabe",
+    "es": "Árabe",
+    "ja": "アラビア語",
+    "zh": "阿拉伯语",
+    "ar": "العربية"
+  },
+  "name_translator": {
+    "ru": "Имя переводчик",
+    "en": "Name Translator",
+    "de": "Namensübersetzer",
+    "fr": "Traducteur de noms",
+    "es": "Traductor de nombres",
+    "ja": "名前翻訳機",
+    "zh": "姓名翻译器",
+    "ar": "مترجم الأسماء"
+  },
+  "add_admin_comment": {
+    "ru": "Добавить комментарий Администрации",
+    "en": "Add Administration Comment",
+    "de": "Administrationskommentar hinzufügen",
+    "fr": "Ajouter un commentaire de l'administration",
+    "es": "Agregar comentario de la administración",
+    "ja": "管理者コメントを追加",
+    "zh": "添加管理员评论",
+    "ar": "إضافة تعليق من الإدارة"
+  },
+  "admin_name_title": {
+    "ru": "Администратор DuoWindo6601",
+    "en": "DuoWindo6601 Administrator",
+    "de": "DuoWindo6601-Administrator",
+    "fr": "Administrateur DuoWindo6601",
+    "es": "Administrador de DuoWindo6601",
+    "ja": "DuoWindo6601 管理者",
+    "zh": "DuoWindo6601 管理员",
+    "ar": "مسؤول DuoWindo6601"
   }
 };
 
@@ -2182,6 +2432,8 @@ export default function App() {
     };
   });
 
+  const [leaderboardLang, setLeaderboardLang] = useState<string>(() => user.language || 'ru');
+
   const t = (key: string) => {
     const lang = TRANSLATIONS[user.language] ? user.language : 'en';
     if (USER_TRANSLATIONS[key] && USER_TRANSLATIONS[key][lang]) {
@@ -3505,13 +3757,61 @@ export default function App() {
                     </div>
                     <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl">
                     <h3 className="text-xl font-bold mb-4 text-white uppercase tracking-widest">{t('language')}</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
                         {['ru','en','de','fr','es','ja','zh','ar'].map(lang => (
                             <button key={lang} onClick={() => { playSound('select'); setUser({...user, language: lang as any}); }} className={`p-3 rounded-xl font-bold border-b-4 transition-all text-xs flex flex-col items-center justify-center space-y-1 ${user.language === lang ? 'bg-duo-blue border-duo-blueDark text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'}`}>
                                 <span className="font-black text-sm tracking-wider">{lang.toUpperCase()}</span>
                                 <span className="text-[10px] opacity-80">{t('lang_' + lang)}</span>
                             </button>
                         ))}
+                    </div>
+
+                    {/* Auto-Translator toggle in Settings -> Language */}
+                    <div className="bg-gray-800/80 border-2 border-indigo-500/40 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-inner">
+                      <div className="flex items-start space-x-3">
+                        <span className="text-2xl p-2 bg-indigo-600/30 rounded-xl border border-indigo-500/40">🌐</span>
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <h4 className="font-extrabold text-sm text-white uppercase tracking-wider">
+                              {user.language === 'ru' ? 'Авто-Переводчик отзывов и имен' : 'Auto-Translator'}
+                            </h4>
+                            <span className="bg-indigo-500/30 text-indigo-300 text-[10px] font-black px-2 py-0.5 rounded-md border border-indigo-500/50 uppercase">
+                              DuoWindo6601
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-300 font-medium mt-1">
+                            {user.language === 'ru'
+                              ? 'Автоматический перевод отзывов, комментариев администрации, категорий и имён авторов на выбранный язык'
+                              : 'Automatically translate reviews, admin comments, categories, and author names into chosen language'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          playSound('click');
+                          const newVal = !(user.autoTranslateFeedback ?? true);
+                          setUser((prev) => {
+                            const updated = { ...prev, autoTranslateFeedback: newVal };
+                            localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+                            return updated;
+                          });
+                          setToast(newVal
+                            ? (user.language === 'ru' ? 'Авто-Переводчик включен!' : 'Auto-Translator enabled!')
+                            : (user.language === 'ru' ? 'Авто-Переводчик отключен' : 'Auto-Translator disabled')
+                          );
+                        }}
+                        className={`w-14 h-8 rounded-full p-1 transition-colors duration-300 flex-shrink-0 cursor-pointer ${
+                          (user.autoTranslateFeedback ?? true) ? 'bg-indigo-600 border-2 border-indigo-400' : 'bg-gray-700 border-2 border-gray-600'
+                        }`}
+                        title="Переключить Авто-Переводчик"
+                      >
+                        <div
+                          className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-300 ${
+                            (user.autoTranslateFeedback ?? true) ? 'translate-x-6' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
                     </div>
                     </div>
                     <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl">
@@ -4549,14 +4849,51 @@ export default function App() {
           {/* ... (LEADERBOARD) ... */}
           {screen === AppScreen.LEADERBOARD && (
              <div className="py-10 animate-in fade-in max-w-2xl mx-auto w-full px-4" dir="auto">
-                <div className="flex flex-col items-center mb-10 text-center" dir="auto">
-                  <ShieldIcon className="w-24 h-24 text-yellow-400 mb-4 animate-bounce shrink-0" />
+                <div className="flex flex-col items-center mb-6 text-center" dir="auto">
+                  <ShieldIcon className="w-20 h-20 text-yellow-400 mb-3 animate-bounce shrink-0" />
                   <h2 className="text-3xl font-black uppercase tracking-widest text-yellow-400" dir="auto">
                     <bdi dir="auto">{t('leaderboardTitle')}</bdi>
                   </h2>
-                  <p className="text-gray-400 font-bold mt-2" dir="auto">
+                  <p className="text-gray-400 font-bold mt-2 text-sm" dir="auto">
                     <bdi dir="auto">{t('leaderboardDesc')}</bdi>
                   </p>
+                </div>
+
+                {/* Rating / Leaderboard Name Translator Bar */}
+                <div className="bg-duo-card border-2 border-purple-500/50 rounded-2xl p-4 mb-6 shadow-xl">
+                  <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                    <span className="text-xs font-black text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>🌐</span> Имя переводчик / Лидеры (8 языков)
+                    </span>
+                    <span className="text-[10px] bg-purple-900/50 text-purple-200 px-2 py-0.5 rounded-md border border-purple-500/40 font-mono">
+                      {leaderboardLang.toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
+                    {[
+                      { code: 'ru', label: 'RU', flag: '🇷🇺' },
+                      { code: 'en', label: 'EN', flag: '🇬🇧' },
+                      { code: 'de', label: 'DE', flag: '🇩🇪' },
+                      { code: 'fr', label: 'FR', flag: '🇫🇷' },
+                      { code: 'es', label: 'ES', flag: '🇪🇸' },
+                      { code: 'ja', label: 'JA', flag: '🇯🇵' },
+                      { code: 'zh', label: 'ZH', flag: '🇨🇳' },
+                      { code: 'ar', label: 'AR', flag: '🇸🇦' },
+                    ].map((l) => (
+                      <button
+                        key={l.code}
+                        onClick={() => { playSound('click'); setLeaderboardLang(l.code); }}
+                        className={`py-1.5 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center gap-0.5 border ${
+                          leaderboardLang === l.code
+                            ? 'bg-purple-600 text-white border-purple-400 shadow-md scale-105'
+                            : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border-gray-700'
+                        }`}
+                      >
+                        <span className="text-base">{l.flag}</span>
+                        <span className="text-[10px]">{l.label}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 
                 {isIncognitoUser && (
@@ -4587,17 +4924,30 @@ export default function App() {
                       const isUser = entry.id === 'user';
                       const rank = index + 1;
                       let rankColor = "text-gray-400"; if (rank === 1) rankColor = "text-yellow-400"; if (rank === 2) rankColor = "text-gray-300"; if (rank === 3) rankColor = "text-orange-400";
+                      
+                      // Translate name if available in LEADERBOARD_TRANSLATIONS or custom
+                      const botNameMap: Record<string, Record<string, string>> = {
+                        'Илон': { ru: 'Илон', en: 'Elon', de: 'Elon', fr: 'Elon', es: 'Elon', ja: 'イーロン', zh: '埃隆', ar: 'إيلون' },
+                        'Гермиона': { ru: 'Гермиона', en: 'Hermione', de: 'Hermine', fr: 'Hermione', es: 'Hermione', ja: 'ハーマイオニー', zh: '赫敏', ar: 'هيرميوني' },
+                        'Наруто': { ru: 'Наруто', en: 'Naruto', de: 'Naruto', fr: 'Naruto', es: 'Naruto', ja: 'ナルト', zh: '鸣人', ar: 'ناروتو' },
+                        'Шерлок': { ru: 'Шерлок', en: 'Sherlock', de: 'Sherlock', fr: 'Sherlock', es: 'Sherlock', ja: 'シャーロック', zh: '夏洛克', ar: 'شيرلوك' },
+                        'Валл-И': { ru: 'Валл-И', en: 'WALL-E', de: 'WALL-E', fr: 'WALL-E', es: 'WALL-E', ja: 'ウォーリー', zh: '机器人总动员', ar: 'والي' },
+                        'Марио': { ru: 'Марио', en: 'Mario', de: 'Mario', fr: 'Mario', es: 'Mario', ja: 'マリオ', zh: '马里奥', ar: 'ماريو' },
+                        'Пикачу': { ru: 'Пикачу', en: 'Pikachu', de: 'Pikachu', fr: 'Pikachu', es: 'Pikachu', ja: 'ピカチュウ', zh: '皮卡丘', ar: 'بيكاتشو' }
+                      };
+                      const displayName = isUser ? entry.name : (botNameMap[entry.name]?.[leaderboardLang] || entry.name);
+
                       return ( 
                         <div key={entry.id} className={`flex items-center gap-3 md:gap-4 p-4 md:p-6 border-b border-gray-700 last:border-0 transition-colors ${isUser ? 'bg-duo-card border-l-4 border-l-duo-blue' : 'hover:bg-white/5'} ${isUser ? 'bg-gray-800' : ''}`} dir="auto">
                           <div className={`w-8 font-black text-xl text-center shrink-0 ${rankColor}`}>
                             <bdi dir="ltr">{rank}</bdi>
                           </div>
                           <div className={`w-12 h-12 rounded-full ${entry.color} flex items-center justify-center font-bold text-lg shrink-0 border-2 border-gray-600`}>
-                            <bdi dir="auto">{entry.name[0]}</bdi>
+                            <bdi dir="auto">{displayName[0]}</bdi>
                           </div>
                           <div className="flex-1 min-w-0" dir="auto">
                             <h3 className={`font-bold text-lg truncate ${isUser ? 'text-duo-blue' : 'text-white'}`}>
-                              <bdi dir="auto">{entry.name}</bdi>
+                              <bdi dir="auto">{displayName}</bdi>
                             </h3>
                             {isUser && <span className="text-xs font-bold text-gray-500 uppercase"><bdi dir="auto">{t('isYou')}</bdi></span>}
                           </div>
@@ -4899,6 +5249,13 @@ export default function App() {
               onOpenAdminDashboard={() => setScreen(AppScreen.ADMIN_DASHBOARD)}
               courses={COURSES}
               currentCourse={currentCourse}
+              onSetLanguage={(newLang) => {
+                setUser((prev) => {
+                  const updated = { ...prev, language: newLang };
+                  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+                  return updated;
+                });
+              }}
             />
           )}
 

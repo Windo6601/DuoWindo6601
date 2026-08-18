@@ -147,6 +147,7 @@ export interface UserProgress {
   country: string;
   preferredVoice?: string;
   voiceProvider?: 'gemini' | 'google' | 'yandex' | 'system';
+  autoTranslateFeedback?: boolean;
   chessStats?: {
     games: number;
     wins: number;
