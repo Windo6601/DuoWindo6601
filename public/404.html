@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>DuoWindo — Запуск приложения / 404 Redirect</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: #131F24;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+      text-align: center;
+    }
+    .card {
+      background: #202F36;
+      border: 2px solid #37464F;
+      border-radius: 28px;
+      padding: 36px 24px;
+      max-width: 460px;
+      width: 100%;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .mascot {
+      font-size: 72px;
+      line-height: 1;
+      margin-bottom: 16px;
+      animation: float 2.5s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-8px); }
+    }
+    h1 {
+      color: #58CC02;
+      font-size: 26px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+    p {
+      color: #AFAFAF;
+      font-size: 15px;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 4px solid #37464F;
+      border-top: 4px solid #1CB0F6;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 18px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 14px 20px;
+      background: #58CC02;
+      color: #ffffff;
+      text-decoration: none;
+      font-weight: 800;
+      font-size: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      border-radius: 16px;
+      border: none;
+      border-bottom: 4px solid #58A700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn:hover {
+      background: #61E002;
+    }
+    .btn:active {
+      transform: translateY(2px);
+      border-bottom-width: 2px;
+    }
+    .btn-blue {
+      background: #1CB0F6;
+      border-bottom-color: #1899D6;
+      margin-top: 10px;
+    }
+    .btn-blue:hover {
+      background: #25BAFF;
+    }
+    .status-text {
+      font-size: 13px;
+      color: #778899;
+      margin-top: 14px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="mascot">🦉</div>
+    <h1>DuoWindo</h1>
+    <p>Перенаправление в приложение... Если страница не открылась автоматически, нажмите кнопку ниже.</p>
+    <div class="spinner"></div>
+    <a id="launchBtn" href="/" class="btn">Открыть DuoWindo</a>
+    <a id="offlineBtn" href="index.html" class="btn btn-blue">Запустить Офлайн-версию</a>
+    <div class="status-text" id="statusNotice">Автоматический переход через 1 сек...</div>
+    
+    <div style="margin-top: 20px; padding-top: 14px; border-top: 1px solid #37464F; width: 100%; font-size: 12px; color: #9EABB2;">
+      <div style="font-weight: 700; color: #58CC02; margin-bottom: 4px;">🛠️ Техподдержка DuoWindo6601:</div>
+      <div>Email: <a href="mailto:abramovanatolij81@gmail.com" style="color: #1CB0F6; text-decoration: none; font-weight: 600;">abramovanatolij81@gmail.com</a></div>
+      <div>Email: <a href="mailto:va997217@gmail.com" style="color: #1CB0F6; text-decoration: none; font-weight: 600;">va997217@gmail.com</a></div>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      // Determine destination
+      var isFileProtocol = window.location.protocol === 'file:';
+      var targetUrl = isFileProtocol ? 'index.html' : '/';
+      
+      var launchBtn = document.getElementById('launchBtn');
+      var offlineBtn = document.getElementById('offlineBtn');
+      var statusNotice = document.getElementById('statusNotice');
+
+      if (launchBtn) launchBtn.href = targetUrl;
+      if (offlineBtn && isFileProtocol) {
+        offlineBtn.style.display = 'none';
+      }
+
+      // Auto redirect after short delay
+      setTimeout(function() {
+        try {
+          if (window.location.pathname !== '/' && window.location.pathname !== '/index.html') {
+            window.location.replace(targetUrl);
+          }
+        } catch (e) {
+          window.location.href = targetUrl;
+        }
+      }, 500);
+    })();
+  </script>
+</body>
+</html>

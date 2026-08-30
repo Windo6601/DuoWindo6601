@@ -205,7 +205,151 @@ export const speakText = async (text: string, lang: string = 'en', slow: boolean
   }
 };
 
+// --- LOCAL OFFLINE LESSON CACHE SYSTEM ---
+const LESSON_CACHE_KEY = 'duowindo_lesson_cache_v2';
+
+export const saveLessonToCache = (subjectId: string, exercise: Exercise) => {
+  try {
+    if (!exercise || !exercise.originalSentence) return;
+    const raw = localStorage.getItem(LESSON_CACHE_KEY);
+    const cache: Record<string, Exercise[]> = raw ? JSON.parse(raw) : {};
+    if (!cache[subjectId]) cache[subjectId] = [];
+    
+    // Avoid exact duplicate
+    const exists = cache[subjectId].some(e => e.originalSentence === exercise.originalSentence && e.type === exercise.type);
+    if (!exists) {
+      const cleanExercise: Exercise = {
+        ...exercise,
+        id: exercise.id || crypto.randomUUID(),
+        isFallback: false,
+        isCached: true
+      };
+      cache[subjectId].unshift(cleanExercise);
+      // Keep up to 30 cached exercises per course
+      if (cache[subjectId].length > 30) {
+        cache[subjectId] = cache[subjectId].slice(0, 30);
+      }
+      localStorage.setItem(LESSON_CACHE_KEY, JSON.stringify(cache));
+    }
+  } catch (e) {
+    console.warn("Failed to save lesson to cache:", e);
+  }
+};
+
+export const getCachedExercise = (subjectId: string, type?: Exercise['type']): Exercise | null => {
+  try {
+    const raw = localStorage.getItem(LESSON_CACHE_KEY);
+    if (!raw) return null;
+    const cache: Record<string, Exercise[]> = JSON.parse(raw);
+    const list = cache[subjectId] || [];
+    if (list.length === 0) return null;
+    
+    const filtered = type ? list.filter(e => e.type === type) : list;
+    const pool = filtered.length > 0 ? filtered : list;
+    const item = pool[Math.floor(Math.random() * pool.length)];
+    return { ...item, id: crypto.randomUUID(), isCached: true, isFallback: false };
+  } catch (e) {
+    console.warn("Failed to read lesson from cache:", e);
+    return null;
+  }
+};
+
+export const getCachedLessonsCount = (subjectId?: string): number => {
+  try {
+    const raw = localStorage.getItem(LESSON_CACHE_KEY);
+    if (!raw) return 0;
+    const cache: Record<string, Exercise[]> = JSON.parse(raw);
+    if (subjectId) {
+      return (cache[subjectId] || []).length;
+    }
+    return Object.values(cache).reduce((acc, curr) => acc + curr.length, 0);
+  } catch {
+    return 0;
+  }
+};
+
+export const clearLessonCache = () => {
+  try {
+    localStorage.removeItem(LESSON_CACHE_KEY);
+  } catch {}
+};
+
+export const preseedDefaultLessonCache = () => {
+  try {
+    const raw = localStorage.getItem(LESSON_CACHE_KEY);
+    if (raw && Object.keys(JSON.parse(raw)).length > 3) {
+      return; // Already preseeded
+    }
+
+    const defaultSeed: Record<string, Exercise[]> = {
+      'en': [
+        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'The cat sleeps on the sofa', targetTranslation: 'Кошка спит на диване', wordBank: ['Кошка', 'спит', 'на', 'диване', 'собака', 'ест', 'в'], isCached: true },
+        { id: crypto.randomUUID(), type: 'listening', originalSentence: 'I drink water every morning', targetTranslation: 'Я пью воду каждое утро', wordBank: ['Я', 'пью', 'воду', 'каждое', 'утро', 'чай', 'он'], isCached: true },
+        { id: crypto.randomUUID(), type: 'speech', originalSentence: 'Good morning, how are you today?', targetTranslation: 'Доброе утро, как ваши дела сегодня?', wordBank: ['Доброе', 'утро', 'как', 'дела', 'хорошо'], isCached: true },
+        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'She reads an interesting book', targetTranslation: 'Она читает интересную книгу', wordBank: ['Она', 'читает', 'интересную', 'книгу', 'он', 'журнал', 'пишет'], isCached: true },
+        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'We travel to new cities in summer', targetTranslation: 'Мы путешествуем в новые города летом', wordBank: ['Мы', 'путешествуем', 'в', 'новые', 'города', 'летом', 'зимой', 'они'], isCached: true },
+      ],
+      'ru': [
+        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'Привет, как тебя зовут?', targetTranslation: 'Hello, what is your name?', wordBank: ['Hello', 'what', 'is', 'your', 'name', 'how', 'old'], isCached: true },
+        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'Это мой лучший друг', targetTranslation: 'This is my best friend', wordBank: ['This', 'is', 'my', 'best', 'friend', 'brother', 'good'], isCached: true },
+        { id: crypto.randomUUID(), type: 'listening', originalSentence: 'Сегодня прекрасная погода', targetTranslation: 'Today is wonderful weather', wordBank: ['Today', 'is', 'wonderful', 'weather', 'cold', 'rain'], isCached: true }
+      ],
+      'de': [
+        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'Guten Tag, wie geht es Ihnen?', targetTranslation: 'Добрый день, как ваши дела?', wordBank: ['Добрый', 'день', 'как', 'ваши', 'дела', 'вечер', 'плохо'], isCached: true },
+        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'Ich lerne gerne Deutsch', targetTranslation: 'Я с удовольствием учу немецкий', wordBank: ['Я', 'с', 'удовольствием', 'учу', 'немецкий', 'он', 'английский'], isCached: true },
+        { id: crypto.randomUUID(), type: 'listening', originalSentence: 'Das Haus ist sehr groß und schön', targetTranslation: 'Дом очень большой и красивый', wordBank: ['Дом', 'очень', 'большой', 'и', 'красивый', 'маленький', 'сад'], isCached: true }
+      ],
+      'fr': [
+        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'Bonjour, comment allez-vous?', targetTranslation: 'Здравствуйте, как ваши дела?', wordBank: ['Здравствуйте', 'как', 'ваши', 'дела', 'Привет', 'он'], isCached: true },
+        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'J\'aime la musique et les voyages', targetTranslation: 'Я люблю музыку и путешествия', wordBank: ['Я', 'люблю', 'музыку', 'и', 'путешествия', 'книги', 'еду'], isCached: true }
+      ],
+      'es': [
+        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'Hola, ¿cómo estás hoy?', targetTranslation: 'Привет, как ты сегодня?', wordBank: ['Привет', 'как', 'ты', 'сегодня', 'он', 'хорошо'], isCached: true },
+        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'El perro corre en el parque', targetTranslation: 'Собака бегает в парке', wordBank: ['Собака', 'бегает', 'в', 'парке', 'кошка', 'спит', 'на'], isCached: true }
+      ],
+      'zh': [
+        { id: crypto.randomUUID(), type: 'translation', originalSentence: '你好，很高兴认识你', targetTranslation: 'Привет, приятно познакомиться', wordBank: ['Привет', 'приятно', 'познакомиться', 'с', 'тобой', 'друг'], isCached: true },
+        { id: crypto.randomUUID(), type: 'translation', originalSentence: '我想喝一杯水', targetTranslation: 'Я хочу выпить стакан воды', wordBank: ['Я', 'хочу', 'выпить', 'стакан', 'воды', 'чай', 'он'], isCached: true }
+      ],
+      'ja': [
+        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'こんにちは、元気ですか？', targetTranslation: 'Привет, как дела?', wordBank: ['Привет', 'как', 'дела', 'хорошо', 'спасибо', 'друг'], isCached: true },
+        { id: crypto.randomUUID(), type: 'translation', originalSentence: '猫は部屋で眠っています', targetTranslation: 'Кошка спит в комнате', wordBank: ['Кошка', 'спит', 'в', 'комнате', 'собака', 'ест', 'на'], isCached: true }
+      ],
+      'ar': [
+        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'مرحبا، كيف حالك؟', targetTranslation: 'Привет, как твои дела?', wordBank: ['Привет', 'как', 'твои', 'дела', 'хорошо', 'друг'], isCached: true },
+        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'هذا بيت جميل وكبير', targetTranslation: 'Это красивый и большой дом', wordBank: ['Это', 'красивый', 'и', 'большой', 'дом', 'сад', 'новый'], isCached: true }
+      ],
+      'math': [
+        { id: crypto.randomUUID(), type: 'translation', originalSentence: '15 + 27 = ?', targetTranslation: '42', wordBank: ['42', '41', '43', '32'], isCached: true },
+        { id: crypto.randomUUID(), type: 'translation', originalSentence: '8 × 7 = ?', targetTranslation: '56', wordBank: ['56', '54', '64', '48'], isCached: true },
+        { id: crypto.randomUUID(), type: 'translation', originalSentence: '100 - 36 = ?', targetTranslation: '64', wordBank: ['64', '74', '54', '66'], isCached: true }
+      ],
+      'music': [
+        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'Какая нота пишется на первой линейке нотного стана?', targetTranslation: 'Ми', wordBank: ['Ми', 'Фа', 'Соль', 'Ре'], isCached: true },
+        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'Какой знак повышает ноту на полутон?', targetTranslation: 'Диез', wordBank: ['Диез', 'Бемоль', 'Бекар', 'Фермата'], isCached: true }
+      ]
+    };
+
+    localStorage.setItem(LESSON_CACHE_KEY, JSON.stringify(defaultSeed));
+  } catch (e) {
+    console.warn("Could not preseed default lessons:", e);
+  }
+};
+
+// Automatically seed cache on module load if available in browser
+if (typeof window !== 'undefined') {
+  setTimeout(() => {
+    preseedDefaultLessonCache();
+  }, 1000);
+}
+
 export const getFallbackExercise = (subjectId: string, type: Exercise['type'], subjectName: string): Exercise => {
+    // 1. Try local cache first!
+    const cached = getCachedExercise(subjectId, type);
+    if (cached) {
+      return cached;
+    }
+
     if (subjectId === 'math') {
         const a = Math.floor(Math.random() * 20) + 1;
         const b = Math.floor(Math.random() * 20) + 1;
@@ -243,24 +387,24 @@ export const getFallbackExercise = (subjectId: string, type: Exercise['type'], s
         };
     }
     const vocab: Record<string, [string, string][]> = {
-        'en': [['Hello', 'Привет'], ['Cat', 'Кошка'], ['Dog', 'Собака'], ['Apple', 'Яблоко'], ['Water', 'Вода'], ['House', 'Дом']],
+        'en': [['Hello, friend', 'Привет, друг'], ['The cat is sleeping', 'Кошка спит'], ['I like reading books', 'Я люблю читать книги'], ['Fresh water is good', 'Свежая вода хорошая'], ['We go to the park', 'Мы идем в парк'], ['Thank you very much', 'Большое спасибо']],
         'ru': [['Hello', 'Привет'], ['Friend', 'Друг'], ['Good', 'Хорошо'], ['Yes', 'Да'], ['No', 'Нет']],
         'zh': [['你好', 'Привет'], ['猫', 'Кошка'], ['狗', 'Собака'], ['水', 'Вода'], ['家', 'Дом'], ['人', 'Человек'], ['谢谢', 'Спасибо'], ['中国', 'Китай']],
         'ja': [['こんにちは', 'Привет'], ['猫', 'Кошка'], ['犬', 'Собака'], ['水', 'Вода'], ['家', 'Дом'], ['ありがとう', 'Спасибо']],
-        'ko': [['안녕하세요', 'Привет'], ['고양이', 'Кошка'], ['강아지', 'Собака'], ['물', 'Вода'], ['집', 'Дом'], ['감사합니다', 'Спасибо']],
-        'de': [['Hallo', 'Привет'], ['Katze', 'Кошка'], ['Hund', 'Собака'], ['Wasser', 'Вода'], ['Haus', 'Дом'], ['Danke', 'Спасибо']],
-        'fr': [['Bonjour', 'Привет'], ['Chat', 'Кошка'], ['Chien', 'Собака'], ['Eau', 'Вода'], ['Maison', 'Дом'], ['Merci', 'Спасибо']],
-        'es': [['Hola', 'Привет'], ['Gato', 'Кошка'], ['Perro', 'Собака'], ['Agua', 'Вода'], ['Casa', 'Дом'], ['Gracias', 'Спасибо']],
-        'ar': [['مرحبا', 'Привет'], ['بيت', 'Дом'], ['ماء', 'Вода'], ['كتاب', 'Книга'], ['قلم', 'Ручка'], ['صديق', 'Друг'], ['شمس', 'Солнце'], ['قمر', 'Луна']],
-        'he': [['שלום', 'Привет'], ['בית', 'Дом'], ['מים', 'Вода'], ['ספר', 'Книга'], ['חבר', 'Друг'], ['תודה', 'Спасибо']],
+        'ko': [['안녕하세요', 'Привет'], ['고양이', 'Кошка'], ['강ажи', 'Собака'], ['물', 'Вода'], ['집', 'Дом'], ['감사합니다', 'Спасибо']],
+        'de': [['Guten Tag', 'Добрый день'], ['Die Katze schläft', 'Кошка спит'], ['Das Haus ist groß', 'Дом большой'], ['Danke schön', 'Большое спасибо']],
+        'fr': [['Bonjour mon ami', 'Привет мой друг'], ['Le chat dort', 'Кот спит'], ['La maison est belle', 'Дом красивый'], ['Merci beaucoup', 'Большое спасибо']],
+        'es': [['Hola amigo', 'Привет друг'], ['El gato duerme', 'Кот спит'], ['La casa es grande', 'Дом большой'], ['Muchas gracias', 'Большое спасибо']],
+        'ar': [['مرحبا يا صديقي', 'Привет мой друг'], ['البيت كبير', 'Дом большой'], ['ماء بارد', 'Холодная вода'], ['شكرا جزيلا', 'Большое спасибо']],
+        'he': [['שלום חבר', 'Привет друг'], ['הבית יפה', 'Дом красивый'], ['מים קרים', 'Холодная вода'], ['תודה רבה', 'Большое спасибо']],
     };
     
     const currentVocab = vocab[subjectId] || vocab['en'];
     const [word, trans] = currentVocab[Math.floor(Math.random() * currentVocab.length)];
-    const distractors = ["Нет", "Дом", "Вода", "Хлеб", "Мир", "Друг"].filter(d => d !== trans).sort(() => Math.random() - 0.5).slice(0, 3);
+    const distractors = ["Нет", "Дом", "Вода", "Хлеб", "Мир", "Друг", "Книга"].filter(d => d !== trans).sort(() => Math.random() - 0.5).slice(0, 3);
     
     return {
-        id: crypto.randomUUID(), type: 'translation', originalSentence: word, targetTranslation: trans,
+        id: crypto.randomUUID(), type: type || 'translation', originalSentence: word, targetTranslation: trans,
         wordBank: [trans, ...distractors].sort(() => Math.random() - 0.5), isFallback: true
     };
 };
@@ -297,7 +441,10 @@ export const generateExercise = async (
       });
       return JSON.parse(response.text || '{}');
     });
-    return { id: crypto.randomUUID(), ...data, type: type };
+    const exercise: Exercise = { id: crypto.randomUUID(), ...data, type: type };
+    // Automatically save to local offline cache!
+    saveLessonToCache(subjectId, exercise);
+    return exercise;
   } catch (error) {
     return getFallbackExercise(subjectId, type, targetSubject);
   }
@@ -381,18 +528,51 @@ export const getMistakeExplanation = async (
     }
 }
 
-export const translateText = async (text: string, targetLang: string): Promise<string> => {
+const CIS_OFFLINE_DICTIONARY: Record<string, Record<string, string>> = {
+  'привет': {
+    'be': 'Прывітанне', 'uk': 'Привіт', 'mo': 'Salut', 'lt': 'Labas', 'lv': 'Sveiki',
+    'et': 'Tere', 'ka': 'გამარჯობა (Gamarjoba)', 'hy': 'Բարև (Barev)', 'az': 'Salam',
+    'kk': 'Сәлем', 'uz': 'Salom', 'tk': 'Salam', 'ky': 'Салам', 'tg': 'Салом',
+    'en': 'Hello', 'de': 'Hallo', 'fr': 'Bonjour', 'es': 'Hola', 'zh': '你好', 'ja': 'こんにちは', 'ar': 'مرحبا'
+  },
+  'спасибо': {
+    'be': 'Дзякуй', 'uk': 'Дякую', 'mo': 'Mulțumesc', 'lt': 'Ačiū', 'lv': 'Paldies',
+    'et': 'Aitäh', 'ka': 'მადლობა (Madloba)', 'hy': 'Շնորհակալություն (Shnorhakalutyun)', 'az': 'Təşəkkür edirəm',
+    'kk': 'Рахмет', 'uz': 'Rahmat', 'tk': 'Sag boluň', 'ky': 'Рахмат', 'tg': 'Раҳмат',
+    'en': 'Thank you', 'de': 'Danke', 'fr': 'Merci', 'es': 'Gracias', 'zh': '谢谢', 'ja': 'ありがとう', 'ar': 'شكرا'
+  },
+  'как дела': {
+    'be': 'Як справы?', 'uk': 'Як справи?', 'mo': 'Ce mai faci?', 'lt': 'Kaip sekasi?', 'lv': 'Kā iet?',
+    'et': 'Kuidas läheb?', 'ka': 'როგორ ხარ? (Rogor khar?)', 'hy': 'Ինչպե՞ս ես (Inchpes es?)', 'az': 'Necəsən?',
+    'kk': 'Қалың қалай?', 'uz': 'Ishlar qalay?', 'tk': 'Ýagdaýlar nähili?', 'ky': 'Кандайсың?', 'tg': 'Аҳвол чӣ хел?',
+    'en': 'How are you?', 'de': 'Wie geht es dir?', 'fr': 'Comment vas-tu?', 'es': '¿Cómo estás?', 'zh': '你好吗？', 'ja': 'お元気ですか？', 'ar': 'كيف حالك؟'
+  },
+  'до свидания': {
+    'be': 'Да пабачэння', 'uk': 'До побачення', 'mo': 'La revedere', 'lt': 'Viso gero', 'lv': 'Uz redzēšanos',
+    'et': 'Head aega', 'ka': 'ნახვამდის (Nakhvamdis)', 'hy': 'Ցտեսություն (Tstesutyun)', 'az': 'Sağ olun',
+    'kk': 'Сау болыңыз', 'uz': 'Xayr', 'tk': 'Hoş gal', 'ky': 'Кош болуңуз', 'tg': 'Хайр',
+    'en': 'Goodbye', 'de': 'Auf Wiedersehen', 'fr': 'Au revoir', 'es': 'Adiós', 'zh': '再见', 'ja': 'さようなら', 'ar': 'مع السلامة'
+  }
+};
+
+export const translateText = async (text: string, targetLang: string, sourceLang?: string): Promise<string> => {
+  if (!text || !text.trim()) return "";
   try {
     const ai = new GoogleGenAI({ apiKey: getApiKey() });
     const response = await callGeminiWithRetry(async () => {
+        const fromClause = sourceLang && sourceLang !== 'auto' ? `from ${sourceLang} ` : '';
         return ai.models.generateContent({
             model: MODEL_FREE,
-            contents: `Translate the following text to ${targetLang}. Return ONLY the translation, no preamble.\n\nText: ${text}`
+            contents: `Translate the following text ${fromClause}into ${targetLang}. Preserve tone and natural grammar. Return ONLY the translation, with no explanation or conversational preamble.\n\nText:\n${text}`
         });
     });
     return response.text?.trim() || "Error translating.";
   } catch (e) {
-    return "Offline / Error";
+    const cleaned = text.trim().toLowerCase().replace(/[.,!?;:]/g, '');
+    if (CIS_OFFLINE_DICTIONARY[cleaned] && CIS_OFFLINE_DICTIONARY[cleaned][targetLang]) {
+      return CIS_OFFLINE_DICTIONARY[cleaned][targetLang];
+    }
+    return `[Офлайн] ${text}`;
   }
 }
 

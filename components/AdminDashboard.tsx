@@ -2,13 +2,14 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { collection, getDocs, deleteDoc, doc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { FeedbackItem, FeedbackReply, UserProgress } from '../types';
-import { StarIcon, TrashIcon, CloseIcon, CheckCircleIcon, ShieldIcon, ActivityIcon, ChatBubbleIcon, ArrowRightIcon } from './Icons';
+import { StarIcon, TrashIcon, CloseIcon, CheckCircleIcon, ShieldIcon, ActivityIcon, ChatBubbleIcon, ArrowRightIcon, FireIcon, GemStoneIcon, LightningIcon } from './Icons';
 
 interface AdminDashboardProps {
   user: UserProgress;
   onBack: () => void;
   playSound?: (type: string) => void;
   setToast?: (msg: string | null) => void;
+  onUpdateUser?: (updater: (prev: UserProgress) => UserProgress) => void;
 }
 
 const OWNER_EMAILS = ['abramovanatolij81@gmail.com', 'va997217@gmail.com'];
@@ -114,7 +115,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   user,
   onBack,
   playSound,
-  setToast
+  setToast,
+  onUpdateUser
 }) => {
   // Check if current user is owner
   const currentEmail = auth.currentUser?.email?.toLowerCase() || user.username?.toLowerCase() || user.name?.toLowerCase() || '';
@@ -127,6 +129,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [unlockError, setUnlockError] = useState<string>('');
 
   // Dashboard Data states
+  const [activeTab, setActiveTab] = useState<'reviews' | 'streak_recovery' | 'users'>('streak_recovery');
   const [reviews, setReviews] = useState<FeedbackItem[]>(SEED_REVIEWS);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeUsersCount, setActiveUsersCount] = useState<number>(148);
@@ -140,6 +143,201 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Reply Draft
   const [adminReplyTexts, setAdminReplyTexts] = useState<Record<string, string>>({});
   const [submittingReplyId, setSubmittingReplyId] = useState<string | null>(null);
+
+  // Admin Streak Recovery State
+  const [adminStreakInput, setAdminStreakInput] = useState<string>(String(user.streak || 0));
+  const [adminFreezesInput, setAdminFreezesInput] = useState<string>(String(user.streakFreezeCount || 0));
+  const [adminGemsInput, setAdminGemsInput] = useState<string>(String(user.gems || 0));
+  const [searchUserKey, setSearchUserKey] = useState<string>('');
+  const [searchedUserDoc, setSearchedUserDoc] = useState<any | null>(null);
+  const [searchingUser, setSearchingUser] = useState<boolean>(false);
+  const [searchedStreakInput, setSearchedStreakInput] = useState<string>('0');
+  const [searchedFreezesInput, setSearchedFreezesInput] = useState<string>('0');
+  const [streakAuditLogs, setStreakAuditLogs] = useState<Array<{ id: string; timestamp: string; action: string; target: string; change: string }>>(() => {
+    try {
+      const saved = localStorage.getItem('duo_admin_streak_audit');
+      return saved ? JSON.parse(saved) : [
+        {
+          id: 'audit-init',
+          timestamp: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+          action: 'Инициализация модуля',
+          target: user.username || user.name || 'Текущий профиль',
+          change: `Текущий ударный режим: ${user.streak} дн.`
+        }
+      ];
+    } catch {
+      return [];
+    }
+  });
+
+  const addAuditLog = (action: string, target: string, change: string) => {
+    const newEntry = {
+      id: `audit-${Date.now()}`,
+      timestamp: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      action,
+      target,
+      change
+    };
+    setStreakAuditLogs(prev => {
+      const updated = [newEntry, ...prev.slice(0, 19)];
+      try {
+        localStorage.setItem('duo_admin_streak_audit', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
+
+  // Sync inputs when user prop changes
+  useEffect(() => {
+    setAdminStreakInput(String(user.streak || 0));
+    setAdminFreezesInput(String(user.streakFreezeCount || 0));
+    setAdminGemsInput(String(user.gems || 0));
+  }, [user.streak, user.streakFreezeCount, user.gems]);
+
+  // Admin handle streak updates for current active user
+  const handleAdminApplyStreak = async (newStreakVal: number, newFreezesVal?: number, customNote?: string) => {
+    playSound?.('success');
+    const todayStr = new Date().toISOString().split('T')[0];
+    const prevStreak = user.streak;
+    const finalStreak = Math.max(0, newStreakVal);
+    const finalFreezes = newFreezesVal !== undefined ? Math.max(0, newFreezesVal) : (user.streakFreezeCount || 0);
+
+    if (onUpdateUser) {
+      onUpdateUser(prev => ({
+        ...prev,
+        streak: finalStreak,
+        streakFreezeCount: finalFreezes,
+        previousLostStreak: 0,
+        maxStreak: Math.max(prev.maxStreak || 0, finalStreak),
+        lastActiveDate: todayStr
+      }));
+    }
+
+    addAuditLog(
+      customNote || 'Восстановление ударного режима',
+      user.username ? `@${user.username}` : user.name,
+      `${prevStreak} дн. ➔ ${finalStreak} дн. (Заморозки: ${finalFreezes} ❄️)`
+    );
+
+    // Sync to Firestore if authenticated
+    try {
+      if (auth.currentUser) {
+        await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+          streak: finalStreak,
+          streakFreezeCount: finalFreezes,
+          previousLostStreak: 0,
+          maxStreak: Math.max(user.maxStreak || 0, finalStreak),
+          lastActiveDate: todayStr
+        });
+      }
+    } catch (err) {
+      console.warn('Firestore user streak sync (local state applied):', err);
+    }
+
+    setToast?.(`🔥 Ударный режим обновлен: ${finalStreak} дн.!`);
+  };
+
+  // Search User in Firestore
+  const handleSearchUserInFirestore = async () => {
+    const key = searchUserKey.trim();
+    if (!key) {
+      setToast?.('Введите UID или Username для поиска');
+      return;
+    }
+
+    playSound?.('click');
+    setSearchingUser(true);
+    setSearchedUserDoc(null);
+
+    try {
+      // 1. Direct UID search
+      const userRef = doc(db, 'users', key);
+      const userSnap = await (async () => {
+        try {
+          const { getDoc } = await import('firebase/firestore');
+          return await getDoc(userRef);
+        } catch {
+          return null;
+        }
+      })();
+
+      if (userSnap && userSnap.exists()) {
+        const data = userSnap.data();
+        setSearchedUserDoc({ id: userSnap.id, ...data });
+        setSearchedStreakInput(String(data.streak || 0));
+        setSearchedFreezesInput(String(data.streakFreezeCount || 0));
+        setToast?.(`👤 Пользователь найден: ${data.name || data.username || userSnap.id}`);
+        return;
+      }
+
+      // 2. Query by username or email
+      const q = query(collection(db, 'users'));
+      const querySnap = await getDocs(q);
+      let found: any = null;
+
+      querySnap.forEach((d) => {
+        const udata = d.data();
+        if (
+          d.id.toLowerCase() === key.toLowerCase() ||
+          (udata.username && udata.username.toLowerCase() === key.toLowerCase()) ||
+          (udata.email && udata.email.toLowerCase() === key.toLowerCase()) ||
+          (udata.name && udata.name.toLowerCase().includes(key.toLowerCase()))
+        ) {
+          found = { id: d.id, ...udata };
+        }
+      });
+
+      if (found) {
+        setSearchedUserDoc(found);
+        setSearchedStreakInput(String(found.streak || 0));
+        setSearchedFreezesInput(String(found.streakFreezeCount || 0));
+        setToast?.(`👤 Пользователь найден: ${found.name || found.username || found.id}`);
+      } else {
+        setToast?.(`❌ Пользователь "${key}" не найден в облачной базе.`);
+      }
+    } catch (err) {
+      console.warn('User search notice:', err);
+      setToast?.(`❌ Ошибка поиска: проверьте подключение к базе данных.`);
+    } finally {
+      setSearchingUser(false);
+    }
+  };
+
+  // Save modified streak for searched user
+  const handleSaveSearchedUserStreak = async () => {
+    if (!searchedUserDoc) return;
+    playSound?.('success');
+    const targetStreak = Math.max(0, parseInt(searchedStreakInput) || 0);
+    const targetFreezes = Math.max(0, parseInt(searchedFreezesInput) || 0);
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    try {
+      await updateDoc(doc(db, 'users', searchedUserDoc.id), {
+        streak: targetStreak,
+        streakFreezeCount: targetFreezes,
+        previousLostStreak: 0,
+        lastActiveDate: todayStr
+      });
+
+      setSearchedUserDoc((prev: any) => ({
+        ...prev,
+        streak: targetStreak,
+        streakFreezeCount: targetFreezes,
+        lastActiveDate: todayStr
+      }));
+
+      addAuditLog(
+        'Восстановление серии пользователя',
+        searchedUserDoc.username ? `@${searchedUserDoc.username}` : (searchedUserDoc.name || searchedUserDoc.id),
+        `${searchedUserDoc.streak || 0} дн. ➔ ${targetStreak} дн.`
+      );
+
+      setToast?.(`✅ Серия пользователя ${searchedUserDoc.name || searchedUserDoc.username} успешно обновлена: ${targetStreak} дн.!`);
+    } catch (err) {
+      console.error('Error updating user streak in Firestore:', err);
+      setToast?.('⚠️ Не удалось обновить документ в Firestore.');
+    }
+  };
 
   // Load reviews from Firestore
   const fetchReviews = async () => {
@@ -429,283 +627,656 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-        {/* STATS & ACTIVE USERS WIDGET GRID */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {/* ACTIVE USERS LIVE WIDGET */}
-          <div className="bg-gradient-to-br from-emerald-950/60 to-emerald-900/40 border-2 border-emerald-500/50 rounded-3xl p-5 shadow-xl relative overflow-hidden flex flex-col justify-between">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-[11px] font-black uppercase tracking-wider text-emerald-400">
-                Активные Юзеры
-              </span>
-              <span className="flex h-3 w-3 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-              </span>
-            </div>
-            <div>
-              <div className="text-3xl md:text-4xl font-black text-white flex items-baseline space-x-2">
-                <span>{activeUsersCount}</span>
-                <span className="text-xs font-bold text-emerald-300">онлайн</span>
-              </div>
-              <p className="text-[10px] text-emerald-200/80 font-bold mt-1">
-                🟢 Живой мониторинг сессий
-              </p>
-            </div>
-          </div>
+        {/* TOP TAB NAVIGATION BAR */}
+        <div className="flex flex-wrap gap-2 bg-gray-900/80 p-1.5 rounded-2xl border border-gray-800 backdrop-blur-md">
+          <button
+            onClick={() => { playSound?.('click'); setActiveTab('streak_recovery'); }}
+            className={`flex-1 min-w-[200px] py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-2 ${
+              activeTab === 'streak_recovery'
+                ? 'bg-gradient-to-r from-duo-red to-orange-600 text-white shadow-lg shadow-red-950/50 scale-[1.02]'
+                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+            }`}
+          >
+            <span className="text-base animate-pulse">🔥</span>
+            <span>Восстановление Ударного Режима</span>
+          </button>
 
-          {/* TOTAL REVIEWS */}
-          <div className="bg-duo-card border-2 border-gray-800 rounded-3xl p-5 shadow-xl flex flex-col justify-between">
-            <span className="text-[11px] font-black uppercase tracking-wider text-gray-400">
-              Всего отзывов
-            </span>
-            <div className="mt-2">
-              <div className="text-3xl md:text-4xl font-black text-duo-blue">
-                {totalReviews}
-              </div>
-              <p className="text-[10px] text-gray-400 font-bold mt-1">
-                💬 Вся база отзывов
-              </p>
-            </div>
-          </div>
+          <button
+            onClick={() => { playSound?.('click'); setActiveTab('reviews'); }}
+            className={`flex-1 min-w-[180px] py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-2 ${
+              activeTab === 'reviews'
+                ? 'bg-amber-500 text-black shadow-lg shadow-amber-950/50 scale-[1.02]'
+                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+            }`}
+          >
+            <span className="text-base">💬</span>
+            <span>Отзывы & Модерация ({reviews.length})</span>
+          </button>
 
-          {/* AVERAGE RATING */}
-          <div className="bg-duo-card border-2 border-gray-800 rounded-3xl p-5 shadow-xl flex flex-col justify-between">
-            <span className="text-[11px] font-black uppercase tracking-wider text-gray-400">
-              Средняя оценка
-            </span>
-            <div className="mt-2">
-              <div className="text-3xl md:text-4xl font-black text-amber-400 flex items-center space-x-1">
-                <span>{avgRating}</span>
-                <StarIcon className="w-6 h-6 fill-amber-400 text-amber-400" />
-              </div>
-              <p className="text-[10px] text-gray-400 font-bold mt-1">
-                ⭐ Уровень удовлетворенности
-              </p>
-            </div>
-          </div>
-
-          {/* PINNED REVIEWS */}
-          <div className="bg-duo-card border-2 border-gray-800 rounded-3xl p-5 shadow-xl flex flex-col justify-between">
-            <span className="text-[11px] font-black uppercase tracking-wider text-gray-400">
-              Закреплено
-            </span>
-            <div className="mt-2">
-              <div className="text-3xl md:text-4xl font-black text-purple-400">
-                {pinnedCount}
-              </div>
-              <p className="text-[10px] text-gray-400 font-bold mt-1">
-                📌 Избранные отзывы
-              </p>
-            </div>
-          </div>
+          <button
+            onClick={() => { playSound?.('click'); setActiveTab('users'); }}
+            className={`flex-1 min-w-[180px] py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-2 ${
+              activeTab === 'users'
+                ? 'bg-duo-blue text-white shadow-lg shadow-blue-950/50 scale-[1.02]'
+                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+            }`}
+          >
+            <span className="text-base">👥</span>
+            <span>Поиск & Облачные Пользователи</span>
+          </button>
         </div>
 
-        {/* SEARCH & FILTER TOOLBAR */}
-        <div className="bg-duo-card border-2 border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
-          <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
-            {/* Search input */}
-            <div className="relative w-full md:w-80">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Поиск по автору, тексту..."
-                className="w-full bg-gray-800 border-2 border-gray-700 focus:border-duo-blue text-white rounded-2xl pl-10 pr-4 py-2.5 text-xs font-bold focus:outline-none transition-colors"
-              />
-              <span className="absolute left-3.5 top-3 text-gray-400 text-sm">🔍</span>
-            </div>
+        {/* ========================================================================= */}
+        {/* TAB 1: STREAK RECOVERY & ADMINISTRATION */}
+        {/* ========================================================================= */}
+        {activeTab === 'streak_recovery' && (
+          <div className="space-y-8 animate-in fade-in">
+            {/* CURRENT USER STREAK REPAIR CARD */}
+            <div className="bg-duo-card border-2 border-duo-red/50 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6 relative overflow-hidden">
+              <div className="absolute -top-10 -right-10 w-40 h-40 bg-duo-red/10 rounded-full blur-3xl pointer-events-none" />
 
-            {/* Filters */}
-            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-              {/* Category Select */}
-              <select
-                value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-                className="bg-gray-800 border-2 border-gray-700 text-white rounded-2xl px-3 py-2.5 text-xs font-bold focus:outline-none"
-              >
-                {CATEGORY_OPTIONS.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-
-              {/* Rating Select */}
-              <select
-                value={filterRating}
-                onChange={(e) => setFilterRating(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-                className="bg-gray-800 border-2 border-gray-700 text-white rounded-2xl px-3 py-2.5 text-xs font-bold focus:outline-none"
-              >
-                <option value="all">Все оценки ⭐</option>
-                <option value={5}>5 Звезд ⭐⭐⭐⭐⭐</option>
-                <option value={4}>4 Звезды ⭐⭐⭐⭐</option>
-                <option value={3}>3 Звезды ⭐⭐⭐</option>
-                <option value={2}>2 Звезды ⭐⭐</option>
-                <option value={1}>1 Звезда ⭐</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* REVIEWS LIST */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between px-2">
-            <h2 className="text-xl font-black uppercase tracking-wider text-white">
-              Список Отзывов ({filteredReviews.length})
-            </h2>
-            <span className="text-xs text-gray-400 font-bold">
-              Владелец может удалять и комментировать любые отзывы
-            </span>
-          </div>
-
-          {loading ? (
-            <div className="bg-duo-card border-2 border-gray-800 rounded-3xl p-12 text-center text-gray-400 font-bold space-y-3">
-              <div className="animate-spin text-3xl mx-auto w-8 h-8">⚙️</div>
-              <p>Загрузка отзывов из базы данных...</p>
-            </div>
-          ) : filteredReviews.length === 0 ? (
-            <div className="bg-duo-card border-2 border-gray-800 rounded-3xl p-12 text-center text-gray-400 font-bold">
-              Отзывы по заданным критериям не найдены.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {filteredReviews.map((rev) => (
-                <div
-                  key={rev.id}
-                  className={`bg-duo-card border-2 rounded-3xl p-6 shadow-xl transition-all relative ${
-                    rev.isPinned ? 'border-amber-500/80 bg-amber-950/10' : 'border-gray-800'
-                  }`}
-                >
-                  {/* PIN BADGE IF PINNED */}
-                  {rev.isPinned && (
-                    <div className="absolute top-4 right-4 bg-amber-500/20 text-amber-400 border border-amber-500/40 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center space-x-1">
-                      <span>📌 Закреплено</span>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-800 pb-6">
+                <div className="flex items-center space-x-4">
+                  <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-orange-600 rounded-3xl flex items-center justify-center text-3xl shadow-xl shadow-red-950/50">
+                    🔥
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <h2 className="text-xl md:text-2xl font-black uppercase tracking-tight text-white">
+                        Восстановление Ударного Режима
+                      </h2>
+                      <span className="bg-red-500/20 text-red-300 border border-red-500/40 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">
+                        Admin Tool
+                      </span>
                     </div>
-                  )}
+                    <p className="text-xs text-gray-400 font-bold mt-0.5">
+                      Управление днями непрерывного обучения для аккаунта: <span className="text-duo-blue font-extrabold">{user.name} ({user.username ? `@${user.username}` : 'Текущий'})</span>
+                    </p>
+                  </div>
+                </div>
 
-                  {/* USER INFO & RATING */}
-                  <div className="flex items-start justify-between gap-4 mb-3 pr-24">
-                    <div className="flex items-center space-x-3">
-                      <div
-                        className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl font-bold shadow-md text-white border-2 border-white/20"
-                        style={{ backgroundColor: rev.userColor || '#1cb0f6' }}
-                      >
-                        {rev.userAvatar || '👤'}
-                      </div>
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <h3 className="font-black text-white text-base">
-                            {rev.userName}
-                          </h3>
-                        </div>
-                        <span className="inline-block bg-gray-800 text-duo-blue text-[10px] font-extrabold px-2.5 py-0.5 rounded-full mt-0.5">
-                          {rev.category || '🌟 Общие впечатления'}
-                        </span>
-                      </div>
+                <div className="flex items-center space-x-3">
+                  <div className="bg-gray-900 border border-gray-800 px-4 py-2 rounded-2xl text-right">
+                    <p className="text-[10px] uppercase font-black tracking-wider text-gray-400">Текущая серия</p>
+                    <p className="text-2xl font-black text-duo-red">{user.streak} дн.</p>
+                  </div>
+                  <div className="bg-gray-900 border border-gray-800 px-4 py-2 rounded-2xl text-right">
+                    <p className="text-[10px] uppercase font-black tracking-wider text-gray-400">Заморозки</p>
+                    <p className="text-2xl font-black text-cyan-400">{user.streakFreezeCount || 0} ❄️</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* LOST STREAK QUICK RESTORATION BANNER IF APPLICABLE */}
+              {(user.previousLostStreak || 0) > 0 && (
+                <div className="bg-gradient-to-r from-amber-950/70 via-red-950/60 to-gray-900 border-2 border-amber-500/60 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+                  <div className="flex items-center space-x-3 text-left">
+                    <span className="text-3xl animate-bounce">🚨</span>
+                    <div>
+                      <h3 className="font-black text-amber-300 text-sm uppercase tracking-wide">
+                        Обнаружена потерянная серия: {user.previousLostStreak} дн.!
+                      </h3>
+                      <p className="text-xs text-gray-300 font-medium mt-0.5">
+                        Ударный режим был прерван или сброшен. Вы можете мгновенно восстановить его в один клик.
+                      </p>
                     </div>
                   </div>
 
-                  {/* RATING STARS */}
-                  <div className="flex items-center space-x-1 mb-3">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <StarIcon
-                        key={star}
-                        className={`w-4 h-4 ${
-                          star <= rev.rating ? 'fill-amber-400 text-amber-400' : 'text-gray-700'
-                        }`}
-                      />
-                    ))}
-                    <span className="text-xs font-bold text-gray-400 ml-2">
-                      {new Date(rev.createdAt).toLocaleDateString('ru-RU')}
-                    </span>
+                  <button
+                    onClick={() => handleAdminApplyStreak(user.previousLostStreak || 0, user.streakFreezeCount, 'Восстановление потерянной серии (Быстрое)')}
+                    className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-black text-xs uppercase tracking-wider rounded-xl shadow-lg border-b-2 border-amber-700 active:translate-y-0.5 transition-all whitespace-nowrap"
+                  >
+                    ⚡ Восстановить {user.previousLostStreak} дн.
+                  </button>
+                </div>
+              )}
+
+              {/* QUICK RESTORATION PRESETS */}
+              <div className="space-y-3">
+                <label className="text-xs font-black uppercase tracking-wider text-gray-300 flex items-center space-x-1.5">
+                  <span>⚡</span>
+                  <span>Быстрое добавление и восстановление дней:</span>
+                </label>
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5">
+                  {[
+                    { label: '+1 день', add: 1 },
+                    { label: '+7 дней', add: 7 },
+                    { label: '+14 дней', add: 14 },
+                    { label: '+30 дней', add: 30 },
+                    { label: '+100 дней', add: 100 },
+                    { label: '+365 дней', add: 365 },
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      onClick={() => handleAdminApplyStreak((user.streak || 0) + preset.add, user.streakFreezeCount, `Быстрое добавление: ${preset.label}`)}
+                      className="py-3 px-2 bg-gray-800 hover:bg-duo-red hover:text-white border-2 border-gray-700 hover:border-red-500 rounded-2xl font-black text-xs uppercase transition-all shadow-md active:scale-95 text-gray-200 flex flex-col items-center justify-center space-y-1"
+                    >
+                      <span className="text-sm">🔥</span>
+                      <span>{preset.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* MANUAL STREAK & FREEZE ADJUSTMENT FORM */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                {/* STREAK DAYS FORM */}
+                <div className="bg-gray-900/60 p-5 rounded-2xl border border-gray-800 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-black uppercase tracking-wider text-white flex items-center space-x-1.5">
+                      <span>🎯</span>
+                      <span>Установить точное число дней:</span>
+                    </label>
+                    <span className="text-[10px] text-gray-400 font-bold">0 - 9999 дн.</span>
                   </div>
 
-                  {/* COMMENT TEXT */}
-                  <p className="text-sm font-bold text-gray-200 leading-relaxed bg-gray-900/50 p-4 rounded-2xl border border-gray-800 mb-4">
-                    {rev.comment}
-                  </p>
-
-                  {/* EXISTING REPLIES */}
-                  {rev.replies && rev.replies.length > 0 && (
-                    <div className="space-y-2 mb-4 pl-4 border-l-2 border-amber-500/40">
-                      {rev.replies.map((rep) => (
-                        <div
-                          key={rep.id}
-                          className={`p-3 rounded-2xl text-xs font-bold flex items-start justify-between gap-3 ${
-                            rep.isAdmin
-                              ? 'bg-amber-950/40 border border-amber-500/30 text-amber-200'
-                              : 'bg-gray-800 text-gray-300'
-                          }`}
-                        >
-                          <div>
-                            <div className="flex items-center space-x-2 mb-1">
-                              <span>{rep.userAvatar || '👑'}</span>
-                              <span className="font-black text-amber-400">
-                                {rep.userName}
-                              </span>
-                            </div>
-                            <p className="leading-snug">{rep.comment}</p>
-                          </div>
-
-                          <button
-                            onClick={() => handleDeleteReply(rev.id, rep.id)}
-                            className="text-red-400 hover:text-red-300 p-1 text-xs font-black transition-colors"
-                            title="Удалить ответ"
-                          >
-                            🗑️
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* ADMIN REPLY INPUT BOX */}
-                  <div className="mt-4 pt-4 border-t border-gray-800/80 flex flex-col md:flex-row gap-2 items-center">
+                  <div className="flex items-center space-x-2">
                     <input
-                      type="text"
-                      value={adminReplyTexts[rev.id] || ''}
-                      onChange={(e) =>
-                        setAdminReplyTexts((prev) => ({ ...prev, [rev.id]: e.target.value }))
-                      }
-                      placeholder="Ответить от имени Администратора DuoWindo6601..."
-                      className="flex-1 w-full bg-gray-800 border-2 border-gray-700 focus:border-amber-400 text-white rounded-2xl px-4 py-2 text-xs font-bold focus:outline-none"
+                      type="number"
+                      min="0"
+                      max="9999"
+                      value={adminStreakInput}
+                      onChange={(e) => setAdminStreakInput(e.target.value)}
+                      className="flex-1 bg-gray-800 border-2 border-gray-700 focus:border-duo-red text-white rounded-xl px-4 py-2.5 font-black text-lg text-center focus:outline-none"
                     />
                     <button
-                      onClick={() => handlePostAdminReply(rev.id)}
-                      disabled={submittingReplyId === rev.id || !adminReplyTexts[rev.id]?.trim()}
-                      className="w-full md:w-auto px-5 py-2 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase rounded-2xl border-b-2 border-amber-700 transition-all disabled:opacity-50"
+                      onClick={() => {
+                        const val = parseInt(adminStreakInput) || 0;
+                        handleAdminApplyStreak(val, user.streakFreezeCount, 'Ручная установка серии');
+                      }}
+                      className="px-5 py-2.5 bg-duo-red hover:bg-red-600 text-white font-black text-xs uppercase rounded-xl border-b-2 border-red-800 active:translate-y-0.5 transition-all shadow-md"
                     >
-                      {submittingReplyId === rev.id ? 'Отправка...' : '💬 Ответить'}
-                    </button>
-                  </div>
-
-                  {/* ACTION CONTROLS BAR */}
-                  <div className="flex items-center justify-between pt-4 mt-3 border-t border-gray-800 text-xs">
-                    <div className="flex items-center space-x-3">
-                      <button
-                        onClick={() => handleTogglePin(rev.id)}
-                        className={`px-3 py-1.5 rounded-xl font-bold transition-colors border ${
-                          rev.isPinned
-                            ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
-                            : 'bg-gray-800 text-gray-400 hover:text-white border-gray-700'
-                        }`}
-                      >
-                        {rev.isPinned ? '📌 Открепить' : '📌 Закрепить'}
-                      </button>
-                    </div>
-
-                    {/* DELETE BUTTON */}
-                    <button
-                      onClick={() => handleDeleteFeedback(rev.id)}
-                      disabled={deletingId === rev.id}
-                      className="px-4 py-1.5 bg-red-900/40 hover:bg-red-800 text-red-300 border border-red-700 rounded-xl font-black text-xs transition-colors flex items-center space-x-1"
-                    >
-                      <span>🗑️ Удалить ненадлежащий отзыв</span>
+                      Сохранить
                     </button>
                   </div>
                 </div>
-              ))}
+
+                {/* FREEZES FORM */}
+                <div className="bg-gray-900/60 p-5 rounded-2xl border border-gray-800 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-black uppercase tracking-wider text-white flex items-center space-x-1.5">
+                      <span>❄️</span>
+                      <span>Пополнить заморозки серии:</span>
+                    </label>
+                    <span className="text-[10px] text-cyan-400 font-bold">Защита от пропуска</span>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    {[1, 3, 5, 10].map((count) => (
+                      <button
+                        key={count}
+                        onClick={() => handleAdminApplyStreak(user.streak, (user.streakFreezeCount || 0) + count, `Пополнение заморозок: +${count} ❄️`)}
+                        className="flex-1 py-2.5 bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-700/50 hover:border-cyan-400 text-cyan-300 font-black text-xs rounded-xl transition-all"
+                      >
+                        +{count} ❄️
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* DANGER / RESET CONTROLS */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-gray-800/80 text-xs">
+                <div className="flex items-center space-x-2 text-gray-400 font-bold">
+                  <span>📅 Последняя активность:</span>
+                  <span className="text-duo-blue font-extrabold">{user.lastActiveDate || 'Не указана'}</span>
+                </div>
+
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => {
+                      if (window.confirm('Сбросить ударный режим до 0? (Потерянное значение будет сохранено для возможности восстановления).')) {
+                        handleAdminApplyStreak(0, user.streakFreezeCount, 'Административный сброс серии');
+                      }
+                    }}
+                    className="px-4 py-2 bg-gray-800 hover:bg-red-950 text-gray-400 hover:text-red-300 border border-gray-700 hover:border-red-700/60 rounded-xl font-bold transition-colors"
+                  >
+                    Сбросить серию (0)
+                  </button>
+                </div>
+              </div>
             </div>
-          )}
-        </div>
+
+            {/* AUDIT LOG TABLE */}
+            <div className="bg-duo-card border-2 border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-black uppercase tracking-wider text-white flex items-center space-x-2">
+                  <span>📋</span>
+                  <span>Журнал операций восстановления (Audit Log)</span>
+                </h3>
+                <span className="text-xs text-gray-500 font-bold">Последние 20 записей</span>
+              </div>
+
+              {streakAuditLogs.length === 0 ? (
+                <p className="text-xs text-gray-500 font-bold text-center py-4">Журнал пуст.</p>
+              ) : (
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                  {streakAuditLogs.map((log) => (
+                    <div
+                      key={log.id}
+                      className="bg-gray-900/60 p-3 rounded-xl border border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between text-xs font-bold gap-1.5"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <span className="text-gray-500 text-[10px] font-mono">{log.timestamp}</span>
+                        <span className="text-amber-400 font-black">{log.action}</span>
+                        <span className="text-gray-400">({log.target})</span>
+                      </div>
+                      <div className="text-duo-blue font-extrabold text-right">
+                        {log.change}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 2: REVIEWS & FEEDBACK */}
+        {/* ========================================================================= */}
+        {activeTab === 'reviews' && (
+          <div className="space-y-8 animate-in fade-in">
+            {/* STATS & ACTIVE USERS WIDGET GRID */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {/* ACTIVE USERS LIVE WIDGET */}
+              <div className="bg-gradient-to-br from-emerald-950/60 to-emerald-900/40 border-2 border-emerald-500/50 rounded-3xl p-5 shadow-xl relative overflow-hidden flex flex-col justify-between">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-emerald-400">
+                    Активные Юзеры
+                  </span>
+                  <span className="flex h-3 w-3 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                  </span>
+                </div>
+                <div>
+                  <div className="text-3xl md:text-4xl font-black text-white flex items-baseline space-x-2">
+                    <span>{activeUsersCount}</span>
+                    <span className="text-xs font-bold text-emerald-300">онлайн</span>
+                  </div>
+                  <p className="text-[10px] text-emerald-200/80 font-bold mt-1">
+                    🟢 Живой мониторинг сессий
+                  </p>
+                </div>
+              </div>
+
+              {/* TOTAL REVIEWS */}
+              <div className="bg-duo-card border-2 border-gray-800 rounded-3xl p-5 shadow-xl flex flex-col justify-between">
+                <span className="text-[11px] font-black uppercase tracking-wider text-gray-400">
+                  Всего отзывов
+                </span>
+                <div className="mt-2">
+                  <div className="text-3xl md:text-4xl font-black text-duo-blue">
+                    {totalReviews}
+                  </div>
+                  <p className="text-[10px] text-gray-400 font-bold mt-1">
+                    💬 Вся база отзывов
+                  </p>
+                </div>
+              </div>
+
+              {/* AVERAGE RATING */}
+              <div className="bg-duo-card border-2 border-gray-800 rounded-3xl p-5 shadow-xl flex flex-col justify-between">
+                <span className="text-[11px] font-black uppercase tracking-wider text-gray-400">
+                  Средняя оценка
+                </span>
+                <div className="mt-2">
+                  <div className="text-3xl md:text-4xl font-black text-amber-400 flex items-center space-x-1">
+                    <span>{avgRating}</span>
+                    <StarIcon className="w-6 h-6 fill-amber-400 text-amber-400" />
+                  </div>
+                  <p className="text-[10px] text-gray-400 font-bold mt-1">
+                    ⭐ Уровень удовлетворенности
+                  </p>
+                </div>
+              </div>
+
+              {/* PINNED REVIEWS */}
+              <div className="bg-duo-card border-2 border-gray-800 rounded-3xl p-5 shadow-xl flex flex-col justify-between">
+                <span className="text-[11px] font-black uppercase tracking-wider text-gray-400">
+                  Закреплено
+                </span>
+                <div className="mt-2">
+                  <div className="text-3xl md:text-4xl font-black text-purple-400">
+                    {pinnedCount}
+                  </div>
+                  <p className="text-[10px] text-gray-400 font-bold mt-1">
+                    📌 Избранные отзывы
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* SEARCH & FILTER TOOLBAR */}
+            <div className="bg-duo-card border-2 border-gray-800 rounded-3xl p-6 shadow-xl space-y-4">
+              <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
+                {/* Search input */}
+                <div className="relative w-full md:w-80">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Поиск по автору, тексту..."
+                    className="w-full bg-gray-800 border-2 border-gray-700 focus:border-duo-blue text-white rounded-2xl pl-10 pr-4 py-2.5 text-xs font-bold focus:outline-none transition-colors"
+                  />
+                  <span className="absolute left-3.5 top-3 text-gray-400 text-sm">🔍</span>
+                </div>
+
+                {/* Filters */}
+                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                  {/* Category Select */}
+                  <select
+                    value={filterCategory}
+                    onChange={(e) => setFilterCategory(e.target.value)}
+                    className="bg-gray-800 border-2 border-gray-700 text-white rounded-2xl px-3 py-2.5 text-xs font-bold focus:outline-none"
+                  >
+                    {CATEGORY_OPTIONS.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+
+                  {/* Rating Select */}
+                  <select
+                    value={filterRating}
+                    onChange={(e) => setFilterRating(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                    className="bg-gray-800 border-2 border-gray-700 text-white rounded-2xl px-3 py-2.5 text-xs font-bold focus:outline-none"
+                  >
+                    <option value="all">Все оценки ⭐</option>
+                    <option value={5}>5 Звезд ⭐⭐⭐⭐⭐</option>
+                    <option value={4}>4 Звезды ⭐⭐⭐⭐</option>
+                    <option value={3}>3 Звезды ⭐⭐⭐</option>
+                    <option value={2}>2 Звезды ⭐⭐</option>
+                    <option value={1}>1 Звезда ⭐</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* REVIEWS LIST */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between px-2">
+                <h2 className="text-xl font-black uppercase tracking-wider text-white">
+                  Список Отзывов ({filteredReviews.length})
+                </h2>
+                <span className="text-xs text-gray-400 font-bold">
+                  Владелец может удалять и комментировать любые отзывы
+                </span>
+              </div>
+
+              {loading ? (
+                <div className="bg-duo-card border-2 border-gray-800 rounded-3xl p-12 text-center text-gray-400 font-bold space-y-3">
+                  <div className="animate-spin text-3xl mx-auto w-8 h-8">⚙️</div>
+                  <p>Загрузка отзывов из базы данных...</p>
+                </div>
+              ) : filteredReviews.length === 0 ? (
+                <div className="bg-duo-card border-2 border-gray-800 rounded-3xl p-12 text-center text-gray-400 font-bold">
+                  Отзывы по заданным критериям не найдены.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredReviews.map((rev) => (
+                    <div
+                      key={rev.id}
+                      className={`bg-duo-card border-2 rounded-3xl p-6 shadow-xl transition-all relative ${
+                        rev.isPinned ? 'border-amber-500/80 bg-amber-950/10' : 'border-gray-800'
+                      }`}
+                    >
+                      {/* PIN BADGE IF PINNED */}
+                      {rev.isPinned && (
+                        <div className="absolute top-4 right-4 bg-amber-500/20 text-amber-400 border border-amber-500/40 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center space-x-1">
+                          <span>📌 Закреплено</span>
+                        </div>
+                      )}
+
+                      {/* USER INFO & RATING */}
+                      <div className="flex items-start justify-between gap-4 mb-3 pr-24">
+                        <div className="flex items-center space-x-3">
+                          <div
+                            className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl font-bold shadow-md text-white border-2 border-white/20"
+                            style={{ backgroundColor: rev.userColor || '#1cb0f6' }}
+                          >
+                            {rev.userAvatar || '👤'}
+                          </div>
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <h3 className="font-black text-white text-base">
+                                {rev.userName}
+                              </h3>
+                            </div>
+                            <span className="inline-block bg-gray-800 text-duo-blue text-[10px] font-extrabold px-2.5 py-0.5 rounded-full mt-0.5">
+                              {rev.category || '🌟 Общие впечатления'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* RATING STARS */}
+                      <div className="flex items-center space-x-1 mb-3">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <StarIcon
+                            key={star}
+                            className={`w-4 h-4 ${
+                              star <= rev.rating ? 'fill-amber-400 text-amber-400' : 'text-gray-700'
+                            }`}
+                          />
+                        ))}
+                        <span className="text-xs font-bold text-gray-400 ml-2">
+                          {new Date(rev.createdAt).toLocaleDateString('ru-RU')}
+                        </span>
+                      </div>
+
+                      {/* COMMENT TEXT */}
+                      <p className="text-sm font-bold text-gray-200 leading-relaxed bg-gray-900/50 p-4 rounded-2xl border border-gray-800 mb-4">
+                        {rev.comment}
+                      </p>
+
+                      {/* EXISTING REPLIES */}
+                      {rev.replies && rev.replies.length > 0 && (
+                        <div className="space-y-2 mb-4 pl-4 border-l-2 border-amber-500/40">
+                          {rev.replies.map((rep) => (
+                            <div
+                              key={rep.id}
+                              className={`p-3 rounded-2xl text-xs font-bold flex items-start justify-between gap-3 ${
+                                rep.isAdmin
+                                  ? 'bg-amber-950/40 border border-amber-500/30 text-amber-200'
+                                  : 'bg-gray-800 text-gray-300'
+                              }`}
+                            >
+                              <div>
+                                <div className="flex items-center space-x-2 mb-1">
+                                  <span>{rep.userAvatar || '👑'}</span>
+                                  <span className="font-black text-amber-400">
+                                    {rep.userName}
+                                  </span>
+                                </div>
+                                <p className="leading-snug">{rep.comment}</p>
+                              </div>
+
+                              <button
+                                onClick={() => handleDeleteReply(rev.id, rep.id)}
+                                className="text-red-400 hover:text-red-300 p-1 text-xs font-black transition-colors"
+                                title="Удалить ответ"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* ADMIN REPLY INPUT BOX */}
+                      <div className="mt-4 pt-4 border-t border-gray-800/80 flex flex-col md:flex-row gap-2 items-center">
+                        <input
+                          type="text"
+                          value={adminReplyTexts[rev.id] || ''}
+                          onChange={(e) =>
+                            setAdminReplyTexts((prev) => ({ ...prev, [rev.id]: e.target.value }))
+                          }
+                          placeholder="Ответить от имени Администратора DuoWindo6601..."
+                          className="flex-1 w-full bg-gray-800 border-2 border-gray-700 focus:border-amber-400 text-white rounded-2xl px-4 py-2 text-xs font-bold focus:outline-none"
+                        />
+                        <button
+                          onClick={() => handlePostAdminReply(rev.id)}
+                          disabled={submittingReplyId === rev.id || !adminReplyTexts[rev.id]?.trim()}
+                          className="w-full md:w-auto px-5 py-2 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase rounded-2xl border-b-2 border-amber-700 transition-all disabled:opacity-50"
+                        >
+                          {submittingReplyId === rev.id ? 'Отправка...' : '💬 Ответить'}
+                        </button>
+                      </div>
+
+                      {/* ACTION CONTROLS BAR */}
+                      <div className="flex items-center justify-between pt-4 mt-3 border-t border-gray-800 text-xs">
+                        <div className="flex items-center space-x-3">
+                          <button
+                            onClick={() => handleTogglePin(rev.id)}
+                            className={`px-3 py-1.5 rounded-xl font-bold transition-colors border ${
+                              rev.isPinned
+                                ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                                : 'bg-gray-800 text-gray-400 hover:text-white border-gray-700'
+                            }`}
+                          >
+                            {rev.isPinned ? '📌 Открепить' : '📌 Закрепить'}
+                          </button>
+                        </div>
+
+                        {/* DELETE BUTTON */}
+                        <button
+                          onClick={() => handleDeleteFeedback(rev.id)}
+                          disabled={deletingId === rev.id}
+                          className="px-4 py-1.5 bg-red-900/40 hover:bg-red-800 text-red-300 border border-red-700 rounded-xl font-black text-xs transition-colors flex items-center space-x-1"
+                        >
+                          <span>🗑️ Удалить ненадлежащий отзыв</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 3: CLOUD USER LOOKUP & STREAK MANAGEMENT */}
+        {/* ========================================================================= */}
+        {activeTab === 'users' && (
+          <div className="space-y-8 animate-in fade-in">
+            <div className="bg-duo-card border-2 border-gray-800 rounded-3xl p-6 md:p-8 shadow-xl space-y-6">
+              <div>
+                <h2 className="text-xl font-black uppercase tracking-tight text-white flex items-center space-x-2">
+                  <span>👥</span>
+                  <span>Поиск и Восстановление Пользователей Firestore</span>
+                </h2>
+                <p className="text-xs text-gray-400 font-bold mt-1">
+                  Найдите любого пользователя по UID, Email или Юзернейму для просмотра и восстановления его ударного режима.
+                </p>
+              </div>
+
+              {/* SEARCH BOX */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <input
+                  type="text"
+                  value={searchUserKey}
+                  onChange={(e) => setSearchUserKey(e.target.value)}
+                  placeholder="Введите UID, Email или @username (например: abramov)..."
+                  className="flex-1 bg-gray-800 border-2 border-gray-700 focus:border-duo-blue text-white rounded-2xl px-4 py-3 text-xs font-bold focus:outline-none"
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearchUserInFirestore()}
+                />
+                <button
+                  onClick={handleSearchUserInFirestore}
+                  disabled={searchingUser}
+                  className="px-6 py-3 bg-duo-blue hover:brightness-110 text-white font-black text-xs uppercase tracking-wider rounded-2xl border-b-2 border-duo-blueDark active:translate-y-0.5 transition-all flex items-center justify-center space-x-2"
+                >
+                  <span>{searchingUser ? 'Поиск...' : '🔍 Найти'}</span>
+                </button>
+              </div>
+
+              {/* SEARCH RESULT CARD */}
+              {searchedUserDoc && (
+                <div className="bg-gray-900/80 border-2 border-duo-blue/50 rounded-2xl p-6 space-y-6 shadow-2xl animate-in zoom-in-95">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-800 pb-4">
+                    <div className="flex items-center space-x-3">
+                      <div
+                        className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl font-bold shadow-md text-white border border-white/20"
+                        style={{ backgroundColor: searchedUserDoc.avatarColor || '#1cb0f6' }}
+                      >
+                        {searchedUserDoc.avatarIcon || '👤'}
+                      </div>
+                      <div>
+                        <h3 className="font-black text-white text-base">
+                          {searchedUserDoc.name || 'Без имени'}
+                        </h3>
+                        <p className="text-xs text-gray-400 font-bold">
+                          {searchedUserDoc.username ? `@${searchedUserDoc.username}` : searchedUserDoc.email || searchedUserDoc.id}
+                        </p>
+                      </div>
+                    </div>
+
+                    <span className="text-xs bg-duo-blue/20 text-duo-blue border border-duo-blue/40 font-black px-3 py-1 rounded-full self-start sm:self-auto">
+                      UID: {searchedUserDoc.id.slice(0, 10)}...
+                    </span>
+                  </div>
+
+                  {/* USER STATS ROW */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="bg-black/40 p-3 rounded-xl border border-gray-800 text-center">
+                      <p className="text-[10px] text-gray-400 font-bold uppercase">Ударный режим</p>
+                      <p className="text-xl font-black text-duo-red">{searchedUserDoc.streak || 0} дн.</p>
+                    </div>
+                    <div className="bg-black/40 p-3 rounded-xl border border-gray-800 text-center">
+                      <p className="text-[10px] text-gray-400 font-bold uppercase">Заморозки</p>
+                      <p className="text-xl font-black text-cyan-400">{searchedUserDoc.streakFreezeCount || 0} ❄️</p>
+                    </div>
+                    <div className="bg-black/40 p-3 rounded-xl border border-gray-800 text-center">
+                      <p className="text-[10px] text-gray-400 font-bold uppercase">Гемы</p>
+                      <p className="text-xl font-black text-duo-blue">{searchedUserDoc.gems || 0} 💎</p>
+                    </div>
+                    <div className="bg-black/40 p-3 rounded-xl border border-gray-800 text-center">
+                      <p className="text-[10px] text-gray-400 font-bold uppercase">Опыт XP</p>
+                      <p className="text-xl font-black text-amber-400">{searchedUserDoc.xp || 0}</p>
+                    </div>
+                  </div>
+
+                  {/* EDIT STREAK & FREEZES */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-black/20 p-4 rounded-xl border border-gray-800">
+                    <div>
+                      <label className="text-xs font-black uppercase text-gray-300 block mb-1.5">
+                        🔥 Новый ударный режим (дней):
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={searchedStreakInput}
+                        onChange={(e) => setSearchedStreakInput(e.target.value)}
+                        className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-3 py-2 text-sm font-bold focus:outline-none focus:border-duo-red"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-black uppercase text-gray-300 block mb-1.5">
+                        ❄️ Новое количество заморозок:
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={searchedFreezesInput}
+                        onChange={(e) => setSearchedFreezesInput(e.target.value)}
+                        className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-3 py-2 text-sm font-bold focus:outline-none focus:border-cyan-400"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleSaveSearchedUserStreak}
+                    className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg border-b-2 border-green-800 active:translate-y-0.5 transition-all"
+                  >
+                    💾 Сохранить и применить в Firestore
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

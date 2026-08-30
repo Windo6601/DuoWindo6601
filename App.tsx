@@ -21,6 +21,13 @@ import { IshiharaPlateCanvas } from './components/IshiharaPlateCanvas';
 import { DrawingCanvas } from './components/DrawingCanvas';
 import { FeedbackScreen } from './components/FeedbackScreen';
 import { AdminDashboard } from './components/AdminDashboard';
+import { ActivityChart } from './components/ActivityChart';
+import { VocabularyBank } from './components/VocabularyBank';
+import { IncognitoRestrictionsModal } from './components/IncognitoRestrictionsModal';
+import { AuthModal } from './components/AuthModal';
+import { ChessInviteModal, ChessOpponent } from './components/ChessInviteModal';
+import { triggerHapticFeedback } from './services/audioService';
+import { CIS_ALPHABET_DATA, AlphabetItem, AlphabetCategory as CISAlphabetCategory } from './services/alphabetData';
 
 // --- CHESS UTILS & TYPES ---
 type ChessColor = 'w' | 'b';
@@ -286,57 +293,373 @@ const COURSES: Course[] = [
 
 interface AlphabetCategory {
   title: string;
-  items: string[];
+  description?: string;
+  script?: 'cyrillic' | 'latin' | 'arabic' | 'georgian' | 'armenian' | 'special';
+  items: (string | AlphabetItem)[];
 }
 
 const ALPHABET_SETS: Record<string, AlphabetCategory[]> = {
+  ...CIS_ALPHABET_DATA,
+  'en': [
+    {
+      title: 'English Alphabet (26)',
+      description: 'Standard Latin Alphabet with pronunciation and phonetic examples',
+      script: 'latin',
+      items: [
+        { char: 'A', name: 'ay', sound: '[eɪ]/[æ]', word: 'Apple', translation: 'Яблоко / Apple' },
+        { char: 'B', name: 'bee', sound: '[b]', word: 'Book', translation: 'Книга / Book' },
+        { char: 'C', name: 'cee', sound: '[k]/[s]', word: 'Cat', translation: 'Кот / Cat' },
+        { char: 'D', name: 'dee', sound: '[d]', word: 'Dog', translation: 'Собака / Dog' },
+        { char: 'E', name: 'ee', sound: '[iː]/[e]', word: 'Elephant', translation: 'Слон / Elephant' },
+        { char: 'F', name: 'ef', sound: '[f]', word: 'Fish', translation: 'Рыба / Fish' },
+        { char: 'G', name: 'gee', sound: '[ɡ]/[dʒ]', word: 'Guitar', translation: 'Гитара / Guitar' },
+        { char: 'H', name: 'aitch', sound: '[h]', word: 'House', translation: 'Дом / House' },
+        { char: 'I', name: 'eye', sound: '[aɪ]/[ɪ]', word: 'Island', translation: 'Остров / Island' },
+        { char: 'J', name: 'jay', sound: '[dʒ]', word: 'Juice', translation: 'Сок / Juice' },
+        { char: 'K', name: 'kay', sound: '[k]', word: 'Kite', translation: 'Воздушный змей / Kite' },
+        { char: 'L', name: 'el', sound: '[l]', word: 'Lion', translation: 'Лев / Lion' },
+        { char: 'M', name: 'em', sound: '[m]', word: 'Moon', translation: 'Луна / Moon' },
+        { char: 'N', name: 'en', sound: '[n]', word: 'Nest', translation: 'Гнездо / Nest' },
+        { char: 'O', name: 'oh', sound: '[oʊ]/[ɒ]', word: 'Orange', translation: 'Апельсин / Orange' },
+        { char: 'P', name: 'pee', sound: '[p]', word: 'Pen', translation: 'Ручка / Pen' },
+        { char: 'Q', name: 'cue', sound: '[kw]', word: 'Queen', translation: 'Королева / Queen' },
+        { char: 'R', name: 'ar', sound: '[r]', word: 'River', translation: 'Река / River' },
+        { char: 'S', name: 'ess', sound: '[s]', word: 'Sun', translation: 'Солнце / Sun' },
+        { char: 'T', name: 'tee', sound: '[t]', word: 'Tree', translation: 'Дерево / Tree' },
+        { char: 'U', name: 'you', sound: '[juː]/[ʌ]', word: 'Umbrella', translation: 'Зонт / Umbrella' },
+        { char: 'V', name: 'vee', sound: '[v]', word: 'Violin', translation: 'Скрипка / Violin' },
+        { char: 'W', name: 'double-u', sound: '[w]', word: 'Water', translation: 'Вода / Water' },
+        { char: 'X', name: 'ex', sound: '[ks]', word: 'Xylophone', translation: 'Ксилофон / Xylophone' },
+        { char: 'Y', name: 'wy', sound: '[waɪ]/[j]', word: 'Yacht', translation: 'Яхта / Yacht' },
+        { char: 'Z', name: 'zed / zee', sound: '[z]', word: 'Zebra', translation: 'Зебра / Zebra' }
+      ]
+    }
+  ],
+  'de': [
+    {
+      title: 'Deutsches Alphabet (30)',
+      description: 'Немецкий алфавит с умлаутами и эсцет',
+      script: 'latin',
+      items: [
+        { char: 'A', name: 'a', sound: '[aː]', word: 'Apfel', translation: 'Яблоко / Apple' },
+        { char: 'B', name: 'be', sound: '[beː]', word: 'Buch', translation: 'Книга / Book' },
+        { char: 'C', name: 'ce', sound: '[tseː]', word: 'Computer', translation: 'Компьютер / Computer' },
+        { char: 'D', name: 'de', sound: '[deː]', word: 'Danke', translation: 'Спасибо / Thanks' },
+        { char: 'E', name: 'e', sound: '[eː]', word: 'Elefant', translation: 'Слон / Elephant' },
+        { char: 'F', name: 'ef', sound: '[ɛf]', word: 'Freund', translation: 'Друг / Friend' },
+        { char: 'G', name: 'ge', sound: '[ɡeː]', word: 'Garten', translation: 'Сад / Garden' },
+        { char: 'H', name: 'ha', sound: '[haː]', word: 'Haus', translation: 'Дом / House' },
+        { char: 'I', name: 'i', sound: '[iː]', word: 'Insel', translation: 'Остров / Island' },
+        { char: 'J', name: 'jot', sound: '[jɔt]', word: 'Jahr', translation: 'Год / Year' },
+        { char: 'K', name: 'ka', sound: '[kaː]', word: 'Katze', translation: 'Кошка / Cat' },
+        { char: 'L', name: 'el', sound: '[ɛl]', word: 'Lampe', translation: 'Лампа / Lamp' },
+        { char: 'M', name: 'em', sound: '[ɛm]', word: 'Mond', translation: 'Луна / Moon' },
+        { char: 'N', name: 'en', sound: '[ɛn]', word: 'Nacht', translation: 'Ночь / Night' },
+        { char: 'O', name: 'o', sound: '[oː]', word: 'Ozean', translation: 'Океан / Ocean' },
+        { char: 'P', name: 'pe', sound: '[peː]', word: 'Papier', translation: 'Бумага / Paper' },
+        { char: 'Q', name: 'ku', sound: '[kuː]', word: 'Quelle', translation: 'Источник / Source' },
+        { char: 'R', name: 'er', sound: '[ɛʁ]', word: 'Regen', translation: 'Дождь / Rain' },
+        { char: 'S', name: 'es', sound: '[ɛs]', word: 'Sonne', translation: 'Солнце / Sun' },
+        { char: 'T', name: 'te', sound: '[teː]', word: 'Tag', translation: 'День / Day' },
+        { char: 'U', name: 'u', sound: '[uː]', word: 'Uhr', translation: 'Часы / Clock' },
+        { char: 'V', name: 'vau', sound: '[faʊ]', word: 'Vogel', translation: 'Птица / Bird' },
+        { char: 'W', name: 'we', sound: '[veː]', word: 'Wasser', translation: 'Вода / Water' },
+        { char: 'X', name: 'ix', sound: '[ɪks]', word: 'Xylofon', translation: 'Ксилофон / Xylophone' },
+        { char: 'Y', name: 'ypsilon', sound: '[ˈʏpsilɔn]', word: 'Yoga', translation: 'Йога / Yoga' },
+        { char: 'Z', name: 'zett', sound: '[tsɛt]', word: 'Zug', translation: 'Поезд / Train' },
+        { char: 'Ä', name: 'ä', sound: '[ɛː]', word: 'Äpfel', translation: 'Яблоки / Apples' },
+        { char: 'Ö', name: 'ö', sound: '[øː]', word: 'Öl', translation: 'Масло / Oil' },
+        { char: 'Ü', name: 'ü', sound: '[yː]', word: 'Über', translation: 'Над / Over' },
+        { char: 'ß', name: 'eszett', sound: '[s]', word: 'Straße', translation: 'Улица / Street' }
+      ]
+    }
+  ],
+  'fr': [
+    {
+      title: 'Alphabet Français (26)',
+      description: 'Французский алфавит с диакритикой',
+      script: 'latin',
+      items: [
+        { char: 'A', name: 'a', sound: '[a]', word: 'Arbre', translation: 'Дерево / Tree' },
+        { char: 'B', name: 'bé', sound: '[be]', word: 'Bateau', translation: 'Лодка / Boat' },
+        { char: 'C', name: 'cé', sound: '[se]/[k]', word: 'Ciel', translation: 'Небо / Sky' },
+        { char: 'D', name: 'dé', sound: '[de]', word: 'Danse', translation: 'Танец / Dance' },
+        { char: 'E', name: 'e', sound: '[ə]', word: 'Eau', translation: 'Вода / Water' },
+        { char: 'F', name: 'effe', sound: '[ɛf]', word: 'Fleur', translation: 'Цветок / Flower' },
+        { char: 'G', name: 'gé', sound: '[ʒe]/[ɡ]', word: 'Gâteau', translation: 'Торт / Cake' },
+        { char: 'H', name: 'hache', sound: '[-]', word: 'Hiver', translation: 'Зима / Winter' },
+        { char: 'I', name: 'i', sound: '[i]', word: 'Île', translation: 'Остров / Island' },
+        { char: 'J', name: 'ji', sound: '[ʒi]', word: 'Jour', translation: 'День / Day' },
+        { char: 'K', name: 'ka', sound: '[ka]', word: 'Koala', translation: 'Коала / Koala' },
+        { char: 'L', name: 'elle', sound: '[ɛl]', word: 'Lune', translation: 'Луна / Moon' },
+        { char: 'M', name: 'emme', sound: '[ɛm]', word: 'Mer', translation: 'Море / Sea' },
+        { char: 'N', name: 'enne', sound: '[ɛn]', word: 'Nuage', translation: 'Облако / Cloud' },
+        { char: 'O', name: 'o', sound: '[o]', word: 'Oiseau', translation: 'Птица / Bird' },
+        { char: 'P', name: 'pé', sound: '[pe]', word: 'Pain', translation: 'Хлеб / Bread' },
+        { char: 'Q', name: 'qu', sound: '[ky]', word: 'Quatre', translation: 'Четыре / Four' },
+        { char: 'R', name: 'erre', sound: '[ɛʁ]', word: 'Rose', translation: 'Роза / Rose' },
+        { char: 'S', name: 'esse', sound: '[ɛs]', word: 'Soleil', translation: 'Солнце / Sun' },
+        { char: 'T', name: 'té', sound: '[te]', word: 'Terre', translation: 'Земля / Earth' },
+        { char: 'U', name: 'u', sound: '[y]', word: 'Usine', translation: 'Завод / Factory' },
+        { char: 'V', name: 'vé', sound: '[ve]', word: 'Vent', translation: 'Ветер / Wind' },
+        { char: 'W', name: 'double vé', sound: '[dubləve]', word: 'Wagon', translation: 'Вагон / Wagon' },
+        { char: 'X', name: 'ixe', sound: '[iks]', word: 'Xylophone', translation: 'Ксилофон / Xylophone' },
+        { char: 'Y', name: 'i grec', sound: '[iɡʁɛk]', word: 'Yeux', translation: 'Глаза / Eyes' },
+        { char: 'Z', name: 'zède', sound: '[zɛd]', word: 'Zèbre', translation: 'Зебра / Zebra' },
+        { char: 'É', name: 'e accent aigu', sound: '[e]', word: 'École', translation: 'Школа / School' },
+        { char: 'È', name: 'e accent grave', sound: '[ɛ]', word: 'Père', translation: 'Отец / Father' },
+        { char: 'Ç', name: 'c cédille', sound: '[s]', word: 'Français', translation: 'Французский / French' }
+      ]
+    }
+  ],
+  'es': [
+    {
+      title: 'Alfabeto Español (27)',
+      description: 'Испанский алфавит с буквой Ñ',
+      script: 'latin',
+      items: [
+        { char: 'A', name: 'a', sound: '[a]', word: 'Amigo', translation: 'Друг / Friend' },
+        { char: 'B', name: 'be', sound: '[be]', word: 'Barco', translation: 'Корабль / Ship' },
+        { char: 'C', name: 'ce', sound: '[θ]/[k]', word: 'Casa', translation: 'Дом / House' },
+        { char: 'D', name: 'de', sound: '[de]', word: 'Día', translation: 'День / Day' },
+        { char: 'E', name: 'e', sound: '[e]', word: 'Estrella', translation: 'Звезда / Star' },
+        { char: 'F', name: 'efe', sound: '[efe]', word: 'Flor', translation: 'Цветок / Flower' },
+        { char: 'G', name: 'ge', sound: '[xe]/[ɡ]', word: 'Gato', translation: 'Кот / Cat' },
+        { char: 'H', name: 'hache', sound: '[-]', word: 'Hola', translation: 'Привет / Hello' },
+        { char: 'I', name: 'i', sound: '[i]', word: 'Isla', translation: 'Остров / Island' },
+        { char: 'J', name: 'jota', sound: '[xota]', word: 'Jardín', translation: 'Сад / Garden' },
+        { char: 'K', name: 'ka', sound: '[ka]', word: 'Kilo', translation: 'Килограмм / Kilo' },
+        { char: 'L', name: 'ele', sound: '[ele]', word: 'Luna', translation: 'Луна / Moon' },
+        { char: 'M', name: 'eme', sound: '[eme]', word: 'Mar', translation: 'Море / Sea' },
+        { char: 'N', name: 'ene', sound: '[ene]', word: 'Noche', translation: 'Ночь / Night' },
+        { char: 'Ñ', name: 'eñe', sound: '[eɲe]', word: 'Niño', translation: 'Ребёнок / Child', tips: 'Буква N с тильдой' },
+        { char: 'O', name: 'o', sound: '[o]', word: 'Ojo', translation: 'Глаз / Eye' },
+        { char: 'P', name: 'pe', sound: '[pe]', word: 'Pan', translation: 'Хлеб / Bread' },
+        { char: 'Q', name: 'cu', sound: '[ku]', word: 'Queso', translation: 'Сыр / Cheese' },
+        { char: 'R', name: 'erre', sound: '[ere]/[r]', word: 'Río', translation: 'Река / River' },
+        { char: 'S', name: 'ese', sound: '[ese]', word: 'Sol', translation: 'Солнце / Sun' },
+        { char: 'T', name: 'te', sound: '[te]', word: 'Tierra', translation: 'Земля / Earth' },
+        { char: 'U', name: 'u', sound: '[u]', word: 'Uva', translation: 'Виноград / Grape' },
+        { char: 'V', name: 'uve', sound: '[ube]', word: 'Viento', translation: 'Ветер / Wind' },
+        { char: 'W', name: 'uve doble', sound: '[ube doble]', word: 'Web', translation: 'Веб / Web' },
+        { char: 'X', name: 'equis', sound: '[ekis]', word: 'Éxito', translation: 'Успех / Success' },
+        { char: 'Y', name: 'ye / i griega', sound: '[ʝe]', word: 'Yo', translation: 'Я / I' },
+        { char: 'Z', name: 'zeta', sound: '[θeta]', word: 'Zapato', translation: 'Обувь / Shoe' }
+      ]
+    }
+  ],
   'zh': [
     {
       title: 'Иероглифы (Hanzi)',
-      items: ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '人', '口', '日', '月', '水', '火', '木', '金', '土', '女', '子', '大', '小', '中', '国', '山', '田', '天', '地', '心', '手', '目', '石', '竹', '米', '糸', '耳', '言', '走', '足', '雨', '风', '龙', '车', '门', '马', '鸟', '鱼']
+      description: 'Базовые ключи и популярные китайские иероглифы',
+      script: 'special',
+      items: [
+        { char: '一', name: 'yī', sound: '[ji]', word: '一天', translation: 'Один день / One day' },
+        { char: '二', name: 'èr', sound: '[aɻ]', word: '二月', translation: 'Февраль / February' },
+        { char: '三', name: 'sān', sound: '[san]', word: '三个人', translation: 'Три человека / 3 people' },
+        { char: '四', name: 'sì', sound: '[sz̩]', word: '四季', translation: 'Четыре сезона / 4 seasons' },
+        { char: '五', name: 'wǔ', sound: '[u]', word: '五星', translation: 'Пять звезд / Five stars' },
+        { char: '六', name: 'liù', sound: '[ljou]', word: '六月', translation: 'Июнь / June' },
+        { char: '七', name: 'qī', sound: '[tɕʰi]', word: '七天', translation: 'Семь дней / Seven days' },
+        { char: '八', name: 'bā', sound: '[pa]', word: '八月', translation: 'Август / August' },
+        { char: '九', name: 'jiǔ', sound: '[tɕjou]', word: '九点', translation: 'Девять часов / 9 o\'clock' },
+        { char: '十', name: 'shí', sound: '[ʂʐ̩]', word: '十分', translation: 'Очень / Very' },
+        { char: '人', name: 'rén', sound: '[ʐən]', word: '人民', translation: 'Человек / Person' },
+        { char: '口', name: 'kǒu', sound: '[kʰou]', word: '门口', translation: 'Рот / Вход / Mouth' },
+        { char: '日', name: 'rì', sound: '[ʐʐ̩]', word: '日出', translation: 'Солнце / День / Sun' },
+        { char: '月', name: 'yuè', sound: '[ɥe]', word: '月亮', translation: 'Луна / Месяц / Moon' },
+        { char: '水', name: 'shuǐ', sound: '[ʂwei]', word: '喝水', translation: 'Вода / Water' },
+        { char: '火', name: 'huǒ', sound: '[xwo]', word: '火山', translation: 'Огонь / Fire' },
+        { char: '木', name: 'mù', sound: '[mu]', word: '木头', translation: 'Дерево / Wood' },
+        { char: '金', name: 'jīn', sound: '[tɕin]', word: '黄金', translation: 'Золото / Металл / Gold' },
+        { char: '土', name: 'tǔ', sound: '[tʰu]', word: '土地', translation: 'Земля / Почва / Soil' },
+        { char: '女', name: 'nǚ', sound: '[ny]', word: '女人', translation: 'Женщина / Woman' },
+        { char: '子', name: 'zǐ', sound: '[tsz̩]', word: '孩子', translation: 'Ребенок / Сын / Child' },
+        { char: '大', name: 'dà', sound: '[ta]', word: '大人', translation: 'Большой / Big' },
+        { char: '小', name: 'xiǎo', sound: '[ɕjau]', word: '小孩', translation: 'Маленький / Small' },
+        { char: '中', name: 'zhōng', sound: '[tʂuŋ]', word: '中国', translation: 'Центр / Китай / Middle' },
+        { char: '国', name: 'guó', sound: '[kwo]', word: '国家', translation: 'Страна / Country' },
+        { char: '山', name: 'shān', sound: '[ʂan]', word: '高山', translation: 'Гора / Mountain' },
+        { char: '田', name: 'tián', sound: '[tʰjɛn]', word: '田野', translation: 'Поле / Field' },
+        { char: '天', name: 'tiān', sound: '[tʰjɛn]', word: '天空', translation: 'Небо / День / Sky' },
+        { char: '心', name: 'xīn', sound: '[ɕin]', word: '心情', translation: 'Сердце / Heart' },
+        { char: '手', name: 'shǒu', sound: '[ʂou]', word: '双手', translation: 'Рука / Hand' }
+      ]
     },
     {
       title: 'Пиньинь (Pinyin)',
+      description: 'Латинская транслитерация китайского языка',
+      script: 'latin',
       items: ['ā', 'á', 'ǎ', 'à', 'ō', 'ó', 'ǒ', 'ò', 'ē', 'é', 'ě', 'è', 'ī', 'í', 'ǐ', 'ì', 'ū', 'ú', 'ǔ', 'ù', 'b', 'p', 'm', 'f', 'd', 't', 'n', 'l', 'g', 'k', 'h', 'j', 'q', 'x', 'zh', 'ch', 'sh', 'r', 'z', 'c', 's']
     }
   ],
   'ja': [
     {
       title: 'Хирагана (Hiragana)',
-      items: ['あ', 'い', 'う', 'え', 'お', 'か', 'き', 'く', 'け', 'こ', 'さ', 'し', 'す', 'せ', 'そ', 'た', 'ち', 'つ', 'て', 'と', 'な', 'に', 'ぬ', 'ね', 'の', 'は', 'ひ', 'ふ', 'へ', 'ほ', 'ま', 'み', 'む', 'め', 'も', 'や', 'ゆ', 'よ', 'ら', 'り', 'る', 'れ', 'ろ', 'わ', 'を', 'ん']
+      description: 'Японская слоговая азбука для исконно японских слов',
+      script: 'special',
+      items: [
+        { char: 'あ', name: 'a', sound: '[a]', word: 'あさ (Asa)', translation: 'Утро / Morning' },
+        { char: 'い', name: 'i', sound: '[i]', word: 'いぬ (Inu)', translation: 'Собака / Dog' },
+        { char: 'う', name: 'u', sound: '[ɯ]', word: 'うみ (Umi)', translation: 'Море / Sea' },
+        { char: 'え', name: 'e', sound: '[e]', word: 'えき (Eki)', translation: 'Станция / Station' },
+        { char: 'お', name: 'o', sound: '[o]', word: 'お茶 (Ocha)', translation: 'Чай / Tea' },
+        { char: 'か', name: 'ka', sound: '[ka]', word: 'かさ (Kasa)', translation: 'Зонт / Umbrella' },
+        { char: 'き', name: 'ki', sound: '[ki]', word: 'き (Ki)', translation: 'Дерево / Tree' },
+        { char: 'く', name: 'ku', sound: '[kɯ]', word: 'くるま (Kuruma)', translation: 'Машина / Car' },
+        { char: 'け', name: 'ke', sound: '[ke]', word: 'けむり (Kemuri)', translation: 'Дым / Smoke' },
+        { char: 'こ', name: 'ko', sound: '[ko]', word: 'こども (Kodomo)', translation: 'Ребенок / Child' },
+        { char: 'さ', name: 'sa', sound: '[sa]', word: 'さくら (Sakura)', translation: 'Сакура / Cherry blossom' },
+        { char: 'し', name: 'shi', sound: '[ɕi]', word: 'しろ (Shiro)', translation: 'Белый / White' },
+        { char: 'す', name: 'su', sound: '[sɯ]', word: 'すし (Sushi)', translation: 'Суши / Sushi' },
+        { char: 'せ', name: 'se', sound: '[se]', word: 'せんせい (Sensei)', translation: 'Учитель / Teacher' },
+        { char: 'そ', name: 'so', sound: '[so]', word: 'そら (Sora)', translation: 'Небо / Sky' },
+        { char: 'た', name: 'ta', sound: '[ta]', word: 'たけ (Take)', translation: 'Бамбук / Bamboo' },
+        { char: 'ち', name: 'chi', sound: '[tɕi]', word: 'ちず (Chizu)', translation: 'Карта / Map' },
+        { char: 'つ', name: 'tsu', sound: '[tsɯ]', word: 'つき (Tsuki)', translation: 'Луна / Moon' },
+        { char: 'て', name: 'te', sound: '[te]', word: 'て (Te)', translation: 'Рука / Hand' },
+        { char: 'と', name: 'to', sound: '[to]', word: 'とり (Tori)', translation: 'Птица / Bird' },
+        { char: 'な', name: 'na', sound: '[na]', word: 'なつ (Natsu)', translation: 'Лето / Summer' },
+        { char: 'に', name: 'ni', sound: '[ɲi]', word: 'にほん (Nihon)', translation: 'Япония / Japan' },
+        { char: 'ぬ', name: 'nu', sound: '[nɯ]', word: 'ぬいぐるみ (Nuigurumi)', translation: 'Игрушка / Toy' },
+        { char: 'ね', name: 'ne', sound: '[ne]', word: 'ねこ (Neko)', translation: 'Кошка / Cat' },
+        { char: 'の', name: 'no', sound: '[no]', word: 'やまの (Yama no)', translation: 'Горы / Mountain\'s' },
+        { char: 'は', name: 'ha', sound: '[ha]', word: 'はな (Hana)', translation: 'Цветок / Flower' },
+        { char: 'ひ', name: 'hi', sound: '[çi]', word: 'ひかり (Hikari)', translation: 'Свет / Light' },
+        { char: 'ふ', name: 'fu', sound: '[ɸɯ]', word: 'ふね (Fune)', translation: 'Корабль / Boat' },
+        { char: 'へ', name: 'he', sound: '[he]', word: 'へや (Heya)', translation: 'Комната / Room' },
+        { char: 'ほ', name: 'ho', sound: '[ho]', word: 'ほし (Hoshi)', translation: 'Звезда / Star' },
+        { char: 'ま', name: 'ma', sound: '[ma]', word: 'まち (Machi)', translation: 'Город / Town' },
+        { char: 'み', name: 'mi', sound: '[mi]', word: 'みず (Mizu)', translation: 'Вода / Water' },
+        { char: 'む', name: 'mu', sound: '[mɯ]', word: 'むし (Mushi)', translation: 'Насекомое / Bug' },
+        { char: 'め', name: 'me', sound: '[me]', word: 'め (Me)', translation: 'Глаз / Eye' },
+        { char: 'も', name: 'mo', sound: '[mo]', word: 'もり (Mori)', translation: 'Лес / Forest' },
+        { char: 'や', name: 'ya', sound: '[ja]', word: 'やま (Yama)', translation: 'Гора / Mountain' },
+        { char: 'ゆ', name: 'yu', sound: '[jɯ]', word: 'ゆき (Yuki)', translation: 'Снег / Snow' },
+        { char: 'よ', name: 'yo', sound: '[jo]', word: 'よる (Yoru)', translation: 'Ночь / Night' },
+        { char: 'ら', name: 'ra', sound: '[ɾa]', word: 'らいおん (Raion)', translation: 'Лев / Lion' },
+        { char: 'り', name: 'ri', sound: '[ɾi]', word: 'りんご (Ringo)', translation: 'Яблоко / Apple' },
+        { char: 'る', name: 'ru', sound: '[ɾɯ]', word: 'るす (Rusu)', translation: 'Отсутствие / Away' },
+        { char: 'れ', name: 're', sound: '[ɾe]', word: 'れんあい (Ren\'ai)', translation: 'Любовь / Love' },
+        { char: 'ろ', name: 'ro', sound: '[ɾo]', word: 'ろうそく (Rōsoku)', translation: 'Свеча / Candle' },
+        { char: 'わ', name: 'wa', sound: '[ɰa]', word: 'わに (Wani)', translation: 'Крокодил / Crocodile' },
+        { char: 'を', name: 'wo / o', sound: '[o]', word: '本を (Hon o)', translation: 'Винительный падеж' },
+        { char: 'ん', name: 'n', sound: '[ɴ]', word: 'ほん (Hon)', translation: 'Книга / Book' }
+      ]
     },
     {
       title: 'Катакана (Katakana)',
+      description: 'Японская слоговая азбука для заимствованных слов',
+      script: 'special',
       items: ['ア', 'イ', 'ウ', 'エ', 'オ', 'カ', 'キ', 'ク', 'ケ', 'コ', 'サ', 'シ', 'ス', 'セ', 'ソ', 'タ', 'チ', 'ツ', 'テ', 'ト', 'ナ', 'ニ', 'ヌ', 'ネ', 'ノ', 'ハ', 'ヒ', 'フ', 'ヘ', 'ホ', 'マ', 'ミ', 'ム', 'メ', 'モ', 'ヤ', 'ユ', 'ヨ', 'ラ', 'リ', 'ル', 'レ', 'ロ', 'ワ', 'ヲ', 'ン']
     }
   ],
   'ko': [
     {
       title: 'Согласные (Consonants)',
-      items: ['ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅅ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ', 'ㄲ', 'ㄸ', 'ㅃ', 'ㅆ', 'ㅉ']
+      description: 'Корейские согласные буквы хангыля',
+      script: 'special',
+      items: [
+        { char: 'ㄱ', name: 'гиёк (giyeok)', sound: '[k]/[ɡ]', word: '가방 (Gabang)', translation: 'Сумка / Bag' },
+        { char: 'ㄴ', name: 'ниын (nieun)', sound: '[n]', word: '나무 (Namu)', translation: 'Дерево / Tree' },
+        { char: 'ㄷ', name: 'дигыт (digeut)', sound: '[t]/[d]', word: '달 (Dal)', translation: 'Луна / Moon' },
+        { char: 'ㄹ', name: 'риыль (rieul)', sound: '[ɾ]/[l]', word: '라면 (Ramyeon)', translation: 'Рамен / Ramen' },
+        { char: 'ㅁ', name: 'миым (mieum)', sound: '[m]', word: '물 (Mul)', translation: 'Вода / Water' },
+        { char: 'ㅂ', name: 'биып (bieup)', sound: '[p]/[b]', word: '밥 (Bap)', translation: 'Рис / Еда / Rice' },
+        { char: 'ㅅ', name: 'сиот (siot)', sound: '[s]', word: '사람 (Saram)', translation: 'Человек / Person' },
+        { char: 'ㅇ', name: 'иын (ieung)', sound: '[-]/[ŋ]', word: '아이 (Ai)', translation: 'Ребенок / Child' },
+        { char: 'ㅈ', name: 'джиыт (jieut)', sound: '[tɕ]/[dʒ]', word: '집 (Jip)', translation: 'Дом / House' },
+        { char: 'ㅊ', name: 'чиыт (chieut)', sound: '[tɕʰ]', word: '차 (Cha)', translation: 'Чай / Машина / Tea' },
+        { char: 'ㅋ', name: 'кхиык (khieuk)', sound: '[kʰ]', word: '커피 (Keopi)', translation: 'Кофе / Coffee' },
+        { char: 'ㅌ', name: 'тхиыт (thieut)', sound: '[tʰ]', word: '토끼 (Tokki)', translation: 'Кролик / Rabbit' },
+        { char: 'ㅍ', name: 'пхиып (phieup)', sound: '[pʰ]', word: '포도 (Podo)', translation: 'Виноград / Grape' },
+        { char: 'ㅎ', name: 'хиыт (hieut)', sound: '[h]', word: '하늘 (Haneul)', translation: 'Небо / Sky' }
+      ]
     },
     {
       title: 'Гласные (Vowels)',
+      description: 'Корейские гласные буквы хангыля',
+      script: 'special',
       items: ['ㅏ', 'ㅑ', 'ㅓ', 'ㅕ', 'ㅗ', 'ㅛ', 'ㅜ', 'ㅠ', 'ㅡ', 'ㅣ', 'ㅐ', 'ㅒ', 'ㅔ', 'ㅖ', 'ㅘ', 'ㅙ', 'ㅚ', 'ㅝ', 'ㅞ', 'ㅟ', 'ㅢ']
     }
   ],
   'ar': [
     {
       title: 'Арабские буквы (28)',
-      items: ['ا', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي']
+      description: 'Арабский алфавит с направлением письма справа налево',
+      script: 'arabic',
+      items: [
+        { char: 'ا', name: 'Алиф (Alif)', sound: '[aː]', word: 'أب (Ab)', translation: 'Отец / Father' },
+        { char: 'ب', name: 'Ба (Baa)', sound: '[b]', word: 'باب (Bab)', translation: 'Дверь / Door' },
+        { char: 'ت', name: 'Та (Taa)', sound: '[t]', word: 'تمر (Tamr)', translation: 'Финики / Dates' },
+        { char: 'ث', name: 'Са (Thaa)', sound: '[θ]', word: 'ثعلب (Tha\'lab)', translation: 'Лиса / Fox' },
+        { char: 'ج', name: 'Джим (Jeem)', sound: '[dʒ]', word: 'جبل (Jabal)', translation: 'Гора / Mountain' },
+        { char: 'ح', name: 'Ха (Haa)', sound: '[ħ]', word: 'حب (Hubb)', translation: 'Любовь / Love' },
+        { char: 'خ', name: 'Ха (Khaa)', sound: '[x]', word: 'خبز (Khubz)', translation: 'Хлеб / Bread' },
+        { char: 'د', name: 'Даль (Dal)', sound: '[d]', word: 'دار (Dar)', translation: 'Дом / House' },
+        { char: 'ذ', name: 'Заль (Dhal)', sound: '[ð]', word: 'ذهب (Dhahab)', translation: 'Золото / Gold' },
+        { char: 'ر', name: 'Ра (Raa)', sound: '[r]', word: 'رجل (Rajul)', translation: 'Мужчина / Man' },
+        { char: 'ز', name: 'Зай (Zay)', sound: '[z]', word: 'زهرة (Zahra)', translation: 'Цветок / Flower' },
+        { char: 'س', name: 'Син (Seen)', sound: '[s]', word: 'سلام (Salam)', translation: 'Мир / Peace' },
+        { char: 'ش', name: 'Шин (Sheen)', sound: '[ʃ]', word: 'شمس (Shams)', translation: 'Солнце / Sun' },
+        { char: 'ص', name: 'Сад (Saad)', sound: '[sˤ]', word: 'صديق (Sadeeq)', translation: 'Друг / Friend' },
+        { char: 'ض', name: 'Дад (Daad)', sound: '[dˤ]', word: 'ضوء (Daw\')', translation: 'Свет / Light' },
+        { char: 'ط', name: 'Та (Taa\')', sound: '[tˤ]', word: 'طالب (Talib)', translation: 'Студент / Student' },
+        { char: 'ظ', name: 'За (Zaa\')', sound: '[ðˤ]', word: 'ظرف (Zarf)', translation: 'Конверт / Envelope' },
+        { char: 'ع', name: 'Айн (\'Ayn)', sound: '[ʕ]', word: 'عين (\'Ayn)', translation: 'Глаз / Родник / Eye' },
+        { char: 'غ', name: 'Гайн (Ghayn)', sound: '[ɣ]', word: 'غيمة (Ghayma)', translation: 'Облако / Cloud' },
+        { char: 'ف', name: 'Фа (Faa)', sound: '[f]', word: 'فراشة (Farasha)', translation: 'Бабочка / Butterfly' },
+        { char: 'ق', name: 'Каф (Qaaf)', sound: '[q]', word: 'قمر (Qamar)', translation: 'Луна / Moon' },
+        { char: 'ك', name: 'Кяф (Kaaf)', sound: '[k]', word: 'كتاب (Kitab)', translation: 'Книга / Book' },
+        { char: 'ل', name: 'Лям (Laam)', sound: '[l]', word: 'ليل (Layl)', translation: 'Ночь / Night' },
+        { char: 'م', name: 'Мим (Meem)', sound: '[m]', word: 'ماء (Maa\')', translation: 'Вода / Water' },
+        { char: 'ن', name: 'Нун (Noon)', sound: '[n]', word: 'نجم (Najm)', translation: 'Звезда / Star' },
+        { char: 'ه', name: 'Ха (Haa\')', sound: '[h]', word: 'هدية (Hadiyya)', translation: 'Подарок / Gift' },
+        { char: 'و', name: 'Вав (Waaw)', sound: '[w]/[uː]', word: 'وردة (Warda)', translation: 'Роза / Rose' },
+        { char: 'ي', name: 'Йа (Yaa\')', sound: '[j]/[iː]', word: 'يد (Yad)', translation: 'Рука / Hand' }
+      ]
     },
     {
-      title: 'Харкаты и Знаки',
+      title: 'Огласовки и Знаки',
+      description: 'Арабские харакаты (гласные значки)',
+      script: 'arabic',
       items: ['َ', 'ُ', 'ِ', 'ً', 'ٌ', 'ٍ', 'ْ', 'ّ', 'آ', 'إ', 'أ', 'ء']
     }
   ],
   'he': [
     {
       title: 'Буквы иврита (22)',
-      items: ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 'י', 'כ', 'ל', 'מ', 'נ', 'ס', 'ע', 'פ', 'צ', 'ק', 'ר', 'ש', 'ת']
+      description: 'Еврейский квадратный алфавит (справа налево)',
+      script: 'special',
+      items: [
+        { char: 'א', name: 'Алеф (Alef)', sound: '[ʔ]', word: 'אבא (Abba)', translation: 'Папа / Father' },
+        { char: 'ב', name: 'Бет (Bet)', sound: '[b]/[v]', word: 'בית (Bayit)', translation: 'Дом / House' },
+        { char: 'ג', name: 'Гимель (Gimel)', sound: '[ɡ]', word: 'גמל (Gamal)', translation: 'Верблюд / Camel' },
+        { char: 'ד', name: 'Далет (Dalet)', sound: '[d]', word: 'דלת (Delet)', translation: 'Дверь / Door' },
+        { char: 'ה', name: 'Хей (He)', sound: '[h]', word: 'הר (Har)', translation: 'Гора / Mountain' },
+        { char: 'ו', name: 'Вав (Vav)', sound: '[v]/[o]/[u]', word: 'ורד (Vered)', translation: 'Роза / Rose' },
+        { char: 'ז', name: 'Заин (Zayin)', sound: '[z]', word: 'זמן (Zman)', translation: 'Время / Time' },
+        { char: 'ח', name: 'Хет (Chet)', sound: '[χ]', word: 'חבר (Chaver)', translation: 'Друг / Friend' },
+        { char: 'ט', name: 'Тет (Tet)', sound: '[t]', word: 'טוב (Tov)', translation: 'Хорошо / Good' },
+        { char: 'י', name: 'Йод (Yod)', sound: '[j]', word: 'ילד (Yeled)', translation: 'Мальчик / Boy' },
+        { char: 'כ', name: 'Каф (Khaf)', sound: '[k]/[χ]', word: 'כוכב (Kochav)', translation: 'Звезда / Star' },
+        { char: 'ל', name: 'Ламед (Lamed)', sound: '[l]', word: 'לב (Lev)', translation: 'Сердце / Heart' },
+        { char: 'מ', name: 'Мем (Mem)', sound: '[m]', word: 'מים (Mayim)', translation: 'Вода / Water' },
+        { char: 'נ', name: 'Нун (Nun)', sound: '[n]', word: 'נר (Ner)', translation: 'Свеча / Candle' },
+        { char: 'ס', name: 'Самех (Samekh)', sound: '[s]', word: 'ספר (Sefer)', translation: 'Книга / Book' },
+        { char: 'ע', name: 'Аин (Ayin)', sound: '[ʔ]', word: 'עין (Ayin)', translation: 'Глаз / Eye' },
+        { char: 'פ', name: 'Пе (Pe/Fe)', sound: '[p]/[f]', word: 'פרח (Perach)', translation: 'Цветок / Flower' },
+        { char: 'צ', name: 'Цади (Tsadi)', sound: '[ts]', word: 'ציפור (Tzipor)', translation: 'Птица / Bird' },
+        { char: 'ק', name: 'Коф (Qof)', sound: '[k]', word: 'קיץ (Kayitz)', translation: 'Лето / Summer' },
+        { char: 'ר', name: 'Реш (Resh)', sound: '[ʁ]', word: 'רוח (Ruach)', translation: 'Ветер / Дух / Wind' },
+        { char: 'ש', name: 'Шин / Син (Shin)', sound: '[ʃ]/[s]', word: 'שלום (Shalom)', translation: 'Мир / Привет / Peace' },
+        { char: 'ת', name: 'Тав (Tav)', sound: '[t]', word: 'תפוח (Tapuach)', translation: 'Яблоко / Apple' }
+      ]
     },
     {
-      title: 'Софиот (Конечные)',
+      title: 'Софиот (Конечные формы)',
+      description: 'Формы букв, пишущиеся только на конце слова',
+      script: 'special',
       items: ['ך', 'ם', 'ן', 'ף', 'ץ']
     }
   ]
@@ -344,6 +667,20 @@ const ALPHABET_SETS: Record<string, AlphabetCategory[]> = {
 
 const ALPHABETS: Record<string, string[]> = {
   'ru': ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ё', 'Ж', 'З', 'И', 'Й', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ', 'Ъ', 'Ы', 'Ь', 'Э', 'Ю', 'Я'],
+  'be': ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ё', 'Ж', 'З', 'І', 'Й', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ў', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Ы', 'Ь', 'Э', 'Ю', 'Я'],
+  'uk': ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е', 'Є', 'Ж', 'З', 'И', 'І', 'Ї', 'Й', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ', 'Ь', 'Ю', 'Я'],
+  'mo': ['A', 'Ă', 'Â', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'Î', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'Ș', 'T', 'Ț', 'U', 'V', 'W', 'X', 'Y', 'Z'],
+  'lt': ['A', 'Ą', 'B', 'C', 'Č', 'D', 'E', 'Ę', 'Ė', 'F', 'G', 'H', 'I', 'Į', 'Y', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'R', 'S', 'Š', 'T', 'U', 'Ų', 'Ū', 'V', 'Z', 'Ž'],
+  'lv': ['A', 'Ā', 'B', 'C', 'Č', 'D', 'E', 'Ē', 'F', 'G', 'Ģ', 'H', 'I', 'Ī', 'J', 'K', 'Ķ', 'L', 'Ļ', 'M', 'N', 'Ņ', 'O', 'P', 'R', 'S', 'Š', 'T', 'U', 'Ū', 'V', 'Z', 'Ž'],
+  'et': ['A', 'B', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'R', 'S', 'Š', 'Z', 'Ž', 'T', 'U', 'V', 'Õ', 'Ä', 'Ö', 'Ü'],
+  'ka': ['ა', 'ბ', 'გ', 'დ', 'ე', 'ვ', 'ზ', 'თ', 'ი', 'კ', 'ლ', 'მ', 'ნ', 'ო', 'პ', 'ჟ', 'რ', 'ს', 'ტ', 'უ', 'ფ', 'ქ', 'ღ', 'ყ', 'შ', 'ჩ', 'ც', 'ძ', 'წ', 'ჭ', 'ხ', 'ჯ', 'ჰ'],
+  'hy': ['Ա', 'Բ', 'Գ', 'Դ', 'Ե', 'Զ', 'Է', 'Ը', 'Թ', 'Ժ', 'Ի', 'Լ', 'Խ', 'Ծ', 'Կ', 'Հ', 'Ձ', 'Ղ', 'Ճ', 'Մ', 'Յ', 'Ն', 'Շ', 'Ո', 'Չ', 'Պ', 'Ջ', 'Ռ', 'Ս', 'Վ', 'Տ', 'Ր', 'Ց', 'Ւ', 'Փ', 'Ք', 'Օ', 'Ֆ', 'և'],
+  'az': ['A', 'B', 'C', 'Ç', 'D', 'E', 'Ə', 'F', 'G', 'Ğ', 'H', 'X', 'I', 'İ', 'J', 'K', 'Q', 'L', 'M', 'N', 'O', 'Ö', 'P', 'R', 'S', 'Ş', 'T', 'U', 'Ü', 'V', 'Y', 'Z'],
+  'kk': ['А', 'Ә', 'Б', 'В', 'Г', 'Ғ', 'Д', 'Е', 'Ё', 'Ж', 'З', 'И', 'Й', 'К', 'Қ', 'Л', 'М', 'Н', 'Ң', 'О', 'Ө', 'П', 'Р', 'С', 'Т', 'У', 'Ұ', 'Ү', 'Ф', 'Х', 'Һ', 'Ц', 'Ч', 'Ш', 'Щ', 'Ъ', 'Ы', 'І', 'Ь', 'Э', 'Ю', 'Я'],
+  'uz': ['A', 'B', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'X', 'Y', 'Z', 'Oʻ', 'Gʻ', 'Sh', 'Ch', 'Ng'],
+  'tk': ['A', 'B', 'Ç', 'D', 'E', 'Ä', 'F', 'G', 'H', 'I', 'J', 'Ž', 'K', 'L', 'M', 'N', 'Ň', 'O', 'Ö', 'P', 'R', 'S', 'Ş', 'T', 'U', 'Ü', 'W', 'Y', 'Ý', 'Z'],
+  'ky': ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ё', 'Ж', 'З', 'И', 'Й', 'К', 'Л', 'М', 'Н', 'Ң', 'О', 'Ө', 'П', 'Р', 'С', 'Т', 'У', 'Ү', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ', 'Ъ', 'Ы', 'Ь', 'Э', 'Ю', 'Я'],
+  'tg': ['А', 'Б', 'В', 'Г', 'Ғ', 'Д', 'Е', 'Ё', 'Ж', 'З', 'И', 'Ӣ', 'Й', 'К', 'Қ', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ӯ', 'Ф', 'Х', 'Ҳ', 'Ч', 'Ҷ', 'Ш', 'Ъ', 'Э', 'Ю', 'Я'],
   'en': ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'],
   'de': ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'Ä', 'Ö', 'Ü', 'ß'],
   'fr': ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'É', 'È', 'Ç', 'À', 'Ù', 'Â', 'Ê', 'Î', 'Ô', 'Û'],
@@ -354,6 +691,7 @@ const ALPHABETS: Record<string, string[]> = {
   'ja': ['あ', 'い', 'う', 'え', 'お', 'か', 'き', 'く', 'け', 'こ', 'さ', 'し', 'す', 'せ', 'そ', 'た', 'ち', 'つ', 'て', 'と', 'な', 'に', 'ぬ', 'ね', 'の', 'は', 'ひ', 'ふ', 'へ', 'ほ', 'ま', 'み', 'む', 'め', 'も', 'や', 'ゆ', 'よ', 'ら', 'り', 'る', 'れ', 'ろ', 'わ', 'を', 'ん'],
   'ko': ['ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅅ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ', 'ㅏ', 'ㅑ', 'ㅓ', 'ㅕ', 'ㅗ', 'ㅛ', 'ㅜ', 'ㅠ', 'ㅡ', 'ㅣ'],
   'ar': ['ا', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي'],
+  'he': ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 'י', 'כ', 'ל', 'מ', 'נ', 'ס', 'ע', 'פ', 'צ', 'ק', 'ר', 'ש', 'ת', 'ך', 'ם', 'ן', 'ף', 'ץ']
 };
 
 const STORAGE_KEY = 'duowindo6601_user_progress_v1';
@@ -1099,8 +1437,8 @@ const TRANSLATIONS: Record<string, any> = {
     serverJsTitle: 'Поддержка server.js!',
     serverJsDesc: 'В проект DuoWindo официально добавлен собственный продакшн-сервер server.js с полной раздачей статики и поддержкой SPA-маршрутов!',
     serverJsBtn: 'Классно! 🚀',
-    streakResume: 'Возобновить ударный режим',
-    streakResumed: '🔥 Ударный режим успешно возобновлен и сохранен!',
+    streakResume: 'Ударный режим',
+    streakResumed: '🔥 Ударный режим возобновлен (+1 день за урок)!',
     browserBtn: 'Браузер',
     eduBtn: '💡 Обучение',
     eduWelcome: 'Добро пожаловать! Нажмите на любую белую фигуру, чтобы узнать, как она ходит.',
@@ -1116,7 +1454,10 @@ const TRANSLATIONS: Record<string, any> = {
     noUsername: 'Юзернейм не установлен',
     editProfile: 'Редактировать профиль',
     registerAuth: 'Регистрация / Вход',
-    streakAdjustment: 'Регулировка ударного режима: возобновление и настройка дней.',
+    streakAdjustment: 'Регулировка ударного режима: ручная накрутка дней отключена (это считается нечестно). Ударный режим возобновляется и продлевается автоматически при прохождении уроков каждый день.',
+    streakLessonAction: '🚀 Пройти урок для возобновления / продления (+1 день)',
+    streakFairPlayBadge: '🛡️ Честная игра: только за прохождение уроков',
+    streakFreezeActive: '❄️ Заморозка активна ({count} шт.)',
     toastStreakBack7: '⏪ Ударный режим: {streak} дн.',
     toastStreakBack1: '◀ Назад: {streak} дн.',
     toastStreakForward1: '▶ Вперёд: {streak} дн.',
@@ -1267,8 +1608,8 @@ const TRANSLATIONS: Record<string, any> = {
     serverJsTitle: 'server.js support is LIVE!',
     serverJsDesc: 'The DuoWindo project has officially integrated its own production server.js with complete static assets distribution and SPA fallback handling!',
     serverJsBtn: 'Awesome! 🚀',
-    streakResume: 'Resume Streak',
-    streakResumed: '🔥 Streak successfully resumed and saved!',
+    streakResume: 'Streak Mode',
+    streakResumed: '🔥 Streak resumed (+1 day for lesson)!',
     browserBtn: 'Browser',
     eduBtn: '💡 Education',
     eduWelcome: 'Welcome! Click on any white piece to see how it moves.',
@@ -1284,7 +1625,10 @@ const TRANSLATIONS: Record<string, any> = {
     noUsername: 'No username set',
     editProfile: 'Edit Profile',
     registerAuth: 'Registration / Auth',
-    streakAdjustment: 'Adjust your streak days forward or backward.',
+    streakAdjustment: 'Streak adjustment: manual day adjustment is disabled (considered unfair). Your streak resumes and extends automatically by completing lessons every day.',
+    streakLessonAction: '🚀 Complete Lesson to Resume / Extend (+1 day)',
+    streakFairPlayBadge: '🛡️ Fair Play: Earned via lessons only',
+    streakFreezeActive: '❄️ Streak Freeze active ({count})',
     toastStreakBack7: '⏪ Streak: {streak} days',
     toastStreakBack1: '◀ Backward: {streak} days',
     toastStreakForward1: '▶ Forward: {streak} days',
@@ -1436,8 +1780,8 @@ const TRANSLATIONS: Record<string, any> = {
     serverJsTitle: 'server.js Unterstützung!',
     serverJsDesc: 'DuoWindo hat offiziell einen eigenen Produktionsserver server.js mit Statik- und SPA-Routing integriert!',
     serverJsBtn: 'Fantastisch! 🚀',
-    streakResume: 'Streak fortsetzen',
-    streakResumed: '🔥 Streak erfolgreich fortgesetzt und gespeichert!',
+    streakResume: 'Streak-Modus',
+    streakResumed: '🔥 Streak fortgesetzt (+1 Tag für Lektion)!',
     browserBtn: 'Browser',
     eduBtn: '💡 Ausbildung',
     eduWelcome: 'Willkommen! Klicken Sie auf eine beliebige weiße Figur, um zu sehen, wie sie sich bewegt.',
@@ -1453,7 +1797,10 @@ const TRANSLATIONS: Record<string, any> = {
     noUsername: 'Kein Benutzername festgelegt',
     editProfile: 'Profil bearbeiten',
     registerAuth: 'Registrierung / Login',
-    streakAdjustment: 'Passen Sie Ihre Streak-Tage an (vorwärts oder rückwärts).',
+    streakAdjustment: 'Streak-Anpassung: Manuelle Tagesänderung ist deaktiviert (gilt als unfairen Vorteil). Der Streak wird automatisch durch tägliche Lektionen fortgesetzt.',
+    streakLessonAction: '🚀 Lektion abschließen (+1 Tag)',
+    streakFairPlayBadge: '🛡️ Fair Play: Nur durch Lektionen',
+    streakFreezeActive: '❄️ Streak-Freeze aktiv ({count})',
     toastStreakBack7: '⏪ Streak: {streak} Tage',
     toastStreakBack1: '◀ Zurück: {streak} Tage',
     toastStreakForward1: '▶ Vorwärts: {streak} Tage',
@@ -1604,8 +1951,8 @@ const TRANSLATIONS: Record<string, any> = {
     serverJsTitle: 'Support de server.js !',
     serverJsDesc: 'DuoWindo a officiellement intégré son propre serveur de production server.js avec distribution des assets et support SPA !',
     serverJsBtn: 'Génial ! 🚀',
-    streakResume: 'Reprendre la série',
-    streakResumed: '🔥 Série reprise avec succès et sauvegardée !',
+    streakResume: 'Mode Série',
+    streakResumed: '🔥 Série reprise (+1 jour pour la leçon) !',
     browserBtn: 'Navigateur',
     eduBtn: '💡 Éducation',
     eduWelcome: 'Bienvenue ! Cliquez sur n\'importe quelle pièce blanche pour voir comment elle se déplace.',
@@ -1621,7 +1968,10 @@ const TRANSLATIONS: Record<string, any> = {
     noUsername: 'Aucun nom d\'utilisateur défini',
     editProfile: 'Modifier le profil',
     registerAuth: 'Inscription / Connexion',
-    streakAdjustment: 'Ajustez vos jours de série en avant ou en arrière.',
+    streakAdjustment: 'Ajustement de la série : l\'ajustement manuel est désactivé (considéré comme déloyal). La série reprend et progresse automatiquement en complétant des leçons quotidiennes.',
+    streakLessonAction: '🚀 Faire une leçon pour prolonger (+1 jour)',
+    streakFairPlayBadge: '🛡️ Jeu équitable : par les leçons uniquement',
+    streakFreezeActive: '❄️ Gel de série actif ({count})',
     toastStreakBack7: '⏪ Série : {streak} jours',
     toastStreakBack1: '◀ En arrière : {streak} jours',
     toastStreakForward1: '▶ En avant : {streak} jours',
@@ -1772,8 +2122,8 @@ const TRANSLATIONS: Record<string, any> = {
     serverJsTitle: '¡Soporte de server.js!',
     serverJsDesc: '¡DuoWindo ha integrado oficialmente su propio servidor server.js con distribución de estáticos y SPA!',
     serverJsBtn: '¡Genial! 🚀',
-    streakResume: 'Reanudar racha',
-    streakResumed: '🔥 ¡Racha reanudada con éxito y guardada!',
+    streakResume: 'Modo Racha',
+    streakResumed: '🔥 ¡Racha reanudada (+1 día por lección)!',
     browserBtn: 'Navegador',
     eduBtn: '💡 Educación',
     eduWelcome: '¡Bienvenido! Haz clic en cualquier pieza blanca para ver cómo se mueve.',
@@ -1789,7 +2139,10 @@ const TRANSLATIONS: Record<string, any> = {
     noUsername: 'Sin nombre de usuario',
     editProfile: 'Editar perfil',
     registerAuth: 'Registro / Iniciar sesión',
-    streakAdjustment: 'Ajusta tus días de racha hacia adelante o hacia atrás.',
+    streakAdjustment: 'Ajuste de racha: el ajuste manual de días está desactivado (se considera injusto). Tu racha se reanuda y extiende automáticamente completando lecciones diarias.',
+    streakLessonAction: '🚀 Completar lección para extender (+1 día)',
+    streakFairPlayBadge: '🛡️ Juego Limpio: solo completando lecciones',
+    streakFreezeActive: '❄️ Protector de racha activo ({count})',
     toastStreakBack7: '⏪ Racha: {streak} días',
     toastStreakBack1: '◀ Atrás: {streak} días',
     toastStreakForward1: '▶ Adelante: {streak} días',
@@ -1940,8 +2293,8 @@ const TRANSLATIONS: Record<string, any> = {
     serverJsTitle: 'server.js サポート！',
     serverJsDesc: 'DuoWindoプロジェクトに独自のプロダクションサーバー server.js が統合され、静的配信とSPAルーティングが有効になりました！',
     serverJsBtn: '最高！ 🚀',
-    streakResume: 'ストリークを再開',
-    streakResumed: '🔥 ストリークの再開に成功し、保存されました！',
+    streakResume: '連続記録モード',
+    streakResumed: '🔥 レッスン完了で連続記録が更新されました (+1日)！',
     browserBtn: 'ブラウザ',
     eduBtn: '💡 学習',
     eduWelcome: 'ようこそ！白い駒をクリックすると、その動き方を確認できます。',
@@ -1957,7 +2310,10 @@ const TRANSLATIONS: Record<string, any> = {
     noUsername: 'ユーザー名未設定',
     editProfile: 'プロフィール編集',
     registerAuth: '登録 / ログイン',
-    streakAdjustment: 'ストリーク（連続学習日数）の調整：日数の巻き戻し・追加。',
+    streakAdjustment: '連続記録の調整：手動の日数調整は無効化されています（フェアプレイのため）。毎日のレッスン完了で自動的に再開・延長されます。',
+    streakLessonAction: '🚀 レッスンを完了して記録を伸ばす (+1日)',
+    streakFairPlayBadge: '🛡️ フェアプレイ：レッスンでのみ獲得',
+    streakFreezeActive: '❄️ 連続フリーズ有効 ({count}個)',
     toastStreakBack7: '⏪ ストリーク：{streak}日',
     toastStreakBack1: '◀ 戻る：{streak}日',
     toastStreakForward1: '▶ 進む：{streak}日',
@@ -2108,8 +2464,8 @@ const TRANSLATIONS: Record<string, any> = {
     serverJsTitle: 'server.js 支持！',
     serverJsDesc: 'DuoWindo 项目已正式集成专属生产服务器 server.js，完美支持静态托管与 SPA 路由！',
     serverJsBtn: '太棒了！ 🚀',
-    streakResume: '恢复连续天数',
-    streakResumed: '🔥 连续天数已成功恢复并保存！',
+    streakResume: '连胜模式',
+    streakResumed: '🔥 完成课程，连胜已恢复（+1天）！',
     browserBtn: '浏览器',
     eduBtn: '💡 学习',
     eduWelcome: '欢迎！点击任意白棋查看其移动方式。',
@@ -2125,7 +2481,10 @@ const TRANSLATIONS: Record<string, any> = {
     noUsername: '未设置用户名',
     editProfile: '编辑个人资料',
     registerAuth: '注册 / 登录',
-    streakAdjustment: '调整你的连续天数。',
+    streakAdjustment: '连胜调整：已禁用手动增减天数（属于作弊行为）。每日完成课程即可自动恢复并延续连胜。',
+    streakLessonAction: '🚀 完成课程以延续连胜（+1天）',
+    streakFairPlayBadge: '🛡️ 公平学习：仅通过课程获取',
+    streakFreezeActive: '❄️ 连胜冻结保护生效中（{count}个）',
     toastStreakBack7: '⏪ 连续：{streak} 天',
     toastStreakBack1: '◀ 后退：{streak} 天',
     toastStreakForward1: '▶ 前进：{streak} 天',
@@ -2276,8 +2635,8 @@ const TRANSLATIONS: Record<string, any> = {
     serverJsTitle: 'دعم server.js!',
     serverJsDesc: 'تم دمج خادم الإنتاج الخصوصي server.js بنجاح!',
     serverJsBtn: 'رائع! 🚀',
-    streakResume: 'استعادة السلسلة',
-    streakResumed: '🔥 تم استعادة السلسلة وحفظها بنجاح!',
+    streakResume: 'وضع الحماسة',
+    streakResumed: '🔥 تم استئناف وضع الحماسة (+1 يوم للدرس)!',
     browserBtn: 'المتصفح',
     eduBtn: '💡 التعلم',
     eduWelcome: 'مرحباً! انقر على أي قطعة بيضاء لمعرفة طريقة حركتها.',
@@ -2293,7 +2652,10 @@ const TRANSLATIONS: Record<string, any> = {
     noUsername: 'اسم المستخدم غير محدد',
     editProfile: 'تعديل الملف الشخصي',
     registerAuth: 'التسجيل / الدخول',
-    streakAdjustment: 'تعديل السلسلة المتتالية.',
+    streakAdjustment: 'تعديل الحماسة: تم تعطيل التعديل اليدوي للأيام (يعتبر غير عادل). يُستأنف وضع الحماسة ويمتد تلقائياً عبر إكمال الدروس اليومية.',
+    streakLessonAction: '🚀 أكمل درساً لتمديد الحماسة (+1 يوم)',
+    streakFairPlayBadge: '🛡️ لعب عادل: عبر الدروس فقط',
+    streakFreezeActive: '❄️ تجميد الحماسة مفعل ({count})',
     toastStreakBack7: '⏪ السلسلة: {streak} يوم',
     toastStreakBack1: '◀ للخلف: {streak} يوم',
     toastStreakForward1: '▶ للأمام: {streak} يوم',
@@ -2386,7 +2748,7 @@ const sanitizeForFirestore = (obj: any) => {
   return cleaned;
 };
 
-export default function App() {
+function App() {
   const [screen, setScreen] = useState<AppScreen>(AppScreen.PATH);
   const [offlineMode, setOfflineMode] = useState(false);
   
@@ -2408,15 +2770,41 @@ export default function App() {
   const [isSwiping, setIsSwiping] = useState<boolean>(false);
   const [swipePath, setSwipePath] = useState<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
   const [simTriggerDismissed, setSimTriggerDismissed] = useState<boolean>(() => localStorage.getItem('duo_sim_trigger_dismissed') === 'true');
+  const [dailyChallengeDismissedDate, setDailyChallengeDismissedDate] = useState<string>(() => localStorage.getItem('duo_daily_challenge_dismissed') || '');
   const [showBetaModal, setShowBetaModal] = useState<boolean>(false);
   const [showExplanationModal, setShowExplanationModal] = useState<boolean>(false);
   const [explanation, setExplanation] = useState<string>('');
   const [explanationLoading, setExplanationLoading] = useState<boolean>(false);
+const DAILY_CHALLENGES: Array<{
+  type: Exercise['type'];
+  titleRu: string;
+  titleEn: string;
+  bonusXp: number;
+  icon: string;
+  descRu: string;
+  descEn: string;
+}> = [
+  { type: 'translation', titleRu: 'Мастер перевода', titleEn: 'Translation Master', bonusXp: 50, icon: '📖', descRu: 'Пройдите 1 упражнение на перевод предложений', descEn: 'Complete 1 sentence translation exercise' },
+  { type: 'listening', titleRu: 'Острый слух', titleEn: 'Sharp Listener', bonusXp: 50, icon: '🎧', descRu: 'Пройдите 1 упражнение на аудирование', descEn: 'Complete 1 listening practice exercise' },
+  { type: 'speech', titleRu: 'Оратор дня', titleEn: 'Daily Speaker', bonusXp: 50, icon: '🎙️', descRu: 'Произнесите фразу с помощью микрофона', descEn: 'Speak a sentence using microphone' },
+  { type: 'roleplay', titleRu: 'Общение с ИИ', titleEn: 'AI Roleplay', bonusXp: 50, icon: '💬', descRu: 'Пообщайтесь с ИИ в ролевом диалоге', descEn: 'Chat with AI in roleplay mode' },
+  { type: 'reading', titleRu: 'Любитель историй', titleEn: 'Story Reader', bonusXp: 50, icon: '📚', descRu: 'Прочитайте короткий текст или историю', descEn: 'Read a short text or story' },
+  { type: 'drawing', titleRu: 'Искусство письма', titleEn: 'Character Artist', bonusXp: 50, icon: '✏️', descRu: 'Нарисуйте символ или иероглиф на экране', descEn: 'Draw a character on screen' },
+  { type: 'illusion', titleRu: 'Слуховая загадка', titleEn: 'Audio Illusion', bonusXp: 50, icon: '👂', descRu: 'Разгадайте слуховую иллюзию', descEn: 'Solve an audio illusion' },
+];
+
+const getTodayChallenge = () => {
+  const today = new Date();
+  const dayOfYear = Math.floor((today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / 86400000);
+  return DAILY_CHALLENGES[dayOfYear % DAILY_CHALLENGES.length];
+};
+
   const [toast, setToast] = useState<string | null>(null);
   const [alphabetTab, setAlphabetTab] = useState<number>(0);
   
   const [user, setUser] = useState<UserProgress>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
+    const todayStr = new Date().toISOString().split('T')[0];
     return saved ? JSON.parse(saved) : { 
       name: "Ученик 6601", avatarColor: "bg-duo-blue", 
       energy: 25, 
@@ -2428,7 +2816,9 @@ export default function App() {
       country: 'Russia',
       preferredVoice: 'Kore',
       voiceProvider: 'gemini',
-      chessStats: { games: 265, wins: 134, elo: 590 }
+      chessStats: { games: 265, wins: 134, elo: 590 },
+      streakFreezeCount: 1,
+      lastActiveDate: todayStr
     };
   });
 
@@ -2501,6 +2891,43 @@ export default function App() {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [authLoading, setAuthLoading] = useState<boolean>(true);
   const initialSyncComplete = useRef<boolean>(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string>(() => {
+    return localStorage.getItem('duo_last_synced_time_6601') || new Date().toLocaleTimeString();
+  });
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  const handleForceSync = async () => {
+    playSound('streak_update');
+    triggerHapticFeedback('medium');
+    setIsSyncing(true);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+      const nowStr = new Date().toLocaleTimeString(user.language === 'ru' ? 'ru-RU' : 'en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+      if (firebaseUser) {
+        const userRef = doc(db, 'users', firebaseUser.uid);
+        await setDoc(userRef, sanitizeForFirestore({
+          ...user,
+          updatedAt: serverTimestamp()
+        }), { merge: true });
+        setLastSyncTime(nowStr);
+        localStorage.setItem('duo_last_synced_time_6601', nowStr);
+        setToast(user.language === 'ru' ? `☁️ Облачная синхронизация Firestore завершена (${nowStr})` : `☁️ Cloud sync completed with Firestore (${nowStr})`);
+      } else {
+        setLastSyncTime(nowStr);
+        localStorage.setItem('duo_last_synced_time_6601', nowStr);
+        setToast(user.language === 'ru' ? `💾 Локальный кэш обновлен (${nowStr}). Готов к выгрузке при подключении!` : `💾 Local cache refreshed (${nowStr}). Ready to sync upon connection!`);
+      }
+    } catch (err: any) {
+      console.error('Force sync error:', err);
+      setToast(user.language === 'ru' ? '⚠️ Ошибка синхронизации: ' + err.message : '⚠️ Sync error: ' + err.message);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Listen to Auth State
   useEffect(() => {
@@ -2515,18 +2942,40 @@ export default function App() {
           if (docSnap.exists()) {
             // Load user profile from Firebase and exclude timestamps from local state
             const { createdAt, updatedAt, ...cloudUser } = docSnap.data() as any;
-            setUser(cloudUser as UserProgress);
+            const updatedUser: UserProgress = {
+              ...user,
+              ...cloudUser,
+              email: fUser.email || cloudUser.email || user.email || '',
+              authProvider: (fUser.providerData?.[0]?.providerId === 'google.com' ? 'google' : 'email') as 'google' | 'email',
+            };
+            setUser(updatedUser);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUser));
           } else {
             // Document doesn't exist, create it from local user
+            const cleanUsername = user.username && !user.username.startsWith('incognito_') 
+              ? user.username 
+              : (fUser.email ? fUser.email.split('@')[0] : ('user_' + Math.floor(1000 + Math.random() * 9000)));
+            const cleanName = user.name && user.name !== "Ученик 6601" && !user.name.includes("Гость")
+              ? user.name
+              : (fUser.displayName || (fUser.email ? fUser.email.split('@')[0] : 'Ученик 6601'));
             const newUserProfile = {
               ...user,
+              name: cleanName,
+              username: cleanUsername,
+              email: fUser.email || user.email || '',
+              authProvider: (fUser.providerData?.[0]?.providerId === 'google.com' ? 'google' : 'email') as 'google' | 'email',
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp()
             };
             await setDoc(userRef, sanitizeForFirestore(newUserProfile));
+            setUser(newUserProfile as any);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(newUserProfile));
           }
           initialSyncComplete.current = true;
           setSimNotify("Успешный вход в облако Duowindo!");
+          const syncNowStr = new Date().toLocaleTimeString();
+          setLastSyncTime(syncNowStr);
+          localStorage.setItem('duo_last_synced_time_6601', syncNowStr);
         } catch (err) {
           console.error("Error syncing profile with Firestore:", err);
           handleFirestoreError(err, OperationType.GET, `users/${fUser.uid}`);
@@ -2642,6 +3091,54 @@ export default function App() {
     }
   }, [user.language]);
 
+  // Daily Streak Freeze check on launch
+  useEffect(() => {
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const lastActive = user.lastActiveDate;
+      
+      if (!lastActive) {
+        setUser(u => ({ ...u, lastActiveDate: todayStr }));
+        return;
+      }
+      
+      if (lastActive !== todayStr) {
+        const lastDate = new Date(lastActive);
+        const currentDate = new Date(todayStr);
+        const diffTime = Math.abs(currentDate.getTime() - lastDate.getTime());
+        const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
+        
+        if (diffDays === 1) {
+          setUser(u => ({ ...u, lastActiveDate: todayStr }));
+        } else if (diffDays === 2 && (user.streakFreezeCount || 0) > 0) {
+          const newFreezeCount = (user.streakFreezeCount || 0) - 1;
+          setUser(u => ({
+            ...u,
+            streakFreezeCount: newFreezeCount,
+            lastActiveDate: todayStr
+          }));
+          playSound('freeze_use');
+          setToast(
+            user.language === 'ru' 
+              ? `❄️ Заморозка серии сработала! Серия в ${user.streak} дн. сохранена!` 
+              : `❄️ Streak Freeze activated! Your ${user.streak}-day streak is saved!`
+          );
+        } else if (diffDays > 1) {
+          const lostAmount = user.streak;
+          setUser(u => ({
+            ...u,
+            previousLostStreak: lostAmount > 0 ? lostAmount : (u.previousLostStreak || 0),
+            maxStreak: Math.max(u.maxStreak || 0, u.streak || 0),
+            streak: 0,
+            lastActiveDate: todayStr
+          }));
+        }
+      }
+    } catch (e) {
+      console.warn("Streak check error:", e);
+    }
+  }, []);
+
 
   const triggerCelebrationConfetti = useCallback(() => {
     try {
@@ -2697,21 +3194,19 @@ export default function App() {
     }
   }, [feedback.status, triggerCelebrationConfetti]);
 
-  // Registration & Incognito Auth Modal states & handlers
+  // Registration, Login & Incognito Auth Modal states & handlers
   const [showRegisterModal, setShowRegisterModal] = useState<boolean>(false);
-  const [regName, setRegName] = useState<string>('');
-  const [regUsername, setRegUsername] = useState<string>('');
-  const [regAvatarColor, setRegAvatarColor] = useState<string>('bg-duo-blue');
-  const [regAvatarIcon, setRegAvatarIcon] = useState<string>('🦉');
-  const [regTab, setRegTab] = useState<'register' | 'incognito' | 'google'>('register');
+  const [showIncognitoRestrictionsModal, setShowIncognitoRestrictionsModal] = useState<boolean>(false);
+  const [regInitialTab, setRegInitialTab] = useState<'login' | 'register' | 'google' | 'incognito'>('register');
 
-  const openRegisterModal = (initialTab: 'register' | 'incognito' | 'google' = 'register') => {
+  const openIncognitoRestrictionsModal = () => {
     playSound('click');
-    setRegName(user.name !== "Ученик 6601" ? user.name : '');
-    setRegUsername(user.username || '');
-    setRegAvatarColor(user.avatarColor || 'bg-duo-blue');
-    setRegAvatarIcon(user.avatarIcon || '🦉');
-    setRegTab(initialTab);
+    setShowIncognitoRestrictionsModal(true);
+  };
+
+  const openRegisterModal = (initialTab: 'login' | 'register' | 'google' | 'incognito' = 'register') => {
+    playSound('click');
+    setRegInitialTab(initialTab);
     setShowRegisterModal(true);
   };
 
@@ -2719,58 +3214,25 @@ export default function App() {
     const hasPrompted = localStorage.getItem('duo_reg_prompt_seen_6601');
     if (!hasPrompted && !user.username && user.name === "Ученик 6601") {
       const timer = setTimeout(() => {
-        setRegName('');
-        setRegUsername('');
+        setRegInitialTab('register');
         setShowRegisterModal(true);
       }, 1000);
       return () => clearTimeout(timer);
     }
   }, []);
 
-  const isIncognitoUser = !firebaseUser || !user.username || user.username.startsWith('incognito_') || user.name.includes('Гость') || user.name.includes('Incognito');
-
-  const handleRegisterUser = () => {
-    playSound('success');
-    const cleanName = regName.trim() || (user.language === 'ru' ? 'Ученик' : 'Learner');
-    const cleanUsername = regUsername.trim().replace(/^@/, '');
-    
-    const updatedUser: UserProgress = {
-      ...user,
-      name: cleanName,
-      username: cleanUsername ? cleanUsername : `user_${Math.floor(1000 + Math.random() * 9000)}`,
-      avatarColor: regAvatarColor,
-      avatarIcon: regAvatarIcon,
-    };
-    setUser(updatedUser);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUser));
-    localStorage.setItem('duo_reg_prompt_seen_6601', 'true');
-    setShowRegisterModal(false);
-    setToast(user.language === 'ru' 
-      ? `🎉 Регистрация завершена! Имя: ${cleanName}, @${updatedUser.username}` 
-      : `🎉 Registration complete! Name: ${cleanName}, @${updatedUser.username}`);
-  };
-
-  const handleContinueIncognito = () => {
-    playSound('click');
-    localStorage.setItem('duo_reg_prompt_seen_6601', 'true');
-    const assignedUsername = (user.username && !user.username.startsWith('user_')) 
-      ? user.username 
-      : `incognito_${Math.floor(100 + Math.random() * 900)}`;
-    const guestUser: UserProgress = {
-      ...user,
-      name: (user.name === "Ученик 6601" || user.name === "Ученик") ? (user.language === 'ru' ? "Гость (Инкогнито)" : "Guest (Incognito)") : user.name,
-      username: assignedUsername
-    };
-    setUser(guestUser);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(guestUser));
-    setShowRegisterModal(false);
-    setToast(user.language === 'ru' ? `🕵️ Режим Инкогнито активен (@${assignedUsername})` : `🕵️ Incognito Mode active (@${assignedUsername})`);
-  };
+  const isIncognitoUser = !firebaseUser && (!user.username || user.username.startsWith('incognito_') || user.name.includes('Гость') || user.name.includes('Incognito') || user.authProvider === 'guest');
 
   // Profile Editor Modal states & handlers
   const [showEditProfileModal, setShowEditProfileModal] = useState<boolean>(false);
   const [editName, setEditName] = useState<string>('');
   const [editUsername, setEditUsername] = useState<string>('');
+  const [editPhone, setEditPhone] = useState<string>('');
+  const [editEmail, setEditEmail] = useState<string>('');
+  const [editLink, setEditLink] = useState<string>('');
+  const [editHidePhone, setEditHidePhone] = useState<boolean>(false);
+  const [editHideEmail, setEditHideEmail] = useState<boolean>(false);
+  const [editHideLink, setEditHideLink] = useState<boolean>(false);
   const [editAvatarColor, setEditAvatarColor] = useState<string>('bg-duo-blue');
   const [editAvatarUrl, setEditAvatarUrl] = useState<string>('');
   const [editAvatarIcon, setEditAvatarIcon] = useState<string>('');
@@ -2780,6 +3242,12 @@ export default function App() {
     playSound('click');
     setEditName(user.name || '');
     setEditUsername(user.username || '');
+    setEditPhone(user.phone || '');
+    setEditEmail(user.email || '');
+    setEditLink(user.link || '');
+    setEditHidePhone(user.hidePhone ?? false);
+    setEditHideEmail(user.hideEmail ?? false);
+    setEditHideLink(user.hideLink ?? false);
     setEditAvatarColor(user.avatarColor || 'bg-duo-blue');
     setEditAvatarUrl(user.avatarUrl || user.avatarImage || '');
     setEditAvatarIcon(user.avatarIcon || '');
@@ -2814,6 +3282,12 @@ export default function App() {
       ...user,
       name: editName.trim(),
       username: cleanUsername ? cleanUsername : undefined,
+      phone: editPhone.trim() || undefined,
+      email: editEmail.trim() || undefined,
+      link: editLink.trim() || undefined,
+      hidePhone: editHidePhone,
+      hideEmail: editHideEmail,
+      hideLink: editHideLink,
       avatarColor: editAvatarColor,
       avatarUrl: editAvatarUrl || undefined,
       avatarImage: editAvatarUrl || undefined,
@@ -2947,6 +3421,13 @@ export default function App() {
   const currentPath = useRef<{x: number, y: number}[]>([]);
   
   // CHESS STATE
+  const [isChessInviteModalOpen, setIsChessInviteModalOpen] = useState(false);
+  const [chessOpponent, setChessOpponent] = useState<{ name: string; elo: number; avatar: string; isBot?: boolean }>({
+    name: "DuoWindo6601",
+    elo: 1500,
+    avatar: "🦉",
+    isBot: true
+  });
   const [chessBoard, setChessBoard] = useState<Board>([]);
   const [chessFen, setChessFen] = useState<string>(INITIAL_BOARD_FEN);
   const [chessTurn, setChessTurn] = useState<ChessColor>('w');
@@ -3095,6 +3576,23 @@ export default function App() {
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(user)); }, [user]);
   useEffect(() => { localStorage.setItem('duo_course_id_6601', currentCourse.id); }, [currentCourse]);
   useEffect(() => { setTransTarget(currentCourse); }, [currentCourse]);
+
+  // Level & Achievement Toast Notification Tracker
+  const prevXpRef = useRef(user.xp);
+  useEffect(() => {
+    if (prevXpRef.current !== undefined && user.xp > prevXpRef.current) {
+      const oldLevel = Math.floor((prevXpRef.current || 0) / 100) + 1;
+      const newLevel = Math.floor((user.xp || 0) / 100) + 1;
+      if (newLevel > oldLevel) {
+        playSound('streak_update');
+        const levelMsg = user.language === 'ru'
+          ? `🎉 ПОЗДРАВЛЯЕМ! Вы достигли уровня ${newLevel}! 🏆`
+          : `🎉 CONGRATULATIONS! You reached Level ${newLevel}! 🏆`;
+        setToast(levelMsg);
+      }
+    }
+    prevXpRef.current = user.xp;
+  }, [user.xp, user.language]);
 
   // ... (Canvas and Resize effects kept same) ...
   useEffect(() => {
@@ -3318,12 +3816,56 @@ export default function App() {
                   wins: result === 'win' ? stats.wins + 1 : stats.wins,
                   elo: result === 'win' ? stats.elo + 15 : Math.max(0, stats.elo - 8)
               },
-              xp: prev.xp + (result === 'win' ? 50 : 10)
+              xp: prev.xp + 30
           };
       });
   };
 
-  const initChessGame = () => { setChessFen(INITIAL_BOARD_FEN); setChessBoard(parseFen(INITIAL_BOARD_FEN)); setChessTurn('w'); setChessHistory([]); setChessSelected(null); setChessValidMoves([]); setChessStatus('active'); setChessLastMove(null); setChessChat([{ role: 'model', text: "Ready to lose? I'm DuoWindo6601, Grandmaster of the Owl Kingdom! 🦉" }]); setChessTab('history'); };
+  const initChessGame = (customOpponent?: { name: string; elo: number; avatar: string; isBot?: boolean }) => {
+    const opp = customOpponent || chessOpponent;
+    setChessFen(INITIAL_BOARD_FEN);
+    setChessBoard(parseFen(INITIAL_BOARD_FEN));
+    setChessTurn('w');
+    setChessHistory([]);
+    setChessSelected(null);
+    setChessValidMoves([]);
+    setChessStatus('active');
+    setChessLastMove(null);
+    setChessChat([{
+      role: 'model',
+      text: opp.isBot
+        ? "Ready to lose? I'm DuoWindo6601, Grandmaster of the Owl Kingdom! 🦉"
+        : `Партия с ${opp.name} (${opp.elo} ELO) началась! Ваш ход белыми. Удачи! ⚔️`
+    }]);
+    setChessTab('history');
+  };
+
+  const handleStartPvpChess = (opponent: ChessOpponent) => {
+    playSound('select');
+    const opp = {
+      name: opponent.name,
+      elo: opponent.elo,
+      avatar: opponent.avatar,
+      isBot: false
+    };
+    setChessOpponent(opp);
+    setChessMode('pvp');
+    setIsChessInviteModalOpen(false);
+    initChessGame(opp);
+    setCurrentExercise({
+      id: crypto.randomUUID(),
+      type: 'chess',
+      originalSentence: `Шахматная партия против ${opp.name}`,
+      targetTranslation: "Checkmate",
+      wordBank: [],
+      chessData: {
+        fen: INITIAL_BOARD_FEN,
+        pgn: [],
+        difficulty: 'intermediate'
+      }
+    });
+    setScreen(AppScreen.LESSON);
+  };
   const handleChessChatSend = async () => { if (!chessInput.trim()) return; const userText = chessInput; setChessInput(""); const newHistory = [...chessChat, { role: 'user', text: userText } as RoleplayMessage]; setChessChat(newHistory); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); const reply = await getChessChatReply(chessFen, chessHistory, newHistory, userText); setChessChat([...newHistory, { role: 'model', text: reply }]); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); }
   const getPieceTutorial = (piece: ChessPiece, lang: string) => {
       const isRu = lang === 'ru';
@@ -3340,7 +3882,7 @@ export default function App() {
 
   const onChessSquareClick = async (r: number, c: number) => { 
       if (chessStatus === 'mate') return; 
-      if ((chessMode === 'pve' || chessMode === 'tutorial') && chessTurn !== 'w') return; // In PvE/Tutorial, player is only white
+      if ((chessMode === 'pve' || chessMode === 'tutorial' || chessMode === 'pvp') && chessTurn !== 'w') return; // In PvE/Tutorial, player is only white
       
       const clickedSq = chessBoard[r][c]; 
       if (clickedSq && (chessMode === 'study' || clickedSq.color === chessTurn)) { 
@@ -3397,7 +3939,7 @@ export default function App() {
           return;
       }
       
-      if (chess.turn() === 'b' && chessMode !== 'study' && (chessMode === 'pve' || chessMode === 'tutorial')) {
+      if (chess.turn() === 'b' && chessMode !== 'study' && (chessMode === 'pve' || chessMode === 'tutorial' || chessMode === 'pvp')) {
           setTimeout(() => makeAiMove(newFen), 500); 
       }
   };
@@ -3485,18 +4027,85 @@ export default function App() {
       } 
   };
   
-  const handleExplainMistake = async () => { playSound('click'); if (user.subscription !== 'max') { setScreen(AppScreen.SUBSCRIPTION); return; } if (!currentExercise) return; setShowExplanationModal(true); if (explanation) return; setExplanationLoading(true); let userAnswer = ""; if (currentExercise.type === 'speech') userAnswer = transcriptRef.current || "(No speech detected)"; else if (currentExercise.type === 'ishihara') userAnswer = ishiharaInput || "No input"; else userAnswer = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text).join(' '); const correctAnswer = currentExercise.type === 'speech' ? currentExercise.originalSentence : currentExercise.targetTranslation; const original = currentExercise.type === 'ishihara' ? "Ishihara Test" : currentExercise.originalSentence; const userLang = user.language === 'en' ? 'English' : 'Russian'; try { const explanationText = await getMistakeExplanation(original, userAnswer, correctAnswer, userLang); setExplanation(explanationText); } catch (e) { setExplanation("Error loading explanation."); } finally { setExplanationLoading(false); } };
+  const handleExplainMistake = async () => {
+    playSound('click');
+    if (user.subscription !== 'max') {
+      if (isIncognitoUser) {
+        setToast(
+          user.language === 'ru'
+            ? '🔒 Функция ИИ-объяснений доступна в подписке Max (требуется аккаунт)'
+            : '🔒 AI Explanation is a Max feature (account registration required)'
+        );
+      }
+      setScreen(AppScreen.SUBSCRIPTION);
+      return;
+    } if (!currentExercise) return; setShowExplanationModal(true); if (explanation) return; setExplanationLoading(true); let userAnswer = ""; if (currentExercise.type === 'speech') userAnswer = transcriptRef.current || "(No speech detected)"; else if (currentExercise.type === 'ishihara') userAnswer = ishiharaInput || "No input"; else userAnswer = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text).join(' '); const correctAnswer = currentExercise.type === 'speech' ? currentExercise.originalSentence : currentExercise.targetTranslation; const original = currentExercise.type === 'ishihara' ? "Ishihara Test" : currentExercise.originalSentence; const userLang = user.language === 'en' ? 'English' : 'Russian'; try { const explanationText = await getMistakeExplanation(original, userAnswer, correctAnswer, userLang); setExplanation(explanationText); } catch (e) { setExplanation("Error loading explanation."); } finally { setExplanationLoading(false); } };
   const startTraining = async (type: Exercise['type'] = 'translation', topicOverride?: string) => { playSound('click'); if (user.subscription === 'free' && user.energy <= 0) { setToast(t('t_energy_low')); setScreen(AppScreen.SHOP); return; } if (currentCourse.id === 'chess') { initChessGame(); setCurrentExercise({ id: crypto.randomUUID(), type: 'chess', originalSentence: "Chess Game", targetTranslation: "Checkmate", wordBank: [], chessData: { fen: INITIAL_BOARD_FEN, pgn: [], difficulty: 'beginner' } }); setScreen(AppScreen.LESSON); return; } if (offlineMode) { setLoading(true); const ex = getFallbackExercise(currentCourse.id, type, currentCourse.localName); setCurrentExercise(ex); setAvailableTokens((ex.wordBank || []).map(w => ({ id: crypto.randomUUID(), text: w }))); setScreen(AppScreen.LESSON); setLoading(false); return; } setLoading(true); try { if (type === 'roleplay') { setRoleplayInput(""); const ex = await startRoleplay(currentCourse.localName, currentCourse.id); if (ex.isFallback && !offlineMode) setShowLimitModal(true); setCurrentExercise(ex); setScreen(AppScreen.LESSON); if (ex.roleplayData?.messages[0]) speakText(ex.roleplayData.messages[0].text, currentCourse.id, false, user.preferredVoice, user.voiceProvider); } else if (type === 'illusion') { const ex = await generateIllusion(currentCourse.localName, currentCourse.id); if (ex.isFallback && !offlineMode) setShowLimitModal(true); setCurrentExercise(ex); setScreen(AppScreen.LESSON); if (ex.illusionData) speakText(ex.illusionData.soundText, currentCourse.id, false, user.preferredVoice, user.voiceProvider); } else if (type === 'drawing') { const ex = await generateDrawing(currentCourse.localName, currentCourse.id, topicOverride); if (ex.isFallback && !offlineMode) setShowLimitModal(true); setCurrentExercise(ex); setPaths([]); setScreen(AppScreen.LESSON); setShowTrace(true); if (ex.drawingData) speakText(ex.drawingData.character, currentCourse.id, false, user.preferredVoice, user.voiceProvider); } else if (type === 'ishihara') { const ex = await generateIshihara(currentCourse.id); if (ex.isFallback && !offlineMode) setShowLimitModal(true); setCurrentExercise(ex); setIshiharaInput(""); setScreen(AppScreen.LESSON); } else if (type === 'reading') { const ex = await generateReading(currentCourse.localName, currentCourse.id); if (ex.isFallback && !offlineMode) setShowLimitModal(true); setCurrentExercise(ex); setReadingInput(""); setScreen(AppScreen.LESSON); if (ex.readingData?.mode === 'fill-blanks') { setAvailableTokens((ex.wordBank || []).map(w => ({ id: crypto.randomUUID(), text: w }))); setSelectedWordIds([]); } } else { const ex = await generateExercise(currentCourse.localName, currentCourse.id, isLanguageCourse, type, user.subscription === 'max', topicOverride); if (ex.isFallback && !offlineMode) setShowLimitModal(true); setAvailableTokens((ex.wordBank || []).map(w => ({ id: crypto.randomUUID(), text: w }))); setSelectedWordIds([]); setCurrentExercise(ex); setScreen(AppScreen.LESSON); setFeedback({ status: 'idle', message: '' }); transcriptRef.current = ""; if (isLanguageCourse && type === 'listening') speakText(ex.originalSentence, currentCourse.id, false, user.preferredVoice, user.voiceProvider); } } catch (e) { setToast(t('t_api_error')); } finally { setLoading(false); } };
-  const handleRoleplaySend = async (text: string) => { if (!currentExercise || !currentExercise.roleplayData || !text.trim()) return; const newMessage: RoleplayMessage = { role: 'user', text: text }; const updatedMessages = [...currentExercise.roleplayData.messages, newMessage]; setCurrentExercise({ ...currentExercise, roleplayData: { ...currentExercise.roleplayData, messages: updatedMessages, userTurn: false } }); setRoleplayInput(""); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); setLoading(true); try { const reply = await replyToRoleplay(updatedMessages, text, currentCourse.localName, user.subscription === 'max'); if (reply.isFallback && !offlineMode) setShowLimitModal(true); setCurrentExercise(prev => { if (!prev || !prev.roleplayData) return prev; return { ...prev, roleplayData: { ...prev.roleplayData, messages: [...updatedMessages, reply], userTurn: true } } }); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); speakText(reply.text, currentCourse.id, false, user.preferredVoice, user.voiceProvider); setUser(u => ({ ...u, xp: u.xp + 10 })); } catch (e) { console.error(e); } finally { setLoading(false); } };
-  const checkIllusionAnswer = async (selectedOption: 'A' | 'B') => { if (!currentExercise || !currentExercise.illusionData) return; setLoading(true); try { const isCorrect = currentExercise.illusionData.correctOption === selectedOption; if (isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: currentExercise.illusionData.explanation }); setUser(u => ({ ...u, xp: u.xp + 20 })); } else { playSound('wrong'); const correctText = currentExercise.illusionData.correctOption === 'A' ? currentExercise.illusionData.optionA : currentExercise.illusionData.optionB; setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${correctText}. ${currentExercise.illusionData.explanation}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } finally { setLoading(false); } };
-  const checkDrawingAnswer = async () => { if (!currentExercise || !currentExercise.drawingData || !canvasRef.current) return; playSound('click'); setLoading(true); try { const imageBase64 = canvasRef.current.toDataURL('image/png').split(',')[1]; const result = await checkDrawing(imageBase64, currentExercise.drawingData.character); if (result.isFallback && !offlineMode) setShowLimitModal(true); if (result.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: result.feedback }); setUser(u => ({ ...u, xp: u.xp + 20 })); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: result.feedback }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } catch (e) { console.error(e); } finally { setLoading(false); } };
-  const checkAnswer = async (spokenText?: string) => { if (!currentExercise) return; if (isRecording) { setIsRecording(false); if (recognitionRef.current) recognitionRef.current.stop(); if (timerRef.current) clearTimeout(timerRef.current); } if (!spokenText && currentExercise.type !== 'ishihara') playSound('click'); if (currentExercise.type === 'ishihara') { const correct = currentExercise.targetTranslation; const userAnswer = ishiharaInput.trim(); if (userAnswer === correct) { playSound('correct'); setFeedback({ status: 'correct', message: "Correct! You have good color vision for this plate." }); setUser(u => ({ ...u, xp: u.xp + 15 })); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `Incorrect. The number was ${correct}.` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } return; } if (currentExercise.type === 'reading') { setLoading(true); if (currentExercise.readingData?.mode === 'write') { const ans = readingInput; const res = await checkAnswerWithAI(currentCourse.localName, ans, currentExercise.readingData.prompt || "Write something relevant", user.subscription === 'max'); if (res.isFallback && !offlineMode) setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + 20, gems: u.gems + 5 })); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: res.feedback }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } setLoading(false); return; } else { let tempText = currentExercise.readingData!.text; const blanksCount = (tempText.match(/___/g) || []).length; if (selectedWordIds.length !== blanksCount) { setToast("Fill all blanks!"); setLoading(false); return; } const correctWords = currentExercise.readingData!.blanks?.map(b => b.word) || []; const userWords = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text); const isCorrect = correctWords.every((w, i) => w.toLowerCase() === userWords[i]?.toLowerCase()); if (isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: "Perfect!" }); setUser(u => ({ ...u, xp: u.xp + 20 })); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `Correct: ${currentExercise.targetTranslation}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } setLoading(false); return; } } setLoading(true); try { let ans = ""; if (typeof spokenText === 'string') ans = spokenText; else if (currentExercise.type === 'speech') { if (transcriptRef.current.trim()) ans = transcriptRef.current; else if (!recognitionRef.current) ans = currentExercise.originalSentence; else { setLoading(false); setToast(t('t_speech_empty')); return; } } else ans = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text).join(' '); const correctAnswer = currentExercise.type === 'speech' ? currentExercise.originalSentence : currentExercise.targetTranslation; const res = await checkAnswerWithAI(currentCourse.localName, ans, correctAnswer, user.subscription === 'max'); if (res.isFallback && !offlineMode) setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + 20, gems: u.gems + 5 })); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${correctAnswer}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } catch (e) { console.error(e); setToast("Ошибка проверки"); } finally { setLoading(false); } };
+  const awardLessonStreak = () => {
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (user.lastActiveDate !== todayStr) {
+        setUser(u => ({
+          ...u,
+          streak: Math.max(1, (u.streak || 0) + 1),
+          lastActiveDate: todayStr
+        }));
+        playSound('streak_update');
+        setToast(t('streakResumed'));
+      }
+    } catch (e) {
+      console.warn("Streak award error", e);
+    }
+  };
+
+  const handleRoleplaySend = async (text: string) => { if (!currentExercise || !currentExercise.roleplayData || !text.trim()) return; const newMessage: RoleplayMessage = { role: 'user', text: text }; const updatedMessages = [...currentExercise.roleplayData.messages, newMessage]; setCurrentExercise({ ...currentExercise, roleplayData: { ...currentExercise.roleplayData, messages: updatedMessages, userTurn: false } }); setRoleplayInput(""); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); setLoading(true); try { const reply = await replyToRoleplay(updatedMessages, text, currentCourse.localName, user.subscription === 'max'); if (reply.isFallback && !offlineMode) setShowLimitModal(true); setCurrentExercise(prev => { if (!prev || !prev.roleplayData) return prev; return { ...prev, roleplayData: { ...prev.roleplayData, messages: [...updatedMessages, reply], userTurn: true } } }); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); speakText(reply.text, currentCourse.id, false, user.preferredVoice, user.voiceProvider); setUser(u => ({ ...u, xp: u.xp + 10 })); checkAndAwardDailyChallenge('roleplay'); awardLessonStreak(); } catch (e) { console.error(e); } finally { setLoading(false); } };
+  const checkIllusionAnswer = async (selectedOption: 'A' | 'B') => { if (!currentExercise || !currentExercise.illusionData) return; setLoading(true); try { const isCorrect = currentExercise.illusionData.correctOption === selectedOption; if (isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: currentExercise.illusionData.explanation }); setUser(u => ({ ...u, xp: u.xp + 20 })); checkAndAwardDailyChallenge('illusion'); awardLessonStreak(); } else { playSound('wrong'); const correctText = currentExercise.illusionData.correctOption === 'A' ? currentExercise.illusionData.optionA : currentExercise.illusionData.optionB; setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${correctText}. ${currentExercise.illusionData.explanation}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } finally { setLoading(false); } };
+  const checkDrawingAnswer = async () => { if (!currentExercise || !currentExercise.drawingData || !canvasRef.current) return; playSound('click'); setLoading(true); try { const imageBase64 = canvasRef.current.toDataURL('image/png').split(',')[1]; const result = await checkDrawing(imageBase64, currentExercise.drawingData.character); if (result.isFallback && !offlineMode) setShowLimitModal(true); if (result.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: result.feedback }); setUser(u => ({ ...u, xp: u.xp + 20 })); checkAndAwardDailyChallenge('drawing'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: result.feedback }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } catch (e) { console.error(e); } finally { setLoading(false); } };
+  const checkAnswer = async (spokenText?: string) => { if (!currentExercise) return; if (isRecording) { setIsRecording(false); if (recognitionRef.current) recognitionRef.current.stop(); if (timerRef.current) clearTimeout(timerRef.current); } if (!spokenText && currentExercise.type !== 'ishihara') playSound('click'); if (currentExercise.type === 'ishihara') { const correct = currentExercise.targetTranslation; const userAnswer = ishiharaInput.trim(); if (userAnswer === correct) { playSound('correct'); setFeedback({ status: 'correct', message: "Correct! You have good color vision for this plate." }); setUser(u => ({ ...u, xp: u.xp + 15 })); checkAndAwardDailyChallenge('ishihara'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `Incorrect. The number was ${correct}.` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } return; } if (currentExercise.type === 'reading') { setLoading(true); if (currentExercise.readingData?.mode === 'write') { const ans = readingInput; const res = await checkAnswerWithAI(currentCourse.localName, ans, currentExercise.readingData.prompt || "Write something relevant", user.subscription === 'max'); if (res.isFallback && !offlineMode) setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + 20, gems: u.gems + 5 })); checkAndAwardDailyChallenge('reading'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: res.feedback }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } setLoading(false); return; } else { let tempText = currentExercise.readingData!.text; const blanksCount = (tempText.match(/___/g) || []).length; if (selectedWordIds.length !== blanksCount) { setToast("Fill all blanks!"); setLoading(false); return; } const correctWords = currentExercise.readingData!.blanks?.map(b => b.word) || []; const userWords = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text); const isCorrect = correctWords.every((w, i) => w.toLowerCase() === userWords[i]?.toLowerCase()); if (isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: "Perfect!" }); setUser(u => ({ ...u, xp: u.xp + 20 })); checkAndAwardDailyChallenge('reading'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `Correct: ${currentExercise.targetTranslation}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } setLoading(false); return; } } setLoading(true); try { let ans = ""; if (typeof spokenText === 'string') ans = spokenText; else if (currentExercise.type === 'speech') { if (transcriptRef.current.trim()) ans = transcriptRef.current; else if (!recognitionRef.current) ans = currentExercise.originalSentence; else { setLoading(false); setToast(t('t_speech_empty')); return; } } else ans = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text).join(' '); const correctAnswer = currentExercise.type === 'speech' ? currentExercise.originalSentence : currentExercise.targetTranslation; const res = await checkAnswerWithAI(currentCourse.localName, ans, correctAnswer, user.subscription === 'max'); if (res.isFallback && !offlineMode) setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + 20, gems: u.gems + 5 })); checkAndAwardDailyChallenge(currentExercise.type); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${correctAnswer}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } catch (e) { console.error(e); setToast("Ошибка проверки"); } finally { setLoading(false); } };
   const handleContinueAfterLesson = () => { playSound('click'); if (user.subscription === 'free' && Math.random() > 0.5) setShowAd(true); else setScreen(AppScreen.PATH); setFeedback({ status: 'idle', message: '' }); setCurrentExercise(null); setExplanation(null); setShowExplanationModal(false); }
   const handleSkip = () => { playSound('click'); setToast(t('t_skip')); handleContinueAfterLesson(); };
   const toggleRecording = () => { playSound('click'); if (isRecording) { setIsRecording(false); if (recognitionRef.current) recognitionRef.current.stop(); if (timerRef.current) clearTimeout(timerRef.current); if (currentExercise?.type === 'roleplay') setTimeout(() => { if (transcriptRef.current) handleRoleplaySend(transcriptRef.current); }, 500); else if (screen === AppScreen.VIDEO_CALL) setTimeout(() => { if (transcriptRef.current) handleVideoCallSend(transcriptRef.current); }, 500); else if (!recognitionRef.current) checkAnswer(currentExercise?.originalSentence); else setTimeout(() => checkAnswer(), 200); } else { transcriptRef.current = ""; setIsRecording(true); if (recognitionRef.current) try { recognitionRef.current.start(); } catch (e) { console.error("Rec start error", e); setIsRecording(false); } else timerRef.current = setTimeout(() => { setIsRecording(false); if (currentExercise?.type === 'roleplay') handleRoleplaySend("Hello friend!"); else if (screen === AppScreen.VIDEO_CALL) handleVideoCallSend("Hello DuoWindo6601!"); else checkAnswer(currentExercise?.originalSentence); }, 3000); } };
-  const upgradeSubscription = (tier: SubscriptionTier) => { playSound('success'); setUser(u => ({ ...u, subscription: tier, energy: 25 })); setToast(tier === 'super' ? t('t_welcome_super') : t('t_welcome_max')); setScreen(AppScreen.PATH); };
+  const upgradeSubscription = (tier: SubscriptionTier) => {
+    if (isIncognitoUser) {
+      playSound('wrong');
+      setToast(
+        user.language === 'ru'
+          ? '🔒 Режим Инкогнито: Подписки DuoWindo6601 Super и Max требуют зарегистрированный аккаунт!'
+          : '🔒 Incognito Mode: DuoWindo6601 Super & Max subscriptions require an account registration!'
+      );
+      openRegisterModal('register');
+      return;
+    }
+    playSound('success');
+    setUser(u => ({ ...u, subscription: tier, energy: 25 }));
+    setToast(tier === 'super' ? t('t_welcome_super') : t('t_welcome_max'));
+    setScreen(AppScreen.PATH);
+  };
   const cancelSubscription = () => { playSound('click'); setUser(u => ({ ...u, subscription: 'free', energy: 25 })); setToast(t('t_sub_cancel')); };
-  const handleNavigation = (s: AppScreen) => { playSound('select'); setScreen(s); };
+  const checkAndAwardDailyChallenge = (exType: Exercise['type']) => {
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const todayChallenge = getTodayChallenge();
+      if (exType === todayChallenge.type && user.dailyChallengeCompletedDate !== todayStr) {
+        setUser(u => ({
+          ...u,
+          xp: u.xp + todayChallenge.bonusXp,
+          dailyChallengeCompletedDate: todayStr
+        }));
+        playSound('streak_update');
+        const challengeTitle = user.language === 'ru' ? todayChallenge.titleRu : todayChallenge.titleEn;
+        setToast(
+          user.language === 'ru'
+            ? `🎯 Ежедневный челлендж "${challengeTitle}" выполнен! +${todayChallenge.bonusXp} XP!`
+            : `🎯 Daily Challenge "${challengeTitle}" completed! +${todayChallenge.bonusXp} XP!`
+        );
+      }
+    } catch (e) {
+      console.warn("Daily challenge award error", e);
+    }
+  };
+
+  const handleNavigation = (s: AppScreen) => { playSound('screen_transition'); setScreen(s); };
 
   const ChessNavIcon: React.FC<{ className?: string }> = ({ className }) => (
     <ChessPieceIcon type="n" color="b" className={className} />
@@ -3506,6 +4115,7 @@ export default function App() {
     { screen: AppScreen.PATH, icon: HomeIcon, label: t('home') },
     { screen: AppScreen.CHESS_MATCH, icon: ChessNavIcon, label: t('playChess') },
     { screen: AppScreen.PRACTICE, icon: DumbbellIcon, label: t('practice') },
+    { screen: AppScreen.VOCABULARY, icon: NewWordIcon, label: user.language === 'ru' ? 'Банк слов' : 'Vocabulary' },
     { screen: AppScreen.VIDEO_CALL, icon: CameraIcon, label: t('videoCall') },
     { screen: AppScreen.LEADERBOARD, icon: ShieldIcon, label: t('leaderboard') },
     { screen: AppScreen.SHOP, icon: ChestIcon, label: t('shop') },
@@ -3523,30 +4133,62 @@ export default function App() {
 
     return (
       <div className={simulatorMode === 'none' 
-        ? "bg-duo-dark min-h-screen text-white flex flex-col lg:flex-row font-din selection:bg-duo-blue/30 overflow-x-hidden w-full"
-        : "w-full h-full text-white flex flex-col font-din selection:bg-duo-blue/30 overflow-y-auto no-scrollbar relative bg-duo-dark"
+        ? `${user.nightMode ? 'bg-[#08080d] brightness-95' : 'bg-duo-dark'} min-h-screen text-white flex flex-col lg:flex-row font-din selection:bg-duo-blue/30 overflow-x-hidden w-full transition-colors duration-500`
+        : `w-full h-full text-white flex flex-col font-din selection:bg-duo-blue/30 overflow-y-auto no-scrollbar relative ${user.nightMode ? 'bg-[#08080d] brightness-95' : 'bg-duo-dark'} transition-colors duration-500`
       }>
       {/* SIDEBAR */}
       <aside className={isSimulatingMobile ? "hidden" : "hidden lg:flex flex-col w-64 fixed left-0 h-full border-r border-gray-800 p-6 z-50 bg-duo-dark"}>
         <h1 className="text-3xl font-black text-duo-green mb-10 italic tracking-tighter font-din">DUOWINDO</h1>
         <nav className="space-y-2">
-          {NAV_ITEMS.map(item => (
-            <button key={item.screen} onClick={() => handleNavigation(item.screen)} className={`flex items-center space-x-4 w-full px-4 py-4 rounded-2xl border-2 transition-all ${screen === item.screen ? 'bg-duo-blue/10 border-duo-blue/40 text-duo-blue' : 'border-transparent text-gray-500 hover:bg-white/5 hover:text-white'}`}>
-              <item.icon className="w-6 h-6" /> <span className="font-bold text-xs uppercase tracking-widest">{item.label}</span>
+          {NAV_ITEMS.map(item => {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const isTodayChallengePending = item.screen === AppScreen.PATH && 
+              user.dailyChallengeCompletedDate !== todayStr && 
+              dailyChallengeDismissedDate !== todayStr;
+            return (
+              <button key={item.screen} onClick={() => handleNavigation(item.screen)} className={`flex items-center space-x-4 w-full px-4 py-4 rounded-2xl border-2 transition-all relative ${screen === item.screen ? 'bg-duo-blue/10 border-duo-blue/40 text-duo-blue' : 'border-transparent text-gray-500 hover:bg-white/5 hover:text-white'}`}>
+                <div className="relative">
+                  <item.icon className="w-6 h-6" />
+                  {isTodayChallengePending && (
+                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-duo-orange rounded-full border-2 border-duo-dark animate-pulse" />
+                  )}
+                </div>
+                <span className="font-bold text-xs uppercase tracking-widest">{item.label}</span>
+              </button>
+            );
+          })}
+          {isIncognitoUser && (
+            <button
+              onClick={openIncognitoRestrictionsModal}
+              className="flex items-center space-x-3 w-full px-4 py-3 rounded-2xl border border-amber-500/40 bg-amber-950/30 hover:bg-amber-900/50 text-amber-300 transition-all text-left shadow-inner mt-4 group cursor-pointer"
+              title="Режим Ограничения в Инкогнито (8 функций заблокировано)"
+            >
+              <span className="text-xl group-hover:scale-110 transition-transform">🚫</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-[11px] uppercase tracking-wider block leading-tight text-amber-200">
+                    {user.language === 'ru' ? 'Ограничения' : 'Restrictions'}
+                  </span>
+                  <span className="bg-amber-500 text-black text-[9px] font-black px-1.5 py-0.5 rounded-full">8</span>
+                </div>
+                <span className="text-[10px] text-amber-400/70 font-bold block truncate">
+                  {user.language === 'ru' ? 'Что заблокировано' : 'Blocked features'}
+                </span>
+              </div>
             </button>
-          ))}
+          )}
         </nav>
       </aside>
 
       <main className={isSimulatingMobile ? "flex-1 relative pb-44 min-h-screen w-full" : "flex-1 lg:ml-64 relative pb-44 lg:pb-0 min-h-screen"}>
         {/* HEADER */}
         {screen !== AppScreen.LESSON && screen !== AppScreen.VIDEO_CALL && (
-          <header className="sticky top-0 z-40 bg-duo-dark/95 backdrop-blur-md p-4 border-b border-gray-800 flex flex-col space-y-4 shadow-xl">
+          <header className="sticky top-0 z-40 bg-duo-dark/95 backdrop-blur-md p-2.5 sm:p-4 border-b border-gray-800 flex flex-col space-y-2 sm:space-y-4 shadow-xl">
              <div className="flex justify-between items-center max-w-5xl mx-auto w-full">
-                <div className="flex items-center space-x-5">
-                  <div className="flex items-center text-duo-red font-bold text-lg"><FireIcon className="w-6 h-6 mr-1" /> {user.streak}</div>
-                  <div className="flex items-center text-duo-blue font-bold text-lg"><GemStoneIcon className="w-6 h-6 mr-1" /> {user.gems}</div>
-                  <div className="flex items-center font-bold text-lg text-yellow-400">{user.subscription !== 'free' ? <InfiniteEnergyIcon className="w-7 h-7 text-yellow-400" /> : <><LightningIcon className="w-6 h-6 mr-1" /> {user.energy}</>}</div>
+                <div className="flex items-center space-x-3 sm:space-x-5">
+                  <div className="flex items-center text-duo-red font-bold text-sm sm:text-lg"><FireIcon className="w-5 h-5 sm:w-6 sm:h-6 mr-1" /> {user.streak}</div>
+                  <div className="flex items-center text-duo-blue font-bold text-sm sm:text-lg"><GemStoneIcon className="w-5 h-5 sm:w-6 sm:h-6 mr-1" /> {user.gems}</div>
+                  <div className="flex items-center font-bold text-sm sm:text-lg text-yellow-400">{user.subscription !== 'free' ? <InfiniteEnergyIcon className="w-6 h-6 sm:w-7 sm:h-7 text-yellow-400" /> : <><LightningIcon className="w-5 h-5 sm:w-6 sm:h-6 mr-1" /> {user.energy}</>}</div>
                 </div>
                  <div className="flex items-center space-x-2">
                     {isIncognitoUser ? (
@@ -3620,17 +4262,27 @@ export default function App() {
         )}
 
         {/* ... (Other Screens) ... */}
-        {screen === AppScreen.ALPHABET && (
+        {screen === AppScreen.ALPHABET && (() => {
+            const currentCatList = ALPHABET_SETS[currentCourse.id];
+            const currentCat = currentCatList ? (currentCatList[alphabetTab] || currentCatList[0]) : null;
+            const alphabetItems = currentCat 
+                ? currentCat.items 
+                : (ALPHABETS[currentCourse.id] || ALPHABETS['en']);
+
+            return (
             <div className="p-4 md:p-10 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-5">
                 <div className="flex flex-col items-center mb-6">
                     <h2 className="text-3xl font-black uppercase tracking-widest text-white mb-2">{t('alphabet')}</h2>
                     <p className="text-gray-400 font-bold text-lg">{getLocalizedCourseName(currentCourse)}</p>
+                    {currentCat?.description && (
+                        <p className="text-xs font-semibold text-gray-500 max-w-lg text-center mt-1">{currentCat.description}</p>
+                    )}
                 </div>
 
-                {/* CATEGORY TABS for CJK or multi-script languages (e.g. Chinese Hanzi/Pinyin, Japanese Hiragana/Katakana, Korean) */}
-                {ALPHABET_SETS[currentCourse.id] && (
-                    <div className="flex items-center justify-center space-x-3 mb-6">
-                        {ALPHABET_SETS[currentCourse.id].map((cat, idx) => (
+                {/* CATEGORY TABS for CJK, CIS multi-script (Cyrillic/Latin), or special writing systems */}
+                {currentCatList && currentCatList.length > 1 && (
+                    <div className="flex items-center justify-center flex-wrap gap-2 mb-6">
+                        {currentCatList.map((cat, idx) => (
                             <button
                                 key={cat.title}
                                 onClick={() => { playSound('click'); setAlphabetTab(idx); }}
@@ -3647,30 +4299,85 @@ export default function App() {
                 )}
                 
                 <div className="bg-duo-card border-2 border-gray-700 rounded-[2.5rem] p-6 md:p-8 shadow-2xl" dir={['ar', 'he'].includes(currentCourse.id) ? 'rtl' : 'ltr'}>
-                    <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 gap-3 md:gap-4">
-                        {(
-                            ALPHABET_SETS[currentCourse.id]
-                                ? (ALPHABET_SETS[currentCourse.id][alphabetTab]?.items || ALPHABET_SETS[currentCourse.id][0].items)
-                                : (ALPHABETS[currentCourse.id] || ALPHABETS['en'])
-                        ).map((char) => (
-                            <button 
-                                key={char} 
-                                onClick={() => startTraining('drawing', char)}
-                                className="aspect-square bg-gray-800 border-b-4 border-gray-900 rounded-2xl flex flex-col items-center justify-center hover:bg-gray-700 hover:scale-105 active:scale-95 active:border-b-0 active:translate-y-1 transition-all group p-1"
-                            >
-                                <span className={`text-2xl md:text-3xl font-black text-white group-hover:text-duo-blue ${currentCourse.id === 'ar' ? 'font-arabic' : currentCourse.id === 'he' ? 'font-hebrew' : ''}`}>{char}</span>
-                                <span className="text-[9px] font-bold text-gray-500 uppercase mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">Писать</span>
-                            </button>
-                        ))}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
+                        {alphabetItems.map((item, idx) => {
+                            const char = typeof item === 'string' ? item : item.char;
+                            const name = typeof item === 'object' ? item.name : undefined;
+                            const sound = typeof item === 'object' ? item.sound : undefined;
+                            const word = typeof item === 'object' ? item.word : undefined;
+                            const translation = typeof item === 'object' ? item.translation : undefined;
+                            const tips = typeof item === 'object' ? item.tips : undefined;
+
+                            return (
+                                <div 
+                                    key={`${char}_${idx}`}
+                                    className="bg-gray-800 border-b-4 border-gray-900 rounded-2xl p-3 flex flex-col items-center justify-between hover:bg-gray-750 hover:border-duo-blue transition-all group relative"
+                                >
+                                    <div className="flex items-center justify-between w-full mb-1">
+                                        <span className="text-[10px] font-bold text-gray-500 uppercase">{sound || name || ''}</span>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                playSound('click');
+                                                speakText(char, currentCourse.id, false, user.preferredVoice, user.voiceProvider);
+                                            }}
+                                            title="Озвучить букву"
+                                            className="w-6 h-6 rounded-lg bg-gray-700 hover:bg-duo-blue flex items-center justify-center transition-colors text-gray-300 hover:text-white"
+                                        >
+                                            <VolumeIcon className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+
+                                    <button 
+                                        type="button"
+                                        onClick={() => startTraining('drawing', char)}
+                                        className="w-full flex flex-col items-center py-2 group-hover:scale-105 active:scale-95 transition-transform"
+                                        title="Нажмите, чтобы тренировать написание"
+                                    >
+                                        <span className={`text-3xl md:text-4xl font-black text-white group-hover:text-duo-blue transition-colors ${
+                                            currentCourse.id === 'ar' ? 'font-arabic' : currentCourse.id === 'he' ? 'font-hebrew' : ''
+                                        }`}>
+                                            {char}
+                                        </span>
+                                        {name && (
+                                            <span className="text-[11px] font-bold text-gray-300 mt-1 truncate max-w-full text-center">
+                                                {name}
+                                            </span>
+                                        )}
+                                        {word && (
+                                            <div className="mt-1 text-center w-full">
+                                                <span className="text-[10px] font-extrabold text-duo-green block truncate">{word}</span>
+                                                {translation && (
+                                                    <span className="text-[9px] font-medium text-gray-400 block truncate">{translation}</span>
+                                                )}
+                                            </div>
+                                        )}
+                                        {tips && (
+                                            <span className="text-[8px] font-semibold text-duo-yellow/90 mt-1 block truncate max-w-full text-center" title={tips}>
+                                                {tips}
+                                            </span>
+                                        )}
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => startTraining('drawing', char)}
+                                        className="w-full mt-2 py-1.5 rounded-xl bg-gray-700/60 hover:bg-duo-blue text-[10px] font-black uppercase text-gray-300 hover:text-white transition-colors flex items-center justify-center space-x-1"
+                                    >
+                                        <PenIcon className="w-3 h-3" />
+                                        <span>Писать</span>
+                                    </button>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
                 
                 <div className="mt-8 flex justify-center">
                     <button onClick={() => {
-                        const chars = ALPHABET_SETS[currentCourse.id]
-                            ? (ALPHABET_SETS[currentCourse.id][alphabetTab]?.items || ALPHABET_SETS[currentCourse.id][0].items)
-                            : (ALPHABETS[currentCourse.id] || ALPHABETS['en']);
-                        const randomChar = chars[Math.floor(Math.random() * chars.length)];
+                        const randomItem = alphabetItems[Math.floor(Math.random() * alphabetItems.length)];
+                        const randomChar = typeof randomItem === 'string' ? randomItem : (randomItem?.char || 'A');
                         startTraining('drawing', randomChar);
                     }} className="bg-duo-blue px-8 py-4 rounded-2xl font-black text-white uppercase tracking-widest border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all shadow-xl flex items-center space-x-3">
                         <PenIcon className="w-6 h-6" />
@@ -3678,7 +4385,8 @@ export default function App() {
                     </button>
                 </div>
             </div>
-        )}
+            );
+        })()}
 
         {/* SETTINGS OVERLAY */}
         {screen === AppScreen.SETTINGS && (
@@ -3734,6 +4442,111 @@ export default function App() {
                     </div>
 
                     <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl"><h3 className="text-xl font-bold mb-4 text-white uppercase tracking-widest">{t('apiStatus')}</h3><div className="flex items-center justify-between"><div className="flex items-center space-x-3"><div className={`w-4 h-4 rounded-full ${offlineMode ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div><span className={`font-bold text-lg ${offlineMode ? 'text-red-400' : 'text-green-400'}`}>{offlineMode ? t('limitReached') : t('online')}</span></div><button onClick={() => { playSound('click'); checkApiStatus(); }} className="px-4 py-2 bg-gray-700 rounded-xl font-bold text-sm hover:bg-gray-600 transition-all border-b-4 border-gray-800 active:border-b-0 active:translate-y-1">{t('checkConnection')}</button></div></div>
+
+                    {/* SYNC STATUS & OFFLINE CACHE CONTROLLER */}
+                    <div className="bg-duo-card border-2 border-emerald-500/50 rounded-3xl p-6 mb-6 shadow-xl space-y-4">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                            <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-xl shadow-md">
+                                    ☁️
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
+                                        <span>{user.language === 'ru' ? 'Статус синхронизации Firestore' : 'Firestore Sync Status'}</span>
+                                    </h3>
+                                    <p className="text-xs text-gray-400 font-bold">
+                                        {user.language === 'ru' ? 'Синхронизация локального кэша с облачной базой данных' : 'Local cache synchronization with cloud database'}
+                                    </p>
+                                </div>
+                            </div>
+                            <span className={`w-full py-3.5 px-6 rounded-2xl font-black text-xs uppercase tracking-wider border-b-4 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center space-x-2 shadow-lg ${isSyncing ? "bg-gray-700 text-gray-400 border-gray-900 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-800 hover:brightness-110"}`}>
+                                <span className="w-2 h-2 rounded-full bg-current animate-pulse"></span>
+                                <span>{firebaseUser ? (user.language === 'ru' ? 'Облако активно' : 'Cloud Active') : (user.language === 'ru' ? 'Локальный кэш' : 'Local Cache')}</span>
+                            </span>
+                        </div>
+
+                        {/* SYNC DETAILS GRID */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-black/40 p-4 rounded-2xl border border-gray-800 text-xs font-din">
+                            <div className="space-y-1">
+                                <p className="text-gray-400 font-bold uppercase text-[10px] tracking-wider">
+                                    {user.language === 'ru' ? 'Последняя синхронизация:' : 'Last Synced:'}
+                                </p>
+                                <p className="font-black text-emerald-400 text-sm flex items-center gap-1.5">
+                                    <span>⏱️</span>
+                                    <span>{lastSyncTime}</span>
+                                </p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-gray-400 font-bold uppercase text-[10px] tracking-wider">
+                                    {user.language === 'ru' ? 'Состояние хранилища:' : 'Storage State:'}
+                                </p>
+                                <p className="font-black text-gray-200 text-sm flex items-center gap-1.5">
+                                    <span>💾</span>
+                                    <span>{firebaseUser ? ("Firestore UID: " + firebaseUser.uid.slice(0, 8) + "...") : (user.language === "ru" ? "Offline IndexedDB / Storage" : "Offline Storage")}</span>
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* FORCE SYNC BUTTON */}
+                        <button
+                            onClick={handleForceSync}
+                            disabled={isSyncing}
+                            className={`w-full py-3.5 px-6 rounded-2xl font-black text-xs uppercase tracking-wider border-b-4 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center space-x-2 shadow-lg ${isSyncing ? "bg-gray-700 text-gray-400 border-gray-900 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-800 hover:brightness-110"}`}
+                        >
+                            <span className={isSyncing ? 'animate-spin' : ''}>🔄</span>
+                            <span>
+                                {isSyncing
+                                    ? (user.language === 'ru' ? 'Синхронизация...' : 'Syncing...')
+                                    : (user.language === 'ru' ? 'Принудительная синхронизация (Force Sync)' : 'Force Sync with Firestore')}
+                            </span>
+                        </button>
+                    </div>
+
+                    {/* HAPTIC FEEDBACK TOGGLE */}
+                    <div className="bg-duo-card border-2 border-amber-500/40 rounded-3xl p-6 mb-6 shadow-xl">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="flex items-start space-x-3">
+                                <span className="text-2xl p-2.5 bg-amber-500/20 rounded-2xl border border-amber-500/40">📳</span>
+                                <div>
+                                    <div className="flex items-center space-x-2">
+                                        <h4 className="font-extrabold text-sm text-white uppercase tracking-wider">
+                                            {user.language === 'ru' ? 'Тактильный отклик (Haptic Feedback)' : 'Haptic Vibration Feedback'}
+                                        </h4>
+                                        <span className="bg-amber-500/30 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-md border border-amber-500/50 uppercase">
+                                            Mobile
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-gray-300 font-medium mt-1">
+                                        {user.language === 'ru'
+                                            ? 'Вибрационный отклик смартфона при правильных и неправильных ответах в уроках'
+                                            : 'Tactile vibration response on mobile devices for correct and incorrect lesson answers'}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    playSound('click');
+                                    triggerHapticFeedback('medium');
+                                    const newVal = !(user.hapticFeedback ?? true);
+                                    setUser((prev) => {
+                                        const updated = { ...prev, hapticFeedback: newVal };
+                                        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+                                        return updated;
+                                    });
+                                    setToast(newVal
+                                        ? (user.language === 'ru' ? '📳 Тактильный отклик включен!' : '📳 Haptic feedback enabled!')
+                                        : (user.language === 'ru' ? '📴 Тактильный отклик выключен' : '📴 Haptic feedback disabled')
+                                    );
+                                }}
+                                className={`w-full py-3.5 px-6 rounded-2xl font-black text-xs uppercase tracking-wider border-b-4 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center space-x-2 shadow-lg ${isSyncing ? "bg-gray-700 text-gray-400 border-gray-900 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-800 hover:brightness-110"}`}
+                                title="Переключить Тактильный отклик"
+                            >
+                                <div
+                                    className={`w-full py-3.5 px-6 rounded-2xl font-black text-xs uppercase tracking-wider border-b-4 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center space-x-2 shadow-lg ${isSyncing ? "bg-gray-700 text-gray-400 border-gray-900 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-800 hover:brightness-110"}`}
+                                />
+                            </button>
+                        </div>
+                    </div>
 
                     {/* SSL CERTIFICATE WR2 & SERVER LOGS STATUS */}
                     <div className="bg-emerald-950/40 border-2 border-emerald-500/60 rounded-3xl p-6 mb-6 shadow-xl">
@@ -3809,6 +4622,54 @@ export default function App() {
                         <div
                           className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-300 ${
                             (user.autoTranslateFeedback ?? true) ? 'translate-x-6' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    {/* NIGHT MODE TOGGLE */}
+                    <div className="bg-gray-800/80 border-2 border-purple-500/40 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-inner mt-3">
+                      <div className="flex items-start space-x-3">
+                        <span className="text-2xl p-2 bg-purple-950/60 rounded-xl border border-purple-500/40">🌙</span>
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <h4 className="font-extrabold text-sm text-white uppercase tracking-wider">
+                              {user.language === 'ru' ? 'Ночная тема' : 'Night Mode'}
+                            </h4>
+                            <span className="bg-purple-500/30 text-purple-300 text-[10px] font-black px-2 py-0.5 rounded-md border border-purple-500/50 uppercase">
+                              Theme
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-300 font-medium mt-1">
+                            {user.language === 'ru'
+                              ? 'Переключение цветовой палитры приложения на более темные тона для комфортного вечернего обучения'
+                              : 'Switch application palette to darker tones for comfortable evening learning'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          playSound('click');
+                          const newVal = !(user.nightMode ?? false);
+                          setUser((prev) => {
+                            const updated = { ...prev, nightMode: newVal };
+                            localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+                            return updated;
+                          });
+                          setToast(newVal
+                            ? (user.language === 'ru' ? '🌙 Ночная тема включена!' : '🌙 Night Mode enabled!')
+                            : (user.language === 'ru' ? '☀️ Дневная тема включена' : '☀️ Day Mode enabled')
+                          );
+                        }}
+                        className={`w-14 h-8 rounded-full p-1 transition-colors duration-300 flex-shrink-0 cursor-pointer ${
+                          (user.nightMode ?? false) ? 'bg-purple-600 border-2 border-purple-400' : 'bg-gray-700 border-2 border-gray-600'
+                        }`}
+                        title="Переключить Ночную тему"
+                      >
+                        <div
+                          className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-300 ${
+                            (user.nightMode ?? false) ? 'translate-x-6' : 'translate-x-0'
                           }`}
                         />
                       </button>
@@ -4064,10 +4925,53 @@ export default function App() {
                     </div>
 
                     <div className="flex-1 p-6 max-w-4xl mx-auto w-full -mt-10 z-10">
+                        {/* INCOGNITO MODE RESTRICTION BANNER */}
+                        {isIncognitoUser && (
+                            <div className="mb-6 bg-gradient-to-r from-amber-950/90 via-purple-950/90 to-indigo-950/90 border-2 border-amber-500/70 rounded-3xl p-5 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-3">
+                                <div className="flex items-start sm:items-center space-x-3.5">
+                                    <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-2xl flex-shrink-0 shadow-inner">
+                                        🕵️
+                                    </div>
+                                    <div>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <h4 className="font-black text-amber-300 text-sm md:text-base uppercase tracking-wider">
+                                                {user.language === 'ru' ? 'Режим Инкогнито (Без аккаунта)' : 'Incognito Mode (No Account)'}
+                                            </h4>
+                                            <span className="bg-amber-500/30 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-500/50 uppercase tracking-widest">
+                                                {user.language === 'ru' ? 'Ограничение подписки' : 'Subscription Restriction'}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-gray-300 font-medium mt-1 leading-relaxed">
+                                            {user.language === 'ru'
+                                                ? 'Подписки DuoWindo6601 Super и DuoWindo6601 Max требуют зарегистрированный аккаунт. Создайте аккаунт или войдите через Google, чтобы активировать подписку и сохранить доступ навсегда!'
+                                                : 'DuoWindo6601 Super and DuoWindo6601 Max subscriptions require a registered account. Create an account or sign in with Google to activate subscriptions and keep permanent access!'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        playSound('click');
+                                        openRegisterModal('register');
+                                    }}
+                                    className="w-full sm:w-auto px-5 py-3 rounded-2xl font-black bg-gradient-to-r from-amber-500 to-orange-500 text-black border-b-4 border-amber-700 active:border-b-0 active:translate-y-1 transition-all uppercase tracking-wider text-xs whitespace-nowrap shadow-lg flex-shrink-0 flex items-center justify-center space-x-1.5"
+                                >
+                                    <span>👤</span>
+                                    <span>{user.language === 'ru' ? 'Создать аккаунт ↗' : 'Register Account ↗'}</span>
+                                </button>
+                            </div>
+                        )}
+
                         <div className="grid md:grid-cols-3 gap-6">
                             {/* FREE CARD */}
                             <div className="bg-[#1a1a1a] border border-gray-800 rounded-3xl p-6 flex flex-col">
-                                <h3 className="text-xl font-black text-gray-400 mb-6 uppercase tracking-widest text-center">{t('free')}</h3>
+                                <div className="flex items-center justify-between mb-6">
+                                    <h3 className="text-xl font-black text-gray-400 uppercase tracking-widest">{t('free')}</h3>
+                                    {isIncognitoUser && (
+                                        <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-md border border-emerald-500/30 uppercase">
+                                            {user.language === 'ru' ? 'Активен (Инкогнито)' : 'Active (Incognito)'}
+                                        </span>
+                                    )}
+                                </div>
                                 <div className="space-y-4 flex-1">
                                     <div className="flex items-center text-gray-400 font-bold"><BatteryIcon className="w-6 h-6 mr-3 opacity-50"/> {t('energy25')}</div>
                                     <div className="flex items-center text-gray-400 font-bold"><span className="w-6 h-6 mr-3 flex items-center justify-center text-xl opacity-50">📺</span> {t('ads')}</div>
@@ -4076,26 +4980,62 @@ export default function App() {
                             </div>
 
                             {/* SUPER CARD */}
-                            <div className="bg-gradient-to-br from-indigo-900 to-purple-900 border-2 border-purple-500 rounded-3xl p-6 flex flex-col relative transform scale-105 shadow-2xl shadow-purple-900/50">
+                            <div className={`bg-gradient-to-br from-indigo-900 to-purple-900 border-2 ${isIncognitoUser ? "border-amber-500/50 opacity-95" : "border-purple-500"} rounded-3xl p-6 flex flex-col relative transform scale-105 shadow-2xl shadow-purple-900/50`}>
                                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs font-black px-4 py-1 rounded-full uppercase tracking-widest shadow-lg">Most Popular</div>
-                                <h3 className="text-2xl font-black text-white mb-6 italic text-center mt-2">SUPER</h3>
+                                <div className="flex items-center justify-center mt-2 mb-6 space-x-2">
+                                    <h3 className="text-2xl font-black text-white italic text-center">SUPER</h3>
+                                    {isIncognitoUser && (
+                                        <span className="bg-amber-500/30 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-md border border-amber-500/50 uppercase">
+                                            🔒 {user.language === 'ru' ? 'Нужен аккаунт' : 'Account needed'}
+                                        </span>
+                                    )}
+                                </div>
                                 <div className="space-y-4 flex-1">
                                     <div className="flex items-center text-white font-bold"><InfiniteEnergyIcon className="w-6 h-6 mr-3 text-yellow-300"/> {t('infEnergy')}</div>
                                     <div className="flex items-center text-white font-bold"><NoAdIcon className="w-6 h-6 mr-3 text-blue-300"/> {t('noAds')}</div>
                                     <div className="flex items-center text-white font-bold"><BookIcon className="w-6 h-6 mr-3 text-purple-300"/> Unlimited Tests</div>
                                 </div>
-                                <button onClick={() => upgradeSubscription('super')} className="mt-8 w-full py-4 rounded-2xl font-black bg-white text-purple-900 border-b-4 border-gray-300 active:border-b-0 active:translate-y-1 transition-all uppercase tracking-widest shadow-xl text-sm">{t('trySuper')}</button>
+                                {isIncognitoUser && (
+                                    <div className="mt-4 p-2 bg-amber-950/60 border border-amber-500/40 rounded-xl text-center">
+                                        <span className="text-[11px] font-bold text-amber-300 flex items-center justify-center space-x-1">
+                                            <span>🔒</span>
+                                            <span>{user.language === 'ru' ? 'Недоступно в Инкогнито без регистрации' : 'Unavailable in Incognito without account'}</span>
+                                        </span>
+                                    </div>
+                                )}
+                                <button onClick={() => upgradeSubscription('super')} className={`mt-6 w-full py-4 rounded-2xl font-black ${isIncognitoUser ? 'bg-amber-400 text-gray-950 hover:bg-amber-300 border-b-4 border-amber-600' : 'bg-white text-purple-900 border-b-4 border-gray-300'} active:border-b-0 active:translate-y-1 transition-all uppercase tracking-widest shadow-xl text-sm flex items-center justify-center space-x-2`}>
+                                    {isIncognitoUser && <span>🔒</span>}
+                                    <span>{isIncognitoUser ? (user.language === 'ru' ? 'ТРЕБУЕТСЯ АККАУНТ' : 'ACCOUNT REQUIRED') : t('trySuper')}</span>
+                                </button>
                             </div>
 
                             {/* MAX CARD */}
-                            <div className="bg-black border border-gray-800 rounded-3xl p-6 flex flex-col relative shadow-[0_0_30px_rgba(28,176,246,0.15)]">
-                                <h3 className="text-xl font-black text-duo-blue mb-6 italic flex items-center justify-center">MAX <span className="ml-2 text-[10px] bg-duo-blue text-black px-1.5 py-0.5 rounded font-bold">NEW</span></h3>
+                            <div className={`bg-black border ${isIncognitoUser ? "border-amber-500/40" : "border-gray-800"} rounded-3xl p-6 flex flex-col relative shadow-[0_0_30px_rgba(28,176,246,0.15)]`}>
+                                <div className="flex items-center justify-center mb-6 space-x-2">
+                                    <h3 className="text-xl font-black text-duo-blue italic flex items-center">MAX <span className="ml-2 text-[10px] bg-duo-blue text-black px-1.5 py-0.5 rounded font-bold">NEW</span></h3>
+                                    {isIncognitoUser && (
+                                        <span className="bg-amber-500/30 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-md border border-amber-500/50 uppercase">
+                                            🔒 {user.language === 'ru' ? 'Нужен аккаунт' : 'Account needed'}
+                                        </span>
+                                    )}
+                                </div>
                                 <div className="space-y-4 flex-1">
                                     <div className="flex items-center text-gray-300 font-bold"><SuperIcon className="w-5 h-5 mr-3 opacity-80"/> {t('allInSuper')}</div>
                                     <div className="flex items-center text-gray-300 font-bold"><MaxIcon className="w-5 h-5 mr-3 text-duo-blue"/> {t('aiExplain')}</div>
                                     <div className="flex items-center text-gray-300 font-bold"><ChatBubbleIcon className="w-5 h-5 mr-3 text-duo-blue"/> Roleplay Max</div>
                                 </div>
-                                <button onClick={() => upgradeSubscription('max')} className="mt-8 w-full py-3 rounded-2xl font-bold bg-gray-900 text-duo-blue border-2 border-duo-blue hover:bg-gray-800 transition-all uppercase tracking-widest text-sm">{t('connectMax')}</button>
+                                {isIncognitoUser && (
+                                    <div className="mt-4 p-2 bg-amber-950/60 border border-amber-500/40 rounded-xl text-center">
+                                        <span className="text-[11px] font-bold text-amber-300 flex items-center justify-center space-x-1">
+                                            <span>🔒</span>
+                                            <span>{user.language === 'ru' ? 'Недоступно в Инкогнито без регистрации' : 'Unavailable in Incognito without account'}</span>
+                                        </span>
+                                    </div>
+                                )}
+                                <button onClick={() => upgradeSubscription('max')} className={`mt-6 w-full py-3 rounded-2xl font-bold ${isIncognitoUser ? 'bg-amber-950/80 text-amber-300 border-2 border-amber-500/60 hover:bg-amber-900/80' : 'bg-gray-900 text-duo-blue border-2 border-duo-blue hover:bg-gray-800'} transition-all uppercase tracking-widest text-sm flex items-center justify-center space-x-2`}>
+                                    {isIncognitoUser && <span>🔒</span>}
+                                    <span>{isIncognitoUser ? (user.language === 'ru' ? 'ТРЕБУЕТСЯ АККАУНТ' : 'ACCOUNT REQUIRED') : t('connectMax')}</span>
+                                </button>
                             </div>
                         </div>
                         <p className="text-center text-gray-600 text-xs mt-8 font-bold">Recurring billing. Cancel anytime.</p>
@@ -4508,6 +5448,61 @@ export default function App() {
         <div className="p-4 md:p-10 max-w-5xl mx-auto">
           {screen === AppScreen.PATH && (
             <div className="flex flex-col items-center py-10 animate-in fade-in slide-in-from-bottom-5">
+              {/* DAILY CHALLENGE BANNER */}
+              {(() => {
+                const todayStr = new Date().toISOString().split('T')[0];
+                if (dailyChallengeDismissedDate === todayStr) return null;
+                const todayChallenge = getTodayChallenge();
+                const isChallengeDone = user.dailyChallengeCompletedDate === todayStr;
+                const challengeTitle = user.language === 'ru' ? todayChallenge.titleRu : todayChallenge.titleEn;
+                const challengeDesc = user.language === 'ru' ? todayChallenge.descRu : todayChallenge.descEn;
+
+                return (
+                  <div className="w-full max-w-md bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 border-2 border-b-8 border-amber-900 rounded-[2.5rem] p-5 md:p-6 mb-8 shadow-2xl relative animate-in zoom-in duration-300">
+                    {/* Close / Dismiss button */}
+                    <button
+                      onClick={() => {
+                        playSound('click');
+                        setDailyChallengeDismissedDate(todayStr);
+                        localStorage.setItem('duo_daily_challenge_dismissed', todayStr);
+                      }}
+                      className="absolute top-4 right-4 w-7 h-7 flex items-center justify-center bg-black/20 hover:bg-black/40 text-amber-100 hover:text-white rounded-full transition-all text-xs font-black z-10"
+                      title={user.language === 'ru' ? 'Скрыть Задание Дня' : 'Dismiss Daily Challenge'}
+                    >
+                      ✕
+                    </button>
+
+                    <div className="flex items-center justify-between mb-2 pr-8">
+                      <span className="bg-amber-300 text-amber-950 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
+                        <span>🎯</span>
+                        <span>{user.language === 'ru' ? 'Задание Дня' : 'Daily Challenge'}</span>
+                      </span>
+                      <span className="text-yellow-300 font-black text-xs flex items-center gap-1">
+                        <span>+{todayChallenge.bonusXp} XP</span>
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="pr-2 min-w-0 flex-1">
+                        <h3 className="font-black text-base md:text-lg text-white uppercase tracking-wider truncate">{challengeTitle}</h3>
+                        <p className="text-xs text-amber-100 font-bold mt-0.5 leading-snug">{challengeDesc}</p>
+                      </div>
+                      {isChallengeDone ? (
+                        <span className="bg-emerald-500/30 text-emerald-300 border border-emerald-500/50 px-3 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider shrink-0 flex items-center gap-1">
+                          <span>✅</span>
+                          <span>{user.language === 'ru' ? 'Готово' : 'Done'}</span>
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => startTraining(todayChallenge.type)}
+                          className="bg-yellow-400 hover:bg-yellow-300 active:scale-95 text-black font-black text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl border-b-4 border-yellow-700 transition-all shrink-0 shadow-lg"
+                        >
+                          {user.language === 'ru' ? 'Начать' : 'Start'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
               {!betaDismissed && (
                   <div className="w-full max-w-md bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 border-2 border-b-8 border-purple-950 rounded-[2.5rem] p-6 mb-8 shadow-2xl relative animate-in zoom-in duration-300">
                       {/* Close button */}
@@ -4716,7 +5711,22 @@ export default function App() {
                   <div className="flex flex-col items-center space-y-16">
                     <button onClick={() => startTraining('translation')} className="w-28 h-28 rounded-full bg-duo-green border-b-8 border-duo-greenDark active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center shadow-2xl hover:brightness-110 group"><StarIcon className="w-14 h-14 text-white group-hover:scale-110 transition-transform" /></button>
                     <div className="w-3 h-16 bg-gray-800 rounded-full"></div>
-                    <button onClick={() => startTraining('listening')} className="w-24 h-24 rounded-full bg-duo-blue border-b-8 border-duo-blueDark active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center shadow-xl hover:brightness-110">{currentCourse.id === 'chess' ? <span className="text-3xl">♟</span> : <VolumeIcon className="w-10 h-10 text-white" />}</button>
+                    <button onClick={() => { playSound('click'); setScreen(AppScreen.VOCABULARY); }} className="bg-gradient-to-r from-emerald-600 to-teal-600 p-8 md:p-10 rounded-[2.5rem] border-b-8 border-emerald-800 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center justify-between shadow-2xl group md:col-span-2">
+                  <div className="flex items-center space-x-6 md:space-x-8">
+                      <div className="bg-white/20 p-4 md:p-5 rounded-3xl group-hover:rotate-6 transition-transform">
+                          <NewWordIcon className="w-10 h-10 md:w-14 md:h-14 text-white" />
+                      </div>
+                      <div>
+                          <div className="flex items-center space-x-2 mb-1">
+                              <h3 className="text-2xl md:text-3xl font-black text-white">{user.language === 'ru' ? 'Банк Слов' : 'Vocabulary Bank'}</h3>
+                              <span className="bg-emerald-950 text-emerald-300 text-[10px] px-2.5 py-0.5 rounded-md font-black border border-emerald-400 uppercase">{user.language === 'ru' ? 'Словарь' : 'Lexicon'}</span>
+                          </div>
+                          <p className="opacity-90 font-bold text-xs md:text-sm text-white/80">{user.language === 'ru' ? 'Все изученные слова по курсам с озвучкой и транскрипцией' : 'All learned words across courses with audio and phonetics'}</p>
+                      </div>
+                  </div>
+                  <ArrowRightIcon className="w-8 h-8 text-white group-hover:translate-x-2 transition-transform hidden sm:block" />
+              </button>
+              <button onClick={() => startTraining('listening')} className="w-24 h-24 rounded-full bg-duo-blue border-b-8 border-duo-blueDark active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center shadow-xl hover:brightness-110">{currentCourse.id === 'chess' ? <span className="text-3xl">♟</span> : <VolumeIcon className="w-10 h-10 text-white" />}</button>
                     <Mascot emotion="neutral" className="w-64 h-64 mt-10 animate-float" variant={currentCourse.mascotVariant} />
                   </div>
                   </>
@@ -4761,19 +5771,82 @@ export default function App() {
                         </div>
                     </div>
                     
+                    {/* Course header badge */}
+                    <div className="mb-4">
+                        <span className="bg-gray-900/20 text-gray-900 text-xs font-black px-4 py-1.5 rounded-full border border-gray-900/30 uppercase tracking-widest shadow-sm">
+                            {user.language === 'ru' ? 'Не язык • Курс Шахматы' : 'Non-language • Chess Course'}
+                        </span>
+                    </div>
+
                     <div className="flex flex-col w-full space-y-3">
-                        <button onClick={() => { setChessMode('tutorial'); setTutorialMessage(t('eduWelcome')); startTraining('chess'); }} className="w-full py-4 bg-duo-blue text-white rounded-2xl font-black uppercase tracking-widest border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all shadow-xl hover:bg-blue-400 flex items-center justify-center space-x-2">
-                            <span className="text-2xl">💡</span>
-                            <span>{t('eduBtn')}</span>
+                        {/* 1. Играть с DuoWindo6601 */}
+                        <button 
+                            onClick={() => { 
+                                setChessMode('pve'); 
+                                const opp = { name: 'DuoWindo6601', elo: 1500, avatar: '🦉', isBot: true };
+                                setChessOpponent(opp); 
+                                initChessGame(opp);
+                                startTraining('chess'); 
+                            }} 
+                            className="w-full p-4 bg-gray-900 text-[#00cd9c] rounded-2xl font-black uppercase tracking-wider border-b-6 border-black active:border-b-0 active:translate-y-1 transition-all shadow-xl hover:bg-gray-800 flex items-center justify-between group cursor-pointer"
+                        >
+                            <div className="flex items-center space-x-3 text-left">
+                                <span className="text-3xl group-hover:scale-110 transition-transform">🦉</span>
+                                <div>
+                                    <div className="text-sm sm:text-base font-black text-[#00cd9c]">
+                                        {user.language === 'ru' ? 'Играть с DuoWindo6601' : 'Play with DuoWindo6601'}
+                                    </div>
+                                    <div className="text-[10px] text-gray-400 font-bold">
+                                        {user.language === 'ru' ? 'Одиночная партия с ИИ-ботом' : 'Single match vs AI Grandmaster'}
+                                    </div>
+                                </div>
+                            </div>
+                            <span className="bg-[#00cd9c]/20 text-[#00cd9c] text-[11px] font-black px-2.5 py-1 rounded-xl border border-[#00cd9c]/40 uppercase tracking-wider whitespace-nowrap">
+                                +30 очков опыта
+                            </span>
                         </button>
-                        <button onClick={() => { setChessMode('study'); setTutorialMessage(t('lessonWelcome')); startTraining('chess'); }} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest border-b-4 border-indigo-800 active:border-b-0 active:translate-y-1 transition-all shadow-xl hover:bg-indigo-500 flex items-center justify-center space-x-2">
-                            <BookIcon className="w-6 h-6 text-white" />
-                            <span>{t('lessonBtn')}</span>
+
+                        {/* 2. Играть с другим Пользователем */}
+                        <button 
+                            onClick={() => { 
+                                playSound('click'); 
+                                setIsChessInviteModalOpen(true); 
+                            }} 
+                            className="w-full p-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white rounded-2xl font-black uppercase tracking-wider border-b-6 border-indigo-950 active:border-b-0 active:translate-y-1 transition-all shadow-xl hover:brightness-110 flex items-center justify-between group cursor-pointer ring-2 ring-white/30"
+                        >
+                            <div className="flex items-center space-x-3 text-left">
+                                <span className="text-3xl group-hover:scale-110 transition-transform">⚔️</span>
+                                <div>
+                                    <div className="text-sm sm:text-base font-black text-white">
+                                        {user.language === 'ru' ? 'Играть с другим Пользователем' : 'Play with another User'}
+                                    </div>
+                                    <div className="text-[10px] text-blue-200 font-bold">
+                                        {user.language === 'ru' ? 'Пригласить друга • Ссылка • Поиск' : 'Invite friend • Link • Search'}
+                                    </div>
+                                </div>
+                            </div>
+                            <span className="bg-amber-400 text-gray-950 text-[11px] font-black px-2.5 py-1 rounded-xl shadow-md uppercase tracking-wider whitespace-nowrap">
+                                +30 очков опыта
+                            </span>
                         </button>
-                        <button onClick={() => { setChessMode('pve'); startTraining('chess'); }} className="w-full py-4 bg-gray-900 text-[#00cd9c] rounded-2xl font-black uppercase tracking-widest border-b-4 border-black active:border-b-0 active:translate-y-1 transition-all shadow-xl hover:bg-gray-800 flex items-center justify-center space-x-2">
-                            <ChessPieceIcon type="p" color="w" className="w-6 h-6" />
-                            <span>{t('playDuoBtn')}</span>
-                        </button>
+
+                        {/* Secondary: Tutorial & Lesson */}
+                        <div className="grid grid-cols-2 gap-2.5 pt-1">
+                            <button 
+                                onClick={() => { setChessMode('tutorial'); setTutorialMessage(t('eduWelcome')); startTraining('chess'); }} 
+                                className="py-3 px-3 bg-teal-800/40 hover:bg-teal-800/60 text-gray-900 rounded-xl font-bold uppercase text-xs tracking-wider border border-teal-700/40 transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+                            >
+                                <span className="text-base">💡</span>
+                                <span>{t('eduBtn')}</span>
+                            </button>
+                            <button 
+                                onClick={() => { setChessMode('study'); setTutorialMessage(t('lessonWelcome')); startTraining('chess'); }} 
+                                className="py-3 px-3 bg-teal-800/40 hover:bg-teal-800/60 text-gray-900 rounded-xl font-bold uppercase text-xs tracking-wider border border-teal-700/40 transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+                            >
+                                <span className="text-base">📖</span>
+                                <span>{t('lessonBtn')}</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 
@@ -4848,15 +5921,20 @@ export default function App() {
 
           {/* ... (LEADERBOARD) ... */}
           {screen === AppScreen.LEADERBOARD && (
-             <div className="py-10 animate-in fade-in max-w-2xl mx-auto w-full px-4" dir="auto">
+             <div className="py-10 animate-in fade-in max-w-4xl mx-auto w-full px-4" dir="auto">
                 <div className="flex flex-col items-center mb-6 text-center" dir="auto">
                   <ShieldIcon className="w-20 h-20 text-yellow-400 mb-3 animate-bounce shrink-0" />
-                  <h2 className="text-3xl font-black uppercase tracking-widest text-yellow-400" dir="auto">
+                  <h2 className="text-3xl md:text-4xl font-black uppercase tracking-widest text-yellow-400" dir="auto">
                     <bdi dir="auto">{t('leaderboardTitle')}</bdi>
                   </h2>
-                  <p className="text-gray-400 font-bold mt-2 text-sm" dir="auto">
+                  <p className="text-gray-400 font-bold mt-2 text-sm md:text-base" dir="auto">
                     <bdi dir="auto">{t('leaderboardDesc')}</bdi>
                   </p>
+                </div>
+
+                {/* 30-DAY ACTIVITY & STREAK PROGRESS BAR CHART */}
+                <div className="mb-8 w-full">
+                  <ActivityChart user={user} language={user.language} />
                 </div>
 
                 {/* Rating / Leaderboard Name Translator Bar */}
@@ -4909,13 +5987,22 @@ export default function App() {
                         </p>
                       </div>
                     </div>
-                    <button
-                      onClick={() => openRegisterModal('register')}
-                      className="w-full md:w-auto px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase rounded-2xl border-b-2 border-amber-700 active:translate-y-0.5 transition-all whitespace-nowrap shadow-md flex items-center justify-center gap-1 shrink-0"
-                    >
-                      <span>✨</span>
-                      <span><bdi dir="auto">{t('register')}</bdi></span>
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      <button
+                        onClick={openIncognitoRestrictionsModal}
+                        className="w-full md:w-auto px-4 py-2.5 bg-amber-900/80 hover:bg-amber-800 text-amber-200 font-bold text-xs uppercase rounded-2xl border border-amber-500/40 active:translate-y-0.5 transition-all whitespace-nowrap shadow-md flex items-center justify-center gap-1.5"
+                      >
+                        <span>🚫</span>
+                        <span>{user.language === 'ru' ? 'Ограничения (8)' : 'Restrictions (8)'}</span>
+                      </button>
+                      <button
+                        onClick={() => openRegisterModal('register')}
+                        className="w-full md:w-auto px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase rounded-2xl border-b-2 border-amber-700 active:translate-y-0.5 transition-all whitespace-nowrap shadow-md flex items-center justify-center gap-1 shrink-0"
+                      >
+                        <span>✨</span>
+                        <span><bdi dir="auto">{t('register')}</bdi></span>
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -4938,20 +6025,20 @@ export default function App() {
                       const displayName = isUser ? entry.name : (botNameMap[entry.name]?.[leaderboardLang] || entry.name);
 
                       return ( 
-                        <div key={entry.id} className={`flex items-center gap-3 md:gap-4 p-4 md:p-6 border-b border-gray-700 last:border-0 transition-colors ${isUser ? 'bg-duo-card border-l-4 border-l-duo-blue' : 'hover:bg-white/5'} ${isUser ? 'bg-gray-800' : ''}`} dir="auto">
-                          <div className={`w-8 font-black text-xl text-center shrink-0 ${rankColor}`}>
+                        <div key={entry.id} className={`flex items-center gap-2.5 sm:gap-4 p-3 sm:p-5 border-b border-gray-700 last:border-0 transition-colors ${isUser ? 'bg-duo-card border-l-4 border-l-duo-blue' : 'hover:bg-white/5'} ${isUser ? 'bg-gray-800' : ''}`} dir="auto">
+                          <div className={`w-6 sm:w-8 font-black text-base sm:text-xl text-center shrink-0 ${rankColor}`}>
                             <bdi dir="ltr">{rank}</bdi>
                           </div>
-                          <div className={`w-12 h-12 rounded-full ${entry.color} flex items-center justify-center font-bold text-lg shrink-0 border-2 border-gray-600`}>
+                          <div className={`w-9 h-9 sm:w-12 sm:h-12 rounded-full ${entry.color} flex items-center justify-center font-bold text-sm sm:text-lg shrink-0 border-2 border-gray-600`}>
                             <bdi dir="auto">{displayName[0]}</bdi>
                           </div>
                           <div className="flex-1 min-w-0" dir="auto">
-                            <h3 className={`font-bold text-lg truncate ${isUser ? 'text-duo-blue' : 'text-white'}`}>
+                            <h3 className={`font-bold text-sm sm:text-base md:text-lg truncate ${isUser ? 'text-duo-blue' : 'text-white'}`}>
                               <bdi dir="auto">{displayName}</bdi>
                             </h3>
-                            {isUser && <span className="text-xs font-bold text-gray-500 uppercase"><bdi dir="auto">{t('isYou')}</bdi></span>}
+                            {isUser && <span className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase"><bdi dir="auto">{t('isYou')}</bdi></span>}
                           </div>
-                          <div className="font-bold text-gray-400 shrink-0 text-right ltr-preserve" dir="ltr">
+                          <div className="font-bold text-xs sm:text-base text-gray-400 shrink-0 text-right ltr-preserve" dir="ltr">
                             <bdi dir="ltr">{entry.xp} XP</bdi>
                           </div>
                         </div> 
@@ -4964,10 +6051,50 @@ export default function App() {
           {screen === AppScreen.SHOP && (
              <div className="py-10 space-y-8 animate-in fade-in">
                 <h2 className="text-4xl font-bold text-center mb-10 tracking-tight uppercase">{t('shopTitle')}</h2>
-                {user.subscription === 'free' && (<div onClick={() => { playSound('click'); setScreen(AppScreen.SUBSCRIPTION); }} className="bg-gradient-to-r from-blue-600 to-purple-600 p-8 rounded-3xl border-b-8 border-purple-800 cursor-pointer hover:scale-[1.02] transition-all shadow-2xl mb-10 flex items-center justify-between"><div><h3 className="text-2xl font-black text-white mb-2">{t('trySuperTitle')}</h3><p className="text-white/80 font-bold">{t('trySuperDesc')}</p></div><SuperIcon className="w-16 h-16" /></div>)}
+                {user.subscription === 'free' && (
+                  <div onClick={() => { playSound('click'); setScreen(AppScreen.SUBSCRIPTION); }} className={`bg-gradient-to-r from-blue-600 to-purple-600 p-8 rounded-3xl border-b-8 border-purple-800 cursor-pointer hover:scale-[1.02] transition-all shadow-2xl mb-10 flex items-center justify-between relative overflow-hidden`}>
+                    {isIncognitoUser && (
+                      <div className="absolute top-3 right-3 bg-amber-500 text-black text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-md flex items-center space-x-1">
+                        <span>🔒</span>
+                        <span>{user.language === 'ru' ? 'Требуется аккаунт (Инкогнито)' : 'Account Required (Incognito)'}</span>
+                      </div>
+                    )}
+                    <div>
+                      <h3 className="text-2xl font-black text-white mb-2">{t('trySuperTitle')}</h3>
+                      <p className="text-white/80 font-bold">{t('trySuperDesc')}</p>
+                    </div>
+                    <SuperIcon className="w-16 h-16" />
+                  </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                    {user.subscription === 'free' ? (<div onClick={() => { playSound('success'); setUser(u => ({...u, energy: 25, gems: Math.max(0, u.gems - 100)})); setToast(t('t_buy_energy')); }} className="bg-duo-card p-8 rounded-3xl border-2 border-b-8 border-duo-red cursor-pointer hover:scale-[1.02] transition-all flex items-center justify-between shadow-xl"><div><h4 className="font-bold text-xl mb-1 uppercase">{t('energy25')}</h4><p className="text-gray-400 font-bold">{t('refill')}</p></div><div className="text-duo-red font-bold text-lg">100 💎</div></div>) : (<div className="bg-duo-card p-8 rounded-3xl border-2 border-b-8 border-gray-700 opacity-80 flex items-center justify-between shadow-xl cursor-default"><div><h4 className="font-bold text-xl mb-1 uppercase text-gray-400">{t('infEnergy')}</h4><p className="text-gray-500 font-bold">{t('activeWith')} {user.subscription === 'super' ? 'Super' : 'Max'}</p></div><InfiniteEnergyIcon className="w-10 h-10 text-yellow-400" /></div>)}
-                   <div className="bg-duo-card p-8 rounded-3xl border-2 border-b-8 border-duo-green cursor-pointer hover:scale-[1.02] transition-all flex items-center justify-between shadow-xl" onClick={() => { playSound('click'); setToast(t('t_freeze_used')); }}><div><h4 className="font-bold text-xl mb-1 uppercase">{t('freeze')}</h4><p className="text-gray-400 font-bold">{t('freezeDesc')}</p></div><div className="text-duo-green font-bold text-lg">500 💎</div></div>
+                   <div 
+                      className="bg-duo-card p-8 rounded-3xl border-2 border-b-8 border-duo-green cursor-pointer hover:scale-[1.02] transition-all flex items-center justify-between shadow-xl" 
+                      onClick={() => { 
+                        if (user.gems < 500) {
+                          playSound('wrong');
+                          setToast(user.language === 'ru' ? "Недостаточно гемов! Нужно 500 💎" : "Not enough gems! Need 500 💎");
+                        } else {
+                          playSound('purchase');
+                          const newCount = (user.streakFreezeCount || 0) + 1;
+                          setUser(u => ({ ...u, gems: u.gems - 500, streakFreezeCount: newCount }));
+                          setToast(user.language === 'ru' ? `❄️ Заморозка куплена! Всего: ${newCount} шт.` : `❄️ Streak Freeze purchased! Total: ${newCount}`);
+                        }
+                      }}
+                   >
+                     <div>
+                       <h4 className="font-bold text-xl mb-1 uppercase flex items-center gap-2">
+                         <span>{t('freeze')}</span>
+                         {(user.streakFreezeCount || 0) > 0 && (
+                           <span className="px-2 py-0.5 text-xs bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 rounded-full font-black">
+                             x{user.streakFreezeCount}
+                           </span>
+                         )}
+                       </h4>
+                       <p className="text-gray-400 font-bold">{t('freezeDesc')}</p>
+                     </div>
+                     <div className="text-duo-green font-bold text-lg shrink-0 ml-4">500 💎</div>
+                   </div>
                 </div>
                 <h3 className="text-2xl font-bold text-gray-400 mb-6 uppercase tracking-wider mt-12 border-t-2 border-gray-800 pt-8">{t('refillGems')}</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
@@ -5019,6 +6146,64 @@ export default function App() {
                          <span>{t('registerAuth')}</span>
                       </button>
                    </div>
+
+   {/* USER CONTACTS & PRIVACY BADGES */}
+                   {(user.phone || user.email || user.link) && (
+                     <div className="mt-4 p-3.5 bg-duo-card/80 border border-gray-800 rounded-2xl max-w-md mx-auto w-full flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 text-xs">
+                       {user.phone && (
+                         <div className="flex items-center space-x-1.5 text-gray-300">
+                           <span>📱</span>
+                           <span className="font-mono font-bold">
+                             {user.hidePhone 
+                               ? (user.phone.length > 5 ? user.phone.slice(0, 4) + ' ••• •• ' + user.phone.slice(-2) : '••••••••') 
+                               : user.phone}
+                           </span>
+                           {user.hidePhone && (
+                             <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30">
+                               🔒 Номер скрыт
+                             </span>
+                           )}
+                         </div>
+                       )}
+                       {user.phone && user.email && <span className="hidden sm:inline text-gray-600">•</span>}
+                       {user.email && (
+                         <div className="flex items-center space-x-1.5 text-gray-300">
+                           <span>📧</span>
+                           <span className="font-mono font-bold">
+                             {user.hideEmail 
+                               ? user.email.split('@')[0].slice(0, 2) + '••••@' + (user.email.split('@')[1] || '•••')
+                               : user.email}
+                           </span>
+                           {user.hideEmail && (
+                             <span className="text-[10px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded border border-purple-500/30">
+                               🔒 Email скрыт
+                             </span>
+                           )}
+                         </div>
+                       )}
+                       {(user.phone || user.email) && user.link && <span className="hidden sm:inline text-gray-600">•</span>}
+                       {user.link && (
+                         <div className="flex items-center space-x-1.5 text-gray-300">
+                           <span>🔗</span>
+                           <span className="font-mono font-bold truncate max-w-[180px]">
+                             {user.hideLink 
+                               ? 'https://••••••••'
+                               : user.link}
+                           </span>
+                           {user.hideLink && (
+                             <span className="text-[10px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded border border-blue-500/30">
+                               🔒 Ссылка скрыта
+                             </span>
+                           )}
+                         </div>
+                       )}
+                     </div>
+                   )}
+                </div>
+
+                {/* 30-DAY ACTIVITY & STREAK PROGRESS BAR CHART */}
+                <div className="w-full">
+                    <ActivityChart user={user} language={user.language} />
                 </div>
 
                 {/* RESPONSIVE GRID FOR PROFILE CARDS (2-COL ON PC, 1-COL ON MOBILE) */}
@@ -5036,94 +6221,107 @@ export default function App() {
                          </div>
                       </div>
 
-                      {/* Streak Resume & Adjustment Card */}
+                      {/* Streak Fair Play & Lesson Resume Card */}
                       <div className="w-full bg-duo-card border-2 border-duo-red/50 rounded-3xl p-5 shadow-xl text-center space-y-4">
-                         <div className="flex items-center justify-center space-x-2">
-                            <span className="text-2xl animate-bounce">🔥</span>
-                            <h3 className="text-sm md:text-base font-black text-white uppercase tracking-wider">{t('streakResume')}</h3>
+                         <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                               <span className="text-2xl animate-bounce">🔥</span>
+                               <h3 className="text-sm md:text-base font-black text-white uppercase tracking-wider">{t('streakResume')}</h3>
+                            </div>
+                            <span className="text-[10px] bg-red-500/20 text-red-300 font-bold px-2.5 py-1 rounded-full border border-red-500/30">
+                               {t('streakFairPlayBadge')}
+                            </span>
                          </div>
-                         <p className="text-xs text-gray-400 font-bold">
+                         <p className="text-xs text-gray-400 font-medium text-left leading-relaxed">
                             {t('streakAdjustment')}
                          </p>
 
-                         {/* Stepper Display */}
-                         <div className="flex items-center justify-between bg-black/40 p-2.5 rounded-2xl border border-gray-800">
-                            <div className="flex items-center space-x-1">
-                               <button
-                                  onClick={() => {
-                                     playSound('click');
-                                     const newStreak = Math.max(0, user.streak - 7);
-                                     setUser(u => ({ ...u, streak: newStreak }));
-                                     setToast(t('toastStreakBack7').replace('{streak}', String(newStreak)));
-                                  }}
-                                  className="w-10 h-10 bg-gray-800 hover:bg-gray-700 active:scale-95 text-red-400 font-black rounded-xl border-b-2 border-gray-700 text-xs transition-all flex items-center justify-center"
-                                  title="Назад (-7 дней)"
-                               >
-                                  -7
-                               </button>
-                               <button
-                                  onClick={() => {
-                                     playSound('click');
-                                     const newStreak = Math.max(0, user.streak - 1);
-                                     setUser(u => ({ ...u, streak: newStreak }));
-                                     setToast(t('toastStreakBack1').replace('{streak}', String(newStreak)));
-                                  }}
-                                  className="w-10 h-10 bg-gray-800 hover:bg-gray-700 active:scale-95 text-red-400 font-black rounded-xl border-b-2 border-gray-700 text-xs transition-all flex items-center justify-center"
-                                  title="Назад (-1 день)"
-                                >
-                                  -1
-                               </button>
+                         {/* Streak Display Info */}
+                         <div className="bg-black/40 p-4 rounded-2xl border border-gray-800 flex items-center justify-between">
+                            <div className="text-left space-y-1">
+                               <div className="flex items-center space-x-2">
+                                  <span className="text-3xl font-black text-duo-red">{user.streak}</span>
+                                  <span className="text-xs text-gray-400 font-bold uppercase">{t('days')}</span>
+                               </div>
+                               <p className="text-[11px] text-gray-400 font-medium">
+                                  {user.lastActiveDate === new Date().toISOString().split('T')[0]
+                                     ? '✅ ' + (user.language === 'ru' ? 'Сегодня урок пройден (+1 день сохранён)' : 'Today\'s lesson completed (+1 day active)')
+                                     : '⏳ ' + (user.language === 'ru' ? 'Пройдите урок сегодня для продления' : 'Complete a lesson today to extend streak')}
+                               </p>
                             </div>
 
-                            <div className="text-center px-2">
-                               <span className="text-2xl font-black text-duo-red">
-                                  {user.streak}
-                               </span>
-                               <span className="block text-[10px] text-gray-400 font-bold uppercase">
-                                  {t('days')}
-                               </span>
-                            </div>
-
-                            <div className="flex items-center space-x-1">
-                               <button
-                                  onClick={() => {
-                                     playSound('success');
-                                     const newStreak = user.streak + 1;
-                                     setUser(u => ({ ...u, streak: newStreak }));
-                                     setToast(t('toastStreakForward1').replace('{streak}', String(newStreak)));
-                                  }}
-                                  className="w-10 h-10 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black rounded-xl border-b-2 border-emerald-800 text-xs transition-all flex items-center justify-center"
-                                  title="Вперёд (+1 день)"
-                               >
-                                  +1
-                               </button>
-                               <button
-                                  onClick={() => {
-                                     playSound('success');
-                                     const newStreak = user.streak + 7;
-                                     setUser(u => ({ ...u, streak: newStreak }));
-                                     setToast(t('toastStreakForward7').replace('{streak}', String(newStreak)));
-                                  }}
-                                  className="w-10 h-10 bg-duo-red hover:bg-red-600 active:scale-95 text-white font-black rounded-xl border-b-2 border-red-800 text-xs transition-all flex items-center justify-center"
-                                  title="Вперёд (+7 дней)"
-                               >
-                                  +7
-                               </button>
+                            <div className="text-right">
+                               <span className="inline-block text-xs bg-cyan-950/80 text-cyan-300 font-bold px-3 py-1.5 rounded-xl border border-cyan-800/50">
+                                  {t('streakFreezeActive').replace('{count}', String(user.streakFreezeCount))}
+                                </span>
                             </div>
                          </div>
 
-                         {/* Direct Resume Action */}
+                         {/* Lost Streak Quick Recovery option for User */}
+                         {((user.previousLostStreak || 0) > 0 || (user.streak === 0 && (user.maxStreak || 0) > 0)) && (
+                            <div className="bg-gradient-to-r from-orange-950/60 to-red-950/60 border border-orange-500/50 p-3.5 rounded-2xl text-left space-y-2.5">
+                               <div className="flex items-center justify-between">
+                                  <span className="text-xs font-black text-orange-300 uppercase tracking-wide flex items-center space-x-1.5">
+                                     <span className="animate-pulse">⚡</span>
+                                     <span>{user.language === 'ru' ? 'Восстановление потерянного режима' : 'Recover Lost Streak'}</span>
+                                  </span>
+                                  <span className="text-[10px] font-bold text-orange-200 bg-orange-500/20 px-2 py-0.5 rounded-lg border border-orange-500/40">
+                                     {user.language === 'ru' ? `Потеряно: ${user.previousLostStreak || user.maxStreak} дн.` : `Lost: ${user.previousLostStreak || user.maxStreak} d.`}
+                                  </span>
+                               </div>
+                               <div className="flex flex-wrap gap-2 pt-1">
+                                  {(user.streakFreezeCount || 0) > 0 && (
+                                     <button
+                                        onClick={() => {
+                                           const recoveredDays = user.previousLostStreak || user.maxStreak || 1;
+                                           setUser(u => ({
+                                              ...u,
+                                              streak: recoveredDays,
+                                              streakFreezeCount: Math.max(0, (u.streakFreezeCount || 0) - 1),
+                                              previousLostStreak: 0,
+                                              lastActiveDate: new Date().toISOString().split('T')[0]
+                                           }));
+                                           playSound('streak_update');
+                                           setToast(user.language === 'ru' ? `🔥 Ударный режим восстановлен: ${recoveredDays} дн. с помощью Заморозки!` : `🔥 Streak restored to ${recoveredDays} days using Streak Freeze!`);
+                                        }}
+                                        className="flex-1 min-w-[130px] py-2 px-3 bg-cyan-600 hover:bg-cyan-500 text-white font-black text-[11px] uppercase tracking-wider rounded-xl shadow border-b-2 border-cyan-800 transition-all"
+                                     >
+                                        ❄️ {user.language === 'ru' ? 'За 1 Заморозку' : '1 Freeze'}
+                                     </button>
+                                  )}
+                                  {(user.gems || 0) >= 50 && (
+                                     <button
+                                        onClick={() => {
+                                           const recoveredDays = user.previousLostStreak || user.maxStreak || 1;
+                                           setUser(u => ({
+                                              ...u,
+                                              streak: recoveredDays,
+                                              gems: Math.max(0, (u.gems || 0) - 50),
+                                              previousLostStreak: 0,
+                                              lastActiveDate: new Date().toISOString().split('T')[0]
+                                           }));
+                                           playSound('streak_update');
+                                           setToast(user.language === 'ru' ? `🔥 Ударный режим восстановлен: ${recoveredDays} дн. за 50 кристаллов!` : `🔥 Streak restored to ${recoveredDays} days for 50 gems!`);
+                                        }}
+                                        className="flex-1 min-w-[130px] py-2 px-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 text-white font-black text-[11px] uppercase tracking-wider rounded-xl shadow border-b-2 border-green-800 transition-all"
+                                     >
+                                        💎 {user.language === 'ru' ? 'За 50 кристаллов' : '50 Gems'}
+                                     </button>
+                                  )}
+                               </div>
+                            </div>
+                         )}
+
+                         {/* Action to Start Lesson */}
                          <button
                             onClick={() => {
-                               playSound('success');
-                               const newStreak = user.streak + 7;
-                               setUser(u => ({ ...u, streak: newStreak }));
-                               setToast(t('streakResumed'));
+                               playSound('click');
+                               setScreen(AppScreen.PATH);
+                               setToast(user.language === 'ru' ? '🎯 Выберите тему урока на пути!' : '🎯 Choose a lesson on your learning path!');
                             }}
-                            className="w-full py-3 bg-duo-red hover:bg-red-600 text-white font-black rounded-2xl border-b-4 border-red-800 active:translate-y-1 transition-all uppercase text-xs tracking-wider shadow-md flex items-center justify-center space-x-2"
+                            className="w-full py-3.5 bg-duo-red hover:bg-red-600 active:scale-[0.98] text-white font-black rounded-2xl border-b-4 border-red-800 transition-all uppercase text-xs tracking-wider shadow-md flex items-center justify-center space-x-2"
                          >
-                            <span>🚀</span>
-                            <span>{t('streakResume')} (+7 {t('days')})</span>
+                            <span>{t('streakLessonAction')}</span>
                          </button>
                       </div>
                    </div>
@@ -5179,18 +6377,26 @@ export default function App() {
                                      </div>
                                   )}
 
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
                                      <button 
-                                        onClick={() => openRegisterModal('register')} 
-                                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all text-xs uppercase flex items-center justify-center space-x-1 shadow-lg"
+                                        onClick={() => openRegisterModal("login")} 
+                                        className="w-full py-3 bg-duo-green hover:bg-duo-greenDark text-white font-black rounded-2xl border-b-4 border-duo-greenDark active:border-b-0 active:translate-y-1 transition-all text-xs uppercase flex items-center justify-center space-x-1 shadow-lg cursor-pointer"
                                      >
-                                        <span>👤</span>
-                                        <span>{t('register')}</span>
+                                        <span>🔑</span>
+                                        <span>{user.language === "ru" ? "Вход" : "Log In"}</span>
                                      </button>
 
                                      <button 
-                                        onClick={handleGoogleSignIn} 
-                                        className="w-full py-3 bg-duo-blue hover:brightness-110 text-white font-black rounded-2xl border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all text-xs uppercase flex items-center justify-center space-x-1 shadow-lg"
+                                        onClick={() => openRegisterModal("register")} 
+                                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all text-xs uppercase flex items-center justify-center space-x-1 shadow-lg cursor-pointer"
+                                     >
+                                        <span>📝</span>
+                                        <span>{user.language === "ru" ? "Регистрация" : "Sign Up"}</span>
+                                     </button>
+
+                                     <button 
+                                        onClick={() => openRegisterModal("google")} 
+                                        className="w-full py-3 bg-duo-blue hover:brightness-110 text-white font-black rounded-2xl border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all text-xs uppercase flex items-center justify-center space-x-1 shadow-lg cursor-pointer"
                                      >
                                         <span>🌐</span>
                                         <span>Google</span>
@@ -5239,6 +6445,17 @@ export default function App() {
              </div>
           )}
 
+          {screen === AppScreen.VOCABULARY && (
+            <VocabularyBank
+              user={user}
+              courses={COURSES}
+              currentCourse={currentCourse}
+              onBack={() => setScreen(AppScreen.PATH)}
+              onSpeak={(text, courseId, slow = false) => {
+                speakText(text, courseId, slow, user.preferredVoice, user.voiceProvider);
+              }}
+            />
+          )}
           {screen === AppScreen.FEEDBACK && (
             <FeedbackScreen
               user={user}
@@ -5247,6 +6464,8 @@ export default function App() {
               playSound={playSound}
               setToast={setToast}
               onOpenAdminDashboard={() => setScreen(AppScreen.ADMIN_DASHBOARD)}
+              onOpenIncognitoRestrictions={openIncognitoRestrictionsModal}
+              onOpenRegister={openRegisterModal}
               courses={COURSES}
               currentCourse={currentCourse}
               onSetLanguage={(newLang) => {
@@ -5265,6 +6484,7 @@ export default function App() {
               onBack={() => setScreen(AppScreen.PATH)}
               playSound={playSound}
               setToast={setToast}
+              onUpdateUser={setUser}
             />
           )}
 
@@ -5464,221 +6684,78 @@ export default function App() {
           ? "fixed bottom-0 left-0 w-full bg-duo-dark/95 backdrop-blur-xl border-t border-gray-800 p-3 sm:p-4 flex justify-around z-50 pb-8 sm:pb-6 shadow-2xl safe-bottom"
           : "lg:hidden fixed bottom-0 left-0 w-full bg-duo-dark/95 backdrop-blur-xl border-t border-gray-800 p-3 sm:p-4 flex justify-around z-50 pb-8 sm:pb-6 shadow-2xl safe-bottom"
         }>
-          {NAV_ITEMS.map(item => (
-            <button key={item.screen} onClick={() => handleNavigation(item.screen)} className={`transition-all duration-300 ${screen === item.screen ? 'text-duo-blue scale-125 -translate-y-2' : 'text-gray-500'}`}><item.icon className="w-8 h-8" /></button>
-          ))}
+          {NAV_ITEMS.map(item => {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const isTodayChallengePending = item.screen === AppScreen.PATH && 
+              user.dailyChallengeCompletedDate !== todayStr && 
+              dailyChallengeDismissedDate !== todayStr;
+            return (
+              <button key={item.screen} onClick={() => handleNavigation(item.screen)} className={`transition-all duration-300 relative ${screen === item.screen ? 'text-duo-blue scale-125 -translate-y-2' : 'text-gray-500'}`}>
+                <item.icon className="w-8 h-8" />
+                {isTodayChallengePending && (
+                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-duo-orange rounded-full border-2 border-duo-dark animate-pulse" />
+                )}
+              </button>
+            );
+          })}
+          {isIncognitoUser && (
+            <button
+              onClick={openIncognitoRestrictionsModal}
+              className="flex items-center space-x-3 w-full px-4 py-3 rounded-2xl border border-amber-500/40 bg-amber-950/30 hover:bg-amber-900/50 text-amber-300 transition-all text-left shadow-inner mt-4 group cursor-pointer"
+              title="Режим Ограничения в Инкогнито (8 функций заблокировано)"
+            >
+              <span className="text-xl group-hover:scale-110 transition-transform">🚫</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-[11px] uppercase tracking-wider block leading-tight text-amber-200">
+                    {user.language === 'ru' ? 'Ограничения' : 'Restrictions'}
+                  </span>
+                  <span className="bg-amber-500 text-black text-[9px] font-black px-1.5 py-0.5 rounded-full">8</span>
+                </div>
+                <span className="text-[10px] text-amber-400/70 font-bold block truncate">
+                  {user.language === 'ru' ? 'Что заблокировано' : 'Blocked features'}
+                </span>
+              </div>
+            </button>
+          )}
         </nav>
       )}
 
-      {/* REGISTRATION & INCOGNITO AUTH MODAL */}
-      {showRegisterModal && (
-        <div className="fixed inset-0 z-[220] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
-          <div className="bg-duo-dark border-2 border-gray-700 rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl space-y-6 text-white my-8 relative">
-            <button 
-              onClick={() => { playSound('click'); setShowRegisterModal(false); }} 
-              className="absolute top-5 right-5 text-gray-400 hover:text-white p-2 rounded-xl bg-gray-800 transition-colors"
-              title="Закрыть"
-            >
-              <CloseIcon className="w-6 h-6"/>
-            </button>
+      {/* CHESS INVITE MODAL (Link, Name Search, Contacts, Your Friends) */}
+      <ChessInviteModal
+        isOpen={isChessInviteModalOpen}
+        onClose={() => setIsChessInviteModalOpen(false)}
+        onStartMatch={handleStartPvpChess}
+        currentUserName={user.name || user.username || 'Пользователь'}
+        currentUserElo={user.chessStats?.elo || 1400}
+        language={user.language}
+        playSound={playSound}
+      />
 
-            {/* HEADER */}
-            <div className="text-center space-y-2 pt-2">
-              <div className="w-16 h-16 bg-duo-blue/20 border-2 border-duo-blue rounded-3xl flex items-center justify-center text-3xl mx-auto shadow-lg">
-                🦉
-              </div>
-              <h2 className="text-2xl md:text-3xl font-black uppercase tracking-wider text-white">
-                {user.language === 'ru' ? 'Регистрация и Вход' : 'Registration & Login'}
-              </h2>
-              <p className="text-xs text-gray-400 font-bold max-w-xs mx-auto">
-                {user.language === 'ru' 
-                  ? 'Зарегистрируйте аккаунт, войдите через Google или играйте Инкогнито без аккаунта' 
-                  : 'Register an account, sign in with Google or play Incognito without an account'}
-              </p>
-            </div>
+      {/* AUTHENTICATION & REGISTRATION MODAL (Email, Username, Password, Google, Incognito) */}
+      <AuthModal
+        isOpen={showRegisterModal}
+        onClose={() => setShowRegisterModal(false)}
+        user={user}
+        setUser={setUser}
+        firebaseUser={firebaseUser}
+        setFirebaseUser={setFirebaseUser}
+        t={t}
+        playSound={playSound}
+        setToast={setToast}
+        onOpenIncognitoRestrictions={openIncognitoRestrictionsModal}
+        initialTab={regInitialTab}
+      />
 
-            {/* TAB SELECTOR */}
-            <div className="grid grid-cols-3 gap-2 bg-gray-900 p-1.5 rounded-2xl border border-gray-800">
-              <button 
-                onClick={() => { playSound('click'); setRegTab('register'); }}
-                className={`py-2.5 px-1 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${regTab === 'register' ? 'bg-duo-blue text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
-              >
-                {user.language === 'ru' ? 'Регистрация' : 'Register'}
-              </button>
-              <button 
-                onClick={() => { playSound('click'); setRegTab('incognito'); }}
-                className={`py-2.5 px-1 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center space-x-1 ${regTab === 'incognito' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
-              >
-                <span>🕵️</span>
-                <span>{user.language === 'ru' ? 'Инкогнито' : 'Incognito'}</span>
-              </button>
-              <button 
-                onClick={() => { playSound('click'); setRegTab('google'); }}
-                className={`py-2.5 px-1 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${regTab === 'google' ? 'bg-purple-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
-              >
-                {user.language === 'ru' ? 'Google' : 'Google'}
-              </button>
-            </div>
-
-            {/* CONTENT BY TAB */}
-            {regTab === 'register' && (
-              <div className="space-y-4 animate-in fade-in">
-                {/* NAME INPUT */}
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center justify-between">
-                    <span>{t('displayNameLabel')}</span>
-                    <span className="text-[10px] text-duo-green font-black">{t('requiredLabel')}</span>
-                  </label>
-                  <input 
-                    type="text" 
-                    value={regName}
-                    onChange={(e) => setRegName(e.target.value)}
-                    placeholder={t('displayNamePlaceholder')}
-                    maxLength={40}
-                    className="w-full bg-gray-800 border-2 border-gray-700 focus:border-duo-blue text-white rounded-2xl px-4 py-3 text-sm font-bold focus:outline-none transition-colors"
-                  />
-                </div>
-
-                {/* USERNAME (@HANDLE) INPUT */}
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center justify-between">
-                    <span>{t('usernameLabel')}</span>
-                    <span className="text-[10px] text-duo-blue font-black">{t('uniqueHandleLabel')}</span>
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-3.5 text-duo-blue font-black text-sm">@</span>
-                    <input 
-                      type="text" 
-                      value={regUsername}
-                      onChange={(e) => setRegUsername(e.target.value.replace(/[^a-zA-Z0-9_\.]/g, ''))}
-                      placeholder="anatolij81"
-                      maxLength={30}
-                      className="w-full bg-gray-800 border-2 border-gray-700 focus:border-duo-blue text-white rounded-2xl pl-9 pr-4 py-3 text-sm font-bold focus:outline-none transition-colors"
-                    />
-                  </div>
-                  <p className="text-[11px] text-gray-400 font-bold pl-1">
-                    {t('profileLeaderboardVisible')}
-                  </p>
-                </div>
-
-                {/* AVATAR COLOR & EMOJI QUICK SELECT */}
-                <div className="space-y-2 pt-1">
-                  <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">
-                    {t('selectAvatarLabel')}
-                  </label>
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-14 h-14 rounded-2xl ${regAvatarColor} border-2 border-white flex items-center justify-center text-2xl shadow-md flex-shrink-0`}>
-                      {regAvatarIcon}
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 flex-1">
-                      {['🦉', '👑', '🚀', '⚡', '🏆', '♟️', '🎨', '🔥'].map(icon => (
-                        <button 
-                          key={icon}
-                          onClick={() => setRegAvatarIcon(icon)}
-                          className={`w-8 h-8 rounded-xl bg-gray-800 border transition-all text-sm flex items-center justify-center ${regAvatarIcon === icon ? 'border-duo-blue bg-duo-blue/30 scale-110' : 'border-gray-700'}`}
-                        >
-                          {icon}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* SUBMIT BUTTON */}
-                <button 
-                  onClick={handleRegisterUser}
-                  className="w-full py-4 bg-duo-green hover:brightness-110 text-white font-black rounded-2xl border-b-4 border-duo-greenDark active:border-b-0 active:translate-y-1 transition-all uppercase text-xs tracking-wider shadow-lg flex items-center justify-center space-x-2 mt-2"
-                >
-                  <span>🚀</span>
-                  <span>{t('registerAndStartBtn')}</span>
-                </button>
-              </div>
-            )}
-
-            {regTab === 'incognito' && (
-              <div className="space-y-5 animate-in fade-in py-2">
-                <div className="bg-emerald-950/40 border-2 border-emerald-500/50 p-5 rounded-2xl space-y-3 text-left">
-                  <div className="flex items-center space-x-3">
-                    <span className="text-3xl">🕵️</span>
-                    <div>
-                      <h4 className="font-black text-base text-emerald-300 uppercase">
-                        {t('incognitoTitle')}
-                      </h4>
-                      <p className="text-xs text-emerald-200/80 font-bold">
-                        {t('fullIncognitoTitle')}
-                      </p>
-                    </div>
-                  </div>
-                  <ul className="text-xs text-gray-300 font-bold space-y-1.5 pl-2 list-disc list-inside">
-                    <li>{t('noSignupPasswordsRule')}</li>
-                    <li>{t('allProgressLocalRule')}</li>
-                    <li>{t('canRegisterAnytimeRule')}</li>
-                  </ul>
-                </div>
-
-                <button 
-                  onClick={handleContinueIncognito}
-                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all uppercase text-xs tracking-wider shadow-lg flex items-center justify-center space-x-2"
-                >
-                  <span>🕵️</span>
-                  <span>{t('continueGuestBtn')}</span>
-                </button>
-              </div>
-            )}
-
-            {regTab === 'google' && (
-              <div className="space-y-5 animate-in fade-in py-2">
-                <div className="bg-purple-950/40 border-2 border-purple-500/50 p-5 rounded-2xl space-y-3 text-left">
-                  <div className="flex items-center space-x-3">
-                    <span className="text-3xl">🌐</span>
-                    <div>
-                      <h4 className="font-black text-base text-purple-300 uppercase">
-                        {t('firebaseCloudSyncTitle')}
-                      </h4>
-                      <p className="text-xs text-purple-200/80 font-bold">
-                        {t('syncAllDevicesDesc')}
-                      </p>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-300 font-bold">
-                    {t('progressSyncNote')}
-                  </p>
-                </div>
-
-                {isIframe && (
-                  <div className="bg-amber-950/40 border border-amber-800/60 p-3 rounded-2xl text-xs text-amber-200 font-medium space-y-2 text-left">
-                    <p>⚠️ <strong>{t('iframeWarning')}</strong></p>
-                    <button 
-                      onClick={() => { playSound('click'); window.open(window.location.href, '_blank'); }} 
-                      className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-black font-bold rounded-xl active:translate-y-0.5 transition-all uppercase text-[10px] tracking-wider text-center"
-                    >
-                      {t('openNewTabBtn')}
-                    </button>
-                  </div>
-                )}
-
-                <button 
-                  onClick={() => { setShowRegisterModal(false); handleGoogleSignIn(); }}
-                  className="w-full py-4 bg-duo-blue hover:brightness-110 text-white font-black rounded-2xl border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all uppercase text-xs tracking-wider shadow-lg flex items-center justify-center space-x-2"
-                >
-                  <span>🌐</span>
-                  <span>{t('signInGoogleBtn')}</span>
-                </button>
-              </div>
-            )}
-
-            {/* BOTTOM INCOGNITO QUICK FOOTER LINK */}
-            <div className="pt-2 text-center border-t border-gray-800">
-              <button 
-                onClick={handleContinueIncognito} 
-                className="text-xs font-bold text-gray-400 hover:text-white transition-colors underline"
-              >
-                {t('skipContinueIncognitoBtn')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* INCOGNITO RESTRICTIONS MODAL */}
+      <IncognitoRestrictionsModal
+        isOpen={showIncognitoRestrictionsModal}
+        onClose={() => setShowIncognitoRestrictionsModal(false)}
+        onOpenRegister={openRegisterModal}
+        onGoogleSignIn={handleGoogleSignIn}
+        language={user.language}
+        playSound={playSound}
+      />
 
       {/* EDIT PROFILE MODAL */}
       {showEditProfileModal && (
@@ -5832,6 +6909,108 @@ export default function App() {
               </div>
             </div>
 
+            {/* PHONE & PRIVACY TOGGLE */}
+            <div className="space-y-1.5 p-3.5 bg-gray-850 rounded-2xl border border-gray-700">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center space-x-1">
+                  <span>📱</span>
+                  <span>{t('phoneLabel') || 'Номер телефона'}</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setEditHidePhone(!editHidePhone)}
+                  className={`text-[11px] font-bold px-2.5 py-1 rounded-xl transition-all flex items-center space-x-1 border ${
+                    editHidePhone
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                      : 'bg-gray-800 text-gray-400 border-gray-700 hover:text-white'
+                  }`}
+                >
+                  <span>{editHidePhone ? '🔒 Скрыть номер: ВКЛ' : '👁️ Номер виден'}</span>
+                </button>
+              </div>
+              <input 
+                type="tel" 
+                value={editPhone}
+                onChange={(e) => setEditPhone(e.target.value)}
+                placeholder="+7 (999) 000-00-00"
+                maxLength={25}
+                className="w-full bg-gray-900 border-2 border-gray-700 focus:border-duo-blue text-white rounded-xl px-3.5 py-2.5 text-sm font-bold focus:outline-none transition-colors"
+              />
+              <p className="text-[10px] text-gray-400">
+                {editHidePhone 
+                  ? '🔒 Номер скрыт от других пользователей в контактах и при приглашениях.'
+                  : '👁️ Номер доступен друзьям для поиска и связи в контактах.'}
+              </p>
+            </div>
+
+            {/* EMAIL & PRIVACY TOGGLE */}
+            <div className="space-y-1.5 p-3.5 bg-gray-850 rounded-2xl border border-gray-700">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center space-x-1">
+                  <span>📧</span>
+                  <span>{t('emailLabel') || 'Электронная почта'}</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setEditHideEmail(!editHideEmail)}
+                  className={`text-[11px] font-bold px-2.5 py-1 rounded-xl transition-all flex items-center space-x-1 border ${
+                    editHideEmail
+                      ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                      : 'bg-gray-800 text-gray-400 border-gray-700 hover:text-white'
+                  }`}
+                >
+                  <span>{editHideEmail ? '🔒 Скрыть email: ВКЛ' : '👁️ Email виден'}</span>
+                </button>
+              </div>
+              <input 
+                type="email" 
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                placeholder="user@example.com"
+                maxLength={60}
+                className="w-full bg-gray-900 border-2 border-gray-700 focus:border-duo-blue text-white rounded-xl px-3.5 py-2.5 text-sm font-bold focus:outline-none transition-colors"
+              />
+              <p className="text-[10px] text-gray-400">
+                {editHideEmail 
+                  ? '🔒 Почта скрыта от других игроков в списках контактов.'
+                  : '👁️ Почта видна контактам для совместной игры и шахматных дуэлей.'}
+              </p>
+            </div>
+
+            {/* LINK / WEBSITE & PRIVACY TOGGLE */}
+            <div className="space-y-1.5 p-3.5 bg-gray-850 rounded-2xl border border-gray-700">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center space-x-1">
+                  <span>🔗</span>
+                  <span>{t('linkLabel') || 'Ссылка / Профиль'}</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setEditHideLink(!editHideLink)}
+                  className={`text-[11px] font-bold px-2.5 py-1 rounded-xl transition-all flex items-center space-x-1 border ${
+                    editHideLink
+                      ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                      : 'bg-gray-800 text-gray-400 border-gray-700 hover:text-white'
+                  }`}
+                >
+                  <span>{editHideLink ? '🔒 Скрыть ссылку: ВКЛ' : '👁️ Ссылка видна'}</span>
+                </button>
+              </div>
+              <input 
+                type="text" 
+                value={editLink}
+                onChange={(e) => setEditLink(e.target.value)}
+                placeholder="https://t.me/username или vk.com/id"
+                maxLength={100}
+                className="w-full bg-gray-900 border-2 border-gray-700 focus:border-duo-blue text-white rounded-xl px-3.5 py-2.5 text-sm font-bold focus:outline-none transition-colors"
+              />
+              <p className="text-[10px] text-gray-400">
+                {editHideLink 
+                  ? '🔒 Персональная ссылка скрыта от других игроков в контактах.'
+                  : '👁️ Персональная ссылка видна друзьям для связи и совместной игры.'}
+              </p>
+            </div>
+
             {/* BUTTONS */}
             <div className="pt-4 flex items-center space-x-3">
               <button 
@@ -5873,21 +7052,45 @@ export default function App() {
                <button onClick={() => { playSound('click'); setScreen(AppScreen.PATH); }} className="text-gray-500 hover:text-white transition-colors"><CloseIcon className="w-8 h-8 md:w-10 md:h-10"/></button>
                {currentExercise.type === 'chess' ? (
                    <div className="flex-1 flex justify-center">
-                       <div className="flex items-center bg-gray-800/50 rounded-full border border-gray-700 overflow-hidden">
-                           <div className="flex items-center px-4 md:px-6 py-2 border-r border-gray-700">
-                               <span className="text-duo-green font-black text-sm md:text-lg mr-2">↑</span>
-                               <span className="text-duo-green font-bold uppercase tracking-widest text-xs md:text-sm">0 ОЧКОВ</span>
+                       <div className="flex items-center bg-gray-800/80 rounded-full border border-gray-700 overflow-hidden shadow-md">
+                           <div className="flex items-center px-4 md:px-6 py-1.5 border-r border-gray-700 bg-amber-500/10">
+                               <span className="text-amber-400 font-black text-sm md:text-lg mr-2">⚡</span>
+                               <span className="text-amber-400 font-black uppercase tracking-wider text-xs md:text-sm">+30 ОЧКОВ ОПЫТА</span>
                            </div>
-                           <div className="flex items-center px-4 md:px-6 py-2">
-                               <span className="text-gray-400 mr-2 text-sm md:text-base">⏱</span>
-                               <span className="text-gray-400 font-bold tracking-widest text-xs md:text-sm">20:00</span>
+                           <div className="flex items-center px-4 md:px-5 py-1.5">
+                               <span className="text-gray-400 mr-2 text-sm">⏱</span>
+                               <span className="text-gray-300 font-bold tracking-widest text-xs md:text-sm">20:00</span>
                            </div>
                        </div>
                    </div>
                ) : currentExercise.type === 'ishihara' ? (
                    <div className="flex-1 text-center font-bold text-gray-400 uppercase tracking-widest text-xs md:text-sm truncate px-2">Ishihara Test</div>
                ) : currentExercise.type !== 'roleplay' ? (
-                  <div className="flex-1 mx-4 md:mx-6 h-4 md:h-5 bg-gray-800 rounded-full overflow-hidden relative shadow-inner"><div className="absolute inset-0 bg-gradient-to-r from-yellow-400 to-green-500 transition-all duration-1000" style={{ width: feedback.status === 'idle' ? '30%' : '100%' }}></div></div>
+                  <div className="flex-1 mx-3 md:mx-6 h-4 md:h-5 bg-gray-800/90 border border-gray-700/80 rounded-full p-0.5 relative overflow-hidden shadow-inner flex items-center">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-700 ease-out relative overflow-hidden ${
+                        feedback.status === 'correct' 
+                          ? 'bg-gradient-to-r from-yellow-400 via-amber-400 to-green-500 shadow-[0_0_12px_rgba(34,197,94,0.7)]' 
+                          : feedback.status === 'wrong'
+                          ? 'bg-gradient-to-r from-yellow-500 to-red-500'
+                          : 'bg-gradient-to-r from-yellow-400 to-amber-500'
+                      }`} 
+                      style={{ width: `${feedback.status === 'correct' ? 100 : feedback.status === 'wrong' ? 30 : selectedWordIds.length > 0 ? Math.min(95, Math.max(10, Math.round((selectedWordIds.length / Math.max(1, availableTokens.length)) * 100))) : 45}%` }}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-[shimmer_2s_infinite]" />
+                      {feedback.status === 'correct' && (
+                        <div className="absolute inset-0 bg-white/25 animate-pulse" />
+                      )}
+                    </div>
+                    <span className="absolute inset-0 flex items-center justify-center text-[10px] md:text-xs font-black text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] pointer-events-none z-10 tracking-wider">
+                      {feedback.status === 'correct' ? 100 : feedback.status === 'wrong' ? 30 : selectedWordIds.length > 0 ? Math.min(95, Math.max(10, Math.round((selectedWordIds.length / Math.max(1, availableTokens.length)) * 100))) : 45}%
+                    </span>
+                    {(currentExercise.isCached || offlineMode) && (
+                      <span className="absolute right-3 text-[9px] md:text-[10px] uppercase font-black tracking-widest text-emerald-400/90 pointer-events-none drop-shadow">
+                        {user.language === 'ru' ? 'Офлайн' : 'Offline'}
+                      </span>
+                    )}
+                  </div>
                ) : (
                   <div className="flex-1 text-center font-bold text-gray-400 uppercase tracking-widest text-xs md:text-sm truncate px-2">Roleplay: {currentExercise.originalSentence}</div>
                )}
@@ -5901,24 +7104,56 @@ export default function App() {
              {/* 1. CHESS UI */}
              {currentExercise.type === 'chess' ? (
                  <div className="flex-1 flex flex-col items-center justify-start min-h-0 overflow-hidden w-full max-w-md mx-auto relative px-2">
-                     <h2 className="text-2xl font-black uppercase tracking-widest text-white mb-6 mt-2">{t('playChess')}</h2>
-                     
-                     <div className="flex items-end w-full mb-6 relative">
-                         <div className="w-24 h-24 relative z-10 flex-shrink-0">
-                             <Mascot variant="chess" className="w-full h-full" />
+                     {/* Game mode & opponent banner */}
+                     <div className="w-full flex items-center justify-between bg-gray-800/90 border border-gray-700 px-4 py-2 rounded-2xl mb-3 mt-1 shadow-md">
+                         <div className="flex items-center space-x-2.5">
+                             <span className="text-2xl">{chessMode === 'pvp' ? '⚔️' : '🦉'}</span>
+                             <div className="text-left">
+                                 <div className="text-xs font-black text-white uppercase tracking-wider">
+                                     {chessMode === 'pvp' ? 'Играть с другим Пользователем' : chessMode === 'study' ? 'Режим урока' : chessMode === 'tutorial' ? 'Обучение' : 'Играть с DuoWindo6601'}
+                                 </div>
+                                 <div className="text-[10px] text-gray-400 font-bold">
+                                     {chessMode === 'pvp' ? `Против: ${chessOpponent.name} (${chessOpponent.elo} ELO)` : 'DuoWindo6601 Grandmaster (1500 ELO)'}
+                                 </div>
+                             </div>
                          </div>
-                         <div className="bg-gray-800 border-2 border-gray-700 rounded-2xl rounded-bl-none p-4 ml-2 mb-4 relative shadow-lg flex-1">
-                             <p className="text-white font-bold text-sm">
-                               {chessMode === 'study' 
-                                 ? (user.language === 'ru' ? 'Режим урока (без бота). Готовьтесь и отрабатывайте ходы!' : 'Lesson mode (no bot). Practice your moves!') 
+                         <div className="bg-amber-400 text-gray-950 font-black text-[10px] px-2.5 py-1 rounded-xl uppercase tracking-wider shadow-sm">
+                             +30 XP
+                         </div>
+                     </div>
+
+                     {/* Opponent & Turn speech bubble */}
+                     <div className="flex items-end w-full mb-3 relative">
+                         <div className="w-16 h-16 relative z-10 flex-shrink-0">
+                             {chessMode === 'pvp' ? (
+                                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-700 flex items-center justify-center text-3xl shadow-xl border-2 border-indigo-400">
+                                     <span>{chessOpponent.avatar || '👤'}</span>
+                                 </div>
+                             ) : (
+                                 <Mascot variant="chess" className="w-full h-full" />
+                             )}
+                         </div>
+                         <div className="bg-gray-800 border-2 border-gray-700 rounded-2xl rounded-bl-none p-3 ml-2 mb-1 relative shadow-lg flex-1">
+                             <div className="flex items-center justify-between mb-0.5">
+                                 <span className="text-xs font-black text-[#00cd9c] uppercase">
+                                     {chessMode === 'pvp' ? chessOpponent.name : 'DuoWindo6601'}
+                                 </span>
+                                 <span className="text-[10px] text-gray-400 font-bold">
+                                     {chessTurn === 'w' ? 'Ход: Белые ⚪' : 'Ход: Черные ⚫'}
+                                 </span>
+                             </div>
+                             <p className="text-white font-bold text-xs leading-tight">
+                               {chessMode === 'pvp'
+                                 ? (chessTurn === 'w' ? 'Ваш ход! Сделайте ход фигурой.' : `${chessOpponent.name} обдумывает ответный ход...`)
+                                 : chessMode === 'study' 
+                                 ? (user.language === 'ru' ? 'Режим урока (без бота). Отрабатывайте ходы!' : 'Lesson mode (no bot). Practice your moves!') 
                                  : chessMode === 'tutorial' 
-                                 ? (user.language === 'ru' ? 'Обучение! Нажмите на любую белую фигуру, чтобы узнать её правила.' : 'Tutorial! Click on any white piece to learn its moves.')
-                                 : (user.language === 'ru' ? 'Не бойтесь. Я буду играть вполсилы!' : "Don't be afraid! I will play at half strength!")}
+                                 ? (user.language === 'ru' ? 'Обучение! Нажмите на любую фигуру, чтобы узнать её правила.' : 'Tutorial! Click on any piece to learn its moves.')
+                                 : (user.language === 'ru' ? 'Не бойтесь. Я буду играть вполсилы! (+30 XP)' : "Don't be afraid! I will play at half strength! (+30 XP)")}
                              </p>
                              <div className="absolute -left-2 bottom-0 w-4 h-4 bg-gray-800 border-l-2 border-b-2 border-gray-700 transform rotate-45 translate-y-1/2"></div>
                          </div>
                      </div>
-                     
                      {chessMode === 'tutorial' && (
                          <div className="w-full bg-duo-blue/20 border-2 border-duo-blue text-duo-blue p-4 rounded-xl mb-4 text-sm font-bold shadow-sm flex items-start space-x-3">
                              <span className="text-2xl flex-shrink-0">💡</span>
@@ -6256,943 +7491,16 @@ export default function App() {
                        </div>
                      )}
                    </div>
-                   <button onClick={() => handleContinueAfterLesson()} className={`w-full md:w-auto px-10 md:px-16 py-4 md:py-6 rounded-2xl md:rounded-3xl font-bold text-white border-b-4 transition-all hover:scale-105 active:translate-y-1 ${feedback.status === 'correct' ? 'bg-duo-green border-duo-greenDark shadow-xl shadow-duo-green/20' : 'bg-duo-red border-red-800'}`}>{t('next')}</button>
-                </div>
-             </div>
-           )}
-        </div>
-      )}
-
-      {/* ANDROID INSTRUCTIONS MODAL */}
-      {showAndroidModal && (
-          <div className="fixed inset-0 z-[260] bg-black/80 flex flex-col justify-end md:justify-center p-0 md:p-6 animate-in fade-in" onClick={() => setShowAndroidModal(false)}>
-              <div className="bg-duo-card border-t-4 border-emerald-500 md:border-4 md:rounded-3xl rounded-t-[3rem] p-6 md:p-8 max-w-2xl w-full mx-auto animate-in slide-in-from-bottom-full md:slide-in-from-bottom-10 max-h-[90vh] flex flex-col shadow-2xl cursor-default" onClick={e => e.stopPropagation()}>
-                  
-                  {/* Pull Indicator on Mobile */}
-                  <div className="w-16 h-1.5 bg-gray-700 rounded-full mx-auto mb-6 cursor-pointer md:hidden" onClick={() => setShowAndroidModal(false)}></div>
-                  
-                  {/* Title */}
-                  <div className="flex items-center space-x-4 mb-6 border-b border-gray-800 pb-4 flex-shrink-0">
-                      <div className="bg-emerald-500/20 p-3 rounded-2xl">
-                          <svg className="w-8 h-8 text-emerald-400 fill-current" viewBox="0 0 24 24">
-                              <path d="M16.621 2.52a1.326 1.326 0 0 0-1.077 1.096l-.59 3.19C13.882 6.3 12.872 6.131 12 6.131c-.872 0-1.882.169-2.954.675l-.59-3.19A1.325 1.325 0 0 0 7.38 2.52a1.327 1.327 0 0 0-1.097 1.076l-.59 3.19C2.791 8.784.82 12.247.82 15.688c0 3.731 2.296 6.84 5.485 7.91l.83 2-.39 2.08a.663.663 0 0 0 .524.773a.658.658 0 0 0 .77-.525l.43-2.31c.884.225 1.954.341 3.53.341s2.646-.116 3.53-.341l.43 2.31a.658.658 0 0 0 .77.525a.663.663 0 0 0 .524-.773l-.39-2.08l.83-2c3.189-1.07 5.485-4.179 5.485-7.91c0-3.441-1.971-6.904-4.872-8.902l-.59-3.19a1.327 1.327 0 0 0-1.097-1.076zM7.5 13.5a1.5 1.5 0 1 1 0 3a1.5 1.5 0 0 1 0-3zm9 0a1.5 1.5 0 1 1 0 3a1.5 1.5 0 0 1 0-3z"/>
-                          </svg>
-                      </div>
-                      <div className="min-w-0">
-                          <h3 className="text-2xl font-black text-emerald-400 uppercase tracking-widest">{t('androidModalTitle')}</h3>
-                          <p className="text-gray-400 font-bold text-xs">DuoWindo6601 Mobile Platform</p>
-                      </div>
-                  </div>
-                  
-                  {/* Scrollable Content */}
-                  <div className="flex-1 overflow-y-auto no-scrollbar space-y-6 text-gray-200 pr-2">
-                      <div className="bg-gradient-to-r from-indigo-900/60 to-purple-900/60 border-2 border-indigo-500/50 p-4 rounded-2xl shadow-lg">
-                          <h4 className="text-yellow-400 font-black text-xs uppercase tracking-widest mb-1 flex items-center">
-                              <span className="mr-2 text-base">🐙</span> DuoWindo6601 уже доступен на GitHub
-                          </h4>
-                          <p className="text-xs text-gray-200 font-bold leading-relaxed mb-3">
-                              Автоматическая сборка Android APK настроена через GitHub Actions. Файл воркфлоу:
-                              <br />
-                              <code className="text-yellow-300 font-mono text-[11px] bg-black/40 px-1.5 py-0.5 rounded inline-block mt-1">.github/workflows/build.yml</code>
-                          </p>
-                          <a 
-                              href="https://github.com/Windo6601/DuoWindo6601"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center space-x-2 bg-white hover:bg-gray-100 text-gray-900 font-black text-xs px-4 py-2.5 rounded-xl border-b-4 border-gray-300 transition-all uppercase tracking-wider shadow-md"
-                          >
-                              <span>Открыть GitHub Репозиторий</span>
-                              <span>↗</span>
-                          </a>
-                      </div>
-
-                      <div>
-                          <h4 className="text-emerald-400 font-black text-xs uppercase tracking-widest mb-2">📋 Требования / Requirements</h4>
-                          <ul className="list-disc pl-5 font-bold text-sm space-y-1 text-gray-300">
-                              <li>Node.js (18+)</li>
-                              <li>Android Studio & Android SDK</li>
-                              <li>JDK 17</li>
-                          </ul>
-                      </div>
-
-                      <div>
-                          <h4 className="text-emerald-400 font-black text-xs uppercase tracking-widest mb-2">🚀 Сборка / Step-by-Step Build</h4>
-                          <div className="space-y-4 font-bold text-sm text-gray-300">
-                              <div>
-                                  <span className="text-emerald-500 font-black mr-2">1.</span>
-                                  <span>Скомпилируйте веб-билд / Build web app:</span>
-                                  <div className="bg-black/40 border border-gray-800 p-3 rounded-xl font-mono text-xs text-emerald-300 mt-1">npm run build</div>
-                              </div>
-                              <div>
-                                  <span className="text-emerald-500 font-black mr-2">2.</span>
-                                  <span>Добавьте Android платформу / Add Android:</span>
-                                  <div className="bg-black/40 border border-gray-800 p-3 rounded-xl font-mono text-xs text-emerald-300 mt-1">npm run cap:add-android</div>
-                              </div>
-                              <div>
-                                  <span className="text-emerald-500 font-black mr-2">3.</span>
-                                  <span>Синхронизируйте ресурсы / Sync assets:</span>
-                                  <div className="bg-black/40 border border-gray-800 p-3 rounded-xl font-mono text-xs text-emerald-300 mt-1">npm run cap:sync</div>
-                              </div>
-                              <div>
-                                  <span className="text-emerald-500 font-black mr-2">4.</span>
-                                  <span>Запустите в Android Studio / Run Android App:</span>
-                                  <div className="bg-black/40 border border-gray-800 p-3 rounded-xl font-mono text-xs text-emerald-300 mt-1">npm run cap:open-android</div>
-                              </div>
-                          </div>
-                      </div>
-
-                      <div className="bg-black/20 border border-dashed border-gray-800 p-4 rounded-2xl">
-                          <h4 className="text-emerald-400 font-black text-xs uppercase tracking-widest mb-2">🔒 Разрешения / Android Permissions</h4>
-                          <p className="text-xs text-gray-400 font-bold mb-2">Настроено в AndroidManifest.xml:</p>
-                          <div className="bg-black/40 border border-gray-800 p-3 rounded-xl font-mono text-[10px] text-gray-400 overflow-x-auto whitespace-pre">
-{`<uses-permission android:name="android.permission.INTERNET" />
-<uses-permission android:name="android.permission.RECORD_AUDIO" />
-<uses-permission android:name="android.permission.CAMERA" />`}
-                          </div>
-                      </div>
-
-                      <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl">
-                          <h4 className="text-emerald-400 font-black text-xs uppercase tracking-widest mb-1">⚡ Горячая перезагрузка / Live Reload</h4>
-                          <p className="text-xs text-emerald-100 font-bold leading-normal">
-                              Для тестирования изменений в реальном времени укажите IP-адрес вашего компьютера во время разработки в файле <code className="bg-emerald-500/20 px-1 py-0.5 rounded text-white font-mono">capacitor.config.ts</code>.
-                          </p>
-                      </div>
-                  </div>
-                  
-                  {/* Close button */}
-                  <button 
-                      onClick={() => setShowAndroidModal(false)} 
-                      className="w-full mt-6 py-4 bg-emerald-600 border-b-4 border-emerald-800 rounded-2xl font-black text-white uppercase tracking-widest active:border-b-0 active:translate-y-1 transition-all"
-                  >
-                      {t('androidModalClose')}
-                  </button>
-              </div>
-          </div>
-      )}
-
-      {/* EXPLANATION MODAL */}
-      {showExplanationModal && (
-          <div className="fixed inset-0 z-[250] bg-black/80 flex flex-col justify-end animate-in fade-in" onClick={() => setShowExplanationModal(false)}>
-              <div className="bg-duo-card border-t-2 border-gray-700 rounded-t-[3rem] p-8 max-w-4xl w-full mx-auto animate-in slide-in-from-bottom-full relative" onClick={e => e.stopPropagation()}>
-                  <div className="w-16 h-2 bg-gray-600 rounded-full mx-auto mb-8 cursor-pointer" onClick={() => setShowExplanationModal(false)}></div>
-                  <div className="flex items-start space-x-6">
-                      <Mascot emotion="neutral" className="w-24 h-24 flex-shrink-0 hidden sm:block" variant={currentCourse.mascotVariant} />
-                      <div className="flex-1">
-                          <h3 className="text-2xl font-black text-duo-blue mb-4 uppercase tracking-widest flex items-center space-x-2">
-                              <MaxIcon className="w-8 h-8" />
-                              <span>{t('explainHeader')}</span>
-                          </h3>
-                          {explanationLoading ? (
-                              <div className="space-y-4 animate-pulse">
-                                  <div className="h-4 bg-gray-700 rounded w-3/4"></div>
-                                  <div className="h-4 bg-gray-700 rounded w-full"></div>
-                                  <div className="h-4 bg-gray-700 rounded w-5/6"></div>
-                              </div>
-                          ) : (
-                              <div className="bg-gray-800 p-6 rounded-3xl border border-gray-700 text-lg font-bold text-white leading-relaxed relative">
-                                  <div className="absolute top-6 -left-3 w-0 h-0 border-t-[10px] border-t-transparent border-r-[15px] border-r-gray-800 border-b-[10px] border-b-transparent hidden sm:block"></div>
-                                  {explanation}
-                              </div>
-                          )}
-                      </div>
-                  </div>
-                  <button onClick={() => setShowExplanationModal(false)} className="w-full mt-8 py-4 bg-duo-blue border-b-4 border-duo-blueDark rounded-2xl font-black text-white uppercase tracking-widest active:border-b-0 active:translate-y-1 transition-all">Понятно</button>
-              </div>
-          </div>
-      )}
-
-      {loading && <div className="fixed inset-0 z-[200] bg-duo-dark/80 backdrop-blur-lg flex items-center justify-center flex-col"><div className="animate-bounce scale-150 mb-8"><Mascot emotion="neutral" className="w-24 h-24" variant={currentCourse.mascotVariant} /></div><button onClick={() => setLoading(false)} className="text-gray-400 font-bold hover:text-white mt-4 underline text-sm">Отмена / Зависло?</button></div>}
-      {toast && <div className="fixed bottom-32 left-1/2 transform -translate-x-1/2 bg-duo-blue text-white px-12 py-6 rounded-[2.5rem] font-bold shadow-2xl z-[300] border-4 border-white/20 animate-in slide-in-from-bottom-10 text-xl font-din text-center whitespace-nowrap">{toast} <button onClick={() => setToast(null)} className="ml-6 opacity-80 text-3xl">×</button></div>}
-    </div>
-  );
-};
-
-return (
-  <>
-    <style>{`
-      @keyframes shake {
-        0% { transform: translate(1px, 1px) rotate(0deg); }
-        10% { transform: translate(-1px, -2px) rotate(-1deg); }
-        20% { transform: translate(-3px, 0px) rotate(1deg); }
-        30% { transform: translate(0px, 2px) rotate(0deg); }
-        40% { transform: translate(1px, -1px) rotate(1deg); }
-        50% { transform: translate(-1px, 2px) rotate(-1deg); }
-        60% { transform: translate(-3px, 1px) rotate(0deg); }
-        70% { transform: translate(2px, 1px) rotate(-1deg); }
-        80% { transform: translate(-1px, -1px) rotate(1deg); }
-        90% { transform: translate(2px, 2px) rotate(0deg); }
-        100% { transform: translate(1px, -2px) rotate(-1deg); }
-      }
-      .no-scrollbar::-webkit-scrollbar {
-        display: none;
-      }
-      .no-scrollbar {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-      }
-    `}</style>
-
-    {simulatorMode === 'none' ? (
-      renderAppLayout()
-    ) : (
-      // SIMULATOR CONTAINER
-      <div className="min-h-screen bg-[#08080a] text-white flex flex-col lg:flex-row items-center justify-center p-4 lg:p-8 select-none overflow-x-hidden antialiased font-sans relative w-full">
-         
-         {/* Fixed Floating Close Button for easy access on both Mobile and PC */}
-         <button 
-             onClick={() => { playSound('click'); setSimulatorMode('none'); }}
-             className="fixed top-4 right-4 md:top-6 md:right-6 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 border-2 border-red-800 text-white px-3 py-1.5 md:px-5 md:py-2.5 rounded-full transition-all z-[150] flex items-center space-x-1.5 md:space-x-2 shadow-[0_4px_20px_rgba(239,68,68,0.4)] hover:scale-105 active:scale-95 cursor-pointer"
-             title="Закрыть симулятор / Close Simulator"
-         >
-             <CloseIcon className="w-3.5 h-3.5 md:w-5 md:h-5 text-white" />
-             <span className="text-[10px] md:text-xs font-black tracking-widest uppercase font-din text-white">Закрыть / Close</span>
-         </button>
-         
-         {/* Screen shutter flash overlay for screenshots */}
-         {simScreenshotFlash && (
-            <div className="fixed inset-0 bg-white z-[999] opacity-100 pointer-events-none transition-all duration-300"></div>
-         )}
-
-         {/* Screenshot Alert Popover */}
-         {showScreenshotAlert && (
-            <div className="fixed bottom-10 left-10 bg-gray-900 border-2 border-emerald-500/50 p-4 rounded-2xl z-[500] shadow-2xl flex items-center space-x-4 animate-in slide-in-from-left-10 duration-300">
-                <div className="w-16 h-24 bg-gray-800 rounded-lg overflow-hidden border border-gray-700 shadow-md relative flex-shrink-0">
-                    <div className="absolute inset-0 bg-emerald-500/20 backdrop-blur-xs flex items-center justify-center">
-                        <span className="text-xl">📸</span>
-                    </div>
-                </div>
-                <div>
-                    <h4 className="text-emerald-400 font-bold text-sm">Скриншот сохранен!</h4>
-                    <p className="text-gray-400 text-xs font-mono">duowindo_shot_{Date.now().toString().slice(-4)}.png</p>
-                    <button onClick={() => setShowScreenshotAlert(false)} className="text-xs text-white/50 hover:text-white underline mt-2 block">Убрать</button>
-                </div>
-            </div>
-         )}
-
-         {/* Shake device simulated state indicator */}
-         {simShaking && (
-            <div className="fixed top-10 left-12 right-12 md:left-auto md:right-10 bg-yellow-500 text-black px-6 py-3 rounded-full font-bold z-[500] shadow-lg flex items-center justify-center space-x-2 animate-bounce">
-                <span>📳</span>
-                <span>Устройство встряхнуто! (Shaking)</span>
-            </div>
-         )}
-
-         {/* SIMULATOR HARDWARE CONTROLLER CONSOLE (LEFT PANEL) */}
-         <div className="w-full lg:w-80 bg-gray-900/60 border border-gray-800 rounded-3xl p-6 mb-8 lg:mb-0 lg:mr-8 flex flex-col space-y-5 shadow-2xl backdrop-blur-md">
-            <div>
-                <div className="flex items-center space-x-2 mb-1">
-                    <span className="text-2xl">⚡</span>
-                    <h2 className="text-xl font-black uppercase text-white tracking-wider">Панель Управления</h2>
-                </div>
-                <p className="text-gray-500 text-xs font-bold font-mono">DuoWindo6601 Mobile Platform</p>
-            </div>
-
-            {/* Hardware Selection */}
-            <div className="space-y-2">
-                <span className="text-gray-400 text-[10px] font-black uppercase tracking-widest block">Тестовая Платформа / OS</span>
-                <div className="grid grid-cols-2 gap-2">
-                    <button 
-                        onClick={() => { playSound('select'); setSimulatorMode('android'); }}
-                        className={`py-3 rounded-xl font-extrabold uppercase text-xs border-2 tracking-wider flex items-center justify-center space-x-1 transition-all ${simulatorMode === 'android' ? 'bg-emerald-600/20 border-emerald-500 text-emerald-400' : 'bg-gray-850 border-transparent text-gray-400 hover:bg-gray-800'}`}
-                    >
-                        <span>🤖 Android</span>
-                    </button>
-                    <button 
-                        onClick={() => { playSound('select'); setSimulatorMode('ios'); }}
-                        className={`py-3 rounded-xl font-extrabold uppercase text-xs border-2 tracking-wider flex items-center justify-center space-x-1 transition-all ${simulatorMode === 'ios' ? 'bg-sky-600/20 border-sky-500 text-sky-400' : 'bg-gray-850 border-transparent text-gray-400 hover:bg-gray-800'}`}
-                    >
-                        <span>🍎 iOS (Apple)</span>
-                    </button>
-                </div>
-            </div>
-
-            {/* Orientation Selector */}
-            <div className="space-y-2">
-                <span className="text-gray-400 text-[10px] font-black uppercase tracking-widest block">Ориентация Экрана</span>
-                <div className="grid grid-cols-2 gap-2">
-                    <button 
-                        onClick={() => { playSound('click'); setSimulatorOrientation('portrait'); }}
-                        className={`py-2 rounded-xl font-bold text-xs flex items-center justify-center space-x-1 transition-all ${simulatorOrientation === 'portrait' ? 'bg-gray-700 text-white' : 'bg-gray-800/40 text-gray-500'}`}
-                    >
-                        <span>📱 Портрет</span>
-                    </button>
-                    <button 
-                        onClick={() => { playSound('click'); setSimulatorOrientation('landscape'); }}
-                        className={`py-2 rounded-xl font-bold text-xs flex items-center justify-center space-x-1 transition-all ${simulatorOrientation === 'landscape' ? 'bg-gray-700 text-white' : 'bg-gray-800/40 text-gray-500'}`}
-                    >
-                        <span>📟 Альбомная</span>
-                    </button>
-                </div>
-            </div>
-
-            {/* Hardware simulations buttons */}
-            <div className="space-y-3 pt-2 border-t border-gray-800">
-                <span className="text-gray-400 text-[10px] font-black uppercase tracking-widest block">Тест Датчиков / Жестов</span>
-                
-                {/* Screenshot trigger */}
-                <button 
-                    onClick={() => {
-                        playSound('click');
-                        setSimScreenshotFlash(true);
-                        setTimeout(() => setSimScreenshotFlash(false), 200);
-                        setTimeout(() => { setShowScreenshotAlert(true); }, 300);
-                    }}
-                    className="w-full py-2.5 bg-gray-800 hover:bg-gray-750 border border-gray-700 rounded-xl font-extrabold uppercase text-xs tracking-wider flex items-center justify-center space-x-2 transition-all text-gray-200"
-                >
-                    <span>📸 Захват Скриншота</span>
-                </button>
-
-                {/* Shake device trigger */}
-                <button 
-                    onClick={() => {
-                        playSound('click');
-                        setSimShaking(true);
-                        setTimeout(() => setSimShaking(false), 1200);
-                        setSimNotify("Виртуальная встряска: Шагомер и акселерометр ответили!");
-                    }}
-                    className="w-full py-2.5 bg-gray-800 hover:bg-gray-750 border border-gray-700 rounded-xl font-extrabold uppercase text-xs tracking-wider flex items-center justify-center space-x-2 transition-all text-gray-200"
-                >
-                    <span>📳 Симулировать Встряску</span>
-                </button>
-
-                {/* Swipe Directional Simulation Buttons */}
-                <div className="space-y-1.5 pt-2 border-t border-gray-800 pb-1">
-                    <span className="text-gray-400 text-[10px] font-black uppercase tracking-widest block mb-1">Симуляция Жестов (Свайпы)</span>
-                    <div className="grid grid-cols-2 gap-1.5">
-                        <button 
-                            onClick={() => simulateGesture('up')}
-                            disabled={isSwiping}
-                            className="py-1.5 bg-gray-800 hover:bg-gray-750 border border-gray-700 rounded-xl font-extrabold uppercase text-[10px] tracking-wide flex items-center justify-center space-x-1 transition-all text-gray-200 hover:text-white"
-                            title="Свайп вверх для прокрутки вниз"
-                        >
-                            <span>☝️ Вверх</span>
-                        </button>
-                        <button 
-                            onClick={() => simulateGesture('down')}
-                            disabled={isSwiping}
-                            className="py-1.5 bg-gray-800 hover:bg-gray-750 border border-gray-700 rounded-xl font-extrabold uppercase text-[10px] tracking-wide flex items-center justify-center space-x-1 transition-all text-gray-200 hover:text-white"
-                            title="Свайп вниз для прокрутки вверх"
-                        >
-                            <span>👇 Вниз</span>
-                        </button>
-                        <button 
-                            onClick={() => simulateGesture('left')}
-                            disabled={isSwiping}
-                            className="py-1.5 bg-gray-800 hover:bg-gray-750 border border-gray-700 rounded-xl font-extrabold uppercase text-[10px] tracking-wide flex items-center justify-center space-x-1 transition-all text-gray-200 hover:text-white"
-                            title="Свайп влево"
-                        >
-                            <span>👈 Влево</span>
-                        </button>
-                        <button 
-                            onClick={() => simulateGesture('right')}
-                            disabled={isSwiping}
-                            className="py-1.5 bg-gray-800 hover:bg-gray-750 border border-gray-700 rounded-xl font-extrabold uppercase text-[10px] tracking-wide flex items-center justify-center space-x-1 transition-all text-gray-200 hover:text-white"
-                            title="Свайп вправо"
-                        >
-                            <span>👉 Вправо</span>
-                        </button>
-                    </div>
-                </div>
-
-                {/* Toggle wifi/network switch */}
-                <div className="flex items-center justify-between p-2 px-3 bg-gray-850/40 rounded-xl border border-gray-800/60 font-din">
-                    <span className="text-xs font-bold text-gray-300">Сеть (Wi-Fi)</span>
-                    <button 
-                        onClick={() => { 
-                            playSound('click'); 
-                            setSimulatorWifi(!simulatorWifi);
-                            setOfflineMode(!simulatorWifi); // Link to real app internet state
-                        }}
-                        className={`w-10 h-5 rounded-full p-0.5 transition-colors duration-300 ${simulatorWifi ? 'bg-emerald-500' : 'bg-gray-600'}`}
-                    >
-                        <div className={`w-4 h-4 bg-white rounded-full shadow-md transform transition-transform duration-300 ${simulatorWifi ? 'translate-x-5' : 'translate-x-0'}`}></div>
-                    </button>
-                </div>
-
-                {/* Toggle Touch Tracking Pointer */}
-                <div className="flex items-center justify-between p-2 px-3 bg-gray-850/40 rounded-xl border border-gray-800/60 font-din">
-                    <div className="flex flex-col">
-                        <span className="text-xs font-bold text-gray-300">Указка Тачпада</span>
-                        <span className="text-[9px] text-gray-500">Симуляция пальца</span>
-                    </div>
-                    <button 
-                        onClick={() => { 
-                            playSound('click'); 
-                            setSimTouchPointer(!simTouchPointer);
-                        }}
-                        className={`w-10 h-5 rounded-full p-0.5 transition-colors duration-300 ${simTouchPointer ? 'bg-sky-500' : 'bg-gray-600'}`}
-                    >
-                        <div className={`w-4 h-4 bg-white rounded-full shadow-md transform transition-transform duration-300 ${simTouchPointer ? 'translate-x-5' : 'translate-x-0'}`}></div>
-                    </button>
-                </div>
-
-                {/* Battery Simulator Slider */}
-                <div className="space-y-1 font-din">
-                    <div className="flex justify-between items-center text-xs font-bold text-gray-400">
-                        <span>Заряд батареи</span>
-                        <span className={`${simulatorBattery <= 20 ? 'text-red-500 font-extrabold animate-pulse' : 'text-gray-300'}`}>{simulatorBattery}%</span>
-                    </div>
-                    <input 
-                        type="range" 
-                        min="5" 
-                        max="100" 
-                        value={simulatorBattery} 
-                        onChange={(e) => setSimulatorBattery(Number(e.target.value))}
-                        className="w-full accent-emerald-500 h-1 bg-gray-700 rounded-lg cursor-pointer"
-                    />
-                </div>
-            </div>
-
-            {/* Exit/Close simulator */}
-            <button 
-                onClick={() => { playSound('click'); setSimulatorMode('none'); }}
-                className="w-full py-3 bg-gradient-to-r from-red-600 to-rose-600 border-b-4 border-red-800 hover:brightness-110 active:translate-y-0.5 active:border-b-0 rounded-xl font-black uppercase text-xs tracking-wider text-white transition-all shadow-lg text-center"
-            >
-                ❌ ВЫЙТИ ИЗ ТЕСТА
-            </button>
-         </div>
-
-         {/* IMMERSIVE PHYSICAL SMARTPHONE MOCKUP FRAME */}
-         <div 
-            style={simShaking ? { animation: 'shake 0.5s ease-in-out infinite' } : {}}
-            className={`relative bg-neutral-950 transition-all duration-500 shadow-[0_0_80px_rgba(0,0,0,0.9)] z-40 outline-none overflow-hidden max-w-full
-               ${simulatorOrientation === 'portrait' 
-                  ? 'w-[375px] h-[780px] rounded-[50px]' 
-                  : 'w-[780px] h-[375px] rounded-[50px]'
-               }
-               ${simulatorMode === 'ios' ? 'border-[12px] border-neutral-800' : 'border-[11px] border-neutral-700'}
-            `}
-         >
-            {/* iPhone buttons styling */}
-            <div className={`absolute left-[-15px] top-24 w-[3px] h-8 bg-neutral-800 rounded-l ${simulatorOrientation === 'landscape' && 'hidden'}`}></div>
-            <div 
-                onClick={() => {
-                    playSound('click');
-                    setSimVolume(v => Math.min(100, v + 10));
-                    setShowVolumeSlider(true);
-                    setTimeout(() => setShowVolumeSlider(false), 2000);
-                }}
-                className={`absolute left-[-15px] top-36 w-[3px] h-12 bg-neutral-800 rounded-l cursor-pointer active:translate-x-[2px] transition-all hover:brightness-125 ${simulatorOrientation === 'landscape' && 'hidden'}`}
-            ></div>
-            <div 
-                onClick={() => {
-                    playSound('click');
-                    setSimVolume(v => Math.max(0, v - 10));
-                    setShowVolumeSlider(true);
-                    setTimeout(() => setShowVolumeSlider(false), 2000);
-                }}
-                className={`absolute left-[-15px] top-50 w-[3px] h-12 bg-neutral-800 rounded-l cursor-pointer active:translate-x-[2px] transition-all hover:brightness-125 ${simulatorOrientation === 'landscape' && 'hidden'}`}
-            ></div>
-            <button 
-                onClick={() => { playSound('click'); setSimScreenOn(!simScreenOn); }}
-                className={`absolute right-[-15px] top-36 w-[3px] h-16 bg-neutral-800 rounded-r cursor-pointer active:translate-x-[-2px] transition-all hover:brightness-125 ${simulatorOrientation === 'landscape' && 'hidden'}`}
-            ></button>
-
-            {/* Inner viewport component container */}
-            <div className="w-full h-full bg-duo-dark overflow-hidden rounded-[38px] relative flex flex-col">
-                
-                {/* BLACK SCREEN IF TURNED OFF */}
-                {!simScreenOn ? (
-                    <div 
-                        onClick={() => setSimScreenOn(true)}
-                        className="absolute inset-0 bg-black z-[480] flex flex-col items-center justify-center p-6 cursor-pointer"
-                    >
-                        <div className="text-4xl animate-pulse mb-2">⚡</div>
-                        <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest text-center">Нажмите кнопку питания, чтобы включить эмулятор</span>
-                    </div>
-                ) : (
-                    <>
-                        {/* Hardware Touch pointer cursor tracker */}
-                        {simTouchPointer && (
-                            <div 
-                                style={{ left: `${pointerPos.x}px`, top: `${pointerPos.y}px` }}
-                                className="absolute w-7 h-7 bg-red-500/50 rounded-full border-2 border-white pointer-events-none z-[490] transform -translate-x-1/2 -translate-y-1/2 transition-all duration-75 shadow-lg flex items-center justify-center text-[10px]"
-                            >
-                                🎯
-                            </div>
-                        )}
-
-                        {/* Animated Swipe pathway vector overlay */}
-                        {swipePath && (
-                            <svg className="absolute inset-0 w-full h-full pointer-events-none z-[488]">
-                                <line 
-                                    x1={swipePath.startX} 
-                                    y1={swipePath.startY} 
-                                    x2={pointerPos.x} 
-                                    y2={pointerPos.y} 
-                                    stroke="#1cb0f6" 
-                                    strokeWidth="6" 
-                                    strokeLinecap="round" 
-                                    strokeDasharray="6 6"
-                                    className="opacity-80 animate-pulse"
-                                />
-                                <circle cx={swipePath.startX} cy={swipePath.startY} r="8" fill="#1cb0f6" className="animate-ping" />
-                            </svg>
-                        )}
-
-                        {/* Click Ripple feedback */}
-                        {clickRipples.map(ripple => (
-                            <div 
-                                key={ripple.id}
-                                style={{ left: `${ripple.x}px`, top: `${ripple.y}px` }}
-                                className="absolute w-10 h-10 border-2 border-emerald-400 rounded-full bg-emerald-500/10 pointer-events-none z-[490] transform -translate-x-1/2 -translate-y-1/2 animate-ping"
-                            ></div>
-                        ))}
-
-                        {/* On-screen volume slider popup on button press */}
-                        {showVolumeSlider && (
-                            <div className="absolute top-14 left-4 bg-black/80 backdrop-blur border border-gray-800 px-3 py-1.5 rounded-xl z-[480] flex items-center space-x-2 animate-in fade-in slide-in-from-left-4 duration-200">
-                                <span className="text-xs font-black">🔊</span>
-                                <div className="w-14 h-1.5 bg-gray-700 rounded-full overflow-hidden">
-                                    <div style={{ width: `${simVolume}%` }} className="h-full bg-emerald-500"></div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* DEVICE STATUS BAR */}
-                        <div className={`w-full bg-[#0d0e12] px-6 py-1.5 flex justify-between items-center z-[460] select-none text-[9px] font-bold text-gray-300 font-mono flex-shrink-0 ${simulatorOrientation === 'landscape' && 'h-6 py-0 px-4'}`}>
-                            <div className="flex items-center space-x-2 truncate max-w-[130px]">
-                                <button 
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        playSound('click');
-                                        setSimulatorMode('none');
-                                    }}
-                                    className="bg-red-600 hover:bg-red-500 text-white font-extrabold px-2 py-0.5 rounded-lg flex items-center space-x-1 cursor-pointer transition-all border border-red-700/80 hover:scale-105 active:scale-95 shadow-md flex-shrink-0"
-                                    title="Закрыть симулятор / Exit"
-                                >
-                                    <CloseIcon className="w-2 h-2 text-white" />
-                                    <span className="text-[7.5px] uppercase font-din font-black tracking-wider">Выход</span>
-                                </button>
-                                <span>{simulatorMode === 'ios' ? ' Duo6601 LTE' : '🤖 Android 6601'}</span>
-                            </div>
-                            
-                            {/* Apple Style Dynamic notch for iOS portrait mode */}
-                            {simulatorMode === 'ios' && simulatorOrientation === 'portrait' && (
-                                <div className="w-20 h-4 bg-black rounded-full flex items-center justify-center text-[7px] text-white/50 px-2 flex-shrink-0">
-                                    <div className="w-1 h-1 bg-stone-900 rounded-full mr-auto"></div>
-                                    <span className="font-sans font-black text-emerald-400 text-[6.5px]">● Live</span>
-                                </div>
-                            )}
-
-                            <div className="flex items-center space-x-1.5 flex-shrink-0">
-                                <span>{simulatorWifi ? '📶 WiFi' : '🚫 Off'}</span>
-                                <div className="flex items-center space-x-1">
-                                    <span className={simulatorBattery <= 20 ? 'text-red-500 font-extrabold animate-pulse' : 'text-gray-300'}>{simulatorBattery}%</span>
-                                    <div className="w-4 h-2 border border-gray-400 p-0.5 rounded-xs flex items-center bg-transparent">
-                                        <div style={{ width: `${simulatorBattery}%` }} className={`h-full rounded-xs ${simulatorBattery <= 20 ? 'bg-red-500' : 'bg-emerald-400'}`}></div>
-                                    </div>
-                                </div>
-                                <span className="text-gray-400 font-bold">{new Date().toUTCString().slice(17, 22)}</span>
-                            </div>
-                        </div>
-
-                        {/* IN-SIMULATOR PUSH NOTIFICATION LAYER */}
-                        {simNotify ? (
-                            <div className="absolute top-10 left-2 right-2 bg-neutral-900/90 backdrop-blur-lg border border-gray-800 p-2.5 rounded-2xl z-[470] shadow-full animate-in slide-in-from-top-10 ease-out duration-300 flex items-start space-x-2.5 cursor-pointer" onClick={() => setSimNotify(null)}>
-                                <div className="bg-emerald-500 text-white p-1 rounded-lg text-sm flex-shrink-0">📱</div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex justify-between items-center bg-transparent p-0 border-0">
-                                        <span className="text-[8px] uppercase font-black tracking-widest text-[#1cb0f6]">Сообщение DuoWindo</span>
-                                        <span className="text-[7.5px] text-gray-500 font-bold">now</span>
-                                    </div>
-                                    <p className="text-[10px] font-bold text-gray-250 mt-0.5 leading-tight">{simNotify}</p>
-                                </div>
-                            </div>
-                        ) : (
-                            !androidDismissed && (
-                                <div 
-                                    className="absolute top-10 left-2 right-2 bg-gradient-to-r from-emerald-600/40 to-teal-500/20 backdrop-blur border border-emerald-500/40 p-2.5 rounded-2xl z-[465] shadow-lg animate-pulse flex items-center space-x-2.5 cursor-pointer relative"
-                                    onClick={() => setSimNotify("Интерактивная демо-среда развернута на сервере. Приложение Android APK работает отлично!")}
-                                >
-                                    <span className="text-lg">🎉</span>
-                                    <div className="flex-1 pr-6">
-                                        <p className="text-[8px] font-bold uppercase tracking-wider text-teal-400">Приложение доступно / App Available!</p>
-                                        <p className="text-[10px] font-extrabold text-white">Android apk собрано. Нажмите для теста.</p>
-                                    </div>
-                                    <button 
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            playSound('click');
-                                            setAndroidDismissed(true);
-                                            localStorage.setItem('duo_android_dismissed', 'true');
-                                        }}
-                                        className="absolute right-2 top-2 text-white/60 hover:text-white transition-colors bg-black/20 hover:bg-black/45 p-1 rounded-full z-10"
-                                        title="Закрыть"
-                                    >
-                                        <CloseIcon className="w-3.5 h-3.5" />
-                                    </button>
-                                </div>
-                            )
-                        )}
-
-                        {/* GRAPHIC VIEWPORT AREA EMBEDDED REAL DUOWINDO APPLICATION LAYOUT */}
-                        <div 
-                            onMouseMove={handleSimMouseMove}
-                            onClick={handleSimScreenClick}
-                            className="flex-1 w-full h-full overflow-y-auto overflow-x-hidden select-text relative no-scrollbar"
-                            id="virtual-device-viewport"
-                        >
-                            {renderAppLayout()}
-                        </div>
-
-                        {/* VIRTUAL HOME SLIDER KEY GESTURE TAB */}
-                        <div className="bg-[#0d0e12] w-full py-1.5 flex justify-center items-center z-[460] flex-shrink-0">
-                            <div 
-                                onClick={() => { playSound('click'); setScreen(AppScreen.PATH); setSimNotify("Эмулятор: Назад на карту уроков"); }}
-                                className="w-24 h-1 bg-white/40 rounded-full hover:bg-white/85 transition-all cursor-pointer hover:scale-x-110 active:scale-x-90"
-                            ></div>
-                        </div>
-                    </>
-                )}
-            </div>
-         </div>
-
-         {/* SPECIFICATIONS INFO SIDEBAR PANEL (RIGHT PANEL) */}
-         <div className="w-full lg:w-72 bg-gray-900/40 border border-gray-800/60 rounded-3xl p-5 mt-8 lg:mt-0 lg:ml-8 flex flex-col space-y-4 shadow-xl backdrop-blur-md">
-            <div>
-                <h3 className="text-emerald-400 font-extrabold text-xs uppercase tracking-widest mb-1 font-din text-center lg:text-left">Сведения о симуляторе</h3>
-                <p className="text-xs text-gray-400 font-bold leading-normal text-center lg:text-left">
-                    Полная программная эмуляция мобильных устройств Android & iOS для тестирования адаптивности.
-                </p>
-            </div>
-
-            <div className="space-y-2 font-mono text-[10px] text-gray-305">
-                <div className="flex justify-between border-b border-gray-800/40 pb-1">
-                    <span className="text-gray-500">Инструмент:</span>
-                    <span className="font-bold text-teal-400">Mobile Simulator</span>
-                </div>
-                <div className="flex justify-between border-b border-gray-800/40 pb-1">
-                    <span className="text-gray-500">Система:</span>
-                    <span className="font-bold">{simulatorMode === 'ios' ? 'iOS 17.4 Simulated' : 'Android API 34 SDK'}</span>
-                </div>
-                <div className="flex justify-between border-b border-gray-800/40 pb-1">
-                    <span className="text-gray-500">IP машины:</span>
-                    <span className="font-bold">192.168.1.105</span>
-                </div>
-                <div className="flex justify-between">
-                    <span className="text-gray-500">Трак-Пойнтер:</span>
-                    <span className="font-bold text-emerald-400">{simTouchPointer ? 'Включен' : 'Выключен'}</span>
-                </div>
-            </div>
-
-            <div className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-2xl text-[10.5px] text-emerald-300 font-bold leading-normal font-din">
-                💻 <strong className="text-white">Тестирование:</strong> Приложение DuoWindo6601 полностью адаптировано под мобильные экраны, управление пальцем, и аппаратную вибро-отзывчивость.
-            </div>
-         </div>
-      </div>
-    )}
-
-    {/* PERSISTENT FLOATING QUICK TRIGGER BUTTON (DESKTOP PC ONLY) */}
-    {simulatorMode === 'none' && !simTriggerDismissed && (
-      <div className="hidden lg:flex fixed bottom-12 right-12 z-[200] items-center">
-        <button 
-          id="trigger-sim-toggle"
-          onClick={() => { playSound('click'); setSimulatorMode('android'); }}
-          className="bg-gradient-to-tr from-emerald-500 to-teal-500 hover:scale-[1.03] active:scale-95 transition-all text-white font-black p-4 pr-10 rounded-full shadow-[0_10px_30px_rgba(16,185,129,0.3)] border-2 border-b-4 border-emerald-700 flex items-center space-x-2 text-xs tracking-widest uppercase font-din relative cursor-pointer"
-          title="Интерактивный тест-стенд iOS и Android (Доступен на ПК)"
-        >
-          <span className="text-xl animate-bounce">📱</span>
-          <div className="flex flex-col text-left">
-            <span className="font-din font-extrabold text-[11px] text-white">
-              Тест-Симулятор (ПК)
-            </span>
-            <span className="text-[9px] text-emerald-100 font-bold">
-              iOS & Android Стенд
-            </span>
-          </div>
-        </button>
-        
-        {/* Direct X close/dismiss button on the floating widget */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            playSound('click');
-            setSimTriggerDismissed(true);
-            localStorage.setItem('duo_sim_trigger_dismissed', 'true');
-          }}
-          className="absolute right-2 bg-black/40 hover:bg-red-600 text-white/90 hover:text-white p-1.5 rounded-full transition-all border border-white/20 z-[201] flex items-center justify-center w-6 h-6 hover:scale-110 active:scale-90 cursor-pointer"
-          title="Скрыть значок симулятора"
-        >
-          <CloseIcon className="w-3.5 h-3.5" />
-        </button>
-      </div>
-    )}
-
-    {/* EXPLANATION GLOBAL MODAL */}
-    {showExplanationModal && (
-        <div className="fixed inset-0 z-[250] bg-black/80 flex flex-col justify-end animate-in fade-in" onClick={() => setShowExplanationModal(false)}>
-            <div className="bg-duo-card border-t-2 border-gray-700 rounded-t-[3rem] p-8 max-w-4xl w-full mx-auto animate-in slide-in-from-bottom-full relative" onClick={e => e.stopPropagation()}>
-                <div className="w-16 h-2 bg-gray-600 rounded-full mx-auto mb-8 cursor-pointer" onClick={() => setShowExplanationModal(false)}></div>
-                <div className="flex items-start space-x-6">
-                    <Mascot emotion="neutral" className="w-24 h-24 flex-shrink-0 hidden sm:block" variant={currentCourse.mascotVariant} />
-                    <div className="flex-1">
-                        <h3 className="text-2xl font-black text-duo-blue mb-4 uppercase tracking-widest flex items-center space-x-2">
-                            <MaxIcon className="w-8 h-8" />
-                            <span>{t('explainHeader')}</span>
-                        </h3>
-                        {explanationLoading ? (
-                            <div className="space-y-4 animate-pulse">
-                                <div className="h-4 bg-gray-700 rounded w-3/4"></div>
-                                <div className="h-4 bg-gray-700 rounded w-full"></div>
-                                <div className="h-4 bg-gray-700 rounded w-5/6"></div>
-                            </div>
-                        ) : (
-                            <div className="bg-gray-800 p-6 rounded-3xl border border-gray-700 text-lg font-bold text-white leading-relaxed relative font-din">
-                                <div className="absolute top-6 -left-3 w-0 h-0 border-t-[10px] border-t-transparent border-r-[15px] border-r-gray-800 border-b-[10px] border-b-transparent hidden sm:block"></div>
-                                {explanation}
-                            </div>
-                        )}
-                    </div>
-                </div>
-                <button onClick={() => setShowExplanationModal(false)} className="w-full mt-8 py-4 bg-duo-blue border-b-4 border-duo-blueDark rounded-2xl font-black text-white uppercase tracking-widest active:border-b-0 active:translate-y-1 transition-all">Понятно</button>
-            </div>
-        </div>
-    )}
-
-    {/* BETA TESTING HUB MODAL */}
-    {showBetaModal && (
-        <div className="fixed inset-0 z-[250] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in" onClick={() => setShowBetaModal(false)}>
-            <div className="bg-duo-card border-2 border-purple-500/50 rounded-[2.5rem] p-6 md:p-8 max-w-2xl w-full shadow-2xl relative max-h-[90vh] overflow-y-auto no-scrollbar animate-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
-                <button 
-                    onClick={() => setShowBetaModal(false)} 
-                    className="absolute top-5 right-5 text-gray-400 hover:text-white bg-gray-800 p-2 rounded-full transition-colors"
-                >
-                    <CloseIcon className="w-5 h-5" />
-                </button>
-
-                <div className="flex items-center space-x-3 mb-6">
-                    <div className="bg-purple-600/30 p-3 rounded-2xl border border-purple-500/40 text-2xl">🧪</div>
-                    <div>
-                        <h2 className="text-2xl font-black text-white uppercase tracking-widest">Бета-Тестирование DuoWindo6601</h2>
-                        <p className="text-xs text-purple-300 font-bold">Центр управления и проверки всех модулей приложения</p>
-                    </div>
-                </div>
-
-                <div className="space-y-4 mb-8">
-                    {/* Module 1 */}
-                    <div className="bg-gray-800/80 border border-gray-700 rounded-2xl p-4 flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                            <span className="text-2xl">🏛️</span>
-                            <div>
-                                <h4 className="font-bold text-sm text-white">1. Языки СНГ и Мировые Курсы</h4>
-                                <p className="text-[11px] text-gray-400">Казахский, Узбекский, Армянский, Грузинский, Английский и др.</p>
-                            </div>
-                        </div>
-                        <button 
-                            onClick={() => { playSound('select'); setShowBetaModal(false); setScreen(AppScreen.COURSE_SELECT); }}
-                            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider rounded-xl border-b-2 border-emerald-800"
-                        >
-                            Тест
-                        </button>
-                    </div>
-
-                    {/* Module 2 */}
-                    <div className="bg-gray-800/80 border border-gray-700 rounded-2xl p-4 flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                            <span className="text-2xl">♟️</span>
-                            <div>
-                                <h4 className="font-bold text-sm text-white">2. Шахматная Игра & ИИ Соперник</h4>
-                                <p className="text-[11px] text-gray-400">Матчи против ИИ, разбор ходов, FEN, чат с тренером</p>
-                            </div>
-                        </div>
-                        <button 
-                            onClick={() => { playSound('select'); setShowBetaModal(false); setScreen(AppScreen.CHESS_MATCH); }}
-                            className="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white font-black text-xs uppercase tracking-wider rounded-xl border-b-2 border-amber-800"
-                        >
-                            Тест
-                        </button>
-                    </div>
-
-                    {/* Module 3 */}
-                    <div className="bg-gray-800/80 border border-gray-700 rounded-2xl p-4 flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                            <span className="text-2xl">🎙️</span>
-                            <div>
-                                <h4 className="font-bold text-sm text-white">3. Видеозвонок & AI Голос DuoWindo6601</h4>
-                                <p className="text-[11px] text-gray-400">Распознавание речи, интерактивная беседа, AI Copilot</p>
-                            </div>
-                        </div>
-                        <button 
-                            onClick={() => { playSound('select'); setShowBetaModal(false); setScreen(AppScreen.VIDEO_CALL); }}
-                            className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs uppercase tracking-wider rounded-xl border-b-2 border-indigo-800"
-                        >
-                            Тест
-                        </button>
-                    </div>
-
-                    {/* Module 4 */}
-                    <div className="bg-gray-800/80 border border-gray-700 rounded-2xl p-4 flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                            <span className="text-2xl">✍️</span>
-                            <div>
-                                <h4 className="font-bold text-sm text-white">4. Графическое Письмо & Алфавиты</h4>
-                                <p className="text-[11px] text-gray-400">Прорисовка иероглифов и символов на холсте</p>
-                            </div>
-                        </div>
-                        <button 
-                            onClick={() => { playSound('select'); setShowBetaModal(false); setScreen(AppScreen.ALPHABET); }}
-                            className="px-3.5 py-2 bg-duo-blue hover:brightness-110 text-white font-black text-xs uppercase tracking-wider rounded-xl border-b-2 border-duo-blueDark"
-                        >
-                            Тест
-                        </button>
-                    </div>
-
-                    {/* Module 5 */}
-                    <div className="bg-purple-950/60 border border-purple-500/40 rounded-2xl p-4 flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                            <span className="text-2xl">👑</span>
-                            <div>
-                                <h4 className="font-bold text-sm text-purple-200">5. Панель Владельцев (Admin Dashboard)</h4>
-                                <p className="text-[11px] text-purple-300">Закреплена за abramovanatolij81@gmail.com / va997217@gmail.com</p>
-                            </div>
-                        </div>
-                        <button 
-                            onClick={() => { playSound('select'); setShowBetaModal(false); setScreen(AppScreen.ADMIN_DASHBOARD); }}
-                            className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-black text-xs uppercase tracking-wider rounded-xl border-b-2 border-purple-800"
-                        >
-                            Панель
-                        </button>
-                    </div>
-
-                    {/* Module 6: Outdated Browser Alert */}
-                    <div className="bg-amber-950/60 border border-amber-500/40 rounded-2xl p-4 flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                            <span className="text-2xl">⚠️</span>
-                            <div>
-                                <h4 className="font-bold text-sm text-amber-200">6. Предупреждение о браузере</h4>
-                                <p className="text-[11px] text-amber-300/80">Проверка совместимости и рисков Gemini API</p>
-                            </div>
-                        </div>
-                        <button 
-                            onClick={() => { playSound('select'); setShowBetaModal(false); setShowBrowserModal(true); }}
-                            className="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-black font-black text-xs uppercase tracking-wider rounded-xl border-b-2 border-amber-800"
-                        >
-                            Проверить
-                        </button>
-                    </div>
-                </div>
-
-                <div className="bg-black/40 border border-gray-700/60 rounded-2xl p-4 text-xs text-gray-300 font-bold flex items-center justify-between">
-                    <span>Статус бета-сборки: <strong className="text-emerald-400">1.0.2 Stable</strong></span>
-                    <button 
-                        onClick={() => { playSound('click'); setShowBetaModal(false); setScreen(AppScreen.FEEDBACK); }}
-                        className="text-amber-400 underline hover:text-amber-300 font-bold"
-                    >
-                        Оставить отзыв тестера
-                    </button>
-                </div>
-            </div>
-        </div>
-    )}
-
-    {/* OUTDATED BROWSER WARNING MODAL */}
-    {showBrowserModal && (
-        <div className="fixed inset-0 z-[350] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in" onClick={() => setShowBrowserModal(false)}>
-            <div className="bg-duo-card border-2 border-amber-500/80 rounded-[2.5rem] p-6 md:p-8 max-w-lg w-full shadow-2xl relative animate-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
-                <button 
-                    onClick={() => {
-                        setShowBrowserModal(false);
-                        sessionStorage.setItem('duo_browser_warning_dismissed', 'true');
-                    }} 
-                    className="absolute top-5 right-5 text-gray-400 hover:text-white bg-gray-800 p-2 rounded-full transition-colors"
-                    title="Закрыть"
-                >
-                    <CloseIcon className="w-5 h-5" />
-                </button>
-
-                <div className="flex items-center space-x-3.5 mb-5">
-                    <div className="bg-amber-500/20 p-3 rounded-2xl border border-amber-500/40 text-3xl shrink-0">⚠️</div>
-                    <div>
-                        <h2 className="text-xl font-black text-amber-400 uppercase tracking-wide leading-tight">
-                            Предупреждение: старый браузер не поддерживается
-                        </h2>
-                        <p className="text-[11px] text-amber-200/80 font-bold uppercase tracking-wider mt-0.5">DuoWindo6601 Browser & OS Alert</p>
-                    </div>
-                </div>
-
-                <div className="space-y-4 mb-6">
-                    {/* Status Badge for Modern vs Outdated Browser */}
-                    {!isOutdatedBrowserDetected ? (
-                        <div className="bg-emerald-950/60 border border-emerald-500/60 p-3.5 rounded-2xl flex items-center space-x-3 text-emerald-200 text-xs font-bold">
-                            <span className="text-xl">✅</span>
-                            <div>
-                                <span className="text-emerald-300 font-black uppercase block">Новый Браузер и современная ОС (Windows / Linux / macOS / Android):</span>
-                                <span>Предупреждения нет! Все функции, Gemini API и озвучка работают идеально.</span>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="bg-rose-950/60 border border-rose-500/60 p-3.5 rounded-2xl flex items-center space-x-3 text-rose-200 text-xs font-bold">
-                            <span className="text-xl">🛑</span>
-                            <div>
-                                <span className="text-rose-300 font-black uppercase block">Обнаружен устаревший браузер или ОС:</span>
-                                <span>Требуется обновление браузера для стабильной работы.</span>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="bg-amber-950/50 border border-amber-500/50 p-4 rounded-2xl text-amber-100 text-sm font-medium leading-relaxed shadow-inner">
-                        <strong>Сообщение:</strong> К сожалению, ваш текущий браузер больше не поддерживается. Чтобы продолжить использовать Duowindo6601 обновитесь до современного браузера или Windows XP/Windows Vista не поддерживается.
-                    </div>
-
-                    <div className="bg-rose-950/60 border border-rose-500/50 p-4 rounded-2xl flex items-start space-x-3 text-rose-200 text-xs font-bold leading-relaxed shadow-sm">
-                        <span className="text-xl shrink-0">🚨</span>
-                        <div>
-                            <span className="text-rose-300 font-black uppercase block mb-0.5">Риск:</span>
-                            <span>Могут некорректно работать Gemini API, интерактивная проверка и голосовой ввод.</span>
-                        </div>
-                    </div>
-
-                    <div className="bg-gray-800/80 border border-gray-700 p-3.5 rounded-2xl text-xs text-gray-300 space-y-2">
-                        <p className="font-bold text-white uppercase tracking-wider text-[11px]">Рекомендуемые современные браузеры:</p>
-                        <div className="grid grid-cols-2 gap-2 text-[11px] font-bold">
-                            <a href="https://www.google.com/chrome/" target="_blank" rel="noopener noreferrer" className="p-2 bg-gray-700/70 hover:bg-gray-700 rounded-xl flex items-center space-x-1.5 text-blue-300 transition-colors border border-gray-600/40">
-                                <span>🌐</span><span>Google Chrome</span>
-                            </a>
-                            <a href="https://www.mozilla.org/firefox/" target="_blank" rel="noopener noreferrer" className="p-2 bg-gray-700/70 hover:bg-gray-700 rounded-xl flex items-center space-x-1.5 text-amber-300 transition-colors border border-gray-600/40">
-                                <span>🦊</span><span>Mozilla Firefox</span>
-                            </a>
-                            <a href="https://www.microsoft.com/edge" target="_blank" rel="noopener noreferrer" className="p-2 bg-gray-700/70 hover:bg-gray-700 rounded-xl flex items-center space-x-1.5 text-teal-300 transition-colors border border-gray-600/40">
-                                <span>🌀</span><span>Microsoft Edge</span>
-                            </a>
-                            <a href="https://browser.yandex.ru/" target="_blank" rel="noopener noreferrer" className="p-2 bg-gray-700/70 hover:bg-gray-700 rounded-xl flex items-center space-x-1.5 text-red-300 transition-colors border border-gray-600/40">
-                                <span>🔴</span><span>Яндекс Браузер</span>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="space-y-2">
-                    <a 
-                        href="https://www.google.com/chrome/" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-sm uppercase tracking-widest rounded-2xl border-b-4 border-amber-700 active:translate-y-0.5 transition-all flex items-center justify-center space-x-2 shadow-xl text-center block"
-                    >
-                        <span>🚀</span>
-                        <span>Обновите свой браузер</span>
-                    </a>
-
-                    <button 
-                        onClick={() => {
-                            setShowBrowserModal(false);
-                            sessionStorage.setItem('duo_browser_warning_dismissed', 'true');
-                            setToast('Предупреждение закрыто. Вы работаете в текущем браузере.');
-                        }}
-                        className="w-full py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white font-bold text-xs uppercase rounded-xl transition-all"
-                    >
-                        Продолжить всё равно (на свой страх и риск)
-                    </button>
-                </div>
-            </div>
-        </div>
-    )}
-
-    {/* GLOBAL LOADER */}
-    {loading && <div className="fixed inset-0 z-[200] bg-duo-dark/80 backdrop-blur-lg flex items-center justify-center flex-col"><div className="animate-bounce scale-150 mb-8"><Mascot emotion="neutral" className="w-24 h-24" variant={currentCourse.mascotVariant} /></div><button onClick={() => setLoading(false)} className="text-gray-400 font-bold hover:text-white mt-4 underline text-sm">Отмена / Зависло?</button></div>}
-    
-    {/* GLOBAL TOAST */}
-    {toast && <div className="fixed bottom-32 left-1/2 transform -translate-x-1/2 bg-duo-blue text-white px-12 py-6 rounded-[2.5rem] font-bold shadow-2xl z-[300] border-4 border-white/20 animate-in slide-in-from-bottom-10 text-xl font-din text-center whitespace-nowrap">{toast} <button onClick={() => setToast(null)} className="ml-6 opacity-80 text-3xl">×</button></div>}
-  </>
-);
-}
+                   <button onClick={() => handleContinueAfterLesson()} className={`w-full md:w-auto px-10 md:px-16 py-4 md:py-6 rounded-2xl md:rounded-3xl font-bold text-x��<�n�֙���"�Z�Crb,)�6�AR�F�pf�̰�mI�4�j@��f{���n���z�(���R;��ۏ}�+�	��}��!9�\d�u*[����|�u�UJ�բ���ıd�V��9YUI�8�֒ݔUʉB��MG9�Kl�*;�;�D�6���ܼ�ێ��l���L暆eѦ3G~I���3��E�l���Ubw�q����*����9��a�V�\rUA������g~N�}gn���|��8��r�$�.�[�abxtl���ԛ0�_��N��k{;kdc{�`��Ճ���}���V�$?�+��]㨮�,Cim-Y%o�A�#�]��IS�m{[��r����|�nS��5�T> p�
+��W�Vi�����J~۳�}�Q�E��R�Iu�ZĄ5`���D�	��-��w����4�.��/��{�'��o˪M�'Q�ۧMS�B�8�M�%ը%�-�$0p��"^[FOo@����.,�}@n~�hr�;�$�uĵ{��Z��{�=��*�`\�24�a h���R�MQ`w��5��A�>#�͞e���-�T'�9�������k�ܑQv�G1�_)C�I���R��cX�6�2�J#|4�G�X&]N�K�'K>�*�� �1li@��P� r�J�Egc�4Qw�ř�D���4;`d۔���#��	�\�C�& &�0F@�k)�UNȥ����>��W�L��[�>�ĉR�T�*)\��U�,Gzt��/�"�����v2e�KZ˹-�̗%�H|I�E� ������JF�ZY��R�x��*�jU"e�@D��V�R,����hrl�y�X�q_+�r�Ė�p�:nT"�O������
+�~���(�((_����W�E@p�b�]��r��`Z���je��Z$%�X-�V5Q�"q|����̗����8�|�R��R���J �J*_,���p�"/���1E�-��r���"��q8�O|2ei\9AQX�E�9�	H����sqE^���k<cS d�"̩UD��ׄ"L�pU������9[�|m #@���J�$�������״���ˏ��<�D��ei�4��@k��d�L�}��*;��ŞiR�)����UE�pG`$l'Ǽ	9����b�E�0s
+����3P��Aҷs+k=�}Eo� J���ai���؛U)�7-CU�l�
+ЁJ�AC���a[y���l�dCt�1��!$��'͢�����q8��o���1���@`��Y&����o���j��j�U끙W;�8B�c�����Y��f/�a"1r�5?`T�	��m׀mr+/�~�o v0k��Xkp��νO�{����M��ܽ�>%�S����8��5�Jr�8#����D2�J�����2�����ģ����n���'��~8�Ľ?��~�>#p�5�?�Y!��w���yO������S���?7�7�c�y���=s��������#�1\�Z�D��EƪB6�i�hi�nx��,�f?���q���3�9~�,����f�{�É���8�^#dXWQ<m���k��<�1^og�v[NS&ѯ�E�˹���R>��7-�c>ʜ�	�9�ա�r�
+�A�:i6p�rN7���6��B�ײ&=!���l'TB���ً��[2پ��L�b��Ґ��Fb�S�����3�(2�5�S)��?Aʾ�n���	D��/�� K@o2!y�>�5�T����/'O���'X�1�cV��gT���?�&�3�JT�虇���d��cO�@�Ǟ�C{j4U����Mb�\)�:�Zh\���L�!������M���/.�ad������Z�A����;Ӯ�k��2i��|O�	��ϧ��*b��"jr�c�K�y'R?���-�P~FzO@I8/�[ĐS�#Gc��O'���+���z�1H�)x"�@��G����=�"C9�"���[�z���4�h� �1���L�Tɞ��M�X=�4<O���&�x4�f��@��A�}3��(�=�1:c�%!�?���[�`��M��l.ɭ�y?	��#pݧ���f��С�����F�u�7	@D��'���$�V��n_��=��`��� I������]I"��-�"7>�4�[HŁ��AK��êS#����?�����%?s0A�'�z�g������ �e��x
+����D��,§[���\���K���W͏�E��8�a�ʯ����L��N>�س�͙!ڈϭK:����'���{��9���������ڕ��k;�\b����WǇ?L��%�a����J�$�F
+);A�ß�"��K|6����0�奁@|�e&��o*�B7Ր'���"�,��t����x�/�c~�&3�h	Nc!&3�O��1�w���s���wP �'0Ɔ��1'u����.��y� ��gL�|���{���}ʀ8av,\�;�5��n�Cy�4�b$��Rk�tr"����YB�έ����cX|���J����%���e�^Y6}U5��ރ�<�7���Y+�J�^���ʈ�"�`�,)��n5R>N+�x4�;�K$�@H���ҒVY$K�g��R1��2B�1���ݬoױ�#��c�o���J����(M��1}#G��j�b8�`i��4������ 2�y,2Z#��1�<�1��h���ي$���vd�	3���ؖl7�P����s:�����q�"7�A��bkK�J�#���Ⱥ�|�7"�pr�kl����׳k���WR�E�k�=�)�Q1c��sb[r�GJ�Fn�B��PQdE�uj���������	�֦�|�˘&I]53{��S�>x����ٍ�Ѓt��\6˟]�e�R�<�'-���� ��.e�|K	q*A-I�$����M�QC�y���P{�*�Y��Siہ���'��V���	7e�!aS&L*E&EB��!�/ӈ-�TVӳBTz�BI�����b���fN�]�j�ʅ�rԏn��ڿ�#����t#[71y��N}mc�m�����f�7Q�K��d���p���UI:\1˒h��Fgp=MD����le���k�m�1��Z��s\�Mm�Ec�0]��tV�ŦqM�����ߑ9���D�<��]�8�����N}��l�l������;�NAn߳wH�,;~�n��\�gG<��'{�����#�,�*DJ��΢4��f��G�)�e.�޶�ۅ���s_9z��gN7�8�<N��~io����=�������Az�s�2�lj�>�{�	��j&G@Q�Ң�)"���H�:Xk_YG�:d��5ӷF�6Q��*
+��{q�����jz$�}�՞�:&'=��ӓ;�{q��wF�?������^��q��d�1,��^�)MV�L6Uq��Fmx�>S�{�s|ŒvO�$\y]xw��F�O��$vr�8����3��R|����c�^Jx�aR��AC
+F��Ě;�}��� ɉ����g�$������IFx�I��5(݃8�Ka>"���7)mvI}wc�}��*������������<q�{�[��R}F�6�6�vA��E�����}��2�z�[�E�F�� ?�5�<�Ǭ�k����G��@�b�tM�ڲmXD3@����Ml�2�r���<�"���9�"�]��A{�`݈���E��4�z�Op����n��+�ă�n�oi_k8v�)%�)�����ۆ�NuB������:9X�?@�:ݨSG~--z �˚s�c��	�����󿯽M�����\��:hqP�7�3.����w�;9 yD�����
+��A!n�uLE^�%2�5��v^��Y[���`����iĺ�0����� �C5�t���v�e-�s�a,7bݐ5�)�+�g������	k*{ʊ��\���Lꗬ���̲�X`Ħ4��6�a�5���|F�2�LZ4�����1׳���.Xd6���6������-��S����H���該uL�~u�te0�Mr�4,�H���g�C��#�^�`+�e]��f�Z�Ԙ3�W_:ҫ���נX8�}er�+����y��_�Rt�1|���86����o�mV�d�V4�"`�-,�3�1|�[ '�)�+���m�MsS>6z�<�A3���`��G���X���yȭ�fI~����J�K3K,_�5(h��C��^7��zw�~��GVw��v6�ɥ�^���8x�7&��#<K��NH��x�I��f"�ϕ">�q�k�Ӎ5.}�Bi������ݿ�+�w��ӹ��ҨIOk�+�̄S
+�BQ� h�h�F�&%��l���?z#)>��3��̕�aޱ��AO3�1d�d�����2_�	���$�bq��	G���I�<��-��0^+��9x(^�LS�)�>���E��{��jpHv��V�@D@)�qo.u"B�����)91MV+��@e#/�:����.�XT�pny:�Vظ����o�g�gL�����/>J�G�|X��^&��U���}��f��J��4c2����V���?��E���3+!��RT����e�
+�-ke�Z�<�	���Y ����$������IR�;|nzŴ@\�\[ocu���W�Z϶{'��0����0����r��:ߖ]�WJ�A�X��</,�|u�aC�ϰ	z�z���������R��֠6�.w�(\1Us|�qoF���_�	�A�mN�K�d�X�5�7lT[��liL��+H���#��׸���ńJ��ٍ��ɖ��'�%�D�nt!�Ɣ\/&�%!�B��,���MWg����\�6�*��J#niF�)�!�_�@��@��3;�NÛ�  �� �� �

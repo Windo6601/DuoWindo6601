@@ -49,11 +49,31 @@ const server = http.createServer((req, res) => {
   // Check if file exists and is not a directory
   fs.stat(filePath, (err, stats) => {
     if (err || !stats.isFile()) {
-      // SPA fallback: If file is not found (e.g., custom routes), serve index.html
-      const fallbackPath = path.join(DIST_DIR, 'index.html');
-      fs.readFile(fallbackPath, (fallbackErr, data) => {
+      // SPA fallback: If file is not found (e.g., custom routes, offline browsers, 404 requests), serve index.html or 404.html
+      const fallbackIndex = path.join(DIST_DIR, 'index.html');
+      const fallback404 = path.join(DIST_DIR, '404.html');
+      const rootIndex = path.join(__dirname, 'index.html');
+      const root404 = path.join(__dirname, '404.html');
+
+      const targetFallback = pathname.includes('404') ? (fs.existsSync(fallback404) ? fallback404 : fallbackIndex) : fallbackIndex;
+
+      fs.readFile(targetFallback, (fallbackErr, data) => {
         if (fallbackErr) {
-          res.statusCode = 500;
+          // Try root index.html or 404.html fallback
+          const secondaryFallback = pathname.includes('404') && fs.existsSync(root404) ? root404 : rootIndex;
+          if (fs.existsSync(secondaryFallback)) {
+            fs.readFile(secondaryFallback, (secErr, secData) => {
+              if (!secErr) {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'text/html; charset=utf-8');
+                res.end(secData);
+                return;
+              }
+            });
+            return;
+          }
+
+          res.statusCode = 200;
           res.setHeader('Content-Type', 'text/html; charset=utf-8');
           res.end(`<!DOCTYPE html>
 <html lang="ru">

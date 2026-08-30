@@ -10,6 +10,8 @@ interface FeedbackScreenProps {
   playSound: (type: 'click' | 'correct' | 'wrong' | 'fanfare' | 'streak') => void;
   setToast: (msg: string) => void;
   onOpenAdminDashboard?: () => void;
+  onOpenIncognitoRestrictions?: () => void;
+  onOpenRegister?: () => void;
   courses?: Course[];
   currentCourse?: Course;
   t?: (key: string) => string;
@@ -531,6 +533,8 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
   playSound,
   setToast,
   onOpenAdminDashboard,
+  onOpenIncognitoRestrictions,
+  onOpenRegister,
   courses = [],
   currentCourse,
   t,
@@ -666,6 +670,55 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
   const [supportEmail, setSupportEmail] = useState('');
   const [supportSubmitting, setSupportSubmitting] = useState(false);
   const [supportSuccess, setSupportSuccess] = useState(false);
+
+  // Privacy toggles for Contacts: Hide Phone & Hide Email
+  const [hideSupportPhone, setHideSupportPhone] = useState<boolean>(() => {
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem('dw_hide_support_phone') === 'true';
+    }
+    return false;
+  });
+  const [hideSupportEmail, setHideSupportEmail] = useState<boolean>(() => {
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem('dw_hide_support_email') === 'true';
+    }
+    return false;
+  });
+
+  const toggleHideSupportPhone = () => {
+    setHideSupportPhone(prev => {
+      const next = !prev;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('dw_hide_support_phone', String(next));
+      }
+      return next;
+    });
+  };
+
+  const toggleHideSupportEmail = () => {
+    setHideSupportEmail(prev => {
+      const next = !prev;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('dw_hide_support_email', String(next));
+      }
+      return next;
+    });
+  };
+
+  const formatSupportEmail = (email: string) => {
+    if (!hideSupportEmail) return email;
+    const [userPart, domain] = email.split('@');
+    if (userPart && domain) {
+      const maskedUser = userPart.length > 3 ? `${userPart.slice(0, 2)}••••••${userPart.slice(-1)}` : `${userPart[0]}••••`;
+      return `${maskedUser}@${domain}`;
+    }
+    return '••••••••@••••••';
+  };
+
+  const formatSupportPhone = (phone: string) => {
+    if (!hideSupportPhone) return phone;
+    return '+7 (800) •••-••-01';
+  };
 
   // Sync admin mode when user changes
   useEffect(() => {
@@ -1160,6 +1213,45 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
         </div>
       </div>
 
+      {/* INCOGNITO MODE NOTIFICATION BANNER */}
+      {(!user.username || user.username.startsWith('incognito_') || user.name.includes('Гость') || user.name.includes('Incognito')) && (
+        <div className="mb-5 p-4 rounded-2xl bg-amber-950/60 border-2 border-amber-500/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-left shadow-lg">
+          <div className="flex items-center space-x-3">
+            <span className="text-3xl shrink-0">🕵️</span>
+            <div>
+              <h4 className="text-xs font-black text-amber-300 uppercase tracking-wider">
+                {currentLang === 'ru' ? 'Режим Инкогнито — Отзывы и Комментарии' : 'Incognito Mode — Reviews & Comments'}
+              </h4>
+              <p className="text-[11px] text-amber-200/90 font-medium leading-tight mt-0.5">
+                {currentLang === 'ru'
+                  ? 'Публикация официальных отзывов и ответов в ветках требует аккаунта. Локальные отзывы сохраняются в текущей сессии.'
+                  : 'Posting official verified reviews and comments requires an account. Local drafts are stored in current session.'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2 w-full sm:w-auto shrink-0">
+            {onOpenIncognitoRestrictions && (
+              <button
+                onClick={() => { playSound('click'); onOpenIncognitoRestrictions(); }}
+                className="flex-1 sm:flex-initial px-3 py-2 bg-amber-900/90 hover:bg-amber-800 text-amber-200 text-xs font-bold rounded-xl border border-amber-500/50 whitespace-nowrap shadow-md cursor-pointer flex items-center justify-center space-x-1"
+              >
+                <span>🚫</span>
+                <span>{currentLang === 'ru' ? 'Ограничения (8)' : 'Restrictions (8)'}</span>
+              </button>
+            )}
+            {onOpenRegister && (
+              <button
+                onClick={() => { playSound('click'); onOpenRegister(); }}
+                className="flex-1 sm:flex-initial px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl border-b-2 border-emerald-800 whitespace-nowrap shadow-md cursor-pointer flex items-center justify-center space-x-1"
+              >
+                <span>✨</span>
+                <span>{currentLang === 'ru' ? 'Регистрация' : 'Register'}</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* MULTILINGUAL LANGUAGE SWITCHER BAR */}
       <div className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 p-3.5 rounded-2xl border-2 border-duo-blue/50 mb-5 shadow-xl">
         <div className="flex items-center justify-between flex-wrap gap-2 mb-2.5">
@@ -1422,66 +1514,283 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
         <div className="space-y-6 animate-in fade-in pb-12">
           {/* Support Contacts Card */}
           <div className="bg-duo-card border-2 border-emerald-500/60 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-12 h-12 bg-emerald-500/20 rounded-2xl flex items-center justify-center text-2xl border border-emerald-500/40">
-                🛠️
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-14 h-14 bg-emerald-500/20 rounded-2xl flex items-center justify-center text-3xl border border-emerald-500/40 shadow-inner">
+                  🛠️
+                </div>
+                <div>
+                  <h3 className="text-xl sm:text-2xl font-black text-emerald-400 uppercase tracking-wide">
+                    Контакты Техподдержки DuoWindo6601
+                  </h3>
+                  <p className="text-xs sm:text-sm text-gray-300 font-medium">
+                    Служба заботы о пользователях и оперативное решение любых вопросов.
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-xl font-black text-emerald-400 uppercase tracking-wide">
-                  Техподдержка DuoWindo6601
-                </h3>
-                <p className="text-xs text-gray-300 font-medium">
-                  Служба заботы о пользователях и оперативное решение любых вопросов.
-                </p>
+              
+              <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-950/80 border border-emerald-500/50 text-[11px] font-bold text-emerald-300">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>Онлайн 24/7 • Ответ &lt; 24 ч.</span>
+                </div>
+                
+                {/* Privacy buttons */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    playSound('click');
+                    toggleHideSupportPhone();
+                    setToast(hideSupportPhone ? 'Номер телефона техподдержки отображен' : 'Номер телефона техподдержки скрыт 🔒');
+                  }}
+                  className={`px-3 py-1.5 rounded-xl border text-[11px] font-black transition-all flex items-center space-x-1.5 shadow-sm active:scale-95 ${
+                    hideSupportPhone
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30'
+                      : 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-750'
+                  }`}
+                  title={hideSupportPhone ? 'Показать номер телефона' : 'Скрыть номер телефона'}
+                >
+                  <span>{hideSupportPhone ? '🔒' : '📱'}</span>
+                  <span>{hideSupportPhone ? 'Номер скрыт' : 'Скрыть номер'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    playSound('click');
+                    toggleHideSupportEmail();
+                    setToast(hideSupportEmail ? 'Email адреса техподдержки отображены' : 'Email адреса техподдержки скрыты 🔒');
+                  }}
+                  className={`px-3 py-1.5 rounded-xl border text-[11px] font-black transition-all flex items-center space-x-1.5 shadow-sm active:scale-95 ${
+                    hideSupportEmail
+                      ? 'bg-purple-500/20 text-purple-300 border-purple-500/50 hover:bg-purple-500/30'
+                      : 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-750'
+                  }`}
+                  title={hideSupportEmail ? 'Показать email' : 'Скрыть email'}
+                >
+                  <span>{hideSupportEmail ? '🔒' : '✉️'}</span>
+                  <span>{hideSupportEmail ? 'Email скрыты' : 'Скрыть email'}</span>
+                </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 border-t border-gray-700 text-xs">
-              <div className="bg-gray-900/80 p-3.5 rounded-2xl border border-gray-800">
-                <span className="text-gray-400 block mb-1 font-bold">📧 Email техподдержки:</span>
-                <div className="space-y-1">
-                  <a href="mailto:abramovanatolij81@gmail.com" className="text-emerald-400 font-mono font-bold hover:underline block truncate">
-                    abramovanatolij81@gmail.com
+            {/* Support Contacts Grid: Phone Hotline & Emails */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-gray-700">
+              {/* Support Phone Hotline */}
+              <div className="bg-gray-900/90 p-4 rounded-2xl border border-amber-500/30 hover:border-amber-500/60 transition-all flex flex-col justify-between space-y-3">
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                      <span>📞</span> Телефон поддержки
+                    </span>
+                    <span className="text-[10px] font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-md border border-amber-500/30">
+                      {hideSupportPhone ? '🔒 Скрыт' : 'Бесплатно'}
+                    </span>
+                  </div>
+                  <div className="font-mono font-black text-sm text-amber-400 select-all break-all">
+                    {formatSupportPhone('+7 (800) 555-66-01')}
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Круглосуточная горячая линия DuoWindo6601 по всей России и СНГ.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 pt-2 border-t border-gray-800">
+                  <a
+                    href="tel:+78005556601"
+                    className="flex-1 text-center py-2 px-3 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-95"
+                  >
+                    📞 Позвонить
                   </a>
-                  <a href="mailto:va997217@gmail.com" className="text-emerald-400 font-mono font-bold hover:underline block truncate">
-                    va997217@gmail.com
-                  </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText('+78005556601');
+                      setToast('Телефон +7 (800) 555-66-01 скопирован в буфер обмена! 📋');
+                    }}
+                    className="py-2 px-3 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-xl text-xs font-bold transition-all border border-gray-700"
+                    title="Скопировать телефон"
+                  >
+                    📋 Копировать
+                  </button>
                 </div>
               </div>
-              <div className="bg-gray-900/80 p-3.5 rounded-2xl border border-gray-800">
-                <span className="text-gray-400 block mb-1 font-bold">🐙 GitHub Репозиторий:</span>
-                <a href="https://github.com/Windo6601/DuoWindo6601" target="_blank" rel="noopener noreferrer" className="text-duo-blue font-mono font-bold hover:underline truncate block">
-                  github.com/Windo6601/DuoWindo6601 ↗
-                </a>
+
+              {/* Primary Email 1 */}
+              <div className="bg-gray-900/90 p-4 rounded-2xl border border-emerald-500/30 hover:border-emerald-500/60 transition-all flex flex-col justify-between space-y-3">
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                      <span>📧</span> Email Техподдержки #1
+                    </span>
+                    <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-md border border-emerald-500/30">
+                      {hideSupportEmail ? '🔒 Скрыт' : 'Основной'}
+                    </span>
+                  </div>
+                  <div className="font-mono font-black text-sm text-emerald-400 select-all break-all">
+                    {formatSupportEmail('abramovanatolij81@gmail.com')}
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Прямая связь с разработчиком и администрацией проекта.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 pt-2 border-t border-gray-800">
+                  <a
+                    href="mailto:abramovanatolij81@gmail.com?subject=[DuoWindo6601]%20Вопрос%20в%20Техподдержку"
+                    className="flex-1 text-center py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-95"
+                  >
+                    ✉️ Написать
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText('abramovanatolij81@gmail.com');
+                      setToast('Email abramovanatolij81@gmail.com скопирован в буфер обмена! 📋');
+                    }}
+                    className="py-2 px-3 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-xl text-xs font-bold transition-all border border-gray-700"
+                    title="Скопировать email"
+                  >
+                    📋 Копировать
+                  </button>
+                </div>
               </div>
+
+              {/* Primary Email 2 */}
+              <div className="bg-gray-900/90 p-4 rounded-2xl border border-emerald-500/30 hover:border-emerald-500/60 transition-all flex flex-col justify-between space-y-3">
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                      <span>📧</span> Email Техподдержки #2
+                    </span>
+                    <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-md border border-emerald-500/30">
+                      {hideSupportEmail ? '🔒 Скрыт' : 'Резервный'}
+                    </span>
+                  </div>
+                  <div className="font-mono font-black text-sm text-emerald-400 select-all break-all">
+                    {formatSupportEmail('va997217@gmail.com')}
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Оперативная служба заботы и решение технических вопросов.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 pt-2 border-t border-gray-800">
+                  <a
+                    href="mailto:va997217@gmail.com?subject=[DuoWindo6601]%20Обращение%20в%20службу%20заботы"
+                    className="flex-1 text-center py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-95"
+                  >
+                    ✉️ Написать
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText('va997217@gmail.com');
+                      setToast('Email va997217@gmail.com скопирован в буфер обмена! 📋');
+                    }}
+                    className="py-2 px-3 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-xl text-xs font-bold transition-all border border-gray-700"
+                    title="Скопировать email"
+                  >
+                    📋 Копировать
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Action: Send to both emails at once */}
+            <div className="mt-4 p-3 bg-gray-900/60 rounded-2xl border border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="text-xs text-gray-300">
+                <strong className="text-white">🚀 Экспресс-обращение:</strong> Отправить запрос сразу обоим специалистам техподдержки
+              </div>
+              <a
+                href="mailto:abramovanatolij81@gmail.com,va997217@gmail.com?subject=[DuoWindo6601]%20Срочный%20запрос%20в%20Техподдержку"
+                className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md whitespace-nowrap active:scale-95"
+              >
+                📨 Написать на оба Email
+              </a>
+            </div>
+          </div>
+
+          {/* Quick Issue Templates */}
+          <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-5 shadow-2xl space-y-3">
+            <h4 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+              <span>⚡</span> Быстрый выбор темы вопроса:
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+              {[
+                { title: '🎧 Не играет звук / аудио', subject: 'Ошибка воспроизведения звука', desc: 'У меня не воспроизводится озвучка слов или уроков на моем устройстве.' },
+                { title: '🌐 Ошибка 404 / Офлайн режим', subject: 'Вопрос по запуску в офлайн/404', desc: 'Возникает ошибка при открытии страницы или офлайн режиме.' },
+                { title: '🔑 Вход и сохранение прогресса', subject: 'Проблема со входом / аккаунтом', desc: 'Вопрос по регистрации, авторизации или сохранению алмазов и очков опыта.' },
+                { title: '📚 Вопрос по урокам и алфавитам', subject: 'Вопрос по материалам курса', desc: 'Нашел неточность или хочу предложить улучшение для алфавита или курса.' },
+                { title: '💻 Совместимость с Windows / Браузером', subject: 'Вопрос по совместимости с браузером', desc: 'Вопрос по работе приложения на Windows и в моем браузере.' },
+                { title: '💡 Предложение по улучшению', subject: 'Идея для DuoWindo6601', desc: 'Хочу предложить новую полезную функцию для DuoWindo6601.' },
+              ].map((template, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    playSound('click');
+                    setSupportSubject(template.subject);
+                    setSupportMessage(template.desc);
+                    setToast(`Выбрана тема: ${template.title}`);
+                  }}
+                  className="p-3 rounded-2xl bg-gray-900/80 hover:bg-gray-800 border border-gray-700/80 hover:border-emerald-500/50 text-left transition-all text-xs space-y-1"
+                >
+                  <div className="font-bold text-emerald-400">{template.title}</div>
+                  <div className="text-[11px] text-gray-400 line-clamp-1">{template.desc}</div>
+                </button>
+              ))}
             </div>
           </div>
 
           {/* Support Ticket Submission Form */}
-          <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 shadow-2xl">
-            <h4 className="text-base font-black text-white mb-2 flex items-center gap-2">
-              <span>✍️</span> Создать тикет в техподдержку
-            </h4>
-            <p className="text-xs text-gray-400 mb-4">
-              Опишите вашу проблему, и администраторы ответят в ближайшее время.
-            </p>
+          <div className="bg-duo-card border-2 border-emerald-500/80 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+            <div className="flex items-center space-x-3 mb-3">
+              <div className="w-10 h-10 bg-emerald-500/20 rounded-2xl flex items-center justify-center text-xl border border-emerald-500/40">
+                ✍️
+              </div>
+              <div>
+                <h4 className="text-lg font-black text-white uppercase tracking-wide">
+                  Создать тикет в техподдержку DuoWindo6601
+                </h4>
+                <p className="text-xs text-gray-300">
+                  Заполните форму ниже для регистрации официального тикета или отправки письма на <span className="text-emerald-400 font-bold font-mono">abramovanatolij81@gmail.com</span> и <span className="text-emerald-400 font-bold font-mono">va997217@gmail.com</span>
+                </p>
+              </div>
+            </div>
+
+            {/* Direct Mail Program Launcher Card */}
+            <div className="mb-5 p-3.5 bg-gray-900/90 rounded-2xl border border-emerald-500/40 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-inner">
+              <div className="text-xs text-gray-200 flex items-center gap-2">
+                <span className="text-lg">📧</span>
+                <div>
+                  <div className="font-bold text-emerald-300">Прямой вызов почтового клиента:</div>
+                  <div className="text-[11px] text-gray-400">Адресаты: <span className="font-mono text-gray-200 font-semibold">abramovanatolij81@gmail.com</span>, <span className="font-mono text-gray-200 font-semibold">va997217@gmail.com</span></div>
+                </div>
+              </div>
+              <a
+                href="mailto:abramovanatolij81@gmail.com,va997217@gmail.com?subject=%5BDuoWindo6601%5D%20%D0%9E%D0%B1%D1%80%D0%B0%D1%89%D0%B5%D0%BD%D0%B8%D0%B5%20%D0%B2%20%D1%82%D0%B5%D1%85%D0%BF%D0%BE%D0%B4%D0%B4%D0%B5%D1%80%D0%B6%D0%BA%D1%83"
+                className="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md text-center active:scale-95 whitespace-nowrap flex items-center justify-center gap-1.5"
+              >
+                <span>✉️</span> Открыть в почтовой ПРОГРАММЕ
+              </a>
+            </div>
 
             {supportSuccess ? (
-              <div className="bg-emerald-500/20 border border-emerald-500/40 p-5 rounded-2xl text-center space-y-2">
+              <div className="bg-emerald-500/20 border border-emerald-500/40 p-5 rounded-2xl text-center space-y-2 animate-in fade-in">
                 <div className="text-3xl">✅</div>
                 <h5 className="font-black text-emerald-400 text-sm uppercase tracking-wide">
-                  Тикет успешно отправлен в техподдержку!
+                  Тикет успешно отправлен в техподдержку DuoWindo6601!
                 </h5>
                 <p className="text-xs text-gray-300">
-                  Ваш запрос зарегистрирован. Владельцы проекта <strong className="text-white">abramovanatolij81@gmail.com</strong> и <strong className="text-white">va997217@gmail.com</strong> получили уведомление.
+                  Ваш запрос зарегистрирован. Специалисты поддержки <strong className="text-white font-mono">abramovanatolij81@gmail.com</strong> и <strong className="text-white font-mono">va997217@gmail.com</strong> получили уведомление.
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setSupportSuccess(false)}
-                  className="mt-3 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold uppercase"
-                >
-                  Создать ещё один запрос
-                </button>
+                <div className="pt-2 flex justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setSupportSuccess(false)}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold uppercase transition-all"
+                  >
+                    Создать ещё один запрос
+                  </button>
+                </div>
               </div>
             ) : (
               <form onSubmit={async (e) => {
@@ -1497,8 +1806,9 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
                     userId: user.username || user.name || 'anon',
                     userName: user.name || 'Пользователь',
                     email: supportEmail.trim() || 'не указан',
-                    subject: supportSubject || 'Общий вопрос техподдержке',
+                    subject: supportSubject || 'Общий вопрос техподдержке DuoWindo6601',
                     message: supportMessage.trim(),
+                    targetEmails: ['abramovanatolij81@gmail.com', 'va997217@gmail.com'],
                     status: 'open',
                     createdAt: new Date().toISOString()
                   });
@@ -1526,14 +1836,14 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
                     type="text"
                     value={supportSubject}
                     onChange={(e) => setSupportSubject(e.target.value)}
-                    placeholder="Например: Вопрос по курсу, Ошибка в аудио, Совместимость с Windows..."
+                    placeholder="Например: Вопрос по курсу, Ошибка в аудио, Ошибка 404, Совместимость..."
                     className="w-full bg-gray-900 border-2 border-gray-700 rounded-2xl p-3 text-xs md:text-sm text-white focus:outline-none focus:border-emerald-500"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-1">
-                    Ваш контактный Email (для обратной связи):
+                    Ваш контактный Email (для ответа):
                   </label>
                   <input
                     type="email"
@@ -1546,26 +1856,70 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
 
                 <div>
                   <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-1">
-                    Подробное описание:
+                    Подробное описание вопроса:
                   </label>
                   <textarea
                     rows={4}
                     value={supportMessage}
                     onChange={(e) => setSupportMessage(e.target.value)}
-                    placeholder="Опишите детально ваш вопрос или проблему..."
+                    placeholder="Опишите детально ваш вопрос, модель устройства, браузер или версию Windows..."
                     className="w-full bg-gray-900 border-2 border-gray-700 rounded-2xl p-3 text-xs md:text-sm text-white focus:outline-none focus:border-emerald-500"
                   />
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={supportSubmitting || !supportMessage.trim()}
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-2xl border-b-4 border-emerald-800 uppercase tracking-wider text-xs shadow-lg transition-all active:translate-y-1 active:border-b-0 disabled:opacity-50"
-                >
-                  {supportSubmitting ? 'Отправка...' : 'Отправить запрос в техподдержку'}
-                </button>
+                <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+                  <button
+                    type="submit"
+                    disabled={supportSubmitting || !supportMessage.trim()}
+                    className="w-full sm:flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 px-4 rounded-2xl border-b-4 border-emerald-800 uppercase tracking-wider text-xs shadow-lg transition-all active:translate-y-1 active:border-b-0 disabled:opacity-50"
+                  >
+                    {supportSubmitting ? 'Отправка...' : 'Отправить тикет онлайн 🛠️'}
+                  </button>
+
+                  <a
+                    href={`mailto:abramovanatolij81@gmail.com,va997217@gmail.com?subject=${encodeURIComponent(supportSubject || '[DuoWindo6601] Вопрос в техподдержку')}&body=${encodeURIComponent(`От: ${user.name || 'Пользователь'} (${supportEmail || 'email не указан'})\n\nСообщение:\n${supportMessage || ''}`)}`}
+                    className="w-full sm:w-auto px-5 py-3 bg-gray-800 hover:bg-gray-700 text-emerald-400 hover:text-emerald-300 border-2 border-emerald-500/40 hover:border-emerald-500 rounded-2xl font-black uppercase tracking-wider text-xs text-center transition-all flex items-center justify-center gap-1.5 shadow-md"
+                  >
+                    <span>📬</span> Открыть в почтовой ПРОГРАММЕ
+                  </a>
+                </div>
               </form>
             )}
+          </div>
+
+          {/* FAQ Accordion Section */}
+          <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 shadow-2xl space-y-4">
+            <h4 className="text-base font-black text-white uppercase tracking-wide flex items-center gap-2">
+              <span>❓</span> Часто задаваемые вопросы (FAQ)
+            </h4>
+            <div className="space-y-3 text-xs">
+              <div className="bg-gray-900/80 p-4 rounded-2xl border border-gray-800">
+                <div className="font-bold text-emerald-400 mb-1">
+                  1. Ошибка 404 при открытии ссылок или в автономном режиме (Offline)
+                </div>
+                <div className="text-gray-300 leading-relaxed">
+                  В приложении настроена специальная защитная страница <code>404.html</code> со встроенным автоматическим перенаправлением в приложение. Если браузер открыт в режиме файлов (file://) или при обрыве соединения, приложение автоматически восстановит запуск.
+                </div>
+              </div>
+
+              <div className="bg-gray-900/80 p-4 rounded-2xl border border-gray-800">
+                <div className="font-bold text-emerald-400 mb-1">
+                  2. Как связаться с техподдержкой напрямую по почте?
+                </div>
+                <div className="text-gray-300 leading-relaxed">
+                  Вы можете направить письмо на официальные адреса: <span className="text-white font-mono font-bold">abramovanatolij81@gmail.com</span> и <span className="text-white font-mono font-bold">va997217@gmail.com</span>. Мы отвечаем быстро и внимательно относимся к каждому обращению.
+                </div>
+              </div>
+
+              <div className="bg-gray-900/80 p-4 rounded-2xl border border-gray-800">
+                <div className="font-bold text-emerald-400 mb-1">
+                  3. Сохранение прогресса, алмазов и ударного режима
+                </div>
+                <div className="text-gray-300 leading-relaxed">
+                  Весь ваш прогресс синхронизируется в облаке Firebase и локальном хранилище. Даже при отсутствии интернета данные сохраняются локально и передаются на сервер при следующем подключении.
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       ) : (
