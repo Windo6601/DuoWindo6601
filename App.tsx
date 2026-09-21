@@ -6,26 +6,36 @@ import { signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } fr
 import { auth, db, googleProvider, handleFirestoreError, OperationType } from './firebase';
 import { AppScreen, Exercise, UserProgress, Course, WordToken, LeaderboardEntry, SubscriptionTier, RoleplayMessage } from './types';
 import { Chess, Square } from 'chess.js';
-import { generateExercise, checkAnswerWithAI, speakText, startRoleplay, replyToRoleplay, generateIllusion, generateDrawing, checkDrawing, getFallbackExercise, getChessMove, getChessChatReply, translateText, getMistakeExplanation, generateIshihara, generateInterviewQuestion, getInterviewHint, generateReading, generateVideoCallRoleplayResponse } from './services/geminiService';
+import { generateExercise, checkAnswerWithAI, pingGeminiApi, speakText, startRoleplay, replyToRoleplay, generateIllusion, generateDrawing, checkDrawing, getFallbackExercise, getChessMove, getChessChatReply, translateText, getMistakeExplanation, generateLocalMistakeExplanation, generateIshihara, generateInterviewQuestion, getInterviewHint, generateReading, generateVideoCallRoleplayResponse } from './services/geminiService';
 
+import { detectSystemCompatibility, SimulationMode, SystemCompatibilityResult } from "./services/systemCompatibilityService";
+import { SystemCompatibilityBanner } from "./components/SystemCompatibilityBanner";
+import { SystemInfoModal } from "./components/SystemInfoModal";
+import { BetaModal } from "./components/BetaModal";
 import { playSound } from './services/audioService';
 import { 
   HomeIcon, DumbbellIcon, ShieldIcon, ChestIcon, UserIcon,
   FireIcon, GemStoneIcon, VolumeIcon, CloseIcon, BookIcon, 
   InfiniteHeartIcon, InfiniteEnergyIcon, LightningIcon, BatteryIcon, CameraIcon,
   ActivityIcon, StarIcon, CheckCircleIcon, GridIcon, MicIcon, NewWordIcon,
-  WarningIcon, TurtleIcon, PlusIcon, SuperIcon, MaxIcon, NoAdIcon, ChatBubbleIcon, EarIcon, PenIcon, EyeIcon, GearIcon, TrashIcon, UndoIcon, ArrowRightIcon, AlphabetIcon, PaletteIcon, VideoIcon, PhoneIcon, MonitorIcon
+  WarningIcon, TurtleIcon, PlusIcon, SuperIcon, MaxIcon, NoAdIcon, ChatBubbleIcon, EarIcon, PenIcon, EyeIcon, GearIcon, TrashIcon, UndoIcon, ArrowRightIcon, AlphabetIcon, PaletteIcon, VideoIcon, PhoneIcon, MonitorIcon, SparklesIcon
 } from './components/Icons';
 import { Mascot } from './components/Mascot';
 import { IshiharaPlateCanvas } from './components/IshiharaPlateCanvas';
 import { DrawingCanvas } from './components/DrawingCanvas';
 import { FeedbackScreen } from './components/FeedbackScreen';
 import { AdminDashboard } from './components/AdminDashboard';
+import { SupportChatScreen } from './components/SupportChatScreen';
 import { ActivityChart } from './components/ActivityChart';
 import { VocabularyBank } from './components/VocabularyBank';
 import { IncognitoRestrictionsModal } from './components/IncognitoRestrictionsModal';
+import { AiLimitModal } from './components/AiLimitModal';
+import { AiLimitSection } from './components/AiLimitSection';
+import { GeminiRefillSection } from './components/GeminiRefillSection';
+import { getTodayAiUsage, AiUsageStatus, isCustomApiKeySkipped } from './services/aiLimitManager';
 import { AuthModal } from './components/AuthModal';
 import { ChessInviteModal, ChessOpponent } from './components/ChessInviteModal';
+import { ChessAnalysisScreen } from './components/ChessAnalysisScreen';
 import { triggerHapticFeedback } from './services/audioService';
 import { CIS_ALPHABET_DATA, AlphabetItem, AlphabetCategory as CISAlphabetCategory } from './services/alphabetData';
 
@@ -1422,6 +1432,9 @@ const TRANSLATIONS: Record<string, any> = {
     t_speech_empty: '–ú—ã –Ω–∏—á–µ–≥–æ –Ω–µ —É—Å–ª—ã—à–∞–ª–∏. –ü–æ–ø—Ä–æ–±—É–π—Ç–µ –µ—â–µ —Ä–∞–∑.', alphabet: '–ë–£–ö–í–´', explainMax: '–û–±—ä—è—Å–Ω–∏ –º–æ–π –æ—Ç–≤–µ—Ç', explainHeader: '–û–±—ä—è—Å–Ω–µ–Ω–∏–µ –æ—à–∏–±–∫–∏',
     ishihara: '–¢–µ—Å—Ç –ò—à–∏—Ö–∞—Ä—ã', ishiharaDesc: '–ü—Ä–æ–≤–µ—Ä–∫–∞ —Ü–≤–µ—Ç–æ–≤–æ—Å–ø—Ä–∏—è—Ç–∏—è', auto: '–ê–≤—Ç–æ',
     chooseTier: "–í—ã–±–µ—Ä–∏—Ç–µ —É—Ä–æ–≤–µ–Ω—å", energy25: "25 –≠–Ω–µ—Ä–≥–∏–∏", ads: "–†–µ–∫–ª–∞–º–∞", infEnergy: "–ë–µ—Å–∫–æ–Ω–µ—á–Ω–∞—è —ç–Ω–µ—Ä–≥–∏—è", noAds: "–ë–µ–∑ —Ä–µ–∫–ª–∞–º—ã",
+    trafficFree: "–ë–µ—Å–ø–ª–∞—Ç–Ω—ã–π —Ç—Ä–∞—Ñ–∏–∫ DuoWindo6601 Gemini API Key",
+    trafficSuper: "–¢—Ä–∞—Ñ–∏–∫ DuoWindo6601 Super –ü–ª–∞—Ç–Ω–æ–µ Gemini API Key",
+    trafficMax: "–¢—Ä–∞—Ñ–∏–∫ DuoWindo6601 Max –ü–ª–∞—Ç–Ω–æ–µ Gemini API Key",
     allInSuper: "–í—Å—ë, —á—Ç–æ –≤ Super", aiExplain: "–û–±—ä—è—Å–Ω–µ–Ω–∏–µ –æ—Ç–≤–µ—Ç–æ–≤ (AI)", currentPlan: "–¢–ï–ö–£–©–ò–ô –ü–õ–ê–ù", streakDays: "–£–¥–∞—Ä–Ω—ã–µ –¥–Ω–∏",
     totalXP: "–û–±—â–∏–π –æ–ø—ã—Ç", playChess: "–°–´–ì–†–ê–ï–ú –í –®–ê–•–ú–ê–¢–´", chessDesc: "–ü–∞—Ä—Ç–∏–∏ —Å DuoWindo6601", games: "–ü–ê–†–¢–ò–ò", wins: "–ü–û–ë–ï–î–´", elo: "–≠–õ–û",
     startChess: "–ù–ê–ß–ê–¢–¨: +30 XP", startSpeak: "–ù–∞—á–Ω–∏ –≥–æ–≤–æ—Ä–∏—Ç—å ‚Üí", whatHeard: "–ß—Ç–æ –≤—ã —É—Å–ª—ã—à–∞–ª–∏?", speakForDuo: "–ì–æ–≤–æ—Ä–∏ –∑–∞ Duo",
@@ -1527,8 +1540,8 @@ const TRANSLATIONS: Record<string, any> = {
     mobileSimBtn: '–ó–∞–ø—É—Å—Ç–∏—Ç—å —Å—Ç–µ–Ω–¥',
     feedbackBannerTitle: '–û—Ç–∑—ã–≤—ã –∏ –ü–æ–¥–¥–µ—Ä–∂–∫–∞',
     feedbackBannerDesc: '–ù–∞—à–ª–∏ –æ—à–∏–±–∫—É –∏–ª–∏ —Ö–æ—Ç–∏—Ç–µ –∏–¥–µ—é?',
-    adminBannerTitle: '–ü–∞–Ω–µ–ª—å –í–ª–∞–¥–µ–ª—å—Ü–∞',
-    adminBannerDesc: '–ú–æ–¥–µ—Ä–∞—Ü–∏—è –∏ –º–æ–Ω–∏—Ç–æ—Ä–∏–Ω–≥',
+    adminBannerTitle: '–ü–∞–Ω–µ–ª—å –í–ª–∞–¥–µ–ª—å—Ü–∞ ‚Äî Admin Tool',
+    adminBannerDesc: '–û–≥—Ä–∞–Ω–∏—á–µ–Ω–∏–µ: –î–æ—Å—Ç—É–ø —Ç–æ–ª—å–∫–æ –∞–¥–º–∏–Ω–∏—Å—Ç—Ä–∞—Ç–æ—Ä–∞ (–í–≤–æ–¥ –ø–∞—Ä–æ–ª—è, —ç–ª. –ø–æ—á—Ç—ã –∏–ª–∏ admin)',
     cloudSaveTitle: '–û–±–ª–∞—á–Ω–æ–µ —Å–æ—Ö—Ä–∞–Ω–µ–Ω–∏–µ',
     loading: '–ó–∞–≥—Ä—É–∑–∫–∞...',
     loggedInAs: '–í—ã –≤–æ—à–ª–∏ –∫–∞–∫ {user}',
@@ -1593,6 +1606,9 @@ const TRANSLATIONS: Record<string, any> = {
     t_topic_empty: 'No topic selected', t_api_error: 'API Error', t_speech_empty: 'Nothing heard', alphabet: 'LETTERS', explainMax: 'Explain my Answer', explainHeader: 'Mistake Explanation',
     ishihara: 'Ishihara Test', ishiharaDesc: 'Color Vision Check', auto: 'Auto',
     chooseTier: "Choose your tier", energy25: "25 Energy", ads: "Ads", infEnergy: "Infinite Energy", noAds: "No Ads",
+    trafficFree: "DuoWindo6601 Free Traffic (Free Gemini API Key)",
+    trafficSuper: "DuoWindo6601 Super Traffic (Paid Gemini API Key)",
+    trafficMax: "DuoWindo6601 Max Traffic (Paid Gemini API Key)",
     allInSuper: "Everything in Super", aiExplain: "Answer Explanation (AI)", currentPlan: "CURRENT PLAN", streakDays: "Streak Days",
     totalXP: "Total XP", playChess: "LET'S PLAY CHESS", chessDesc: "Games with DuoWindo6601", games: "GAMES", wins: "WINS", elo: "ELO",
     startChess: "START: +30 XP", startSpeak: "Start speaking ‚Üí", whatHeard: "What did you hear?", speakForDuo: "Speak for Duo",
@@ -1698,8 +1714,8 @@ const TRANSLATIONS: Record<string, any> = {
     mobileSimBtn: 'Launch Simulator',
     feedbackBannerTitle: 'Feedback & Support',
     feedbackBannerDesc: 'Found a bug or want to suggest an idea?',
-    adminBannerTitle: 'Owner Dashboard',
-    adminBannerDesc: 'Moderation & Monitoring',
+    adminBannerTitle: 'Owner Dashboard ‚Äî Admin Tool',
+    adminBannerDesc: 'Restricted: Administrator Access Only (Enter password, email, or "admin")',
     cloudSaveTitle: 'Cloud Save',
     loading: 'Loading...',
     loggedInAs: 'You are logged in as {user}',
@@ -1765,6 +1781,9 @@ const TRANSLATIONS: Record<string, any> = {
     t_speech_empty: 'Nichts geh√∂rt.', alphabet: 'BUCHSTABEN', explainMax: 'Antwort erkl√§ren', explainHeader: 'Fehlererkl√§rung',
     ishihara: 'Ishihara-Test', ishiharaDesc: 'Farbsehtest', auto: 'Auto',
     chooseTier: "Stufe w√§hlen", energy25: "25 Energie", ads: "Werbung", infEnergy: "Unendliche Energie", noAds: "Keine Werbung",
+    trafficFree: "Kostenloser DuoWindo6601 Gemini API Key-Traffic",
+    trafficSuper: "DuoWindo6601 Super-Traffic (Kostenpflichtiger Gemini API Key)",
+    trafficMax: "DuoWindo6601 Max-Traffic (Kostenpflichtiger Gemini API Key)",
     allInSuper: "Alles in Super", aiExplain: "Antworterkl√§rung (AI)", currentPlan: "AKTUELLER PLAN", streakDays: "Streak-Tage",
     totalXP: "Gesamt-XP", playChess: "SCHACH SPIELEN", chessDesc: "Partien mit DuoWindo6601", games: "SPIELE", wins: "SIEGE", elo: "ELO",
     startChess: "START: +30 XP", startSpeak: "Sprechen beginnen ‚Üí", whatHeard: "Was haben Sie geh√∂rt?", speakForDuo: "F√ºr Duo sprechen",
@@ -1936,6 +1955,9 @@ const TRANSLATIONS: Record<string, any> = {
     t_topic_empty: 'Aucun sujet choisi', t_api_error: 'Erreur r√©seau', t_speech_empty: 'Rien entendu.', alphabet: 'LETTRES', explainMax: 'Expliquer ma r√©ponse', explainHeader: 'Explication de l‚Äôerreur',
     ishihara: 'Test d‚ÄôIshihara', ishiharaDesc: 'Contr√¥le de la vision des couleurs', auto: 'Auto',
     chooseTier: "Choisir le niveau", energy25: "25 √ânergie", ads: "Publicit√©s", infEnergy: "√ânergie illimit√©e", noAds: "Sans pub",
+    trafficFree: "Trafic gratuit DuoWindo6601 Gemini API Key",
+    trafficSuper: "Trafic DuoWindo6601 Super (Gemini API Key Payant)",
+    trafficMax: "Trafic DuoWindo6601 Max (Gemini API Key Payant)",
     allInSuper: "Tout dans Super", aiExplain: "Explication des r√©ponses (IA)", currentPlan: "PLAN ACTUEL", streakDays: "Jours de s√©rie",
     totalXP: "XP Total", playChess: "JOUER AUX √âCHECS", chessDesc: "Parties avec DuoWindo6601", games: "PARTIES", wins: "VICTOIRES", elo: "ELO",
     startChess: "D√âMARRER : +30 XP", startSpeak: "Commencer √† parler ‚Üí", whatHeard: "Qu‚Äôavez-vous entendu ?", speakForDuo: "Parler pour Duo",
@@ -2107,6 +2129,9 @@ const TRANSLATIONS: Record<string, any> = {
     t_topic_empty: 'Sin tema seleccionado', t_api_error: 'Error de red', t_speech_empty: 'No se escuch√≥ nada.', alphabet: 'LETRAS', explainMax: 'Explicar mi respuesta', explainHeader: 'Explicaci√≥n del error',
     ishihara: 'Test de Ishihara', ishiharaDesc: 'Prueba de visi√≥n crom√°tica', auto: 'Auto',
     chooseTier: "Elige tu nivel", energy25: "25 Energ√≠a", ads: "Anuncios", infEnergy: "Energ√≠a infinita", noAds: "Sin anuncios",
+    trafficFree: "Tr√°fico gratuito DuoWindo6601 Gemini API Key",
+    trafficSuper: "Tr√°fico DuoWindo6601 Super (Gemini API Key De Pago)",
+    trafficMax: "Tr√°fico DuoWindo6601 Max (Gemini API Key De Pago)",
     allInSuper: "Todo en Super", aiExplain: "Explicaci√≥n de respuestas (IA)", currentPlan: "PLAN ACTUAL", streakDays: "D√≠as de racha",
     totalXP: "XP Total", playChess: "JUGAR AL AJEDREZ", chessDesc: "Partidas con DuoWindo6601", games: "PARTIDAS", wins: "VICTORIAS", elo: "ELO",
     startChess: "INICIAR: +30 XP", startSpeak: "Empezar a hablar ‚Üí", whatHeard: "¬øQu√© escuchaste?", speakForDuo: "Hablar por Duo",
@@ -2278,6 +2303,9 @@ const TRANSLATIONS: Record<string, any> = {
     t_topic_empty: '„Éà„Éî„ÉÉ„ÇØÊú™ÈÅ∏Êäû', t_api_error: 'API„Ç®„É©„Éº', t_speech_empty: 'Èü≥Â£∞„Å™„Åó', alphabet: 'ÊñáÂ≠ó', explainMax: 'ÂõûÁ≠î„ÇíËß£Ë™¨', explainHeader: '„Éü„Çπ„ÅÆËß£Ë™¨',
     ishihara: 'Áü≥ÂéüÂºèËâ≤Ë¶ö„ÉÜ„Çπ„Éà', ishiharaDesc: 'Ëâ≤Ë¶ö„ÉÅ„Çß„ÉÉ„ÇØ', auto: 'Ëá™Âãï',
     chooseTier: "„Éó„É©„É≥„ÇíÈÅ∏Êäû", energy25: "25 „Ç®„Éç„É´„ÇÆ„Éº", ads: "Â∫ÉÂëä", infEnergy: "ÁÑ°Âà∂Èôê„Ç®„Éç„É´„ÇÆ„Éº", noAds: "Â∫ÉÂëä„Å™„Åó",
+    trafficFree: "DuoWindo6601 ÁÑ°Êñô„Éà„É©„Éï„Ç£„ÉÉ„ÇØ (ÁÑ°Êñô Gemini API Key)",
+    trafficSuper: "DuoWindo6601 Super „Éà„É©„Éï„Ç£„ÉÉ„ÇØ (ÊúâÊñô Gemini API Key)",
+    trafficMax: "DuoWindo6601 Max „Éà„É©„Éï„Ç£„ÉÉ„ÇØ (ÊúâÊñô Gemini API Key)",
     allInSuper: "Super„ÅÆÂÖ®Ê©üËÉΩ", aiExplain: "AI„Å´„Çà„ÇãÂõûÁ≠îËß£Ë™¨", currentPlan: "ÁèæÂú®„ÅÆ„Éó„É©„É≥", streakDays: "ÈÄ£Á∂öÊó•Êï∞",
     totalXP: "ÂêàË®àXP", playChess: "„ÉÅ„Çß„Çπ„ÅßÈÅä„Å∂", chessDesc: "DuoWindo6601„Å®„ÅÆÂØæÂ±Ä", games: "ÂØæÂ±ÄÊï∞", wins: "ÂãùÂà©", elo: "„Ç§„É≠",
     startChess: "ÈñãÂßãÔºö+30 XP", startSpeak: "Ë©±„ÅóÂßã„ÇÅ„Çã ‚Üí", whatHeard: "‰Ωï„ÅåËÅû„Åì„Åà„Åæ„Åó„Åü„ÅãÔºü", speakForDuo: "Duo„ÅÆ‰ª£„Çè„Çä„Å´Ë©±„Åô",
@@ -2449,6 +2477,9 @@ const TRANSLATIONS: Record<string, any> = {
     t_topic_empty: 'Êú™ÈÄâÊã©‰∏ªÈ¢ò', t_api_error: 'API ÈîôËØØ', t_speech_empty: 'Êú™Âê¨Âà∞ËØ≠Èü≥', alphabet: 'Â≠óÊØç', explainMax: 'Ëß£ÈáäÊàëÁöÑÂõûÁ≠î', explainHeader: 'ÈîôËØØËß£Èáä',
     ishihara: 'Áü≥ÂéüËâ≤Áõ≤ÊµãËØï', ishiharaDesc: 'Ëâ≤ËßâÊ£ÄÊü•', auto: 'Ëá™Âä®',
     chooseTier: "ÈÄâÊã©Á≠âÁ∫ß", energy25: "25 ËÉΩÈáè", ads: "ÂπøÂëä", infEnergy: "Êó†ÈôêËÉΩÈáè", noAds: "Êó†ÂπøÂëä",
+    trafficFree: "DuoWindo6601 ÂÖçË¥πÊµÅÈáè (ÂÖçË¥π Gemini API Key)",
+    trafficSuper: "DuoWindo6601 Super ÊµÅÈáè (‰ªòË¥π Gemini API Key)",
+    trafficMax: "DuoWindo6601 Max ÊµÅÈáè (‰ªòË¥π Gemini API Key)",
     allInSuper: "Super ÁöÑÊâÄÊúâÂäüËÉΩ", aiExplain: "AI Ëß£Á≠îÁ∫†Èîô", currentPlan: "ÂΩìÂâçÊñπÊ°à", streakDays: "ËøûÁª≠Â§©Êï∞",
     totalXP: "ÊÄªÁªèÈ™åÂÄº", playChess: "‰∏ãÂõΩÈôÖË±°Ê£ã", chessDesc: "‰∏é DuoWindo6601 ÂØπÂºà", games: "ÂØπÂ±Ä", wins: "ËÉúÂà©", elo: "ÁßØÂàÜ",
     startChess: "ÂºÄÂßãÔºö+30 XP", startSpeak: "ÂºÄÂßãËØ¥ËØù ‚Üí", whatHeard: "‰Ω†Âê¨Âà∞‰∫Ü‰ªÄ‰πàÔºü", speakForDuo: "Êõø Duo ÂèëË®Ä",
@@ -2620,6 +2651,9 @@ const TRANSLATIONS: Record<string, any> = {
     t_topic_empty: 'ŸÑŸÖ Ÿäÿ™ŸÖ ÿ™ÿ≠ÿØŸäÿØ ŸÖŸàÿ∂Ÿàÿπ', t_api_error: 'ÿÆÿ∑ÿ£ ŸÅŸä API', t_speech_empty: 'ŸÑŸÖ Ÿäÿ™ŸÖ ÿ≥ŸÖÿßÿπ ÿµŸàÿ™', alphabet: 'ÿßŸÑÿ£ÿ®ÿ¨ÿØŸäÿ©', explainMax: 'ÿ¥ÿ±ÿ≠ ÿ•ÿ¨ÿßÿ®ÿ™Ÿä', explainHeader: 'ÿ¥ÿ±ÿ≠ ÿßŸÑÿÆÿ∑ÿ£',
     ishihara: 'ÿßÿÆÿ™ÿ®ÿßÿ± ÿ•Ÿäÿ¥ŸäŸáÿßÿ±ÿß', ishiharaDesc: 'ŸÅÿ≠ÿµ ÿ±ÿ§Ÿäÿ© ÿßŸÑÿ£ŸÑŸàÿßŸÜ', auto: 'ÿ™ŸÑŸÇÿßÿ¶Ÿä',
     chooseTier: "ÿßÿÆÿ™ÿ± ÿßŸÑŸÖÿ≥ÿ™ŸàŸâ", energy25: "25 ÿ∑ÿßŸÇÿ©", ads: "ÿßŸÑÿ•ÿπŸÑÿßŸÜÿßÿ™", infEnergy: "ÿ∑ÿßŸÇÿ© ÿ∫Ÿäÿ± ŸÖÿ≠ÿØŸàÿØÿ©", noAds: "ÿ®ÿØŸàŸÜ ÿ•ÿπŸÑÿßŸÜÿßÿ™",
+    trafficFree: "ÿ≠ÿ±ŸÉÿ© ŸÖÿ±Ÿàÿ± DuoWindo6601 ÿßŸÑŸÖÿ¨ÿßŸÜŸäÿ© (Gemini API Key ŸÖÿ¨ÿßŸÜŸä)",
+    trafficSuper: "ÿ≠ÿ±ŸÉÿ© ŸÖÿ±Ÿàÿ± DuoWindo6601 Super (Gemini API Key ŸÖÿØŸÅŸàÿπ)",
+    trafficMax: "ÿ≠ÿ±ŸÉÿ© ŸÖÿ±Ÿàÿ± DuoWindo6601 Max (Gemini API Key ŸÖÿØŸÅŸàÿπ)",
     allInSuper: "ÿ¨ŸÖŸäÿπ ŸÖŸäÿ≤ÿßÿ™ Super", aiExplain: "ÿ™Ÿàÿ∂Ÿäÿ≠ ÿßŸÑÿ∞ŸÉÿßÿ° ÿßŸÑÿßÿµÿ∑ŸÜÿßÿπŸä", currentPlan: "ÿßŸÑÿÆÿ∑ÿ© ÿßŸÑÿ≠ÿßŸÑŸäÿ©", streakDays: "ÿ£ŸäÿßŸÖ ŸÖÿ™ÿ™ÿßŸÑŸäÿ©",
     totalXP: "ÿ•ÿ¨ŸÖÿßŸÑŸä ÿßŸÑŸÜŸÇÿßÿ∑", playChess: "ŸÑÿπÿ® ÿßŸÑÿ¥ÿ∑ÿ±ŸÜÿ¨", chessDesc: "ÿßŸÑŸÑÿπÿ® ŸÖÿπ DuoWindo6601", games: "ŸÖÿ®ÿßÿ±Ÿäÿßÿ™", wins: "ÿßŸÜÿ™ÿµÿßÿ±ÿßÿ™", elo: "ÿßŸÑÿ™ÿµŸÜŸäŸÅ",
     startChess: "ÿßÿ®ÿØÿ£: +30 XP", startSpeak: "ÿßÿ®ÿØÿ£ ÿßŸÑÿ™ÿ≠ÿØÿ´ ‚Üê", whatHeard: "ŸÖÿßÿ∞ÿß ÿ≥ŸÖÿπÿ™ÿü", speakForDuo: "ÿßŸÑÿ™ÿ≠ÿØÿ´ ÿπŸÜ Duo",
@@ -2748,7 +2782,26 @@ const sanitizeForFirestore = (obj: any) => {
   return cleaned;
 };
 
+const DUO_TIPS = [
+  "ü¶â Duo —Ç–æ—á–∏—Ç –∫–∞—Ä–∞–Ω–¥–∞—à–∏ –∏ —Ä–∞—Å–∫–ª–∞–¥—ã–≤–∞–µ—Ç –∫–∞—Ä—Ç–æ—á–∫–∏...",
+  "üí° 15 –º–∏–Ω—É—Ç –≤ –¥–µ–Ω—å ‚Äî –∏ –≤—ã –∑–∞–≥–æ–≤–æ—Ä–∏—Ç–µ —Å–≤–æ–±–æ–¥–Ω–æ!",
+  "‚ú® –ù–µ –±–æ–π—Ç–µ—Å—å –æ—à–∏–±–∞—Ç—å—Å—è ‚Äî –Ω–∞ –æ—à–∏–±–∫–∞—Ö —É—á–∞—Ç—Å—è –±—ã—Å—Ç—Ä–µ–µ!",
+  "üéØ –ü–æ–¥–±–∏—Ä–∞–µ–º –ø–µ—Ä—Å–æ–Ω–∞–ª—å–Ω—ã–µ —É–ø—Ä–∞–∂–Ω–µ–Ω–∏—è –ø–æ–¥ –≤–∞—à —É—Ä–æ–≤–µ–Ω—å...",
+  "‚ö° –ù–µ –ø—Ä–µ—Ä—ã–≤–∞–π—Ç–µ —Å–µ—Ä–∏—é —É–¥–∞—Ä–Ω—ã—Ö –¥–Ω–µ–π ‚Äî –≤—ã –Ω–∞ –≤–µ—Ä–Ω–æ–º –ø—É—Ç–∏!",
+  "üß† –†–µ–≥—É–ª—è—Ä–Ω–æ—Å—Ç—å –∑–∞–Ω—è—Ç–∏–π –Ω–∞–º–Ω–æ–≥–æ –≤–∞–∂–Ω–µ–µ –∏—Ö –¥–ª–∏—Ç–µ–ª—å–Ω–æ—Å—Ç–∏!",
+  "üéâ –ö–∞–∂–¥—ã–π –ø—Ä–æ–π–¥–µ–Ω–Ω—ã–π —É—Ä–æ–∫ –ø—Ä–∏–±–ª–∏–∂–∞–µ—Ç –≤–∞—Å –∫ –∑–∞–≤–µ—Ç–Ω–æ–π —Ü–µ–ª–∏!",
+  "üåü –ò–∑—É—á–µ–Ω–∏–µ –Ω–æ–≤–æ–≥–æ —è–∑—ã–∫–∞ —Ç—Ä–µ–Ω–∏—Ä—É–µ—Ç –ø–∞–º—è—Ç—å –∏ –º–æ–∑–≥!"
+];
+
 function App() {
+  const [simSystemMode, setSimSystemMode] = useState<SimulationMode>("real");
+  const [systemDismissed, setSystemDismissed] = useState<boolean>(false);
+  const [showSystemInfoModal, setShowSystemInfoModal] = useState<boolean>(false);
+
+  const systemInfo = useMemo(() => {
+    return detectSystemCompatibility(simSystemMode);
+  }, [simSystemMode]);
+
   const [screen, setScreen] = useState<AppScreen>(AppScreen.PATH);
   const [offlineMode, setOfflineMode] = useState(false);
   
@@ -2888,6 +2941,35 @@ const getTodayChallenge = () => {
   });
 
   const [loading, setLoading] = useState(false);
+  const [isCheckingApi, setIsCheckingApi] = useState(false);
+  const [lessonLoading, setLessonLoading] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(25);
+  const [loadingTipIndex, setLoadingTipIndex] = useState(0);
+  const [showQuitModal, setShowQuitModal] = useState(false);
+
+  useEffect(() => {
+    if (!lessonLoading) {
+      setLoadingProgress(25);
+      return;
+    }
+    setLoadingProgress(30);
+    const tipInterval = setInterval(() => {
+      setLoadingTipIndex(prev => (prev + 1) % DUO_TIPS.length);
+    }, 2200);
+
+    const progressInterval = setInterval(() => {
+      setLoadingProgress(prev => {
+        if (prev >= 92) return prev;
+        return prev + (prev < 65 ? 12 : 4);
+      });
+    }, 280);
+
+    return () => {
+      clearInterval(tipInterval);
+      clearInterval(progressInterval);
+    };
+  }, [lessonLoading]);
+
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [authLoading, setAuthLoading] = useState<boolean>(true);
   const initialSyncComplete = useRef<boolean>(false);
@@ -3199,6 +3281,44 @@ const getTodayChallenge = () => {
   const [showIncognitoRestrictionsModal, setShowIncognitoRestrictionsModal] = useState<boolean>(false);
   const [regInitialTab, setRegInitialTab] = useState<'login' | 'register' | 'google' | 'incognito'>('register');
 
+  // AI Daily Limit Modal states & handlers
+  const [isAiLimitModalOpen, setIsAiLimitModalOpen] = useState<boolean>(false);
+  const [aiLimitStatus, setAiLimitStatus] = useState<AiUsageStatus | null>(null);
+
+  useEffect(() => {
+    const handleAiLimitEvent = (event: Event) => {
+      // NEVER show limit modal if custom API key is skipped (using free DuoWindo6601 traffic) or user has Super / Max!
+      if (isCustomApiKeySkipped() || user.subscription === 'super' || user.subscription === 'max') {
+        return;
+      }
+      const customEvent = event as CustomEvent<AiUsageStatus>;
+      if (customEvent.detail) {
+        setAiLimitStatus(customEvent.detail);
+      } else {
+        setAiLimitStatus(getTodayAiUsage(user));
+      }
+      setIsAiLimitModalOpen(true);
+    };
+
+    const handleDisableOffline = () => {
+      setOfflineMode(false);
+    };
+
+    // If key is already skipped or user is super/max, disable offline mode automatically
+    if (isCustomApiKeySkipped() || user.subscription === 'super' || user.subscription === 'max') {
+      setOfflineMode(false);
+    }
+
+    window.addEventListener('duowindo_ai_limit_reached', handleAiLimitEvent);
+    window.addEventListener('duowindo_disable_offline_mode', handleDisableOffline);
+    window.addEventListener('duowindo_api_key_changed', handleDisableOffline);
+    return () => {
+      window.removeEventListener('duowindo_ai_limit_reached', handleAiLimitEvent);
+      window.removeEventListener('duowindo_disable_offline_mode', handleDisableOffline);
+      window.removeEventListener('duowindo_api_key_changed', handleDisableOffline);
+    };
+  }, [user]);
+
   const openIncognitoRestrictionsModal = () => {
     playSound('click');
     setShowIncognitoRestrictionsModal(true);
@@ -3441,6 +3561,8 @@ const getTodayChallenge = () => {
   const [chessChat, setChessChat] = useState<RoleplayMessage[]>([]);
   const [chessTab, setChessTab] = useState<'history' | 'chat'>('history');
   const [chessInput, setChessInput] = useState("");
+  const [chessTimerSeconds, setChessTimerSeconds] = useState<number>(20 * 60);
+  const chessMoveHistoryEndRef = useRef<HTMLDivElement>(null);
 
   const [ishiharaInput, setIshiharaInput] = useState("");
   const [readingInput, setReadingInput] = useState("");
@@ -3790,7 +3912,33 @@ const getTodayChallenge = () => {
   const undoDrawing = () => { if (paths.length > 0) { setPaths(prev => prev.slice(0, -1)); playSound('click'); } };
 
   // ... (API and Logic handlers) ...
-  const checkApiStatus = async () => { setLoading(true); try { const res = await checkAnswerWithAI('Test', 'Test', 'Test'); if (res.isFallback) throw new Error("Limit Reached"); setOfflineMode(false); setToast(t('t_api_online')); } catch (e) { setOfflineMode(true); setToast(t('t_offline_limit')); } finally { setLoading(false); } };
+  const checkApiStatus = async () => { 
+    setIsCheckingApi(true); 
+    try { 
+      const res = await pingGeminiApi(); 
+      if (res.ok || isCustomApiKeySkipped() || user.subscription === 'super' || user.subscription === 'max') { 
+        setOfflineMode(false); 
+        setToast(user.language === 'ru' ? "‚ö° Gemini API –æ–Ω–ª–∞–π–Ω –∏ —Ä–∞–±–æ—Ç–∞–µ—Ç (–¢—Ä–∞—Ñ–∏–∫ –∞–∫—Ç–∏–≤–µ–Ω)!" : "‚ö° Gemini API is Online!"); 
+        playSound('success'); 
+      } else { 
+        setOfflineMode(true); 
+        setToast(user.language === 'ru' ? `‚ö†Ô∏è –û—à–∏–±–∫–∞ API: ${res.message}` : `‚ö†Ô∏è API Error: ${res.message}`); 
+        playSound('wrong'); 
+      } 
+    } catch (e: any) { 
+      if (isCustomApiKeySkipped() || user.subscription === 'super' || user.subscription === 'max') {
+        setOfflineMode(false);
+        setToast(user.language === 'ru' ? "‚ö° –ë–µ—Å–ø–ª–∞—Ç–Ω—ã–π —Ç—Ä–∞—Ñ–∏–∫ DuoWindo6601 –æ–Ω–ª–∞–π–Ω!" : "‚ö° DuoWindo6601 Free Traffic Online!");
+        playSound('success');
+      } else {
+        setOfflineMode(true); 
+        setToast(user.language === 'ru' ? "‚ö†Ô∏è –°–±–æ–π –ø—Ä–æ–≤–µ—Ä–∫–∏ —Å–æ–µ–¥–∏–Ω–µ–Ω–∏—è —Å API" : "‚ö†Ô∏è API Connection Test Failed"); 
+        playSound('wrong'); 
+      }
+    } finally { 
+      setIsCheckingApi(false); 
+    } 
+  };
   const handleTranslator = async (targetLangOverride?: string) => {
     if (!translatorInput.trim()) return;
     setLoading(true);
@@ -3831,6 +3979,7 @@ const getTodayChallenge = () => {
     setChessValidMoves([]);
     setChessStatus('active');
     setChessLastMove(null);
+    setChessTimerSeconds(20 * 60);
     setChessChat([{
       role: 'model',
       text: opp.isBot
@@ -3904,8 +4053,9 @@ const getTodayChallenge = () => {
   
   const makeChessMove = async (from: Coords, to: Coords) => { 
       const chess = new Chess(chessFen);
+      let moveObj: any = null;
       try {
-          chess.move({
+          moveObj = chess.move({
               from: coordToAlg(from.r, from.c) as Square,
               to: coordToAlg(to.r, to.c) as Square,
               promotion: 'q'
@@ -3915,6 +4065,13 @@ const getTodayChallenge = () => {
           return;
       }
       
+      const isCapture = !!(moveObj && (moveObj.captured || (moveObj.flags && (moveObj.flags.includes('c') || moveObj.flags.includes('e')))));
+      if (isCapture) {
+          playSound('capture');
+      } else {
+          playSound('click');
+      }
+
       const newFen = chess.fen();
       setChessFen(newFen);
       setChessBoard(parseFen(newFen));
@@ -3983,6 +4140,13 @@ const getTodayChallenge = () => {
       const aiMoves = chess.history({ verbose: true });
       if (aiMoves.length === 0) return;
       const lastMove = aiMoves[aiMoves.length - 1];
+
+      const isCapture = !!(lastMove && (lastMove.captured || (lastMove.flags && (lastMove.flags.includes('c') || lastMove.flags.includes('e')))));
+      if (isCapture) {
+          playSound('capture');
+      } else {
+          playSound('select');
+      }
       
       const newFen = chess.fen();
       setChessFen(newFen);
@@ -4026,6 +4190,53 @@ const getTodayChallenge = () => {
           setChessChat(prev => prev.filter(m => m.text !== '...'));
       } 
   };
+
+  useEffect(() => {
+      let timer: any = null;
+      if (screen === AppScreen.LESSON && currentExercise?.type === 'chess' && chessStatus === 'active') {
+          timer = setInterval(() => {
+              setChessTimerSeconds((prev) => {
+                  if (prev <= 1) {
+                      clearInterval(timer);
+                      setChessStatus('mate');
+                      setFeedback({ status: 'wrong', message: user.language === 'ru' ? '–í—Ä–µ–º—è –≤—ã—à–ª–æ! –ü–æ—Ä–∞–∂–µ–Ω–∏–µ –ø–æ –≤—Ä–µ–º–µ–Ω–∏ ‚è±' : 'Time is up! Defeat on time ‚è±' });
+                      playSound('wrong');
+                      return 0;
+                  }
+                  return prev - 1;
+              });
+          }, 1000);
+      }
+      return () => {
+          if (timer) clearInterval(timer);
+      };
+  }, [screen, currentExercise?.type, chessStatus, user.language]);
+
+  useEffect(() => {
+      if (chessMoveHistoryEndRef.current) {
+          chessMoveHistoryEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
+  }, [chessHistory, chessTab]);
+
+  const formatChessTimer = (sec: number) => {
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  const getFormattedMoveHistory = (history: string[] = chessHistory) => {
+      const pairs: { moveNum: number; moveNumber: number; white: string; black?: string }[] = [];
+      for (let i = 0; i < history.length; i += 2) {
+          const mNum = Math.floor(i / 2) + 1;
+          pairs.push({
+              moveNum: mNum,
+              moveNumber: mNum,
+              white: history[i],
+              black: history[i + 1]
+          });
+      }
+      return pairs;
+  };
   
   const handleExplainMistake = async () => {
     playSound('click');
@@ -4033,14 +4244,128 @@ const getTodayChallenge = () => {
       if (isIncognitoUser) {
         setToast(
           user.language === 'ru'
-            ? 'üîí –§—É–Ω–∫—Ü–∏—è –ò–ò-–æ–±—ä—è—Å–Ω–µ–Ω–∏–π –¥–æ—Å—Ç—É–ø–Ω–∞ –≤ –ø–æ–¥–ø–∏—Å–∫–µ Max (—Ç—Ä–µ–±—É–µ—Ç—Å—è –∞–∫–∫–∞—É–Ω—Ç)'
-            : 'üîí AI Explanation is a Max feature (account registration required)'
+            ? 'üîí –§—É–Ω–∫—Ü–∏—è ¬´–û–±—ä—è—Å–Ω–µ–Ω–∏–µ –æ—Ç–≤–µ—Ç–æ–≤ (AI)¬ª ‚Äî –ø–ª–∞—Ç–Ω–∞—è —Ñ—É–Ω–∫—Ü–∏—è –ø–æ–¥–ø–∏—Å–∫–∏ DuoWindo6601 Max (—Ç—Ä–µ–±—É–µ—Ç—Å—è –∞–∫–∫–∞—É–Ω—Ç)'
+            : 'üîí "AI Answer Explanation" is a paid DuoWindo6601 Max feature (account required)'
+        );
+      } else {
+        setToast(
+          user.language === 'ru'
+            ? 'üîí –§—É–Ω–∫—Ü–∏—è ¬´–û–±—ä—è—Å–Ω–µ–Ω–∏–µ –æ—Ç–≤–µ—Ç–æ–≤ (AI)¬ª ‚Äî –ø–ª–∞—Ç–Ω–∞—è —Ñ—É–Ω–∫—Ü–∏—è, –¥–æ—Å—Ç—É–ø–Ω–∞—è —Ç–æ–ª—å–∫–æ –≤ –ø–æ–¥–ø–∏—Å–∫–µ DuoWindo6601 Max'
+            : 'üîí "AI Answer Explanation" is a paid feature available only in DuoWindo6601 Max'
         );
       }
       setScreen(AppScreen.SUBSCRIPTION);
       return;
-    } if (!currentExercise) return; setShowExplanationModal(true); if (explanation) return; setExplanationLoading(true); let userAnswer = ""; if (currentExercise.type === 'speech') userAnswer = transcriptRef.current || "(No speech detected)"; else if (currentExercise.type === 'ishihara') userAnswer = ishiharaInput || "No input"; else userAnswer = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text).join(' '); const correctAnswer = currentExercise.type === 'speech' ? currentExercise.originalSentence : currentExercise.targetTranslation; const original = currentExercise.type === 'ishihara' ? "Ishihara Test" : currentExercise.originalSentence; const userLang = user.language === 'en' ? 'English' : 'Russian'; try { const explanationText = await getMistakeExplanation(original, userAnswer, correctAnswer, userLang); setExplanation(explanationText); } catch (e) { setExplanation("Error loading explanation."); } finally { setExplanationLoading(false); } };
-  const startTraining = async (type: Exercise['type'] = 'translation', topicOverride?: string) => { playSound('click'); if (user.subscription === 'free' && user.energy <= 0) { setToast(t('t_energy_low')); setScreen(AppScreen.SHOP); return; } if (currentCourse.id === 'chess') { initChessGame(); setCurrentExercise({ id: crypto.randomUUID(), type: 'chess', originalSentence: "Chess Game", targetTranslation: "Checkmate", wordBank: [], chessData: { fen: INITIAL_BOARD_FEN, pgn: [], difficulty: 'beginner' } }); setScreen(AppScreen.LESSON); return; } if (offlineMode) { setLoading(true); const ex = getFallbackExercise(currentCourse.id, type, currentCourse.localName); setCurrentExercise(ex); setAvailableTokens((ex.wordBank || []).map(w => ({ id: crypto.randomUUID(), text: w }))); setScreen(AppScreen.LESSON); setLoading(false); return; } setLoading(true); try { if (type === 'roleplay') { setRoleplayInput(""); const ex = await startRoleplay(currentCourse.localName, currentCourse.id); if (ex.isFallback && !offlineMode) setShowLimitModal(true); setCurrentExercise(ex); setScreen(AppScreen.LESSON); if (ex.roleplayData?.messages[0]) speakText(ex.roleplayData.messages[0].text, currentCourse.id, false, user.preferredVoice, user.voiceProvider); } else if (type === 'illusion') { const ex = await generateIllusion(currentCourse.localName, currentCourse.id); if (ex.isFallback && !offlineMode) setShowLimitModal(true); setCurrentExercise(ex); setScreen(AppScreen.LESSON); if (ex.illusionData) speakText(ex.illusionData.soundText, currentCourse.id, false, user.preferredVoice, user.voiceProvider); } else if (type === 'drawing') { const ex = await generateDrawing(currentCourse.localName, currentCourse.id, topicOverride); if (ex.isFallback && !offlineMode) setShowLimitModal(true); setCurrentExercise(ex); setPaths([]); setScreen(AppScreen.LESSON); setShowTrace(true); if (ex.drawingData) speakText(ex.drawingData.character, currentCourse.id, false, user.preferredVoice, user.voiceProvider); } else if (type === 'ishihara') { const ex = await generateIshihara(currentCourse.id); if (ex.isFallback && !offlineMode) setShowLimitModal(true); setCurrentExercise(ex); setIshiharaInput(""); setScreen(AppScreen.LESSON); } else if (type === 'reading') { const ex = await generateReading(currentCourse.localName, currentCourse.id); if (ex.isFallback && !offlineMode) setShowLimitModal(true); setCurrentExercise(ex); setReadingInput(""); setScreen(AppScreen.LESSON); if (ex.readingData?.mode === 'fill-blanks') { setAvailableTokens((ex.wordBank || []).map(w => ({ id: crypto.randomUUID(), text: w }))); setSelectedWordIds([]); } } else { const ex = await generateExercise(currentCourse.localName, currentCourse.id, isLanguageCourse, type, user.subscription === 'max', topicOverride); if (ex.isFallback && !offlineMode) setShowLimitModal(true); setAvailableTokens((ex.wordBank || []).map(w => ({ id: crypto.randomUUID(), text: w }))); setSelectedWordIds([]); setCurrentExercise(ex); setScreen(AppScreen.LESSON); setFeedback({ status: 'idle', message: '' }); transcriptRef.current = ""; if (isLanguageCourse && type === 'listening') speakText(ex.originalSentence, currentCourse.id, false, user.preferredVoice, user.voiceProvider); } } catch (e) { setToast(t('t_api_error')); } finally { setLoading(false); } };
+    }
+    if (!currentExercise) return;
+    setShowExplanationModal(true);
+    if (explanation) return;
+    setExplanationLoading(true);
+    let userAnswer = "";
+    if (currentExercise.type === 'speech') userAnswer = transcriptRef.current || "(No speech detected)";
+    else if (currentExercise.type === 'ishihara') userAnswer = ishiharaInput || "No input";
+    else userAnswer = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text).join(' ');
+    const correctAnswer = currentExercise.type === 'speech' ? currentExercise.originalSentence : currentExercise.targetTranslation;
+    const original = currentExercise.type === 'ishihara' ? "Ishihara Test" : currentExercise.originalSentence;
+    const userLang = user.language === 'en' ? 'English' : 'Russian';
+    try {
+      const explanationText = await getMistakeExplanation(original, userAnswer, correctAnswer, userLang);
+      setExplanation(explanationText);
+    } catch (e) {
+      setExplanation(generateLocalMistakeExplanation(original, userAnswer, correctAnswer, userLang));
+    } finally {
+      setExplanationLoading(false);
+    }
+  };
+  const startTraining = async (type: Exercise['type'] = 'translation', topicOverride?: string) => {
+    playSound('click');
+    if (user.subscription === 'free' && user.energy <= 0) {
+      setToast(t('t_energy_low'));
+      setScreen(AppScreen.SHOP);
+      return;
+    }
+
+    if (currentCourse.id === 'chess') {
+      initChessGame();
+      setCurrentExercise({
+        id: crypto.randomUUID(),
+        type: 'chess',
+        originalSentence: "Chess Game",
+        targetTranslation: "Checkmate",
+        wordBank: [],
+        chessData: { fen: INITIAL_BOARD_FEN, pgn: [], difficulty: 'beginner' }
+      });
+      setScreen(AppScreen.LESSON);
+      return;
+    }
+
+    // Authentic Duolingo lesson loading screen transition
+    setCurrentExercise(null);
+    setLessonLoading(true);
+    setLoading(true);
+    setScreen(AppScreen.LESSON);
+    setFeedback({ status: 'idle', message: '' });
+    setSelectedWordIds([]);
+    setPaths([]);
+    setIshiharaInput("");
+    setReadingInput("");
+
+    if (offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') {
+      const ex = getFallbackExercise(currentCourse.id, type, currentCourse.localName);
+      setCurrentExercise(ex);
+      setAvailableTokens((ex.wordBank || []).map(w => ({ id: crypto.randomUUID(), text: w })));
+      setLessonLoading(false);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      if (type === 'roleplay') {
+        setRoleplayInput("");
+        const ex = await startRoleplay(currentCourse.localName, currentCourse.id);
+        setCurrentExercise(ex);
+        if (ex.roleplayData?.messages[0]) speakText(ex.roleplayData.messages[0].text, currentCourse.id, false, user.preferredVoice, user.voiceProvider);
+      } else if (type === 'illusion') {
+        const ex = await generateIllusion(currentCourse.localName, currentCourse.id);
+        setCurrentExercise(ex);
+        if (ex.illusionData) speakText(ex.illusionData.soundText, currentCourse.id, false, user.preferredVoice, user.voiceProvider);
+      } else if (type === 'drawing') {
+        const ex = await generateDrawing(currentCourse.localName, currentCourse.id, topicOverride);
+        setCurrentExercise(ex);
+        setPaths([]);
+        setShowTrace(true);
+        if (ex.drawingData) speakText(ex.drawingData.character, currentCourse.id, false, user.preferredVoice, user.voiceProvider);
+      } else if (type === 'ishihara') {
+        const ex = await generateIshihara(currentCourse.id);
+        setCurrentExercise(ex);
+        setIshiharaInput("");
+      } else if (type === 'reading') {
+        const ex = await generateReading(currentCourse.localName, currentCourse.id);
+        setCurrentExercise(ex);
+        setReadingInput("");
+        if (ex.readingData?.mode === 'fill-blanks') {
+          setAvailableTokens((ex.wordBank || []).map(w => ({ id: crypto.randomUUID(), text: w })));
+          setSelectedWordIds([]);
+        }
+      } else {
+        const ex = await generateExercise(currentCourse.localName, currentCourse.id, isLanguageCourse, type, user.subscription === 'max', topicOverride);
+        setAvailableTokens((ex.wordBank || []).map(w => ({ id: crypto.randomUUID(), text: w })));
+        setSelectedWordIds([]);
+        setCurrentExercise(ex);
+        transcriptRef.current = "";
+        if (isLanguageCourse && type === 'listening') speakText(ex.originalSentence, currentCourse.id, false, user.preferredVoice, user.voiceProvider);
+      }
+    } catch (e: any) {
+      console.warn("API exercise generation failed, smoothly loading offline exercise:", e);
+      const ex = getFallbackExercise(currentCourse.id, type, currentCourse.localName);
+      setAvailableTokens((ex.wordBank || []).map(w => ({ id: crypto.randomUUID(), text: w })));
+      setSelectedWordIds([]);
+      setCurrentExercise(ex);
+    } finally {
+      setLessonLoading(false);
+      setLoading(false);
+    }
+  };
   const awardLessonStreak = () => {
     try {
       const todayStr = new Date().toISOString().split('T')[0];
@@ -4058,10 +4383,10 @@ const getTodayChallenge = () => {
     }
   };
 
-  const handleRoleplaySend = async (text: string) => { if (!currentExercise || !currentExercise.roleplayData || !text.trim()) return; const newMessage: RoleplayMessage = { role: 'user', text: text }; const updatedMessages = [...currentExercise.roleplayData.messages, newMessage]; setCurrentExercise({ ...currentExercise, roleplayData: { ...currentExercise.roleplayData, messages: updatedMessages, userTurn: false } }); setRoleplayInput(""); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); setLoading(true); try { const reply = await replyToRoleplay(updatedMessages, text, currentCourse.localName, user.subscription === 'max'); if (reply.isFallback && !offlineMode) setShowLimitModal(true); setCurrentExercise(prev => { if (!prev || !prev.roleplayData) return prev; return { ...prev, roleplayData: { ...prev.roleplayData, messages: [...updatedMessages, reply], userTurn: true } } }); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); speakText(reply.text, currentCourse.id, false, user.preferredVoice, user.voiceProvider); setUser(u => ({ ...u, xp: u.xp + 10 })); checkAndAwardDailyChallenge('roleplay'); awardLessonStreak(); } catch (e) { console.error(e); } finally { setLoading(false); } };
+  const handleRoleplaySend = async (text: string) => { if (!currentExercise || !currentExercise.roleplayData || !text.trim()) return; const newMessage: RoleplayMessage = { role: 'user', text: text }; const updatedMessages = [...currentExercise.roleplayData.messages, newMessage]; setCurrentExercise({ ...currentExercise, roleplayData: { ...currentExercise.roleplayData, messages: updatedMessages, userTurn: false } }); setRoleplayInput(""); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); setLoading(true); try { const reply = await replyToRoleplay(updatedMessages, text, currentCourse.localName, user.subscription === 'max'); if (reply.isFallback && !offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); setCurrentExercise(prev => { if (!prev || !prev.roleplayData) return prev; return { ...prev, roleplayData: { ...prev.roleplayData, messages: [...updatedMessages, reply], userTurn: true } } }); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); speakText(reply.text, currentCourse.id, false, user.preferredVoice, user.voiceProvider); setUser(u => ({ ...u, xp: u.xp + 10 })); checkAndAwardDailyChallenge('roleplay'); awardLessonStreak(); } catch (e) { console.error(e); } finally { setLoading(false); } };
   const checkIllusionAnswer = async (selectedOption: 'A' | 'B') => { if (!currentExercise || !currentExercise.illusionData) return; setLoading(true); try { const isCorrect = currentExercise.illusionData.correctOption === selectedOption; if (isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: currentExercise.illusionData.explanation }); setUser(u => ({ ...u, xp: u.xp + 20 })); checkAndAwardDailyChallenge('illusion'); awardLessonStreak(); } else { playSound('wrong'); const correctText = currentExercise.illusionData.correctOption === 'A' ? currentExercise.illusionData.optionA : currentExercise.illusionData.optionB; setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${correctText}. ${currentExercise.illusionData.explanation}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } finally { setLoading(false); } };
-  const checkDrawingAnswer = async () => { if (!currentExercise || !currentExercise.drawingData || !canvasRef.current) return; playSound('click'); setLoading(true); try { const imageBase64 = canvasRef.current.toDataURL('image/png').split(',')[1]; const result = await checkDrawing(imageBase64, currentExercise.drawingData.character); if (result.isFallback && !offlineMode) setShowLimitModal(true); if (result.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: result.feedback }); setUser(u => ({ ...u, xp: u.xp + 20 })); checkAndAwardDailyChallenge('drawing'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: result.feedback }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } catch (e) { console.error(e); } finally { setLoading(false); } };
-  const checkAnswer = async (spokenText?: string) => { if (!currentExercise) return; if (isRecording) { setIsRecording(false); if (recognitionRef.current) recognitionRef.current.stop(); if (timerRef.current) clearTimeout(timerRef.current); } if (!spokenText && currentExercise.type !== 'ishihara') playSound('click'); if (currentExercise.type === 'ishihara') { const correct = currentExercise.targetTranslation; const userAnswer = ishiharaInput.trim(); if (userAnswer === correct) { playSound('correct'); setFeedback({ status: 'correct', message: "Correct! You have good color vision for this plate." }); setUser(u => ({ ...u, xp: u.xp + 15 })); checkAndAwardDailyChallenge('ishihara'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `Incorrect. The number was ${correct}.` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } return; } if (currentExercise.type === 'reading') { setLoading(true); if (currentExercise.readingData?.mode === 'write') { const ans = readingInput; const res = await checkAnswerWithAI(currentCourse.localName, ans, currentExercise.readingData.prompt || "Write something relevant", user.subscription === 'max'); if (res.isFallback && !offlineMode) setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + 20, gems: u.gems + 5 })); checkAndAwardDailyChallenge('reading'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: res.feedback }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } setLoading(false); return; } else { let tempText = currentExercise.readingData!.text; const blanksCount = (tempText.match(/___/g) || []).length; if (selectedWordIds.length !== blanksCount) { setToast("Fill all blanks!"); setLoading(false); return; } const correctWords = currentExercise.readingData!.blanks?.map(b => b.word) || []; const userWords = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text); const isCorrect = correctWords.every((w, i) => w.toLowerCase() === userWords[i]?.toLowerCase()); if (isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: "Perfect!" }); setUser(u => ({ ...u, xp: u.xp + 20 })); checkAndAwardDailyChallenge('reading'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `Correct: ${currentExercise.targetTranslation}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } setLoading(false); return; } } setLoading(true); try { let ans = ""; if (typeof spokenText === 'string') ans = spokenText; else if (currentExercise.type === 'speech') { if (transcriptRef.current.trim()) ans = transcriptRef.current; else if (!recognitionRef.current) ans = currentExercise.originalSentence; else { setLoading(false); setToast(t('t_speech_empty')); return; } } else ans = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text).join(' '); const correctAnswer = currentExercise.type === 'speech' ? currentExercise.originalSentence : currentExercise.targetTranslation; const res = await checkAnswerWithAI(currentCourse.localName, ans, correctAnswer, user.subscription === 'max'); if (res.isFallback && !offlineMode) setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + 20, gems: u.gems + 5 })); checkAndAwardDailyChallenge(currentExercise.type); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${correctAnswer}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } catch (e) { console.error(e); setToast("–û—à–∏–±–∫–∞ –ø—Ä–æ–≤–µ—Ä–∫–∏"); } finally { setLoading(false); } };
+  const checkDrawingAnswer = async () => { if (!currentExercise || !currentExercise.drawingData || !canvasRef.current) return; playSound('click'); setLoading(true); try { const imageBase64 = canvasRef.current.toDataURL('image/png').split(',')[1]; const result = await checkDrawing(imageBase64, currentExercise.drawingData.character); if (result.isFallback && !offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); if (result.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: result.feedback }); setUser(u => ({ ...u, xp: u.xp + 20 })); checkAndAwardDailyChallenge('drawing'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: result.feedback }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } catch (e) { console.error(e); } finally { setLoading(false); } };
+  const checkAnswer = async (spokenText?: string) => { if (!currentExercise) return; if (isRecording) { setIsRecording(false); if (recognitionRef.current) recognitionRef.current.stop(); if (timerRef.current) clearTimeout(timerRef.current); } if (!spokenText && currentExercise.type !== 'ishihara') playSound('click'); if (currentExercise.type === 'ishihara') { const correct = currentExercise.targetTranslation; const userAnswer = ishiharaInput.trim(); if (userAnswer === correct) { playSound('correct'); setFeedback({ status: 'correct', message: "Correct! You have good color vision for this plate." }); setUser(u => ({ ...u, xp: u.xp + 15 })); checkAndAwardDailyChallenge('ishihara'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `Incorrect. The number was ${correct}.` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } return; } if (currentExercise.type === 'reading') { setLoading(true); if (currentExercise.readingData?.mode === 'write') { const ans = readingInput; const res = await checkAnswerWithAI(currentCourse.localName, ans, currentExercise.readingData.prompt || "Write something relevant", user.subscription === 'max'); if (res.isFallback && !offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + 20, gems: u.gems + 5 })); checkAndAwardDailyChallenge('reading'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: res.feedback }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } setLoading(false); return; } else { let tempText = currentExercise.readingData!.text; const blanksCount = (tempText.match(/___/g) || []).length; if (selectedWordIds.length !== blanksCount) { setToast("Fill all blanks!"); setLoading(false); return; } const correctWords = currentExercise.readingData!.blanks?.map(b => b.word) || []; const userWords = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text); const isCorrect = correctWords.every((w, i) => w.toLowerCase() === userWords[i]?.toLowerCase()); if (isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: "Perfect!" }); setUser(u => ({ ...u, xp: u.xp + 20 })); checkAndAwardDailyChallenge('reading'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `Correct: ${currentExercise.targetTranslation}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } setLoading(false); return; } } setLoading(true); try { let ans = ""; if (typeof spokenText === 'string') ans = spokenText; else if (currentExercise.type === 'speech') { if (transcriptRef.current.trim()) ans = transcriptRef.current; else if (!recognitionRef.current) ans = currentExercise.originalSentence; else { setLoading(false); setToast(t('t_speech_empty')); return; } } else ans = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text).join(' '); const correctAnswer = currentExercise.type === 'speech' ? currentExercise.originalSentence : currentExercise.targetTranslation; const res = await checkAnswerWithAI(currentCourse.localName, ans, correctAnswer, user.subscription === 'max'); if (res.isFallback && !offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + 20, gems: u.gems + 5 })); checkAndAwardDailyChallenge(currentExercise.type); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${correctAnswer}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } catch (e) { console.error(e); setToast("–û—à–∏–±–∫–∞ –ø—Ä–æ–≤–µ—Ä–∫–∏"); } finally { setLoading(false); } };
   const handleContinueAfterLesson = () => { playSound('click'); if (user.subscription === 'free' && Math.random() > 0.5) setShowAd(true); else setScreen(AppScreen.PATH); setFeedback({ status: 'idle', message: '' }); setCurrentExercise(null); setExplanation(null); setShowExplanationModal(false); }
   const handleSkip = () => { playSound('click'); setToast(t('t_skip')); handleContinueAfterLesson(); };
   const toggleRecording = () => { playSound('click'); if (isRecording) { setIsRecording(false); if (recognitionRef.current) recognitionRef.current.stop(); if (timerRef.current) clearTimeout(timerRef.current); if (currentExercise?.type === 'roleplay') setTimeout(() => { if (transcriptRef.current) handleRoleplaySend(transcriptRef.current); }, 500); else if (screen === AppScreen.VIDEO_CALL) setTimeout(() => { if (transcriptRef.current) handleVideoCallSend(transcriptRef.current); }, 500); else if (!recognitionRef.current) checkAnswer(currentExercise?.originalSentence); else setTimeout(() => checkAnswer(), 200); } else { transcriptRef.current = ""; setIsRecording(true); if (recognitionRef.current) try { recognitionRef.current.start(); } catch (e) { console.error("Rec start error", e); setIsRecording(false); } else timerRef.current = setTimeout(() => { setIsRecording(false); if (currentExercise?.type === 'roleplay') handleRoleplaySend("Hello friend!"); else if (screen === AppScreen.VIDEO_CALL) handleVideoCallSend("Hello DuoWindo6601!"); else checkAnswer(currentExercise?.originalSentence); }, 3000); } };
@@ -4119,9 +4444,12 @@ const getTodayChallenge = () => {
     { screen: AppScreen.VIDEO_CALL, icon: CameraIcon, label: t('videoCall') },
     { screen: AppScreen.LEADERBOARD, icon: ShieldIcon, label: t('leaderboard') },
     { screen: AppScreen.SHOP, icon: ChestIcon, label: t('shop') },
+    { screen: AppScreen.SUBSCRIPTION, icon: SparklesIcon, label: user.language === 'ru' ? '–õ–∏–º–∏—Ç & –ü–æ–¥–ø–∏—Å–∫–∞' : 'Limit & Subscription' },
     { screen: AppScreen.PROFILE, icon: UserIcon, label: t('profile') },
-    { screen: AppScreen.FEEDBACK, icon: StarIcon, label: t('feedback') },
-    { screen: AppScreen.TRANSLATOR, icon: BookIcon, label: t('translator') }
+    { screen: AppScreen.FEEDBACK, icon: StarIcon, label: user.language === 'ru' ? '–û—Ç–∑—ã–≤—ã' : 'Reviews' },
+    { screen: AppScreen.SUPPORT_CHAT, icon: ChatBubbleIcon, label: user.language === 'ru' ? '–¢–µ—Ö–ø–æ–¥–¥–µ—Ä–∂–∫–∞' : 'Support Chat' },
+    { screen: AppScreen.TRANSLATOR, icon: BookIcon, label: t('translator') },
+    ...(user.isAdmin ? [{ screen: AppScreen.ADMIN_DASHBOARD, icon: GearIcon, label: 'Admin Tool üõ°Ô∏è' }] : [])
   ];
 
   const renderAppLayout = () => {
@@ -4217,7 +4545,29 @@ const getTodayChallenge = () => {
                         </span>
                       </button>
                     )}
-                    {/* QUICK LANGUAGE SWITCHER */}
+                                      {/* SYSTEM STATUS BADGE BUTTON */}
+                  <button
+                    onClick={() => setShowSystemInfoModal(true)}
+                    className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center space-x-1 shadow-md cursor-pointer border ${
+                      systemInfo.warningType === "windows_xp_vista"
+                        ? "bg-red-950/80 hover:bg-red-900 text-red-300 border-red-500/60 animate-pulse"
+                        : systemInfo.warningType === "old_browser"
+                          ? "bg-amber-950/80 hover:bg-amber-900 text-amber-300 border-amber-500/60"
+                          : "bg-gray-800/80 hover:bg-gray-700 text-emerald-400 border-gray-700"
+                    }`}
+                    title="–ò–Ω—Ñ–æ—Ä–º–∞—Ü–∏—è –æ —Å–∏—Å—Ç–µ–º–µ –∏ –û–° (Windows 7/8/8.1/10/11 & XP/Vista)"
+                  >
+                    <span>{systemInfo.warningType === "windows_xp_vista" ? "üõë" : systemInfo.warningType === "old_browser" ? "‚ö†Ô∏è" : "üíª"}</span>
+                    <span className="hidden sm:inline">
+                      {systemInfo.warningType === "windows_xp_vista" 
+                        ? "Win XP/Vista" 
+                        : systemInfo.warningType === "old_browser" 
+                          ? "–°—Ç–∞—Ä—ã–π –ë—Ä–∞—É–∑–µ—Ä" 
+                          : "Win 7-11"}
+                    </span>
+                  </button>
+
+{/* QUICK LANGUAGE SWITCHER */}
                     <div className="relative group">
                       <button 
                         onClick={() => {
@@ -4242,7 +4592,7 @@ const getTodayChallenge = () => {
                       <span className="hidden sm:inline">–ë–µ—Ç–∞-–¢–µ—Å—Ç</span>
                     </button>
                     <button 
-                      onClick={() => { playSound('click'); setShowBrowserModal(true); }} 
+                      onClick={() => { playSound('click'); setShowBrowserModal(true); setShowSystemInfoModal(true); }} 
                       className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider ${isOutdatedBrowserDetected ? 'bg-amber-950 text-amber-300 border border-amber-500/80 animate-pulse' : 'bg-gray-800/80 text-gray-300 border border-gray-700 hover:text-white'} hover:scale-105 transition-all flex items-center space-x-1 shadow-md cursor-pointer`}
                       title="–ü—Ä–µ–¥—É–ø—Ä–µ–∂–¥–µ–Ω–∏–µ –æ –±—Ä–∞—É–∑–µ—Ä–µ / –ü–æ–¥–¥–µ—Ä–∂–∫–∞"
                     >
@@ -4395,7 +4745,46 @@ const getTodayChallenge = () => {
                     <button onClick={() => { playSound('click'); setScreen(AppScreen.PROFILE); }} className="mb-6 text-gray-500 hover:text-white flex items-center font-bold"><CloseIcon className="w-8 h-8 mr-2"/> {t('back')}</button>
                     <h2 className="text-4xl font-black mb-8">{t('settings')}</h2>
                     
-                    {/* PROFILE SUMMARY & EDIT TRIGGER */}
+                                        {/* SYSTEM COMPATIBILITY CARD */}
+                    <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xl ${
+                            systemInfo.warningType === "windows_xp_vista" ? "bg-red-600 text-white" : systemInfo.warningType === "old_browser" ? "bg-amber-500 text-black" : "bg-emerald-600 text-white"
+                          }`}>
+                            {systemInfo.warningType === "windows_xp_vista" ? "üõë" : systemInfo.warningType === "old_browser" ? "‚ö†Ô∏è" : "üíª"}
+                          </div>
+                          <div>
+                            <h4 className="font-black text-base text-white uppercase tracking-wider">
+                              –°–æ–≤–º–µ—Å—Ç–∏–º–æ—Å—Ç—å –û–° –∏ –ë—Ä–∞—É–∑–µ—Ä–∞
+                            </h4>
+                            <p className="text-xs text-gray-400 font-bold">
+                              Windows 7/8/8.1/10/11 (–ë–µ–∑ –ø—Ä–µ–¥—É–ø—Ä–µ–∂–¥–µ–Ω–∏–π) | XP/Vista (–ü—Ä–µ–∫—Ä–∞—â–µ–Ω–æ)
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => setShowSystemInfoModal(true)}
+                          className="px-4 py-2 bg-duo-blue hover:bg-duo-blue/90 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition-all active:scale-95"
+                        >
+                          –ü—Ä–æ–≤–µ—Ä–∏—Ç—å
+                        </button>
+                      </div>
+
+                      <div className="bg-gray-800/80 p-3 rounded-2xl border border-gray-700 text-xs flex items-center justify-between">
+                        <span className="text-gray-300 font-bold">
+                          –¢–µ–∫—É—â–∞—è –û–°: <strong className="text-white">{systemInfo.osName}</strong> | –ë—Ä–∞—É–∑–µ—Ä: <strong className="text-white">{systemInfo.browserName}</strong>
+                        </span>
+                        <span className={`font-black px-2 py-0.5 rounded text-[10px] uppercase ${
+                          systemInfo.isModernSystem ? "bg-emerald-950 text-emerald-300 border border-emerald-500/40" : "bg-red-950 text-red-300 border border-red-500/40"
+                        }`}>
+                          {systemInfo.isModernSystem ? "–ü–æ–¥–¥–µ—Ä–∂–∏–≤–∞–µ—Ç—Å—è" : "–ü—Ä–µ–¥—É–ø—Ä–µ–∂–¥–µ–Ω–∏–µ"}
+                        </span>
+                      </div>
+                    </div>
+
+{/* PROFILE SUMMARY & EDIT TRIGGER */}
                     <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl flex items-center justify-between">
                         <div className="flex items-center space-x-4">
                             <div className={`w-14 h-14 rounded-2xl ${user.avatarColor || 'bg-duo-blue'} flex items-center justify-center text-2xl font-bold overflow-hidden border-2 border-gray-700 shadow-md`}>
@@ -4441,7 +4830,36 @@ const getTodayChallenge = () => {
                         </div>
                     </div>
 
-                    <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl"><h3 className="text-xl font-bold mb-4 text-white uppercase tracking-widest">{t('apiStatus')}</h3><div className="flex items-center justify-between"><div className="flex items-center space-x-3"><div className={`w-4 h-4 rounded-full ${offlineMode ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div><span className={`font-bold text-lg ${offlineMode ? 'text-red-400' : 'text-green-400'}`}>{offlineMode ? t('limitReached') : t('online')}</span></div><button onClick={() => { playSound('click'); checkApiStatus(); }} className="px-4 py-2 bg-gray-700 rounded-xl font-bold text-sm hover:bg-gray-600 transition-all border-b-4 border-gray-800 active:border-b-0 active:translate-y-1">{t('checkConnection')}</button></div></div>
+                    <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl">
+                      <h3 className="text-xl font-bold mb-4 text-white uppercase tracking-widest">{t('apiStatus')}</h3>
+                      <div className="flex items-center justify-between flex-wrap gap-4">
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-4 h-4 rounded-full ${offlineMode ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div>
+                          <div>
+                            <span className={`font-black text-lg ${offlineMode ? 'text-red-400' : 'text-green-400'}`}>
+                              {offlineMode 
+                                ? (user.language === 'ru' ? '–û—Ñ–ª–∞–π–Ω / –û—à–∏–±–∫–∞' : t('limitReached')) 
+                                : (user.language === 'ru' ? '–û–Ω–ª–∞–π–Ω' : t('online'))}
+                            </span>
+                            <p className="text-xs text-gray-400 font-bold">
+                              {user.language === 'ru' ? '–ü—Ä–æ–≤–µ—Ä–∫–∞ —Å–≤—è–∑–∏ —Å –º–æ–¥–µ–ª—å—é Gemini 3.8 Flash' : 'Gemini 3.8 Flash model connection status'}
+                            </p>
+                          </div>
+                        </div>
+                        <button 
+                          disabled={isCheckingApi}
+                          onClick={() => { playSound('click'); checkApiStatus(); }} 
+                          className="px-5 py-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 rounded-2xl font-black text-xs md:text-sm transition-all border-b-4 border-gray-800 active:border-b-0 active:translate-y-1 uppercase tracking-wider text-white flex items-center space-x-2 shadow-lg cursor-pointer"
+                        >
+                          {isCheckingApi && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>}
+                          <span>
+                            {isCheckingApi 
+                              ? (user.language === 'ru' ? '–ü–†–û–í–ï–†–ö–ê...' : 'CHECKING...') 
+                              : (user.language === 'ru' ? '–ü–†–û–í–ï–†–ò–¢–¨ –°–û–ï–î–ò–ù–ï–ù–ò–ï' : t('checkConnection'))}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
 
                     {/* SYNC STATUS & OFFLINE CACHE CONTROLLER */}
                     <div className="bg-duo-card border-2 border-emerald-500/50 rounded-3xl p-6 mb-6 shadow-xl space-y-4">
@@ -4513,13 +4931,13 @@ const getTodayChallenge = () => {
                                             {user.language === 'ru' ? '–¢–∞–∫—Ç–∏–ª—å–Ω—ã–π –æ—Ç–∫–ª–∏–∫ (Haptic Feedback)' : 'Haptic Vibration Feedback'}
                                         </h4>
                                         <span className="bg-amber-500/30 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-md border border-amber-500/50 uppercase">
-                                            Mobile
+                                            Mobile & PC
                                         </span>
                                     </div>
                                     <p className="text-xs text-gray-300 font-medium mt-1">
                                         {user.language === 'ru'
-                                            ? '–í–∏–±—Ä–∞—Ü–∏–æ–Ω–Ω—ã–π –æ—Ç–∫–ª–∏–∫ —Å–º–∞—Ä—Ç—Ñ–æ–Ω–∞ –ø—Ä–∏ –ø—Ä–∞–≤–∏–ª—å–Ω—ã—Ö –∏ –Ω–µ–ø—Ä–∞–≤–∏–ª—å–Ω—ã—Ö –æ—Ç–≤–µ—Ç–∞—Ö –≤ —É—Ä–æ–∫–∞—Ö'
-                                            : 'Tactile vibration response on mobile devices for correct and incorrect lesson answers'}
+                                            ? '–í–∏–±—Ä–∞—Ü–∏–æ–Ω–Ω—ã–π –æ—Ç–∫–ª–∏–∫ —Å–º–∞—Ä—Ç—Ñ–æ–Ω–∞ –∏ –ü–ö –≤–µ—Ä—Å–∏—è –ø—Ä–∏ –ø—Ä–∞–≤–∏–ª—å–Ω—ã—Ö –∏ –Ω–µ–ø—Ä–∞–≤–∏–ª—å–Ω—ã—Ö –æ—Ç–≤–µ—Ç–∞—Ö –≤ —É—Ä–æ–∫–∞—Ö'
+                                            : 'Tactile vibration response on mobile devices and PC version for correct and incorrect lesson answers'}
                                     </p>
                                 </div>
                             </div>
@@ -4538,12 +4956,18 @@ const getTodayChallenge = () => {
                                         : (user.language === 'ru' ? 'üì¥ –¢–∞–∫—Ç–∏–ª—å–Ω—ã–π –æ—Ç–∫–ª–∏–∫ –≤—ã–∫–ª—é—á–µ–Ω' : 'üì¥ Haptic feedback disabled')
                                     );
                                 }}
-                                className={`w-full py-3.5 px-6 rounded-2xl font-black text-xs uppercase tracking-wider border-b-4 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center space-x-2 shadow-lg ${isSyncing ? "bg-gray-700 text-gray-400 border-gray-900 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-800 hover:brightness-110"}`}
+                                className={`py-3.5 px-6 rounded-2xl font-black text-xs uppercase tracking-wider border-b-4 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center space-x-2 shadow-lg shrink-0 ${
+                                    (user.hapticFeedback ?? true)
+                                        ? "bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-800"
+                                        : "bg-gray-800 hover:bg-gray-700 text-gray-400 border-gray-950"
+                                }`}
                                 title="–ü–µ—Ä–µ–∫–ª—é—á–∏—Ç—å –¢–∞–∫—Ç–∏–ª—å–Ω—ã–π –æ—Ç–∫–ª–∏–∫"
                             >
-                                <div
-                                    className={`w-full py-3.5 px-6 rounded-2xl font-black text-xs uppercase tracking-wider border-b-4 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center space-x-2 shadow-lg ${isSyncing ? "bg-gray-700 text-gray-400 border-gray-900 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-800 hover:brightness-110"}`}
-                                />
+                                <span>
+                                    {(user.hapticFeedback ?? true)
+                                        ? (user.language === 'ru' ? '–í–ö–õ–Æ–ß–ï–ù–û' : 'ENABLED')
+                                        : (user.language === 'ru' ? '–í–´–ö–õ–Æ–ß–ï–ù–û' : 'DISABLED')}
+                                </span>
                             </button>
                         </div>
                     </div>
@@ -4961,6 +5385,16 @@ const getTodayChallenge = () => {
                             </div>
                         )}
 
+                        {/* RENDER SUBSCRIPTION & FREE PLAN AI LIMIT SECTION */}
+                        <AiLimitSection
+                            user={user}
+                            setUser={setUser}
+                            onOpenLimitModal={() => setIsAiLimitModalOpen(true)}
+                            onUpgrade={(tier) => upgradeSubscription(tier)}
+                            playSound={playSound}
+                            onToast={(msg) => setToast(msg)}
+                        />
+
                         <div className="grid md:grid-cols-3 gap-6">
                             {/* FREE CARD */}
                             <div className="bg-[#1a1a1a] border border-gray-800 rounded-3xl p-6 flex flex-col">
@@ -4975,6 +5409,7 @@ const getTodayChallenge = () => {
                                 <div className="space-y-4 flex-1">
                                     <div className="flex items-center text-gray-400 font-bold"><BatteryIcon className="w-6 h-6 mr-3 opacity-50"/> {t('energy25')}</div>
                                     <div className="flex items-center text-gray-400 font-bold"><span className="w-6 h-6 mr-3 flex items-center justify-center text-xl opacity-50">üì∫</span> {t('ads')}</div>
+                                    <div className="flex items-center text-gray-400 font-bold text-xs"><SparklesIcon className="w-5 h-5 mr-3 text-emerald-400/70" /> {t('trafficFree')}</div>
                                 </div>
                                 <button onClick={cancelSubscription} className="mt-8 w-full py-3 rounded-2xl font-bold border-2 border-gray-700 text-gray-400 hover:bg-gray-800 transition-colors uppercase tracking-widest text-sm">{t('currentPlan')}</button>
                             </div>
@@ -4994,6 +5429,7 @@ const getTodayChallenge = () => {
                                     <div className="flex items-center text-white font-bold"><InfiniteEnergyIcon className="w-6 h-6 mr-3 text-yellow-300"/> {t('infEnergy')}</div>
                                     <div className="flex items-center text-white font-bold"><NoAdIcon className="w-6 h-6 mr-3 text-blue-300"/> {t('noAds')}</div>
                                     <div className="flex items-center text-white font-bold"><BookIcon className="w-6 h-6 mr-3 text-purple-300"/> Unlimited Tests</div>
+                                    <div className="flex items-center text-amber-200 font-bold text-xs"><SparklesIcon className="w-5 h-5 mr-3 text-amber-300 animate-pulse"/> {t('trafficSuper')}</div>
                                 </div>
                                 {isIncognitoUser && (
                                     <div className="mt-4 p-2 bg-amber-950/60 border border-amber-500/40 rounded-xl text-center">
@@ -5023,6 +5459,7 @@ const getTodayChallenge = () => {
                                     <div className="flex items-center text-gray-300 font-bold"><SuperIcon className="w-5 h-5 mr-3 opacity-80"/> {t('allInSuper')}</div>
                                     <div className="flex items-center text-gray-300 font-bold"><MaxIcon className="w-5 h-5 mr-3 text-duo-blue"/> {t('aiExplain')}</div>
                                     <div className="flex items-center text-gray-300 font-bold"><ChatBubbleIcon className="w-5 h-5 mr-3 text-duo-blue"/> Roleplay Max</div>
+                                    <div className="flex items-center text-duo-blue font-bold text-xs"><SparklesIcon className="w-5 h-5 mr-3 text-duo-blue animate-pulse"/> {t('trafficMax')}</div>
                                 </div>
                                 {isIncognitoUser && (
                                     <div className="mt-4 p-2 bg-amber-950/60 border border-amber-500/40 rounded-xl text-center">
@@ -5830,6 +6267,30 @@ const getTodayChallenge = () => {
                             </span>
                         </button>
 
+                        {/* 3. –ê–ù–ê–õ–ò–ó–ò–†–û–í–ê–¢–¨ –ü–ê–†–¢–ò–Æ –®–ê–•–ú–ê–¢–´ */}
+                        <button 
+                            onClick={() => { 
+                                playSound('click'); 
+                                setScreen(AppScreen.CHESS_ANALYSIS); 
+                            }} 
+                            className="w-full p-4 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-slate-950 rounded-2xl font-black uppercase tracking-wider border-b-6 border-amber-900 active:border-b-0 active:translate-y-1 transition-all shadow-xl hover:brightness-105 flex items-center justify-between group cursor-pointer ring-2 ring-white/40"
+                        >
+                            <div className="flex items-center space-x-3 text-left">
+                                <span className="text-3xl group-hover:scale-110 transition-transform">üîç</span>
+                                <div>
+                                    <div className="text-sm sm:text-base font-black text-slate-950 flex items-center gap-1.5">
+                                        <span>{user.language === 'ru' ? '–ê–ù–ê–õ–ò–ó–ò–†–û–í–ê–¢–¨ –ü–ê–†–¢–ò–Æ –®–ê–•–ú–ê–¢–´' : 'ANALYZE CHESS GAME'}</span>
+                                    </div>
+                                    <div className="text-[10px] text-amber-950 font-bold">
+                                        {user.language === 'ru' ? '–ò–ò-—Ä–∞–∑–±–æ—Ä —Ö–æ–¥–æ–≤ ‚Ä¢ –û—Ü–µ–Ω–∫–∞ –ø–æ–∑–∏—Ü–∏–∏ ‚Ä¢ –¢–æ—á–Ω–æ—Å—Ç—å' : 'AI Move Breakdown ‚Ä¢ Position Eval ‚Ä¢ Accuracy'}
+                                    </div>
+                                </div>
+                            </div>
+                            <span className="bg-slate-950 text-amber-400 text-[11px] font-black px-2.5 py-1 rounded-xl shadow-md uppercase tracking-wider whitespace-nowrap">
+                                {user.language === 'ru' ? '–ò–ò-–ê–Ω–∞–ª–∏–∑' : 'AI Analysis'}
+                            </span>
+                        </button>
+
                         {/* Secondary: Tutorial & Lesson */}
                         <div className="grid grid-cols-2 gap-2.5 pt-1">
                             <button 
@@ -5859,6 +6320,102 @@ const getTodayChallenge = () => {
                     <button onClick={() => setScreen(AppScreen.SHOP)} className="p-2 opacity-50 hover:opacity-100 transition-opacity"><span className="text-3xl font-black text-gray-900">üè™</span></button>
                     <button onClick={() => setScreen(AppScreen.PROFILE)} className="p-2 opacity-50 hover:opacity-100 transition-opacity"><UserIcon className="w-8 h-8 text-gray-900" /></button>
                 </div>
+            </div>
+          )}
+
+          {screen === AppScreen.CHESS_ANALYSIS && (
+            <div className="fixed inset-0 z-[120] bg-slate-950 overflow-y-auto animate-in fade-in duration-200">
+              <ChessAnalysisScreen
+                initialMoves={chessHistory}
+                initialFen={chessFen}
+                gameResult={
+                  chessStatus === 'mate'
+                    ? (feedback.status === 'correct' ? (user.language === 'ru' ? '–ü–æ–±–µ–¥–∞ –±–µ–ª—ã—Ö' : 'White wins') : (user.language === 'ru' ? '–ü–æ–±–µ–¥–∞ —á–µ—Ä–Ω—ã—Ö' : 'Black wins'))
+                    : chessStatus === 'draw'
+                    ? (user.language === 'ru' ? '–ù–∏—á—å—è' : 'Draw')
+                    : (chessHistory.length > 0 ? (user.language === 'ru' ? '–¢–µ–∫—É—â–∞—è –ø–∞—Ä—Ç–∏—è' : 'Active game') : undefined)
+                }
+                playerColor="w"
+                onBack={() => setScreen(AppScreen.CHESS_MATCH)}
+                onNewGame={() => {
+                  playSound('select');
+                  setChessMode('pve');
+                  const botOpp = { name: 'DuoWindo6601', elo: 1500, avatar: 'ü¶â', isBot: true };
+                  setChessOpponent(botOpp);
+                  initChessGame(botOpp);
+                  setCurrentExercise({
+                    id: crypto.randomUUID(),
+                    type: 'chess',
+                    originalSentence: "–û–¥–∏–Ω–æ—á–Ω–∞—è –ø–∞—Ä—Ç–∏—è —Å DuoWindo6601",
+                    targetTranslation: "Checkmate",
+                    wordBank: [],
+                    chessData: {
+                      fen: INITIAL_BOARD_FEN,
+                      pgn: [],
+                      difficulty: 'intermediate'
+                    }
+                  });
+                  setScreen(AppScreen.LESSON);
+                }}
+                onPlayAgainstBot={(startFen?: string, startMoves?: string[]) => {
+                  playSound('select');
+                  setChessMode('pve');
+                  const botOpp = { name: 'DuoWindo6601', elo: 1500, avatar: 'ü¶â', isBot: true };
+                  setChessOpponent(botOpp);
+
+                  if (startFen && startFen !== INITIAL_BOARD_FEN) {
+                    setChessFen(startFen);
+                    setChessBoard(parseFen(startFen));
+                    const chessObj = new Chess(startFen);
+                    const turn = chessObj.turn();
+                    setChessTurn(turn);
+                    setChessHistory(startMoves || []);
+                    setChessSelected(null);
+                    setChessValidMoves([]);
+                    setChessStatus(chessObj.isGameOver() ? 'mate' : 'active');
+                    setChessLastMove(null);
+                    setChessTimerSeconds(20 * 60);
+                    setChessChat([{
+                      role: 'model',
+                      text: turn === 'b'
+                        ? "–ì–æ—Ç–æ–≤ –ø—Ä–æ–∏–≥—Ä–∞—Ç—å? –Ø DuoWindo6601! ü¶â –°–µ–π—á–∞—Å –º–æ–π —Ö–æ–¥ —á–µ—Ä–Ω—ã–º–∏... –ü–æ—Å–º–æ—Ç—Ä–∏–º!"
+                        : "–ì–æ—Ç–æ–≤ –ø—Ä–æ–∏–≥—Ä–∞—Ç—å? –Ø DuoWindo6601, –ì—Ä–æ—Å—Å–º–µ–π—Å—Ç–µ—Ä –°–æ–≤–∏–Ω–æ–≥–æ –ö–æ—Ä–æ–ª–µ–≤—Å—Ç–≤–∞! ü¶â –¢–≤–æ–π —Ö–æ–¥ –±–µ–ª—ã–º–∏!"
+                    }]);
+                    setChessTab('history');
+                    setCurrentExercise({
+                      id: crypto.randomUUID(),
+                      type: 'chess',
+                      originalSentence: "–û–¥–∏–Ω–æ—á–Ω–∞—è –ø–∞—Ä—Ç–∏—è —Å DuoWindo6601",
+                      targetTranslation: "Checkmate",
+                      wordBank: [],
+                      chessData: {
+                        fen: startFen,
+                        pgn: startMoves || [],
+                        difficulty: 'intermediate'
+                      }
+                    });
+                    setScreen(AppScreen.LESSON);
+                    if (turn === 'b' && !chessObj.isGameOver()) {
+                      setTimeout(() => makeAiMove(startFen), 600);
+                    }
+                  } else {
+                    initChessGame(botOpp);
+                    setCurrentExercise({
+                      id: crypto.randomUUID(),
+                      type: 'chess',
+                      originalSentence: "–û–¥–∏–Ω–æ—á–Ω–∞—è –ø–∞—Ä—Ç–∏—è —Å DuoWindo6601",
+                      targetTranslation: "Checkmate",
+                      wordBank: [],
+                      chessData: {
+                        fen: INITIAL_BOARD_FEN,
+                        pgn: [],
+                        difficulty: 'intermediate'
+                      }
+                    });
+                    setScreen(AppScreen.LESSON);
+                  }
+                }}
+              />
             </div>
           )}
 
@@ -6096,6 +6653,25 @@ const getTodayChallenge = () => {
                      <div className="text-duo-green font-bold text-lg shrink-0 ml-4">500 üíé</div>
                    </div>
                 </div>
+
+                {/* GEMINI REFILL & BONUS REQUESTS SECTION IN SHOP */}
+                <GeminiRefillSection
+                    user={user}
+                    setUser={setUser}
+                    playSound={playSound}
+                    onToast={(msg) => setToast(msg)}
+                />
+
+                {/* AI LIMIT & SUBSCRIPTION OVERVIEW SECTION */}
+                <AiLimitSection
+                    user={user}
+                    setUser={setUser}
+                    onOpenLimitModal={() => setIsAiLimitModalOpen(true)}
+                    onUpgrade={(tier) => upgradeSubscription(tier)}
+                    playSound={playSound}
+                    onToast={(msg) => setToast(msg)}
+                />
+
                 <h3 className="text-2xl font-bold text-gray-400 mb-6 uppercase tracking-wider mt-12 border-t-2 border-gray-800 pt-8">{t('refillGems')}</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                     <div onClick={() => { playSound('success'); setUser(u => ({...u, gems: u.gems + 300})); setToast(`${t('t_buy_gems')}: 300 üíé`); }} className="bg-duo-card p-6 rounded-3xl border-2 border-b-8 border-gray-700 cursor-pointer hover:scale-[1.05] transition-all flex flex-col items-center shadow-xl text-center group"><GemStoneIcon className="w-16 h-16 text-duo-blue mb-4 group-hover:animate-bounce" /><h4 className="font-bold text-lg mb-1">{t('handful')}</h4><p className="text-gray-500 font-bold text-sm mb-4">300 —à—Ç.</p><div className="w-full py-2 rounded-xl bg-gray-800 font-bold text-green-400 group-hover:bg-green-500 group-hover:text-white transition-colors">–ë–µ—Å–ø–ª–∞—Ç–Ω–æ</div></div>
@@ -6257,57 +6833,48 @@ const getTodayChallenge = () => {
                             </div>
                          </div>
 
-                         {/* Lost Streak Quick Recovery option for User */}
+                         {/* Lost Streak Restriction & Recovery Policy */}
                          {((user.previousLostStreak || 0) > 0 || (user.streak === 0 && (user.maxStreak || 0) > 0)) && (
-                            <div className="bg-gradient-to-r from-orange-950/60 to-red-950/60 border border-orange-500/50 p-3.5 rounded-2xl text-left space-y-2.5">
-                               <div className="flex items-center justify-between">
-                                  <span className="text-xs font-black text-orange-300 uppercase tracking-wide flex items-center space-x-1.5">
-                                     <span className="animate-pulse">‚ö°</span>
-                                     <span>{user.language === 'ru' ? '–í–æ—Å—Å—Ç–∞–Ω–æ–≤–ª–µ–Ω–∏–µ –ø–æ—Ç–µ—Ä—è–Ω–Ω–æ–≥–æ —Ä–µ–∂–∏–º–∞' : 'Recover Lost Streak'}</span>
+                            <div className="bg-gradient-to-r from-red-950/70 via-gray-900 to-amber-950/70 border-2 border-amber-500/50 p-4 rounded-2xl text-left space-y-3 shadow-xl">
+                               <div className="flex items-center justify-between gap-2 border-b border-gray-800 pb-2.5">
+                                  <span className="text-xs font-black text-amber-300 uppercase tracking-wide flex items-center space-x-1.5">
+                                     <span className="text-base">üîí</span>
+                                     <span>{user.language === 'ru' ? '–û–≥—Ä–∞–Ω–∏—á–µ–Ω–∏–µ: –í–æ—Å—Å—Ç–∞–Ω–æ–≤–ª–µ–Ω–∏–µ –£–¥–∞—Ä–Ω–æ–≥–æ –†–µ–∂–∏–º–∞' : 'Restricted: Streak Recovery'}</span>
                                   </span>
-                                  <span className="text-[10px] font-bold text-orange-200 bg-orange-500/20 px-2 py-0.5 rounded-lg border border-orange-500/40">
+                                  <span className="text-[10px] font-bold text-red-300 bg-red-500/20 px-2 py-0.5 rounded-lg border border-red-500/40">
                                      {user.language === 'ru' ? `–ü–æ—Ç–µ—Ä—è–Ω–æ: ${user.previousLostStreak || user.maxStreak} –¥–Ω.` : `Lost: ${user.previousLostStreak || user.maxStreak} d.`}
                                   </span>
                                </div>
-                               <div className="flex flex-wrap gap-2 pt-1">
-                                  {(user.streakFreezeCount || 0) > 0 && (
+                               <p className="text-[11px] text-gray-300 font-medium leading-relaxed">
+                                  {user.language === 'ru' 
+                                     ? '–°–∞–º–æ—Å—Ç–æ—è—Ç–µ–ª—å–Ω–æ–µ –≤–æ—Å—Å—Ç–∞–Ω–æ–≤–ª–µ–Ω–∏–µ —É–¥–∞—Ä–Ω–æ–≥–æ —Ä–µ–∂–∏–º–∞ –∑–∞–±–ª–æ–∫–∏—Ä–æ–≤–∞–Ω–æ –¥–ª—è —á–µ—Å—Ç–Ω–æ–≥–æ —Ä–µ–π—Ç–∏–Ω–≥–∞. –î–æ—Å—Ç—É–ø –æ—Ç–∫—Ä—ã—Ç —Ç–æ–ª—å–∫–æ –ê–¥–º–∏–Ω–∏—Å—Ç—Ä–∞—Ç–æ—Ä—É —á–µ—Ä–µ–∑ –ü–∞–Ω–µ–ª—å –í–ª–∞–¥–µ–ª—å—Ü–∞ (Admin Tool) –∏–ª–∏ –ø–æ –æ–±—Ä–∞—â–µ–Ω–∏—é –≤ –ß–∞—Ç —Ç–µ—Ö–ø–æ–¥–¥–µ—Ä–∂–∫–∏.'
+                                     : 'Direct streak recovery is restricted for fair play. Available exclusively to Administrators in the Admin Tool or via the Support Chat.'}
+                                </p>
+                               <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                                  {(user.isAdmin || (user.email && user.email.toLowerCase().includes('abramov'))) && (
                                      <button
                                         onClick={() => {
-                                           const recoveredDays = user.previousLostStreak || user.maxStreak || 1;
-                                           setUser(u => ({
-                                              ...u,
-                                              streak: recoveredDays,
-                                              streakFreezeCount: Math.max(0, (u.streakFreezeCount || 0) - 1),
-                                              previousLostStreak: 0,
-                                              lastActiveDate: new Date().toISOString().split('T')[0]
-                                           }));
-                                           playSound('streak_update');
-                                           setToast(user.language === 'ru' ? `üî• –£–¥–∞—Ä–Ω—ã–π —Ä–µ–∂–∏–º –≤–æ—Å—Å—Ç–∞–Ω–æ–≤–ª–µ–Ω: ${recoveredDays} –¥–Ω. —Å –ø–æ–º–æ—â—å—é –ó–∞–º–æ—Ä–æ–∑–∫–∏!` : `üî• Streak restored to ${recoveredDays} days using Streak Freeze!`);
+                                           playSound('click');
+                                           setScreen(AppScreen.ADMIN_DASHBOARD);
+                                           setToast(user.language === 'ru' ? 'üëë –û—Ç–∫—Ä—ã—Ç–∞ –ü–∞–Ω–µ–ª—å –í–ª–∞–¥–µ–ª—å—Ü–∞ (Admin Tool)' : 'üëë Opened Admin Tool');
                                         }}
-                                        className="flex-1 min-w-[130px] py-2 px-3 bg-cyan-600 hover:bg-cyan-500 text-white font-black text-[11px] uppercase tracking-wider rounded-xl shadow border-b-2 border-cyan-800 transition-all"
+                                        className="flex-1 py-2.5 px-3 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase tracking-wider rounded-xl shadow border-b-2 border-amber-700 active:translate-y-0.5 transition-all flex items-center justify-center space-x-1.5"
                                      >
-                                        ‚ùÑÔ∏è {user.language === 'ru' ? '–ó–∞ 1 –ó–∞–º–æ—Ä–æ–∑–∫—É' : '1 Freeze'}
+                                        <span>üëë</span>
+                                        <span>{user.language === 'ru' ? 'Admin Tool: –í–æ—Å—Å—Ç–∞–Ω–æ–≤–∏—Ç—å' : 'Admin Tool: Restore'}</span>
                                      </button>
                                   )}
-                                  {(user.gems || 0) >= 50 && (
-                                     <button
-                                        onClick={() => {
-                                           const recoveredDays = user.previousLostStreak || user.maxStreak || 1;
-                                           setUser(u => ({
-                                              ...u,
-                                              streak: recoveredDays,
-                                              gems: Math.max(0, (u.gems || 0) - 50),
-                                              previousLostStreak: 0,
-                                              lastActiveDate: new Date().toISOString().split('T')[0]
-                                           }));
-                                           playSound('streak_update');
-                                           setToast(user.language === 'ru' ? `üî• –£–¥–∞—Ä–Ω—ã–π —Ä–µ–∂–∏–º –≤–æ—Å—Å—Ç–∞–Ω–æ–≤–ª–µ–Ω: ${recoveredDays} –¥–Ω. –∑–∞ 50 –∫—Ä–∏—Å—Ç–∞–ª–ª–æ–≤!` : `üî• Streak restored to ${recoveredDays} days for 50 gems!`);
-                                        }}
-                                        className="flex-1 min-w-[130px] py-2 px-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 text-white font-black text-[11px] uppercase tracking-wider rounded-xl shadow border-b-2 border-green-800 transition-all"
-                                     >
-                                        üíé {user.language === 'ru' ? '–ó–∞ 50 –∫—Ä–∏—Å—Ç–∞–ª–ª–æ–≤' : '50 Gems'}
-                                     </button>
-                                  )}
+                                  <button
+                                     onClick={() => {
+                                        playSound('click');
+                                        setScreen(AppScreen.SUPPORT_CHAT);
+                                        setToast(user.language === 'ru' ? 'üí¨ –û—Ç–∫—Ä—ã—Ç –ß–∞—Ç —Ç–µ—Ö–ø–æ–¥–¥–µ—Ä–∂–∫–∏' : 'üí¨ Opened Support Chat');
+                                     }}
+                                     className="flex-1 py-2.5 px-3 bg-duo-blue hover:bg-sky-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow border-b-2 border-duo-blueDark active:translate-y-0.5 transition-all flex items-center justify-center space-x-1.5"
+                                  >
+                                     <span>üí¨</span>
+                                     <span>{user.language === 'ru' ? '–ß–∞—Ç —Ç–µ—Ö–ø–æ–¥–¥–µ—Ä–∂–∫–∏ (–í–æ—Å—Å—Ç–∞–Ω–æ–≤–∏—Ç—å —Å–µ—Ä–∏—é)' : 'Support Chat (Restore Streak)'}</span>
+                                  </button>
                                </div>
                             </div>
                          )}
@@ -6429,15 +6996,20 @@ const getTodayChallenge = () => {
                            className="w-full bg-gradient-to-r from-amber-500/20 via-amber-600/20 to-amber-700/20 border-2 border-amber-500 hover:border-amber-400 p-4 rounded-2xl flex items-center justify-between shadow-xl transition-all group cursor-pointer mt-2"
                          >
                            <div className="flex items-center space-x-3 text-left">
-                             <div className="bg-amber-500 p-2 rounded-xl text-black font-black text-xl shadow-md group-hover:scale-110 transition-transform">
+                             <div className="bg-amber-500 p-2 rounded-xl text-black font-black text-xl shadow-md group-hover:scale-110 transition-transform flex-shrink-0">
                                üëë
                              </div>
                              <div>
-                               <h4 className="font-bold text-xs text-amber-400 uppercase tracking-wider">{t('adminBannerTitle')}</h4>
-                               <p className="text-[10px] text-gray-300 font-bold">{t('adminBannerDesc')}</p>
+                               <div className="flex items-center space-x-2 flex-wrap">
+                                 <h4 className="font-bold text-xs text-amber-400 uppercase tracking-wider">{t('adminBannerTitle')}</h4>
+                                 <span className="bg-red-500/25 border border-red-500/40 text-red-300 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                   {user.language === 'ru' ? '–î–æ—Å—Ç—É–ø —Ç–æ–ª—å–∫–æ –∞–¥–º–∏–Ω–∏—Å—Ç—Ä–∞—Ç–æ—Ä–∞' : 'Admin Only'}
+                                 </span>
+                               </div>
+                               <p className="text-[10px] text-gray-300 font-bold mt-0.5">{t('adminBannerDesc')}</p>
                              </div>
                            </div>
-                           <ArrowRightIcon className="w-5 h-5 text-amber-400 group-hover:translate-x-1 transition-transform" />
+                           <ArrowRightIcon className="w-5 h-5 text-amber-400 group-hover:translate-x-1 transition-transform flex-shrink-0" />
                          </button>
                       </div>
                    </div>
@@ -6464,6 +7036,7 @@ const getTodayChallenge = () => {
               playSound={playSound}
               setToast={setToast}
               onOpenAdminDashboard={() => setScreen(AppScreen.ADMIN_DASHBOARD)}
+              onOpenSupportChat={() => setScreen(AppScreen.SUPPORT_CHAT)}
               onOpenIncognitoRestrictions={openIncognitoRestrictionsModal}
               onOpenRegister={openRegisterModal}
               courses={COURSES}
@@ -6485,6 +7058,20 @@ const getTodayChallenge = () => {
               playSound={playSound}
               setToast={setToast}
               onUpdateUser={setUser}
+              onOpenSupportChat={() => setScreen(AppScreen.SUPPORT_CHAT)}
+              isIncognito={isIncognitoUser}
+            />
+          )}
+
+          {screen === AppScreen.SUPPORT_CHAT && (
+            <SupportChatScreen
+              user={user}
+              onBack={() => setScreen(AppScreen.PATH)}
+              playSound={playSound}
+              setToast={setToast}
+              onUpdateUser={setUser}
+              isIncognito={isIncognitoUser}
+              onOpenProfile={() => setScreen(AppScreen.PROFILE)}
             />
           )}
 
@@ -6753,6 +7340,20 @@ const getTodayChallenge = () => {
         onClose={() => setShowIncognitoRestrictionsModal(false)}
         onOpenRegister={openRegisterModal}
         onGoogleSignIn={handleGoogleSignIn}
+        language={user.language}
+        playSound={playSound}
+      />
+
+      {/* GEMINI AI DAILY LIMIT MODAL */}
+      <AiLimitModal
+        isOpen={isAiLimitModalOpen}
+        onClose={() => setIsAiLimitModalOpen(false)}
+        status={aiLimitStatus}
+        currentSubscription={user.subscription || 'free'}
+        onUpgrade={(tier) => {
+          setIsAiLimitModalOpen(false);
+          upgradeSubscription(tier);
+        }}
         language={user.language}
         playSound={playSound}
       />
@@ -7044,12 +7645,84 @@ const getTodayChallenge = () => {
           </div>
       )}
 
+      {/* AUTHENTIC DUOLINGO LESSON LOADING SCREEN */}
+      {screen === AppScreen.LESSON && (!currentExercise || lessonLoading) && (
+        <div className="fixed inset-0 z-[100] bg-duo-dark flex flex-col p-4 md:p-6 animate-in fade-in duration-300 font-din h-[100dvh] select-none">
+          <div className="max-w-3xl mx-auto w-full flex flex-col h-full relative">
+            {/* TOP BAR */}
+            <div className="flex items-center justify-between mb-4 flex-shrink-0">
+              <button 
+                onClick={() => { playSound('click'); setLessonLoading(false); setLoading(false); setScreen(AppScreen.PATH); }} 
+                className="text-gray-500 hover:text-white transition-colors p-1"
+                title={user.language === 'ru' ? '–ü—Ä–µ—Ä–≤–∞—Ç—å –∑–∞–≥—Ä—É–∑–∫—É' : 'Cancel'}
+              >
+                <CloseIcon className="w-8 h-8 md:w-10 md:h-10"/>
+              </button>
+              <div className="flex-1 mx-4 text-center">
+                <span className="text-xs md:text-sm font-black uppercase tracking-widest text-emerald-400">
+                  {user.language === 'ru' ? '–ü–æ–¥–≥–æ—Ç–æ–≤–∫–∞ —É—Ä–æ–∫–∞...' : 'Preparing lesson...'}
+                </span>
+              </div>
+              <div className="flex items-center space-x-2 text-yellow-400 font-bold text-xl md:text-2xl">
+                {user.subscription !== 'free' ? <InfiniteEnergyIcon className="w-6 h-6 md:w-8 md:h-8 text-yellow-400"/> : <><LightningIcon className="w-5 h-5 md:w-7 md:h-7" /> <span>{user.energy}</span></>}
+              </div>
+            </div>
+
+            {/* CENTER CONTENT */}
+            <div className="flex-1 flex flex-col items-center justify-center text-center px-4 max-w-md mx-auto w-full my-auto space-y-6">
+              {/* MASCOT ANIMATION */}
+              <div className="relative">
+                <div className="absolute -inset-4 bg-emerald-500/20 rounded-full blur-2xl animate-pulse" />
+                <div className="relative animate-bounce duration-1000">
+                  <Mascot 
+                    emotion="happy" 
+                    className="w-36 h-36 md:w-48 md:h-48 drop-shadow-[0_15px_25px_rgba(0,0,0,0.8)]" 
+                    variant={currentCourse.mascotVariant || 'default'} 
+                  />
+                </div>
+              </div>
+
+              {/* SPEECH BUBBLE WITH ROTATING DUO TIP */}
+              <div className="bg-gray-800/90 border-2 border-gray-700/80 p-5 rounded-3xl shadow-xl w-full text-center relative animate-in fade-in zoom-in-95 duration-300">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-3 bg-gray-800 border-t-2 border-l-2 border-gray-700 rotate-45" />
+                <p className="text-[11px] md:text-xs uppercase font-black text-amber-400 tracking-wider mb-1.5 flex items-center justify-center space-x-1.5">
+                  <span>üí°</span>
+                  <span>{user.language === 'ru' ? '–°–û–í–ï–¢ –û–¢ DUO' : 'DUO TIP'}</span>
+                </p>
+                <p className="text-sm md:text-base font-bold text-white leading-relaxed min-h-[3rem] flex items-center justify-center">
+                  {DUO_TIPS[loadingTipIndex % DUO_TIPS.length]}
+                </p>
+              </div>
+
+              {/* DUOLINGO SIGNATURE SHIMMER LOADING BAR */}
+              <div className="w-full space-y-2.5">
+                <div className="w-full h-4 md:h-5 bg-gray-800 border border-gray-700 rounded-full p-0.5 relative overflow-hidden shadow-inner flex items-center">
+                  <div 
+                    className="h-full rounded-full bg-gradient-to-r from-yellow-400 via-amber-400 to-green-500 relative overflow-hidden transition-all duration-300 ease-out"
+                    style={{ width: `${loadingProgress}%` }}
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-[shimmer_1.5s_infinite]" />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-xs font-bold text-gray-400 px-1">
+                  <span className="flex items-center space-x-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+                    <span>{user.language === 'ru' ? '–ó–∞–≥—Ä—É–∑–∫–∞ —É–ø—Ä–∞–∂–Ω–µ–Ω–∏—è...' : 'Loading exercise...'}</span>
+                  </span>
+                  <span className="text-emerald-400 font-mono font-black">{Math.round(loadingProgress)}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* LESSON OVERLAY */}
-      {screen === AppScreen.LESSON && currentExercise && (
+      {screen === AppScreen.LESSON && currentExercise && !lessonLoading && (
         <div className="fixed inset-0 z-[100] bg-duo-dark flex flex-col p-4 md:p-6 animate-in fade-in duration-300 font-din h-[100dvh]">
            <div className="max-w-4xl mx-auto w-full flex flex-col h-full relative">
              <div className="flex items-center justify-between mb-4 flex-shrink-0">
-               <button onClick={() => { playSound('click'); setScreen(AppScreen.PATH); }} className="text-gray-500 hover:text-white transition-colors"><CloseIcon className="w-8 h-8 md:w-10 md:h-10"/></button>
+               <button onClick={() => { playSound('click'); setShowQuitModal(true); }} className="text-gray-500 hover:text-white transition-colors" title={user.language === 'ru' ? '–í—ã–π—Ç–∏' : 'Quit'}><CloseIcon className="w-8 h-8 md:w-10 md:h-10"/></button>
                {currentExercise.type === 'chess' ? (
                    <div className="flex-1 flex justify-center">
                        <div className="flex items-center bg-gray-800/80 rounded-full border border-gray-700 overflow-hidden shadow-md">
@@ -7117,8 +7790,17 @@ const getTodayChallenge = () => {
                                  </div>
                              </div>
                          </div>
-                         <div className="bg-amber-400 text-gray-950 font-black text-[10px] px-2.5 py-1 rounded-xl uppercase tracking-wider shadow-sm">
-                             +30 XP
+                         <div className="flex items-center space-x-2">
+                             {/* 20-Minute Countdown Timer */}
+                             <div className={`flex items-center space-x-1 px-2.5 py-1 rounded-xl text-xs font-mono font-black border shadow-inner transition-colors ${
+                                 chessTimerSeconds < 180 ? 'bg-red-950/80 border-red-500/60 text-red-400 animate-pulse' : 'bg-gray-900/90 border-amber-500/40 text-amber-400'
+                             }`}>
+                                 <span className="text-sm animate-pulse">‚è±</span>
+                                 <span>{formatChessTimer(chessTimerSeconds)}</span>
+                             </div>
+                             <div className="bg-amber-400 text-gray-950 font-black text-[10px] px-2.5 py-1 rounded-xl uppercase tracking-wider shadow-sm">
+                                 +30 XP
+                             </div>
                          </div>
                      </div>
 
@@ -7168,14 +7850,23 @@ const getTodayChallenge = () => {
                                  const isSelected = chessSelected?.r === r && chessSelected?.c === c;
                                  const isLight = (r + c) % 2 === 0;
                                  const isValid = chessValidMoves.some(m => m.r === r && m.c === c);
-                                 const isLastMove = chessLastMove && ((chessLastMove.from.r === r && chessLastMove.from.c === c) || (chessLastMove.to.r === r && chessLastMove.to.c === c));
+                                 const isLastMoveFrom = chessLastMove && chessLastMove.from.r === r && chessLastMove.from.c === c;
+                                 const isLastMoveTo = chessLastMove && chessLastMove.to.r === r && chessLastMove.to.c === c;
+                                 const isLastMove = isLastMoveFrom || isLastMoveTo;
                                  
-                                 const bgClass = isSelected ? '!bg-[#f5f682]' : (isLastMove ? '!bg-[#cdd26a]' : (isLight ? 'bg-[#3a4a5a]' : 'bg-[#2a3a4a]'));
+                                 const bgClass = isSelected ? '!bg-[#f5f682] ring-2 ring-yellow-300 z-10' : (isLastMove ? '!bg-[#cdd26a]/90' : (isLight ? 'bg-[#3a4a5a]' : 'bg-[#2a3a4a]'));
 
                                  return (
                                      <div key={`${r}-${c}`} onClick={() => onChessSquareClick(r, c)} className={`relative flex items-center justify-center cursor-pointer ${bgClass} transition-colors duration-100`}>
-                                         {isValid && !square && <div className="w-3 h-3 bg-black/30 rounded-full absolute pointer-events-none"></div>}
-                                         {isValid && square && <div className="absolute inset-0 border-[4px] border-black/30 rounded-full pointer-events-none"></div>}
+                                         {isLastMove && (
+                                             <div className={`absolute inset-0 pointer-events-none z-10 border-2 ${isLastMoveTo ? 'border-amber-300 shadow-[inset_0_0_8px_rgba(251,191,36,0.6)]' : 'border-amber-400/50 shadow-[inset_0_0_4px_rgba(251,191,36,0.3)]'} rounded-sm flex items-center justify-center`}>
+                                                 {isLastMoveTo && (
+                                                     <div className="w-2 h-2 rounded-full bg-amber-300/90 ring-2 ring-amber-500/80 opacity-80" />
+                                                 )}
+                                             </div>
+                                         )}
+                                         {isValid && !square && <div className="w-3 h-3 bg-emerald-400/60 rounded-full absolute pointer-events-none z-20"></div>}
+                                         {isValid && square && <div className="absolute inset-0 border-[3px] border-emerald-400/80 rounded-full pointer-events-none z-20"></div>}
 
                                          {square && (
                                              <div className={`w-[85%] h-[85%] drop-shadow-sm select-none pointer-events-none transform transition-transform ${chessTurn === square.color ? 'hover:scale-105' : ''}`}>
@@ -7189,6 +7880,58 @@ const getTodayChallenge = () => {
                                      </div>
                                  );
                              }))}
+                         </div>
+                     </div>
+                     
+                     {/* Algebraic Notation Move History Panel */}
+                     <div className="w-full max-w-[400px] mt-2.5 bg-gray-900/90 border border-gray-700/80 rounded-xl p-2.5 shadow-lg flex flex-col z-10">
+                         <div className="flex items-center justify-between mb-1.5 px-1">
+                             <div className="flex items-center space-x-1.5 text-xs font-bold text-gray-300 uppercase tracking-wider">
+                                 <span>üìú</span>
+                                 <span>–ò—Å—Ç–æ—Ä–∏—è —Ö–æ–¥–æ–≤</span>
+                             </div>
+                             <div className="flex items-center space-x-2">
+                                 <button
+                                     type="button"
+                                     onClick={() => {
+                                         playSound("click");
+                                         setScreen(AppScreen.CHESS_ANALYSIS);
+                                     }}
+                                     className="px-2.5 py-0.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-[10px] rounded-lg uppercase tracking-wider transition-all flex items-center gap-1 shadow-sm active:scale-95 cursor-pointer"
+                                 >
+                                     <span>üîç</span>
+                                     <span>{user.language === "ru" ? "–ê–Ω–∞–ª–∏–∑" : "Analyze"}</span>
+                                 </button>
+                                 <span className="text-[10px] text-gray-400 font-mono">
+                                     {chessHistory.length} {chessHistory.length === 1 ? '—Ö–æ–¥' : chessHistory.length > 1 && chessHistory.length < 5 ? '—Ö–æ–¥–∞' : '—Ö–æ–¥–æ–≤'}
+                                 </span>
+                             </div>
+                         </div>
+                         <div className="max-h-24 overflow-y-auto pr-1 space-y-1 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
+                             {getFormattedMoveHistory().length === 0 ? (
+                                 <div className="text-[11px] text-gray-500 italic text-center py-2">
+                                     –•–æ–¥–æ–≤ –ø–æ–∫–∞ –Ω–µ —Å–¥–µ–ª–∞–Ω–æ (e2-e4)
+                                 </div>
+                             ) : (
+                                 <div className="grid grid-cols-2 gap-1.5">
+                                     {getFormattedMoveHistory().map((item) => (
+                                         <div key={item.moveNumber} className="flex items-center justify-between bg-gray-800/80 border border-gray-700/50 px-2.5 py-1 rounded-lg text-xs font-mono">
+                                             <span className="text-gray-500 font-bold text-[10px]">{item.moveNumber}.</span>
+                                             <div className="flex items-center space-x-2">
+                                                 <span className={`font-semibold ${chessHistory.length % 2 === 1 && item.moveNumber === Math.ceil(chessHistory.length/2) && !item.black ? 'text-amber-300 font-bold' : 'text-gray-200'}`}>
+                                                     {item.white}
+                                                 </span>
+                                                 {item.black && (
+                                                     <span className={`font-semibold ${chessHistory.length % 2 === 0 && item.moveNumber === Math.ceil(chessHistory.length/2) ? 'text-amber-300 font-bold' : 'text-gray-400'}`}>
+                                                         {item.black}
+                                                     </span>
+                                                 )}
+                                             </div>
+                                         </div>
+                                     ))}
+                                     <div ref={chessMoveHistoryEndRef} />
+                                 </div>
+                             )}
                          </div>
                      </div>
                      
@@ -7446,61 +8189,260 @@ const getTodayChallenge = () => {
                           {availableTokens.map(token => {
                             const isArTok = isArabicText(token.text);
                             return (
-                              <button key={token.id} disabled={selectedWordIds.includes(token.id) || feedback.status !== 'idle'} onClick={() => { playSound('click'); setSelectedWordIds([...selectedWordIds, token.id]); }} className={`p-3 px-6 md:p-5 md:px-10 rounded-xl md:rounded-2xl border-2 border-b-4 font-bold text-lg md:text-2xl transition-all ${isArTok ? 'font-arabic' : ''} ${selectedWordIds.includes(token.id) ? 'opacity-0 scale-90 pointer-events-none' : 'bg-duo-card border-gray-700 hover:border-duo-blue hover:text-duo-blue'}`}>
+                              <button key={token.id} disabled={selectedWordIds.includes(token.id) || feedback.status !== 'idle'} onClick={() => { playSound('click'); setSelectedWordIds(p => [...p, token.id]); }} className={`bg-duo-card border-2 border-b-4 border-gray-700 p-2 px-4 md:p-4 md:px-8 rounded-xl md:rounded-2xl font-bold text-lg md:text-2xl hover:bg-gray-700 transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none ${isArTok ? 'font-arabic' : ''}`}>
                                 {formatRTLOverride(token.text)}
                               </button>
                             );
                           })}
                         </div>
                         </>
-                     )}
-                   </div>
-                 </div>
-             )}
+                      )}
+                    </div>
+                  </div>
+              )}
 
-             <div className="mt-auto pt-4 space-y-3 md:space-y-4 font-din flex-shrink-0 z-20 bg-duo-dark">
-               {currentExercise.type !== 'roleplay' && currentExercise.type !== 'illusion' && currentExercise.type !== 'chess' && (
-                   <>
-                   {feedback.status === 'idle' && <button onClick={handleSkip} className="w-full text-center text-gray-500 font-bold text-lg md:text-xl uppercase tracking-widest hover:text-white transition-colors py-2 md:py-4">{currentExercise.type === 'listening' ? t('cantListen') : currentExercise.type === 'speech' ? t('cantSpeak') : t('skip')}</button>}
-                   <button onClick={() => { if (feedback.status !== 'idle') handleContinueAfterLesson(); else if (currentExercise.type === 'drawing') checkDrawingAnswer(); else if (selectedWordIds.length > 0 || currentExercise.type === 'speech' || currentExercise.type === 'ishihara') checkAnswer(); }} className={`w-full py-4 md:py-7 rounded-2xl md:rounded-[2.5rem] font-bold text-xl md:text-2xl transition-all uppercase tracking-widest shadow-2xl active:translate-y-2 active:border-b-0 ${selectedWordIds.length > 0 || feedback.status !== 'idle' || currentExercise.type === 'speech' || currentExercise.type === 'drawing' || (currentExercise.type === 'ishihara' && ishiharaInput) ? 'bg-duo-green border-b-8 border-duo-greenDark text-white' : 'bg-gray-800 text-gray-600 cursor-not-allowed'}`}>{feedback.status === 'idle' ? t('check') : t('continue')}</button>
-                   </>
-               )}
-               {currentExercise.type === 'roleplay' && <button onClick={handleContinueAfterLesson} className="w-full text-center text-red-500 font-bold text-sm uppercase tracking-widest hover:text-red-400 py-4">{t('endChat')}</button>}
-               {currentExercise.type === 'chess' && <button onClick={handleContinueAfterLesson} className="w-full text-center text-gray-500 font-bold text-sm uppercase tracking-widest hover:text-white py-4">{t('exitGame')}</button>}
-             </div>
-           </div>
-           
-           {feedback.status !== 'idle' && currentExercise.type !== 'roleplay' && currentExercise.type !== 'chess' && (
-             <div className={`fixed bottom-0 left-0 w-full p-6 md:p-12 border-t-8 bg-duo-dark animate-in slide-in-from-bottom-20 z-[150] shadow-[0_-10px_40px_rgba(0,0,0,0.5)] ${feedback.status === 'correct' ? 'border-duo-green' : 'border-duo-red'}`}>
-                <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-                   <div className="flex-1 w-full md:pr-12">
-                     <p className={`text-2xl md:text-4xl font-bold mb-2 ${feedback.status === 'correct' ? 'text-duo-green' : 'text-duo-red'}`}>{feedback.status === 'correct' ? t('great') : t('wrong')}</p>
-                     <p className={`text-gray-300 font-bold text-lg md:text-xl leading-relaxed ${isArabicText(feedback.message) ? 'font-arabic text-right' : ''}`} dir="auto">{formatRTLOverride(feedback.message)}</p>
-                     
-                     {/* EXPLAIN MY ANSWER BUTTON */}
-                     {feedback.status === 'wrong' && currentExercise.type !== 'ishihara' && (
-                       <div 
-                         className="mt-4 p-3 md:p-4 bg-gray-800 rounded-2xl border border-duo-blue/30 flex items-center justify-between cursor-pointer hover:bg-gray-700 transition-colors shadow-lg group" 
-                         onClick={handleExplainMistake}
-                       >
-                         <div className="flex items-center space-x-4">
-                           <div className="bg-black p-2 rounded-xl border border-gray-700"><MaxIcon className="w-6 h-6 md:w-8 md:h-8 group-hover:scale-110 transition-transform" /></div>
-                           <span className="text-duo-blue font-black text-sm md:text-lg">{t('explainMax')}</span>
-                         </div>
-                         <ArrowRightIcon className="w-5 h-5 md:w-6 md:h-6 text-duo-blue" />
-                       </div>
-                     )}
-                   </div>
-                   <button onClick={() => handleContinueAfterLesson()} className={`w-full md:w-auto px-10 md:px-16 py-4 md:py-6 rounded-2xl md:rounded-3xl font-bold text-xú‹<În‹÷ôˇ˝É"íZëCrÓä•b,)©6∫ARíF‡pfŒÃ∞ÊmIé4≤j@∂ìf{ì†Õn∫≈Óz≥(∞¿˛R;∂„€è}Œ+‰	¸˚}áó!9‰\dßu*[ÁúÔ|˜u‘UJÜ’¢◊‡äƒ±d›V≈–9YUI◊8§÷í›îU âBâ»MG9§Klñ*;î;ÊDÚ≥ì6•≠Ü‹º €éÏÙl≤ººLÊöÜe—¶3G~IÊÆ’3∏éE©l¨…÷UbwÂñqƒı’‡*ºùóÑ9≤Æa—V∞\rUAòª˛·ıïg~Nß}gn·˙≈|£Á8ÜærÅ$æ.Ê[ abxtl·˙Ö‘õ0Ó_ù‰NÍ€k{;kdc{ˇ`Ô›’ÉçùÌ}≤µ≥Vﬂ$?œ+úÿ]„®Æ∑,Cim-Y%oºAÊ#õ]ÑıISïm{[÷ËrÆ≠Ù·|änSá»5Ó≤T> pÙÜ
-¯ÕW“Viü˝‡öÜJ~€≥•}ÃQΩE¥÷R±IuáZƒÑ5`‘‰ D÷	¶Ë§-∑wé˙™™4Ø.üÃ/êÂ{Ó'¿ùoÀ™MÆ'Qô€ßMS∂B‚8¿M˛%’®%´-Æ$0p¸—"^[FOo@¯‡⁄·.,™}@n~ïhrü;‚$òuƒµ{¿ôZüì{é=ó≠*Ï`\€24Æa h˛‰÷RÍMQ`wπÀ5·∞˚A∑>#‚¶Õûe¿≤¥-˜T'Ç9äà£¿˜Üπk¶‹ëQvÊG1Ü_)C»Iª‚ÜﬁRö≤cX∞6Ÿ2äJ#|4˜GúX&]N‰K»'K>Ê*ÄË õ1li@©”Pì r∫J´Egcà4Qw»≈ô˙Då†ò4;`d€îõîÎ#œ‡	Ö\∞CÉ& &Í0F@ªk)˙UN»•¡ò¡¬>•ÏW±Lêπ[Õ>ÏƒâRöTâ*)\∑∂UÂÄ,Gzt…Ë/Á"©ˇ«Ó¬v2eßKZÀπ-±Ãó%ëH|IíEæ ïâ˜◊ÄÑJFÑZYÂ¯Rçx±∂*¯jU"eæ@DâØVR,à¡ªhrláyºXÆq_+˘r•ƒñ·pô:nT"ﬁO∂©ÖÍî
-Ò~Ü†‘(ï((_©â§ W™E@p§bÖ]ï¯rµ⁄`Z•ÄÁìjeÄÆZ$%æX-¡V5QÂ´"q|°˜Ö™ÃóÀ¸ˆ°8ä|•RÄÒRøÉÒJ êJ*_,¿¡‡ºpÃ"/±√‡1E∂-¬ñ¯r±ÃÒ"»éq8àO|2ei\9AQXÅEÿ9©	H®÷ôºsqE^¨‘¸k<cS dã"Ã©UDÆÃ◊Ñ"L˙pU∏ñÜÙ»¬9[Ω|m #@˘íåJø$áüÖ»é¡é◊¥¶öòÀèïà<àD¶eiè4…‘@kçëdˆL∑}Ñâ*Ó∂°;ûÌ≈ûiR´)€ΩûÊUEÔpG`$l'«º	9¢ˆòˆbÆE∑0s
-¶õò‰3PµÂA“∑s+k=„}EoÂ≤ J¸™∂aiÛÊÃÿõU)Ô7-CUÂlª
-–ÅJöACÉÁáﬁa[yÏô›‡l∂dCtˆ1®Î!$‘—'Õ¢ï·¡ñ†q8Ñôo¿ô“1∏ËÈ≤@`‹ÏY&∏®˛Äo§‡¬üéjΩÑjΩUÎÅôW;¨8B⁄c™‚·áƒÚYﬂŒf/¥a"1rì5?`Tè	ûëm◊Ämr+/Ó~˛o v0kÖƒXkpÀ˝ŒΩO‹{Ó≥¡ç¡M¯¯‹ΩÔ>%ÓS˜åº≠8øÍ5∆Jr∑8#”√Ò„D2øJÅúÄã™2˙∫Äå¬ƒ£ªüªﬂn∫œ‹'Ó¸~8¯ƒΩ?∏·~ü>#pÒ5Ï?ﬂY!ı›wÿÒÿyO·…˚Ï∞Ï¡S¯¿?7©7—c≥y‚˛≈=sπèâ˚ç∑⁄‡#˜1\›ZöDóÜE∆™B6©i¥hiÜnxòª,äf?‚˘Åq˚Ã…3è9~˘,±Ç™Ëf¿{ö√âπæ£8›^#dXWQ<màµ≈kÍ≈<¬1^ogÍv[NS&—ØÆE€ÀπÆ„òˆR>ÔÅ¬7-Úc> úπ	À9≤’°ŒrÓ
-‡Aø:i6p’rN7ìÍ‡6Í¿B¡◊≤&=!åè–l'TB™±»Ÿãè∑[2ŸæñÆLÙbÅÜ“êÜıFb®Sãúëà…3Ùä(2≠5Ó∞S)ô˜?A æúnÉÙ‹	D≈˝/úÁ K@o2!yË>Ú5ŒTÎ˛˚/'Oøòó'Xæ1∆cVÛÕgT‚™‹?ﬁ&Ó3ïJT«Ëôá†ïÚdè˛cOÅ@∏«û®C{j4U±Æ•ÿMb™\)È:ÿZh\≈√ØL∂!™≤≤Äˇ≠MÊ≈Í/.ÊadäáΩ∫ÔÙZäAﬁÌ˛⁄;”ÆÒkÔ±2iˆ≈|O˝	—ˇœßƒ˝*bÄÚÄ"jrçcìK®y'R?·ı‘-¶P~FzO@I8/È[ƒêSä#Gcú»O'˘·Ú+ÄßÔôz„1H…)x"è@ì‹GõƒÒŒ=¿"C9¢"õÊ“[çzê°ı4Îh÷ Ë1√–æLÄT…ûù’MçX=ù4<OÅÍÈ&˝x4ìfßŸ@±ØA´}3∏√(»=Ò1:c‡%!Î?‹¢’[≠`¬ÎM≤¶l.…≠Áy?	‚Œ#p›ßÉèôfâÓ°–°’ˇ¯›‹FÕu¨7	@D˚ı'ü¿˛$ËVúùn_Ç¿=¬‹`¡éß I¬ÉÉò„ù◊]I"…–-µ"7>ë4—[H≈ÅîƒAK∂ª√™S#≈ÈÛ√?ÜÎÒ≈–%?s0A˛'‚zÆg¿ª‘“€∆ ˜e£¯x
-À¡˝èDÄ˝,¬ß[≤Æ¥\æØ©Kì¢ WÕèóE√Á8¯a∫ ØÜ∞ŒÛµLã˝N>ºÿ≥©Õô!⁄àœ≠K:ÉÀˇƒ'€Î{€Î9ÃÃ˛¯ﬁ˙ÍŒﬁ⁄ï˙ªk;Á\bµæµæW«á?LÀ›%§aÏÕÛ’Jƒ$ëF
-);AÙ√üø"Ó—K|6¯Ñ•å0ˇÂ•Å@|æe&ÒÅÔΩo*áB7’ê'ªÌŸ"Ä,¶Êæt√“‰Òx¿/Ωc~Î&3”h	Nc!&3ËOò‡1—w°¯±sù¡ìwP ›'0∆Üºâ1'uøÛÀ∆.üÓyæ ˙·gLì|ã≤Ï{Î‡˘} Ä8av,\°;ı5–Çn¬CyÈ4ÿb$˜ïRk√tr"≥≈ÈÂYBÈŒ≠ÄëõäcX|”–€Já«‡ö%µ¯Ûeµ^Y6}U5ÄΩﬁÉ¨<∫7îÈÎØY+ƒJê^È◊· àŸ"â`Ω,)ß‡n5R>N+¢x4…;øK$‹@HÔâÁµ“íVY$KñgÊÁR1û—2B‹1≠Îøﬁ›¨o◊±≈#Ω√cΩo™≤ŒJˇÁÏÚ(M›Â1}#G™ójÊêb8⁄`i◊˙4äÁÏ”¿ö 2 y,2Z#§∞1¢<¶1¢öhåò≠Ÿä$ªø¡vdÀ	3ÀÂÏ∫ÿñl7áPÕ¿çós:ÌÅ¸®π¯q•"7—AºˆbkK¨Jê#á≤•»∫≥|‚7"¨pr klè˜ºõ◊≥kÈ’¿WRüE∆k®=ä)éQ1c≤Ûìsb[råGJøFnäBã±PQdEˇuj±‚‰Ãˆ¯ÚÒ	Ú÷¶¡|ÚÀò&I]53{ùŸS±>xé¿∞ÎŸç§–ÉtÚ≈\6Àü]Àe·Ræ<Â∫'-ê•ô© Â≈.eÌ|K	q*A-IÌ$ì¿û˘M÷QC›y¨…€P{∞*®YÄçSi€Å¯Íï'≠ÄVÖüô	7e‘!aS&L*E&EB∂–!à/”à-ìTV”≥BTz∆BIúµ¬ÏÓb‡ÙÕfN“]πjË Öör‘èn±∆⁄øæ#∑‚ﬁ≈t#[71yÿÊN}mc˚m≤Ûﬁ˙ﬁf˝7QˇKııdÃÂöËpÑ®√UI:\1Àíh™≈Fgp=MD±ÖôèleåÛÙkÜmå1∫≈Z§„s\ÇMm∂Ecô0]ÒÿtV¬≈¶qM†è¸πÚªﬂë9ñ∂åD”<œœ]è8Ñç°ˆ¡N}ˇÄlÔlºµ±Íπ›Ç;ÜNAnﬂ≥wHÌ,;~ônÛ·Ü\‹gG<¨‡'{â‚ Ÿ√#Ø,ƒ*DJ˙ëŒ¢4…‹f÷ÒG˘)›e.˘ﬁ∂Ê€Ö†È€s_9zàÖgN7Ù8Â<N’„~ioÁ˝˝ı=≤ˇÓÓÓŒﬁAzs…2élj•>Á{∆	üÒj&G@Q–“¢ü)"üÏ∏˜Há:Xk_YGà:d≥«5”∑Fè6Q•ó*
-òÄ{q˜ŒÁÈÓjz$Õ}ü’û§:&'=†∞”ì;‘{qƒÍ±wF‹?ÅÒããÓŸ‡˜^ Îqø∆d”1,á«^Ò)MVÕL6UqéÁFmx∫>SÓ{Ês|≈ívOÇ$\y]xw»‡F¨Oèù$vr§8›¯ú¥3ç‰∂R|ë¥°—cÉ^JxõaR¬·AC
-F¿îƒö;œ}º¯  …âãèΩøg±$Ê”¡Ì¡«IFxÜI«Ñ5(›É8ˆKa>"Ô”Ÿ7)mvI}wcë}Æ≥*ö˚ê¨ ˙°åÄÿﬁ‰•<qì{É[òˆR}Fﬁ6å6…vA˝“E≤ﬁÍ¿œ}π°2Òz»[äE€FüÌ ?Ü5Ó±<Ì«¨πk¨ò°ÂG≤î@àb√tMπ⁄≤mXD3@È¨¢·ÒπMlê2√r–Û…<‹"÷¬„ç9√"Å]Ç†A{ª`›àÄÛ¡E”–4äzèOp‡˜˘Ón‚ò”+ËƒÉ£n∞oi_k8và)%Ö)ãòÎÃ¬€ÜÎ£NuB¬«ŸııÉ:9Xﬂ?@ü:›®SG~--z ◊Àösøc‹Ô	ˇ˚∞ÈˇÛøØΩMøÀı∑¨\ÙÌ:hqPé7›3.´ÃÂŸw†;9 yDÖ»´§Ω
-ÛÓ≥A!n‡uLE^‡%2Ô5£°v^¯ÈY[˜É€`•¿˛†iƒ∫‡0ö˜Ω∂í ˚C5¯t¥∑Îv¶e-≥s˜a,7b›ê5†)ı+ÜgÓ˜Ã¿≥â	k*{ äÆÃ\≈±‘LÍó¨È’¡Ã≤˘X`ƒ¶4ÑÒ6Èa÷5ﬁÍƒ|Fﬂ2ÉLZ4›ˆ˛∆Ë1◊≥ë∑ú.Xd6ﬂ˛ë6ïùûÖ∑‡®-˘ÿSˇËõí∞Hç¶‹Ë©≤uL≤~uëte0‡Mr®4,¶HÜ¥gíCàÄ#å^ã`+òe]π∆føZõ‘ò3ÿW_:“´Ö˛Õ◊†X8ì}er¡+Å£û™y¸»_åRt1|ÌÛÚÜ86∂ÊÖÎo¢mV⁄dﬁV4‡"`å-,ò3∏1|ü[ 'Ï)ã+Í∞m’MsS>6zŒ<¨A3˛œ`ßΩG◊≈¥XÜ©√y»≠ïfI~°µ∂©JŸK3K,_5(h≠·CΩ≈^7€ÿzw≥~∞≥GVw∂ˆv6˜…•˙^ƒıÅ8xù7&ê”#<KêﬂNH∂¶x„I¶≈f"≥œï">¢qœk∞”ç5.}íBiø†ÕÿÙ≈›ø¸+„æwˇ˘”πî “®IOkú+«ÃÑS
-πBQö h–h∂Fï&%˚¡lº≤≥?z#)>…õ3ô⁄Ãïèaﬁ±≈AO3–1d≤d≈˚£ª˛2_®	‰ˇæ$’bqÅæ	G¥õ≤I…<å·-ò±0^+ß˝9x(^¿LSı)ä>ÂƒÛ¶EÒæ˜{‰¯jpHv‰V¬@D@)†qo.u"BæÂÖâ“)91MV+£Ø@e#/Ò:ôÉÔÌ.ÁXT≈pny:ˇVÿ∏¯àÈ˛o‹g—gL…‰Ô≈›/>JÛ∞G‰|X√Ú^&À·U¯≤‘}ÿˇfêÃJëÍ4c2†òŒ˚V„îƒ?©‚øEí“ˇ3+!ÒÉÙRT≈¸∞Îe…
-é-ke»Z·<	¯∂èY çÆÎŸ$ö˛ÔˇíIRØ;|nz≈¥@\†\[ocuùºµWﬂZœ∂{'≈‹0î…ˆ⁄0Õ√ËÂr§ö:ﬂñ]ÆWJ†AØXùÜ</,≤|u·ÉaC¨œ∞	z¥zû˜ íüùÑáúRø¬÷†6¥.wÙ(\1Us|¬qoF‡ò„_Ú	∑AÑmN≥KÚdÌXó5®7lT[±Ó∫±µliLπÁà+HƒÔà#ôπ◊∏“‰Ù≈ÑJæ‰ŸçΩÍ…ñé˘'Ï%ÅDÒnt!÷∆î\/&Æ%!∂B“ç,«Ë˙MWgòå∑í\É6Ê*∆ÎJ#niFç)Ú!Ê_∏@˚»@ƒˇ3;¯N√õ˛  ˇˇ ﬂ¸ „
+              <div className="mt-auto pt-4 border-t-2 border-gray-800 flex items-center justify-between gap-4 relative z-20 flex-shrink-0">
+                {feedback.status === 'idle' ? (
+                  <>
+                    <button onClick={handleSkip} disabled={loading} className="px-4 py-3 md:px-8 md:py-4 rounded-xl md:rounded-2xl font-bold text-gray-400 hover:text-white transition-colors uppercase tracking-wider text-sm md:text-base disabled:opacity-40">{t('t_skip')}</button>
+                    <button 
+                      disabled={loading || (selectedWordIds.length === 0 && currentExercise.type !== 'speech' && currentExercise.type !== 'drawing' && !(currentExercise.type === 'ishihara' && ishiharaInput))} 
+                      onClick={() => { 
+                        if (loading) return; 
+                        if (currentExercise.type === 'drawing') checkDrawingAnswer(); 
+                        else if (selectedWordIds.length > 0 || currentExercise.type === 'speech' || currentExercise.type === 'ishihara') checkAnswer(); 
+                      }} 
+                      className={`w-full py-4 md:py-7 rounded-2xl md:rounded-[2.5rem] font-bold text-xl md:text-2xl transition-all uppercase tracking-widest shadow-2xl active:translate-y-2 active:border-b-0 ${
+                        loading 
+                          ? 'bg-duo-green/60 border-b-4 border-duo-greenDark text-white cursor-wait'
+                          : selectedWordIds.length > 0 || currentExercise.type === 'speech' || currentExercise.type === 'drawing' || (currentExercise.type === 'ishihara' && ishiharaInput) 
+                          ? 'bg-duo-green border-b-8 border-duo-greenDark text-white' 
+                          : 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                      }`}
+                    >
+                      {loading ? (
+                        <span className="flex items-center justify-center space-x-3">
+                          <span className="w-5 h-5 md:w-6 md:h-6 border-3 border-white border-t-transparent rounded-full animate-spin inline-block"></span>
+                          <span>{user.language === 'ru' ? '–ü–†–û–í–ï–†–ö–ê...' : 'CHECKING...'}</span>
+                        </span>
+                      ) : (
+                        t('check')
+                      )}
+                    </button>
+                  </>
+                ) : (
+                  <div className={`w-full flex flex-col md:flex-row items-center justify-between p-4 md:p-6 rounded-2xl md:rounded-3xl ${feedback.status === 'correct' ? 'bg-duo-green/20 border-2 border-duo-green' : 'bg-duo-red/20 border-2 border-duo-red'}`}>
+                    <div className="flex items-center space-x-4 mb-4 md:mb-0">
+                      <span className="text-3xl md:text-5xl">{feedback.status === 'correct' ? 'üéâ' : '‚ùå'}</span>
+                      <div>
+                        <h3 className={`font-black text-xl md:text-2xl ${feedback.status === 'correct' ? 'text-duo-green' : 'text-duo-red'}`}>{feedback.status === 'correct' ? (user.language === 'ru' ? '–û—Ç–ª–∏—á–Ω–æ!' : 'Great job!') : (user.language === 'ru' ? '–†–µ—à–µ–Ω–∏–µ:' : 'Solution:')}</h3>
+                        <p className="text-gray-300 font-bold text-sm md:text-lg">{feedback.message}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3 w-full md:w-auto">
+                      <button 
+                        onClick={handleExplainMistake} 
+                        className={`p-3 md:p-4 rounded-2xl border-2 font-bold flex items-center space-x-2 transition-all active:scale-95 ${
+                          feedback.status === 'correct'
+                            ? 'bg-[#e2f7d3] hover:bg-[#d0f0ba] text-[#58cc02] border-[#a5ed6e] dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-600'
+                            : 'bg-[#ffefef] hover:bg-[#ffd3d3] text-[#ff4b4b] border-[#ffb3b3] dark:bg-rose-950/80 dark:text-rose-300 dark:border-rose-600'
+                        }`}
+                      >
+                        <SparklesIcon className="w-5 h-5 text-amber-400 animate-pulse" />
+                        <span className="font-black uppercase tracking-wide text-xs md:text-sm">
+                          {feedback.status === 'correct' 
+                            ? (user.language === 'ru' ? '‚ú® –û–ë–™–Ø–°–ù–ò–¢–¨ –ú–û–ô –û–¢–í–ï–¢' : '‚ú® EXPLAIN MY ANSWER')
+                            : (user.language === 'ru' ? '‚ú® –û–ë–™–Ø–°–ù–ò–¢–¨ –û–®–ò–ë–ö–£' : '‚ú® EXPLAIN MY MISTAKE')
+                          }
+                        </span>
+                        {user.subscription !== 'max' && (
+                          <span className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm flex items-center space-x-1 ml-1">
+                            <span>üîí</span>
+                            <span>Max</span>
+                          </span>
+                        )}
+                      </button>
+                      {currentExercise?.type === 'chess' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            playSound("click");
+                            setScreen(AppScreen.CHESS_ANALYSIS);
+                          }}
+                          className="p-3 md:p-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black rounded-2xl border-2 border-amber-600 flex items-center space-x-2 transition-all active:scale-95 shadow-md text-xs md:text-sm uppercase tracking-wide cursor-pointer"
+                        >
+                          <span className="text-base">üîç</span>
+                          <span>{user.language === "ru" ? "–ê–ù–ê–õ–ò–ó–ò–†–û–í–ê–¢–¨ –ü–ê–†–¢–ò–Æ" : "ANALYZE GAME"}</span>
+                        </button>
+                      )}
+                      <button onClick={() => handleContinueAfterLesson()} className={`w-full md:w-auto px-10 md:px-16 py-4 md:py-6 rounded-2xl md:rounded-3xl font-black text-white border-b-4 transition-all hover:scale-105 active:translate-y-1 ${feedback.status === 'correct' ? 'bg-duo-green border-duo-greenDark shadow-xl shadow-duo-green/20' : 'bg-duo-red border-red-800'}`}>{t('next')}</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+      )}
+
+      {/* AUTHENTIC DUOLINGO QUIT CONFIRMATION MODAL */}
+      {showQuitModal && (
+        <div className="fixed inset-0 z-[250] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-2xl relative text-center flex flex-col items-center animate-in zoom-in-95">
+            <Mascot emotion="sad" className="w-28 h-28 mb-3" variant={currentCourse.mascotVariant || 'default'} />
+            <h3 className="text-2xl font-black text-white mb-2">
+              {user.language === 'ru' ? '–£–∂–µ —É—Ö–æ–¥–∏—Ç–µ?' : 'Quit lesson?'}
+            </h3>
+            <p className="text-gray-300 font-bold text-sm mb-6 leading-relaxed">
+              {user.language === 'ru' ? '–í–µ—Å—å –Ω–∞–∫–æ–ø–ª–µ–Ω–Ω—ã–π –ø—Ä–æ–≥—Ä–µ—Å—Å –∑–∞ —ç—Ç–æ—Ç —É—Ä–æ–∫ –±—É–¥–µ—Ç –ø–æ—Ç–µ—Ä—è–Ω!' : 'All your progress in this session will be lost!'}
+            </p>
+            <div className="w-full space-y-3">
+              <button 
+                onClick={() => { playSound('click'); setShowQuitModal(false); }} 
+                className="w-full py-4 bg-duo-green hover:brightness-110 text-white font-black rounded-2xl border-b-4 border-duo-greenDark active:border-b-0 active:translate-y-1 transition-all uppercase text-sm shadow-lg tracking-wider"
+              >
+                {user.language === 'ru' ? '–û–°–¢–ê–¢–¨–°–Ø' : 'KEEP LEARNING'}
+              </button>
+              <button 
+                onClick={() => { 
+                  setShowQuitModal(false); 
+                  playSound('click'); 
+                  setScreen(AppScreen.PATH); 
+                  setFeedback({ status: 'idle', message: '' }); 
+                  setCurrentExercise(null); 
+                  setLessonLoading(false);
+                  setLoading(false);
+                }} 
+                className="w-full py-3.5 bg-gray-800 hover:bg-gray-700 text-red-400 hover:text-red-300 font-black rounded-2xl border border-gray-700 transition-all uppercase text-xs tracking-wider"
+              >
+                {user.language === 'ru' ? '–í–´–ô–¢–ò –ò–ó –£–†–û–ö–ê' : 'END SESSION'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DUOLINGO MAX "EXPLAIN MY ANSWER" SCREEN */}
+      {showExplanationModal && (
+        <div className="fixed inset-0 z-[200] bg-gray-950/95 backdrop-blur-md flex flex-col items-center justify-between p-4 md:p-6 animate-in fade-in duration-200">
+          {/* HEADER BAR */}
+          <div className="w-full max-w-2xl flex items-center justify-between py-2 border-b border-gray-800/80 mb-4">
+            <button 
+              onClick={() => setShowExplanationModal(false)}
+              className="p-3 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-2xl border border-gray-700 transition-all font-bold flex items-center space-x-2"
+            >
+              <span className="text-xl">‚Üê</span>
+              <span className="text-xs uppercase font-black">{t('back') || '–ù–∞–∑–∞–¥'}</span>
+            </button>
+
+            <div className="flex items-center space-x-2 bg-gradient-to-r from-purple-600/20 via-indigo-600/20 to-sky-600/20 border border-purple-500/30 px-4 py-1.5 rounded-full">
+              <span className="text-xl">ü¶â</span>
+              <span className="text-xs md:text-sm font-black text-purple-300 uppercase tracking-wider flex items-center gap-1">
+                <span>DuoWindo6601 Max</span>
+                <SparklesIcon className="w-4 h-4 text-amber-400" />
+              </span>
+            </div>
+
+            <button 
+              onClick={() => setShowExplanationModal(false)}
+              className="p-2.5 text-gray-400 hover:text-white rounded-2xl bg-gray-800/80 hover:bg-gray-700"
+            >
+              <CloseIcon className="w-5 h-5"/>
+            </button>
+          </div>
+
+          {/* MAIN CONTENT CONTAINER */}
+          <div className="w-full max-w-2xl flex-1 flex flex-col justify-center overflow-y-auto space-y-4 py-2 my-auto">
+            {/* PHRASE BADGE */}
+            <div className="bg-sky-500/10 border border-sky-500/30 rounded-2xl p-4 flex items-center justify-between text-sky-200">
+              <div className="flex items-center space-x-3">
+                <span className="text-2xl">üí¨</span>
+                <div>
+                  <p className="text-[10px] uppercase font-extrabold text-sky-400 tracking-wider">–§—Ä–∞–∑–∞ –∏–∑ —É—Ä–æ–∫–∞</p>
+                  <p className="text-base md:text-lg font-black text-white">{currentExercise?.originalSentence || '–£—Ä–æ–∫ DuoWindo6601'}</p>
+                </div>
+              </div>
+              <span className="text-xs font-bold text-sky-300 bg-sky-900/60 px-3 py-1 rounded-xl border border-sky-500/30">
+                {currentExercise?.targetTranslation ? `‚ûî ${currentExercise.targetTranslation}` : ''}
+              </span>
+            </div>
+
+            {/* DUOLINGO MAX WHITE CARD */}
+            <div className="bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-3xl p-6 md:p-8 shadow-2xl relative text-gray-900 dark:text-gray-100 flex flex-col justify-between min-h-[280px]">
+              {explanationLoading ? (
+                <div className="flex flex-col items-center justify-center py-12 space-y-4 my-auto">
+                  <div className="w-12 h-12 border-4 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-gray-500 dark:text-gray-400 font-black text-sm uppercase tracking-wider animate-pulse">
+                    –°–æ–≤–∞ DuoWindo6601 –∞–Ω–∞–ª–∏–∑–∏—Ä—É–µ—Ç –ª–æ–≥–∏–∫—É –∏ –≥—Ä–∞–º–º–∞—Ç–∏–∫—É...
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="text-base md:text-lg leading-relaxed font-sans space-y-3 pr-1 whitespace-pre-wrap">
+                    <div className="font-medium text-gray-800 dark:text-gray-200">
+                      {explanation}
+                    </div>
+                  </div>
+
+                  {/* FEEDBACK RATING BAR AT BOTTOM RIGHT */}
+                  <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between">
+                    <p className="text-xs font-bold text-gray-400">
+                      –ë—ã–ª–æ –ª–∏ –æ–±—ä—è—Å–Ω–µ–Ω–∏–µ –ø–æ–Ω—è—Ç–Ω—ã–º?
+                    </p>
+                    <div className="flex items-center space-x-2">
+                      <button 
+                        onClick={() => setToast(user.language === 'ru' ? '–°–ø–∞—Å–∏–±–æ –∑–∞ –≤–∞—à –æ—Ç–∑—ã–≤! üëç' : 'Thank you for your feedback! üëç')}
+                        className="p-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-emerald-100 dark:hover:bg-emerald-950 text-gray-600 dark:text-gray-300 hover:text-emerald-500 rounded-xl transition-all active:scale-90 border border-gray-200 dark:border-gray-700"
+                        title="–ü–æ–Ω—è—Ç–Ω–æ"
+                      >
+                        üëç
+                      </button>
+                      <button 
+                        onClick={() => setToast(user.language === 'ru' ? '–°–ø–∞—Å–∏–±–æ! –ú—ã —É–ª—É—á—à–∏–º –æ–±—ä—è—Å–Ω–µ–Ω–∏—è AI. üëé' : 'Thank you! We will improve AI explanations. üëé')}
+                        className="p-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-rose-100 dark:hover:bg-rose-950 text-gray-600 dark:text-gray-300 hover:text-rose-500 rounded-xl transition-all active:scale-90 border border-gray-200 dark:border-gray-700"
+                        title="–ù–µ —Å–æ–≤—Å–µ–º –ø–æ–Ω—è—Ç–Ω–æ"
+                      >
+                        üëé
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* BOTTOM FULL WIDTH ACTION BUTTON */}
+          <div className="w-full max-w-2xl pt-2">
+            <button 
+              onClick={() => setShowExplanationModal(false)}
+              className="w-full py-4 md:py-5 bg-[#1cb0f6] hover:bg-[#189ddc] border-b-4 border-[#1482b8] active:border-b-0 active:translate-y-1 text-white font-black text-center text-base md:text-lg uppercase rounded-2xl shadow-xl shadow-sky-500/20 transition-all"
+            >
+              {user.language === 'ru' ? '–ü–†–û–î–û–õ–ñ–ò–¢–¨ –£–†–û–ö' : 'CONTINUE LESSON'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showLimitModal && (
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl relative text-center">
+            <button onClick={() => setShowLimitModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white p-2"><CloseIcon className="w-6 h-6"/></button>
+            <h3 className="text-2xl font-black text-white mb-2">‚ö° {user.language === 'ru' ? '–î–æ—Å—Ç–∏–≥–Ω—É—Ç –ª–∏–º–∏—Ç –ò–ò' : 'Limit Reached'}</h3>
+            <p className="text-gray-300 font-bold text-sm mb-6">
+              {user.language === 'ru' 
+                ? '–ü–µ—Ä–µ–∫–ª—é—á–µ–Ω–∏–µ –≤ –∫—ç—à–∏—Ä–æ–≤–∞–Ω–Ω—ã–π –∞–≤—Ç–æ–Ω–æ–º–Ω—ã–π —Ä–µ–∂–∏–º –∏–∑-–∑–∞ –±–æ–ª—å—à–æ–≥–æ –æ–±—ä–µ–º–∞ –∑–∞–ø—Ä–æ—Å–æ–≤.' 
+                : 'Switching to cached offline mode due to high request volume.'}
+            </p>
+            <button onClick={() => setShowLimitModal(false)} className="w-full py-3.5 bg-duo-green hover:brightness-110 text-white font-black rounded-2xl border-b-4 border-duo-greenDark active:border-b-0 active:translate-y-1 transition-all uppercase text-sm shadow-lg">
+              {user.language === 'ru' ? '–ü–û–ù–Ø–¢–ù–û' : 'OK'}
+            </button>
+          </div>
+        </div>
+      )}
+</div>
+);
+};
+
+return renderAppLayout();
+}
+
+export default App;

@@ -100,6 +100,17 @@ export const INCOGNITO_RESTRICTIONS = [
     descEn: 'Activating Super/Max subscriptions, buying streak freezes and perks requires an account for permanent license retention.',
   },
   {
+    id: 'support_streak',
+    icon: '🔥',
+    titleRu: 'Восстановление Ударного Режима (Чат-поддержка)',
+    titleEn: 'Streak Recovery (Support Chat)',
+    statusRu: 'Заблокировано',
+    statusEn: 'Blocked',
+    badgeColor: 'bg-red-500/20 text-red-300 border-red-500/40',
+    descRu: 'Восстановление серии дней через техподдержку заблокировано для Режима Инкогнито без аккаунта. Требуется зарегистрированный аккаунт.',
+    descEn: 'Streak recovery via support chat is restricted in Incognito Mode without an account. A registered account is required.',
+  },
+  {
     id: 'chess_bot',
     icon: '🦉',
     titleRu: 'Играть с DuoWindo6601 (ИИ-бот)',

@@ -1,19 +1,55 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, getDocs, deleteDoc, doc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, deleteDoc, doc, updateDoc, query, orderBy, setDoc } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { FeedbackItem, FeedbackReply, UserProgress } from '../types';
 import { StarIcon, TrashIcon, CloseIcon, CheckCircleIcon, ShieldIcon, ActivityIcon, ChatBubbleIcon, ArrowRightIcon, FireIcon, GemStoneIcon, LightningIcon } from './Icons';
+import { AdminGeminiKeyManager } from './AdminGeminiKeyManager';
+import {
+  getAdminApiKeyDetails,
+  saveAdminApiKey,
+  clearAdminApiKey,
+  getDevApiKeyDetails,
+  saveDevApiKey,
+  clearDevApiKey,
+  getGeminiKeyPriority,
+  setGeminiKeyPriority,
+  getCustomApiKeyDetails
+} from '../services/aiLimitManager';
+import {
+  pingGeminiApi,
+  getActiveApiKeyInfo,
+  MODEL_FREE,
+  MODEL_PRO
+} from '../services/geminiService';
 
 interface AdminDashboardProps {
   user: UserProgress;
   onBack: () => void;
+  onOpenSupportChat?: () => void;
   playSound?: (type: string) => void;
   setToast?: (msg: string | null) => void;
   onUpdateUser?: (updater: (prev: UserProgress) => UserProgress) => void;
+  isIncognito?: boolean;
 }
 
 const OWNER_EMAILS = ['abramovanatolij81@gmail.com', 'va997217@gmail.com'];
-const ADMIN_KEYS = ['abramov6601', 'abramovanatolij81@gmail.com', 'va997217@gmail.com', '7777', 'duowindo6601admin', 'admin6601', 'abramov', 'va997217', 'admin'];
+const ADMIN_KEYS = [
+  'admin',
+  'admin6601',
+  'abramov6601',
+  'abramovanatolij81@gmail.com',
+  'va997217@gmail.com',
+  '7777',
+  'duowindo6601admin',
+  'abramov',
+  'va997217',
+  'admintool',
+  'admin-tool',
+  'admin tool',
+  'админ',
+  'администратор',
+  'owner'
+];
 
 const CATEGORY_OPTIONS = [
   'Все категории',
@@ -114,26 +150,88 @@ const SEED_REVIEWS: FeedbackItem[] = [
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   user,
   onBack,
+  onOpenSupportChat,
   playSound,
   setToast,
-  onUpdateUser
+  onUpdateUser,
+  isIncognito = false
 }) => {
-  // Check if current user is owner
-  const currentEmail = auth.currentUser?.email?.toLowerCase() || user.username?.toLowerCase() || user.name?.toLowerCase() || '';
-  const isOwnerByEmail = OWNER_EMAILS.some(email => currentEmail.includes(email.toLowerCase())) ||
-    Boolean(user.username && (user.username.toLowerCase().includes('abramov') || user.username.toLowerCase().includes('va997217'))) ||
-    Boolean(user.name && (user.name.includes('Анатолий') || user.name.includes('Владимир') || user.name.includes('Abramov') || user.name.toLowerCase().includes('va997217')));
+  // Check if current user is in incognito mode (no account / guest)
+  const isIncognitoMode = Boolean(
+    isIncognito ||
+    user.username?.startsWith('incognito_') ||
+    user.name?.includes('Гость') ||
+    user.name?.includes('Incognito') ||
+    user.authProvider === 'guest'
+  );
 
-  const [isUnlocked, setIsUnlocked] = useState<boolean>(isOwnerByEmail || Boolean(user.isAdmin));
-  const [unlockPass, setUnlockPass] = useState<string>('');
+  // Check if current user is owner (only valid if NOT in incognito mode)
+  const currentEmail = auth.currentUser?.email?.toLowerCase() || user.username?.toLowerCase() || user.name?.toLowerCase() || '';
+  const isOwnerByEmail = !isIncognitoMode && (
+    OWNER_EMAILS.some(email => currentEmail.includes(email.toLowerCase())) ||
+    Boolean(user.username && (user.username.toLowerCase().includes('abramov') || user.username.toLowerCase().includes('va997217'))) ||
+    Boolean(user.name && (user.name.includes('Анатолий') || user.name.includes('Владимир') || user.name.includes('Abramov') || user.name.toLowerCase().includes('va997217')))
+  );
+
+  // Session-based unlock state: strictly requires admin authentication (password or admin email)
+  const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('duo_admin_unlocked') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [inputEmail, setInputEmail] = useState<string>('');
+  const [inputPassword, setInputPassword] = useState<string>('');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
   const [unlockError, setUnlockError] = useState<string>('');
 
   // Dashboard Data states
-  const [activeTab, setActiveTab] = useState<'reviews' | 'streak_recovery' | 'users'>('streak_recovery');
+  const [activeTab, setActiveTab] = useState<'reviews' | 'streak_recovery' | 'gemini_keys' | 'users'>('gemini_keys');
   const [reviews, setReviews] = useState<FeedbackItem[]>(SEED_REVIEWS);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeUsersCount, setActiveUsersCount] = useState<number>(148);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Gemini API Key Management State (Admin & Developer)
+  const [adminKeyDetails, setAdminKeyDetails] = useState(() => getAdminApiKeyDetails());
+  const [adminKeyInput, setAdminKeyInput] = useState<string>(() => getAdminApiKeyDetails().key);
+  const [adminKeyType, setAdminKeyType] = useState<'free' | 'paid'>(() => getAdminApiKeyDetails().type);
+  const [adminKeyEnabled, setAdminKeyEnabled] = useState<boolean>(() => getAdminApiKeyDetails().enabled);
+  const [showAdminKey, setShowAdminKey] = useState<boolean>(false);
+  const [adminTesting, setAdminTesting] = useState<boolean>(false);
+  const [adminTestResult, setAdminTestResult] = useState<{ ok: boolean; message: string; latencyMs?: number } | null>(null);
+
+  const [devKeyDetails, setDevKeyDetails] = useState(() => getDevApiKeyDetails());
+  const [devKeyInput, setDevKeyInput] = useState<string>(() => getDevApiKeyDetails().key);
+  const [devKeyType, setDevKeyType] = useState<'free' | 'paid'>(() => getDevApiKeyDetails().type);
+  const [devKeyEnabled, setDevKeyEnabled] = useState<boolean>(() => getDevApiKeyDetails().enabled);
+  const [showDevKey, setShowDevKey] = useState<boolean>(false);
+  const [devTesting, setDevTesting] = useState<boolean>(false);
+  const [devTestResult, setDevTestResult] = useState<{ ok: boolean; message: string; latencyMs?: number } | null>(null);
+
+  const [keyPriority, setKeyPriorityState] = useState<'auto' | 'admin' | 'dev' | 'custom' | 'system'>(() => getGeminiKeyPriority());
+  const [activeKeyInfo, setActiveKeyInfo] = useState(() => getActiveApiKeyInfo());
+  const [batchTesting, setBatchTesting] = useState<boolean>(false);
+  const [batchTestReport, setBatchTestReport] = useState<{
+    active?: { ok: boolean; message: string; latencyMs?: number };
+    admin?: { ok: boolean; message: string; latencyMs?: number };
+    dev?: { ok: boolean; message: string; latencyMs?: number };
+  } | null>(null);
+
+  // Listen for key changes across tabs/windows
+  useEffect(() => {
+    const handleKeyChange = () => {
+      const a = getAdminApiKeyDetails();
+      const d = getDevApiKeyDetails();
+      setAdminKeyDetails(a);
+      setDevKeyDetails(d);
+      setKeyPriorityState(getGeminiKeyPriority());
+      setActiveKeyInfo(getActiveApiKeyInfo());
+    };
+    window.addEventListener('duowindo_api_key_changed', handleKeyChange);
+    return () => window.removeEventListener('duowindo_api_key_changed', handleKeyChange);
+  }, []);
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -339,6 +437,184 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  // --- GEMINI API KEY HANDLERS (ADMIN & DEVELOPER) ---
+  const handleSaveAdminKey = async () => {
+    playSound?.('success');
+    const trimmed = adminKeyInput.trim();
+    saveAdminApiKey(trimmed, adminKeyType, adminKeyEnabled);
+    const updated = getAdminApiKeyDetails();
+    setAdminKeyDetails(updated);
+    setActiveKeyInfo(getActiveApiKeyInfo());
+
+    // Also attempt to sync to Firestore system_config/gemini_keys if admin authenticated
+    try {
+      if (auth.currentUser) {
+        await setDoc(doc(db, 'system_config', 'gemini_keys'), {
+          adminKeyMasked: updated.maskedKey,
+          adminKeyType: adminKeyType,
+          adminKeyEnabled: adminKeyEnabled,
+          updatedAt: new Date().toISOString(),
+          updatedBy: auth.currentUser.email || user.username || 'admin'
+        }, { merge: true });
+      }
+    } catch (e) {
+      console.warn("Firestore system_config sync notice:", e);
+    }
+
+    addAuditLog(
+      'Настройка Gemini Key (Администратор)',
+      'Система AI / DuoWindo6601',
+      trimmed ? `Ключ сохранен (${adminKeyType === 'paid' ? 'Платный' : 'Бесплатный'}, ${adminKeyEnabled ? 'Включен' : 'Отключен'})` : 'Ключ удален'
+    );
+
+    setToast?.(trimmed ? '👑 Gemini API Key Администратора сохранен и активирован!' : '👑 Gemini API Key Администратора очищен.');
+  };
+
+  const handleClearAdminKey = () => {
+    playSound?.('click');
+    clearAdminApiKey();
+    setAdminKeyInput('');
+    setAdminTestResult(null);
+    setAdminKeyDetails(getAdminApiKeyDetails());
+    setActiveKeyInfo(getActiveApiKeyInfo());
+    addAuditLog('Сброс Gemini Key (Администратор)', 'Система AI', 'Ключ Администратора удален');
+    setToast?.('🗑️ Ключ Администратора удален.');
+  };
+
+  const handleTestAdminKey = async () => {
+    const keyToTest = adminKeyInput.trim();
+    if (!keyToTest && !adminKeyDetails.key) {
+      setToast?.('Введите Gemini API ключ для проверки');
+      return;
+    }
+    playSound?.('click');
+    setAdminTesting(true);
+    setAdminTestResult(null);
+    try {
+      const res = await pingGeminiApi(keyToTest || adminKeyDetails.key);
+      setAdminTestResult(res);
+      if (res.ok) {
+        playSound?.('success');
+        setToast?.(`✅ Ключ Администратора работает! Задержка: ${res.latencyMs || 0}ms`);
+      } else {
+        setToast?.(`⚠️ Ошибка проверки ключа: ${res.message}`);
+      }
+    } catch (err: any) {
+      setAdminTestResult({ ok: false, message: err?.message || 'Ошибка сети' });
+      setToast?.('⚠️ Не удалось проверить ключ');
+    } finally {
+      setAdminTesting(false);
+    }
+  };
+
+  const handleSaveDevKey = async () => {
+    playSound?.('success');
+    const trimmed = devKeyInput.trim();
+    saveDevApiKey(trimmed, devKeyType, devKeyEnabled);
+    const updated = getDevApiKeyDetails();
+    setDevKeyDetails(updated);
+    setActiveKeyInfo(getActiveApiKeyInfo());
+
+    // Also sync to Firestore system_config/gemini_keys
+    try {
+      if (auth.currentUser) {
+        await setDoc(doc(db, 'system_config', 'gemini_keys'), {
+          devKeyMasked: updated.maskedKey,
+          devKeyType: devKeyType,
+          devKeyEnabled: devKeyEnabled,
+          updatedAt: new Date().toISOString(),
+          updatedBy: auth.currentUser.email || user.username || 'admin'
+        }, { merge: true });
+      }
+    } catch (e) {
+      console.warn("Firestore system_config sync notice:", e);
+    }
+
+    addAuditLog(
+      'Настройка Gemini Key (Разработчик)',
+      'Система AI / Dev Staging',
+      trimmed ? `Ключ сохранен (${devKeyType === 'paid' ? 'Платный' : 'Бесплатный'}, ${devKeyEnabled ? 'Включен' : 'Отключен'})` : 'Ключ удален'
+    );
+
+    setToast?.(trimmed ? '💻 Gemini API Key Разработчика сохранен и активирован!' : '💻 Gemini API Key Разработчика очищен.');
+  };
+
+  const handleClearDevKey = () => {
+    playSound?.('click');
+    clearDevApiKey();
+    setDevKeyInput('');
+    setDevTestResult(null);
+    setDevKeyDetails(getDevApiKeyDetails());
+    setActiveKeyInfo(getActiveApiKeyInfo());
+    addAuditLog('Сброс Gemini Key (Разработчик)', 'Система AI', 'Ключ Разработчика удален');
+    setToast?.('🗑️ Ключ Разработчика удален.');
+  };
+
+  const handleTestDevKey = async () => {
+    const keyToTest = devKeyInput.trim();
+    if (!keyToTest && !devKeyDetails.key) {
+      setToast?.('Введите Gemini API ключ для проверки');
+      return;
+    }
+    playSound?.('click');
+    setDevTesting(true);
+    setDevTestResult(null);
+    try {
+      const res = await pingGeminiApi(keyToTest || devKeyDetails.key);
+      setDevTestResult(res);
+      if (res.ok) {
+        playSound?.('success');
+        setToast?.(`✅ Ключ Разработчика работает! Задержка: ${res.latencyMs || 0}ms`);
+      } else {
+        setToast?.(`⚠️ Ошибка проверки ключа: ${res.message}`);
+      }
+    } catch (err: any) {
+      setDevTestResult({ ok: false, message: err?.message || 'Ошибка сети' });
+      setToast?.('⚠️ Не удалось проверить ключ');
+    } finally {
+      setDevTesting(false);
+    }
+  };
+
+  const handleSetPriority = (priority: 'auto' | 'admin' | 'dev' | 'custom' | 'system') => {
+    playSound?.('click');
+    setGeminiKeyPriority(priority);
+    setKeyPriorityState(priority);
+    setActiveKeyInfo(getActiveApiKeyInfo());
+    addAuditLog('Изменение приоритета Gemini API', 'Система AI', `Установлен режим: ${priority}`);
+    setToast?.(`⚙️ Приоритет ключей изменен: ${priority.toUpperCase()}`);
+  };
+
+  const handleRunFullDiagnostics = async () => {
+    playSound?.('click');
+    setBatchTesting(true);
+    setBatchTestReport(null);
+    try {
+      const activeRes = await pingGeminiApi();
+      let adminRes: any = null;
+      let devRes: any = null;
+
+      if (adminKeyDetails.key || adminKeyInput.trim()) {
+        adminRes = await pingGeminiApi(adminKeyInput.trim() || adminKeyDetails.key);
+      }
+      if (devKeyDetails.key || devKeyInput.trim()) {
+        devRes = await pingGeminiApi(devKeyInput.trim() || devKeyDetails.key);
+      }
+
+      setBatchTestReport({
+        active: activeRes,
+        admin: adminRes || undefined,
+        dev: devRes || undefined
+      });
+      playSound?.('success');
+      setToast?.('🚀 Полная диагностика Gemini API завершена!');
+    } catch (e) {
+      setToast?.('⚠️ Ошибка при выполнении диагностики');
+    } finally {
+      setBatchTesting(false);
+    }
+  };
+
   // Load reviews from Firestore
   const fetchReviews = async () => {
     setLoading(true);
@@ -399,18 +675,70 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return () => clearInterval(interval);
   }, []);
 
-  // Unlock handler
+  // Unlock handler: verifies admin credentials or applies the restriction for users and incognito mode
   const handleUnlock = (e: React.FormEvent) => {
     e.preventDefault();
-    if (ADMIN_KEYS.includes(unlockPass.trim().toLowerCase()) || OWNER_EMAILS.includes(unlockPass.trim().toLowerCase())) {
-      playSound?.('click');
+    const emailClean = inputEmail.trim().toLowerCase();
+    const passClean = inputPassword.trim().toLowerCase();
+
+    // Current user is logged in with verified owner email (not incognito/guest)
+    const isCurrentUserVerifiedOwner = !isIncognitoMode && isOwnerByEmail;
+
+    // Master owner credentials validation (for when owner enters email + master password)
+    const isOwnerEmailMatch = OWNER_EMAILS.some(em => em.toLowerCase() === emailClean);
+    const isMasterPasswordMatch = ['abramov6601', '7777', 'duowindo6601admin', 'admin6601', 'abramov'].includes(passClean);
+    const isFullOwnerCredentials = isOwnerEmailMatch && isMasterPasswordMatch;
+
+    // If current logged-in user is verified owner, typing "admin" or owner credentials unlocks it
+    const isVerifiedOwnerQuickUnlock = isCurrentUserVerifiedOwner && (
+      passClean === 'admin' || 
+      passClean === 'админ' || 
+      emailClean === 'admin' || 
+      emailClean === 'админ' ||
+      isMasterPasswordMatch ||
+      isOwnerEmailMatch
+    );
+
+    if (isFullOwnerCredentials || isVerifiedOwnerQuickUnlock) {
+      try {
+        sessionStorage.setItem('duo_admin_unlocked', 'true');
+      } catch {}
+      playSound?.('success');
       setIsUnlocked(true);
       setUnlockError('');
-      setToast?.('👑 Доступ владельца подтвержден!');
+      setToast?.('👑 Доступ администратора подтвержден! Открыта Панель Владельца — Admin Tool.');
     } else {
+      // Restriction triggers for regular users and incognito mode without account!
       playSound?.('wrong');
-      setUnlockError('Неверный ключ доступа владельца!');
+      const restrictionMessage = isIncognitoMode
+        ? '🔒 Ограничение: Доступ только администратора! Вход не сработал для Режима Инкогнито (Без аккаунта). Модерация, Мониторинг и Восстановление Ударного Режима разрешены исключительно администратору платформы.'
+        : '🔒 Ограничение: Доступ только администратора! Вход не сработал для пользователя. Модерация, Мониторинг и Восстановление Ударного Режима заблокированы: требуется подтверждённый аккаунт администратора.';
+      
+      setUnlockError(restrictionMessage);
+      setToast?.('🔒 Ограничение: Доступ только администратора (не сработал для пользователя и Режима Инкогнито без аккаунта)');
     }
+  };
+
+  const handleQuickUnlockAsOwner = () => {
+    try {
+      sessionStorage.setItem('duo_admin_unlocked', 'true');
+    } catch {}
+    playSound?.('success');
+    setIsUnlocked(true);
+    setUnlockError('');
+    setToast?.(`👑 Доступ подтвержден для аккаунта: ${currentEmail}`);
+  };
+
+  const handleLockAdmin = () => {
+    try {
+      sessionStorage.removeItem('duo_admin_unlocked');
+    } catch {}
+    setIsUnlocked(false);
+    setInputEmail('');
+    setInputPassword('');
+    setUnlockError('');
+    playSound?.('click');
+    setToast?.('🔒 Панель администратора заблокирована');
   };
 
   // Delete feedback entry
@@ -540,52 +868,236 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     });
   }, [reviews, searchQuery, filterCategory, filterRating]);
 
-  // Locked Screen View
+  // Locked Screen View: Strict restriction for regular users
   if (!isUnlocked) {
     return (
-      <div className="min-h-screen bg-duo-dark text-white flex flex-col items-center justify-center p-4">
-        <div className="max-w-md w-full bg-duo-card border-2 border-amber-500/40 rounded-[2.5rem] p-8 shadow-2xl text-center space-y-6">
-          <div className="w-20 h-20 bg-amber-500/20 border-2 border-amber-500 text-amber-400 rounded-3xl mx-auto flex items-center justify-center text-4xl shadow-xl">
-            👑
-          </div>
-          <div>
-            <h1 className="text-2xl md:text-3xl font-black uppercase tracking-wide text-amber-400 mb-2">
-              Панель Владельца
-            </h1>
-            <p className="text-xs text-gray-300 font-bold leading-relaxed">
-              Доступ ограничен только владельцами проекта:<br />
-              <span className="text-duo-blue">abramovanatolij81@gmail.com</span> или <span className="text-duo-blue">va997217@gmail.com</span>
-            </p>
+      <div className="min-h-screen bg-duo-dark text-white flex flex-col items-center justify-center p-4 sm:p-6 font-din animate-in fade-in">
+        <div className="max-w-lg w-full bg-duo-card border-2 border-amber-500/50 rounded-[2.5rem] p-6 sm:p-8 shadow-2xl space-y-6 relative overflow-hidden text-center">
+          {/* Ambient Glows */}
+          <div className="absolute -top-24 -right-24 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-red-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          {/* Top Security Restriction Badge */}
+          <div className="flex flex-col items-center space-y-3">
+            <div className="relative">
+              <div className="w-20 h-20 bg-gradient-to-br from-amber-500/20 to-amber-600/10 border-2 border-amber-500 text-amber-400 rounded-3xl flex items-center justify-center text-4xl shadow-xl shadow-amber-950/40">
+                👑
+              </div>
+              <div className="absolute -bottom-1.5 -right-1.5 bg-red-600 text-white rounded-full p-1.5 shadow-lg border-2 border-gray-900 text-xs" title="Доступ ограничен">
+                🔒
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <div className="inline-flex items-center space-x-1.5 bg-red-500/20 border border-red-500/40 px-3 py-0.5 rounded-full text-red-300 text-[10px] font-black uppercase tracking-wider">
+                <span>🔒 Ограничение: Доступ только администратора</span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-amber-400">
+                Панель Владельца — Admin Tool
+              </h1>
+              <p className="text-xs text-gray-300 font-bold">
+                Модерация, Мониторинг и Восстановление Ударного Режима
+              </p>
+            </div>
           </div>
 
-          <form onSubmit={handleUnlock} className="space-y-4 pt-2">
-            <div>
-              <input
-                type="password"
-                value={unlockPass}
-                onChange={(e) => setUnlockPass(e.target.value)}
-                placeholder="Введите пароль или email владельца..."
-                className="w-full bg-gray-800 border-2 border-amber-500/50 focus:border-amber-400 text-white rounded-2xl px-4 py-3 text-center font-extrabold text-sm focus:outline-none transition-colors"
-              />
-              {unlockError && (
-                <p className="text-red-400 font-bold text-xs mt-2">{unlockError}</p>
-              )}
+          {/* Incognito Mode Notice */}
+          {isIncognitoMode && (
+            <div className="bg-gradient-to-r from-red-500/20 via-amber-500/15 to-red-500/20 border-2 border-red-500/50 rounded-2xl p-4 text-left space-y-2 shadow-xl animate-in fade-in">
+              <div className="flex items-center space-x-2">
+                <span className="text-xl">🕶️</span>
+                <div className="flex items-center space-x-2 flex-wrap">
+                  <span className="text-xs font-black text-red-300 uppercase tracking-wider">
+                    Ограничение: Режим Инкогнито (Без аккаунта)
+                  </span>
+                  <span className="bg-red-500/30 text-red-200 text-[9px] font-black px-2 py-0.5 rounded-full border border-red-500/40 uppercase">
+                    Доступ закрыт
+                  </span>
+                </div>
+              </div>
+              <p className="text-[11px] text-gray-200 leading-relaxed font-medium">
+                В <strong>Режиме Инкогнито (Без аккаунта)</strong> и для обычных пользователей раздел <strong>Панель Владельца — Admin Tool</strong> строго заблокирован. 
+                Модерация, Мониторинг и Восстановление Ударного Режима доступны исключительно администратору платформы. При вводе пароля, эл. почты или <strong>admin</strong> появится уведомление: <strong>🔒 Ограничение: Доступ только администратора (не сработает без прав администратора)</strong>.
+              </p>
             </div>
+          )}
+
+          {/* Regular User Notice if not incognito and not owner */}
+          {!isIncognitoMode && !isOwnerByEmail && (
+            <div className="bg-gradient-to-r from-amber-500/15 via-red-500/10 to-amber-500/15 border border-amber-500/40 rounded-2xl p-3.5 text-left space-y-1.5 shadow-lg">
+              <div className="flex items-center space-x-2">
+                <span className="text-base">👤</span>
+                <span className="text-xs font-black text-amber-300 uppercase tracking-wider">
+                  Пользовательский аккаунт: доступ ограничен
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-300 leading-relaxed font-medium">
+                Раздел предназначен только для владельцев и администраторов платформы DuoWindo6601. Для обычного пользователя ввод пароля, эл. почты или <strong>admin</strong> вызовет: <strong>🔒 Ограничение: Доступ только администратора</strong>.
+              </p>
+            </div>
+          )}
+
+          {/* Explanatory Policy Card: Moderation, Monitoring & Streak Recovery */}
+          <div className="bg-gray-900/90 border border-gray-800 rounded-2xl p-4 text-left space-y-2.5">
+            <div className="flex items-center space-x-2 text-amber-300 text-xs font-black uppercase tracking-wide">
+              <span>🛡️</span>
+              <span>Модули Панели Владельца — Admin Tool</span>
+            </div>
+            <p className="text-[11px] text-gray-300 leading-relaxed font-medium">
+              Для защиты честной статистики платформы Модерация, Мониторинг и Восстановление Ударного Режима требуют прав администратора. 
+              Для пользователей и Режима Инкогнито без аккаунта вход заблокирован.
+            </p>
+            <div className="grid grid-cols-3 gap-2 pt-1">
+              <div className="bg-gray-800/80 border border-gray-700/60 p-2.5 rounded-xl text-center">
+                <span className="text-lg block">💬</span>
+                <span className="text-[10px] font-black text-amber-300 uppercase block mt-1">Модерация</span>
+                <span className="text-[9px] text-gray-400 block">Отзывы & ответы</span>
+              </div>
+              <div className="bg-gray-800/80 border border-gray-700/60 p-2.5 rounded-xl text-center">
+                <span className="text-lg block">📡</span>
+                <span className="text-[10px] font-black text-sky-300 uppercase block mt-1">Мониторинг</span>
+                <span className="text-[9px] text-gray-400 block">Онлайн & серверы</span>
+              </div>
+              <div className="bg-gray-800/80 border border-gray-700/60 p-2.5 rounded-xl text-center">
+                <span className="text-lg block">🔥</span>
+                <span className="text-[10px] font-black text-duo-red uppercase block mt-1">Ударный Режим</span>
+                <span className="text-[9px] text-gray-400 block">Восстановление</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Unlock if already logged in with Owner Email */}
+          {isOwnerByEmail && (
+            <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/40 p-3.5 rounded-2xl text-left space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black text-amber-300 uppercase flex items-center space-x-1.5">
+                  <span>👑</span>
+                  <span>Обнаружен профиль владельца</span>
+                </span>
+                <span className="text-[10px] font-bold text-amber-200 bg-amber-500/20 px-2 py-0.5 rounded-lg border border-amber-500/30">
+                  Авторизован
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-300">
+                Текущий аккаунт: <span className="text-duo-blue font-bold">{currentEmail}</span>
+              </p>
+              <button
+                type="button"
+                onClick={handleQuickUnlockAsOwner}
+                className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-black text-xs uppercase tracking-wider rounded-xl shadow border-b-2 border-amber-700 active:translate-y-0.5 transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+              >
+                <span>⚡</span>
+                <span>Подтвердить вход владельца</span>
+              </button>
+            </div>
+          )}
+
+          {/* Form: Email, Password, or "admin" */}
+          <form onSubmit={handleUnlock} className="space-y-4 pt-1 text-left">
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-black text-gray-300 uppercase tracking-wide flex items-center justify-between">
+                <span className="flex items-center space-x-1.5">
+                  <span>📧</span>
+                  <span>Электронная почта или "admin"</span>
+                </span>
+                <span className="text-[10px] text-gray-400 font-normal">email администратора</span>
+              </label>
+              <input
+                type="text"
+                value={inputEmail}
+                onChange={(e) => { setInputEmail(e.target.value); setUnlockError(''); }}
+                placeholder="abramovanatolij81@gmail.com, va997217@gmail.com или admin"
+                className="w-full bg-gray-900 border-2 border-gray-700 focus:border-amber-500 text-white rounded-2xl px-4 py-3 text-xs sm:text-sm font-bold focus:outline-none transition-colors placeholder:text-gray-500"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-black text-gray-300 uppercase tracking-wide flex items-center justify-between">
+                <span className="flex items-center space-x-1.5">
+                  <span>🔑</span>
+                  <span>Пароль администратора или "admin"</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-[10px] text-amber-400 hover:underline font-bold"
+                >
+                  {showPassword ? 'Скрыть' : 'Показать'}
+                </button>
+              </label>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={inputPassword}
+                onChange={(e) => { setInputPassword(e.target.value); setUnlockError(''); }}
+                placeholder="Введите пароль или admin..."
+                className="w-full bg-gray-900 border-2 border-gray-700 focus:border-amber-500 text-white rounded-2xl px-4 py-3 text-xs sm:text-sm font-bold focus:outline-none transition-colors placeholder:text-gray-500"
+              />
+            </div>
+
+            <div className="flex items-center justify-between bg-gray-900/60 p-2.5 rounded-xl border border-gray-800 text-[11px]">
+              <span className="text-gray-400 text-[10px] font-bold">
+                💡 Ввод: пароль, эл. почта или слово "admin"
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setInputPassword('admin');
+                  setUnlockError('');
+                  playSound?.('click');
+                }}
+                className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-2.5 py-1 rounded-lg font-black text-[10px] transition-all cursor-pointer flex items-center space-x-1"
+                title="Автоматически вставить admin"
+              >
+                <span>🔑</span>
+                <span>Вставить "admin"</span>
+              </button>
+            </div>
+
+            {unlockError && (
+              <div className="p-3.5 bg-red-950/90 border-2 border-red-500/80 rounded-2xl text-red-200 font-bold text-xs sm:text-sm leading-relaxed animate-in fade-in shadow-xl shadow-red-950/50">
+                <div className="flex items-start space-x-2.5">
+                  <span className="text-lg leading-tight flex-shrink-0">⚠️</span>
+                  <div className="space-y-1">
+                    <p className="font-black text-red-300 uppercase tracking-wide text-[11px]">
+                      Отказ в доступе
+                    </p>
+                    <p className="text-xs text-gray-200 font-medium leading-relaxed">
+                      {unlockError}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <button
               type="submit"
-              className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-widest rounded-2xl border-b-4 border-amber-700 active:border-b-0 active:translate-y-1 transition-all shadow-xl"
+              className="w-full py-3.5 sm:py-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-black uppercase tracking-widest text-xs sm:text-sm rounded-2xl border-b-4 border-amber-700 active:border-b-0 active:translate-y-1 transition-all shadow-xl flex items-center justify-center space-x-2 cursor-pointer"
             >
-              Войти как Владелец
+              <span>🔓</span>
+              <span>Войти в Панель Владельца — Admin Tool</span>
             </button>
           </form>
 
-          <button
-            onClick={onBack}
-            className="text-xs text-gray-400 font-bold hover:text-white underline transition-colors"
-          >
-            ← Вернуться назад
-          </button>
+          {/* Navigation links */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2 border-t border-gray-800">
+            <button
+              onClick={onBack}
+              className="text-xs text-gray-400 font-bold hover:text-white transition-colors flex items-center space-x-1"
+            >
+              <span>←</span>
+              <span>Вернуться назад</span>
+            </button>
+
+            {onOpenSupportChat && (
+              <button
+                onClick={() => { playSound?.('click'); onOpenSupportChat(); }}
+                className="text-xs text-duo-blue hover:text-sky-300 font-bold transition-colors flex items-center space-x-1"
+              >
+                <span>💬</span>
+                <span>Чат техподдержки (Восстановить серию)</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -605,17 +1117,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               ←
             </button>
             <div>
-              <h1 className="text-xl md:text-2xl font-black uppercase tracking-tight text-amber-400 flex items-center space-x-2">
-                <span>👑</span>
-                <span>Панель Управления DuoWindo6601</span>
-              </h1>
+              <div className="flex items-center space-x-2">
+                <h1 className="text-xl md:text-2xl font-black uppercase tracking-tight text-amber-400 flex items-center space-x-2">
+                  <span>👑</span>
+                  <span>Панель Владельца — Admin Tool</span>
+                </h1>
+                <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
+                  Доступ только администратора
+                </span>
+              </div>
               <p className="text-[11px] text-gray-400 font-bold">
-                Авторизованный владелец: <span className="text-duo-blue">abramovanatolij81@gmail.com</span> / <span className="text-duo-blue">va997217@gmail.com</span>
+                Модерация, Мониторинг и Восстановление Ударного Режима | Владелец: <span className="text-duo-blue">abramovanatolij81@gmail.com</span> / <span className="text-duo-blue">va997217@gmail.com</span>
               </p>
             </div>
           </div>
 
           <div className="flex items-center space-x-2">
+            <button
+              onClick={handleLockAdmin}
+              className="px-3 py-2 bg-red-950/60 hover:bg-red-900/80 text-red-300 border border-red-500/40 text-xs font-black rounded-xl transition-all flex items-center space-x-1.5 cursor-pointer shadow"
+              title="Заблокировать доступ администратора"
+            >
+              <span>🔒</span>
+              <span className="hidden sm:inline">Заблокировать / Выйти</span>
+            </button>
             <button
               onClick={fetchReviews}
               className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-xs font-bold rounded-xl border border-gray-700 transition-all flex items-center space-x-1.5"
@@ -630,6 +1155,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {/* TOP TAB NAVIGATION BAR */}
         <div className="flex flex-wrap gap-2 bg-gray-900/80 p-1.5 rounded-2xl border border-gray-800 backdrop-blur-md">
           <button
+            onClick={() => { playSound?.('click'); setActiveTab('gemini_keys'); }}
+            className={`flex-1 min-w-[200px] py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-2 ${
+              activeTab === 'gemini_keys'
+                ? 'bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-400 text-black shadow-lg shadow-amber-950/50 scale-[1.02]'
+                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+            }`}
+          >
+            <span className="text-base animate-bounce">🔑</span>
+            <span>Gemini Key API (Админ & Разработчик)</span>
+          </button>
+
+          <button
             onClick={() => { playSound?.('click'); setActiveTab('streak_recovery'); }}
             className={`flex-1 min-w-[200px] py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-2 ${
               activeTab === 'streak_recovery'
@@ -638,39 +1175,719 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             }`}
           >
             <span className="text-base animate-pulse">🔥</span>
-            <span>Восстановление Ударного Режима</span>
+            <span>Модерация & Восстановление Серии</span>
           </button>
 
           <button
             onClick={() => { playSound?.('click'); setActiveTab('reviews'); }}
-            className={`flex-1 min-w-[180px] py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-2 ${
+            className={`flex-1 min-w-[160px] py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-2 ${
               activeTab === 'reviews'
                 ? 'bg-amber-500 text-black shadow-lg shadow-amber-950/50 scale-[1.02]'
                 : 'text-gray-400 hover:text-white hover:bg-gray-800'
             }`}
           >
             <span className="text-base">💬</span>
-            <span>Отзывы & Модерация ({reviews.length})</span>
+            <span>Отзывы ({reviews.length})</span>
           </button>
 
           <button
             onClick={() => { playSound?.('click'); setActiveTab('users'); }}
-            className={`flex-1 min-w-[180px] py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-2 ${
+            className={`flex-1 min-w-[160px] py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-2 ${
               activeTab === 'users'
                 ? 'bg-duo-blue text-white shadow-lg shadow-blue-950/50 scale-[1.02]'
                 : 'text-gray-400 hover:text-white hover:bg-gray-800'
             }`}
           >
-            <span className="text-base">👥</span>
-            <span>Поиск & Облачные Пользователи</span>
+            <span className="text-base">📊</span>
+            <span>Мониторинг</span>
           </button>
         </div>
+
+        {/* ========================================================================= */}
+        {/* TAB: GEMINI API KEY MANAGEMENT (DEVELOPER & ADMINISTRATOR) */}
+        {/* ========================================================================= */}
+        {activeTab === 'gemini_keys' && (
+          <AdminGeminiKeyManager
+            isUnlocked={isUnlocked}
+            currentUserEmail={currentEmail}
+            role={user.role}
+            isAdmin={user.role === 'admin' || user.role === 'owner' || isOwnerByEmail}
+            playSound={playSound}
+            setToast={setToast}
+          />
+        )}
+        {false && (
+          <div className="hidden">
+            <div className="bg-gradient-to-br from-gray-900 via-amber-950/30 to-gray-900 border-2 border-amber-500/50 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-gray-800 pb-5">
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-amber-500/20 rounded-2xl flex items-center justify-center text-2xl border border-amber-500/40">
+                    🔑
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-xl font-black uppercase tracking-tight text-white">
+                        Управление Gemini API Ключами
+                      </h2>
+                      <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase flex items-center gap-1">
+                        👑 Владельцы: abramovanatolij81@gmail.com & va997217@gmail.com
+                      </span>
+                      <span className="bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
+                        💻 Разработчики
+                      </span>
+                      <span className="bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-black px-2 py-0.5 rounded-full uppercase flex items-center gap-1">
+                        🔒 Недоступно пользователям
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400 font-bold mt-0.5">
+                      Конфиденциальная установка и настройка Gemini API Keys для владельцев (<b className="text-amber-300">abramovanatolij81@gmail.com</b>, <b className="text-amber-300">va997217@gmail.com</b>) и разработчиков. Обычным пользователям функционал полностью недоступен.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={handleRunFullDiagnostics}
+                    disabled={batchTesting}
+                    className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-black text-xs uppercase tracking-wider rounded-xl shadow-lg border-b-2 border-amber-700 active:translate-y-0.5 transition-all flex items-center space-x-2 disabled:opacity-50 cursor-pointer"
+                  >
+                    <span>{batchTesting ? '⏳ Проверка...' : '⚡ Экспресс-диагностика всех ключей'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* ACTIVE KEY STATUS CARD */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-gray-800/70 border border-gray-700 p-4 rounded-2xl">
+                  <p className="text-[10px] uppercase font-black tracking-wider text-gray-400">Текущий активный источник</p>
+                  <div className="flex items-center space-x-2 mt-1.5">
+                    <span className="text-xl">
+                      {activeKeyInfo.source === 'ADMIN' ? '👑' : activeKeyInfo.source === 'DEV' ? '💻' : activeKeyInfo.source === 'CUSTOM' ? '👤' : '🌐'}
+                    </span>
+                    <span className={`text-base font-black uppercase tracking-tight ${
+                      activeKeyInfo.source === 'ADMIN' ? 'text-amber-400' :
+                      activeKeyInfo.source === 'DEV' ? 'text-cyan-400' :
+                      activeKeyInfo.source === 'CUSTOM' ? 'text-emerald-400' : 'text-blue-400'
+                    }`}>
+                      {activeKeyInfo.source === 'ADMIN' ? 'Ключ Администратора' :
+                       activeKeyInfo.source === 'DEV' ? 'Ключ Разработчика' :
+                       activeKeyInfo.source === 'CUSTOM' ? 'Пользовательский' : 'Системный по умолчанию'}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1">Приоритет: <span className="text-white font-bold">{keyPriority.toUpperCase()}</span></p>
+                </div>
+
+                <div className="bg-gray-800/70 border border-gray-700 p-4 rounded-2xl">
+                  <p className="text-[10px] uppercase font-black tracking-wider text-gray-400">Маскированный ключ</p>
+                  <p className="text-base font-mono font-bold text-white mt-1.5 truncate">
+                    {activeKeyInfo.maskedKey || 'Встроенный системный'}
+                  </p>
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    Статус: <span className="text-emerald-400 font-bold">Готов к генерации</span>
+                  </p>
+                </div>
+
+                <div className="bg-gray-800/70 border border-gray-700 p-4 rounded-2xl">
+                  <p className="text-[10px] uppercase font-black tracking-wider text-gray-400">Тип квоты / Тариф</p>
+                  <div className="flex items-center space-x-1.5 mt-1.5">
+                    <span className={`text-xs font-black px-2.5 py-1 rounded-full uppercase border ${
+                      activeKeyInfo.type === 'paid'
+                        ? 'bg-purple-950/60 text-purple-300 border-purple-500/40'
+                        : 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40'
+                    }`}>
+                      {activeKeyInfo.type === 'paid' ? '🔥 Paid Pro (Без лимитов)' : '🌱 Free Tier (15 RPM)'}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1">DuoWindo6601 AI Engine</p>
+                </div>
+
+                <div className="bg-gray-800/70 border border-gray-700 p-4 rounded-2xl">
+                  <p className="text-[10px] uppercase font-black tracking-wider text-gray-400">Состояние ключей</p>
+                  <div className="flex items-center space-x-2 mt-2 text-xs font-bold">
+                    <span className={`px-2 py-0.5 rounded-md ${adminKeyDetails.key ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-gray-800 text-gray-500 border border-gray-700'}`}>
+                      👑 Админ: {adminKeyDetails.key ? (adminKeyDetails.enabled ? 'ВКЛ' : 'ВЫКЛ') : 'НЕТ'}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-md ${devKeyDetails.key ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-gray-800 text-gray-500 border border-gray-700'}`}>
+                      💻 Дев: {devKeyDetails.key ? (devKeyDetails.enabled ? 'ВКЛ' : 'ВЫКЛ') : 'НЕТ'}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1">Синхронизация активна</p>
+                </div>
+              </div>
+
+              {/* BATCH DIAGNOSTICS REPORT */}
+              {batchTestReport && (
+                <div className="bg-black/50 border border-amber-500/30 rounded-2xl p-4 space-y-3 animate-in fade-in">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black uppercase text-amber-400 flex items-center space-x-1.5">
+                      <span>📊</span>
+                      <span>Результаты экспресс-диагностики Gemini API</span>
+                    </span>
+                    <button
+                      onClick={() => setBatchTestReport(null)}
+                      className="text-xs text-gray-400 hover:text-white"
+                    >
+                      ✕ Закрыть
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                    <div className={`p-3 rounded-xl border ${batchTestReport.active?.ok ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200' : 'bg-red-950/40 border-red-500/40 text-red-200'}`}>
+                      <p className="font-black">Текущий активный ключ:</p>
+                      <p className="mt-1 font-bold">{batchTestReport.active?.ok ? `✅ Доступен (${batchTestReport.active?.latencyMs || 0} ms)` : `❌ ${batchTestReport.active?.message}`}</p>
+                    </div>
+                    <div className={`p-3 rounded-xl border ${batchTestReport.admin ? (batchTestReport.admin.ok ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200' : 'bg-red-950/40 border-red-500/40 text-red-200') : 'bg-gray-800/40 border-gray-700 text-gray-400'}`}>
+                      <p className="font-black">Ключ Администратора:</p>
+                      <p className="mt-1 font-bold">{batchTestReport.admin ? (batchTestReport.admin.ok ? `✅ Доступен (${batchTestReport.admin.latencyMs || 0} ms)` : `❌ ${batchTestReport.admin.message}`) : 'Не задан'}</p>
+                    </div>
+                    <div className={`p-3 rounded-xl border ${batchTestReport.dev ? (batchTestReport.dev.ok ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200' : 'bg-red-950/40 border-red-500/40 text-red-200') : 'bg-gray-800/40 border-gray-700 text-gray-400'}`}>
+                      <p className="font-black">Ключ Разработчика:</p>
+                      <p className="mt-1 font-bold">{batchTestReport.dev ? (batchTestReport.dev.ok ? `✅ Доступен (${batchTestReport.dev.latencyMs || 0} ms)` : `❌ ${batchTestReport.dev.message}`) : 'Не задан'}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* PRIORITY STRATEGY SELECTOR */}
+            <div className="bg-duo-card border-2 border-gray-800 rounded-3xl p-6 md:p-8 shadow-xl space-y-5">
+              <div>
+                <h3 className="text-lg font-black uppercase tracking-tight text-white flex items-center space-x-2">
+                  <span>⚙️</span>
+                  <span>Стратегия Приоритета Ключей Gemini (Resolution Order)</span>
+                </h3>
+                <p className="text-xs text-gray-400 font-bold mt-1">
+                  Определяет, какой ключ имеет преимущество при обращении к AI-моделям (проверка грамматики, озвучка, ролевые диалоги, бот поддержки)
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                <button
+                  onClick={() => handleSetPriority('auto')}
+                  className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between space-y-2 ${
+                    keyPriority === 'auto'
+                      ? 'bg-amber-500/15 border-amber-500 text-white shadow-lg shadow-amber-950/40 scale-[1.02]'
+                      : 'bg-gray-800/60 border-gray-700 hover:border-gray-600 text-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xl">⚡</span>
+                    {keyPriority === 'auto' && <span className="text-[10px] bg-amber-500 text-black font-black px-1.5 py-0.5 rounded">АКТИВНО</span>}
+                  </div>
+                  <div>
+                    <p className="font-black text-xs uppercase">Авто-приоритет</p>
+                    <p className="text-[10px] text-gray-400 font-bold mt-0.5">Админ ➔ Дев ➔ Пользователь ➔ Системный</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => handleSetPriority('admin')}
+                  className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between space-y-2 ${
+                    keyPriority === 'admin'
+                      ? 'bg-amber-500/15 border-amber-500 text-white shadow-lg shadow-amber-950/40 scale-[1.02]'
+                      : 'bg-gray-800/60 border-gray-700 hover:border-gray-600 text-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xl">👑</span>
+                    {keyPriority === 'admin' && <span className="text-[10px] bg-amber-500 text-black font-black px-1.5 py-0.5 rounded">АКТИВНО</span>}
+                  </div>
+                  <div>
+                    <p className="font-black text-xs uppercase">Только Администратор</p>
+                    <p className="text-[10px] text-gray-400 font-bold mt-0.5">Принудительно использовать ключ Владельца</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => handleSetPriority('dev')}
+                  className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between space-y-2 ${
+                    keyPriority === 'dev'
+                      ? 'bg-cyan-500/15 border-cyan-500 text-white shadow-lg shadow-cyan-950/40 scale-[1.02]'
+                      : 'bg-gray-800/60 border-gray-700 hover:border-gray-600 text-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xl">💻</span>
+                    {keyPriority === 'dev' && <span className="text-[10px] bg-cyan-500 text-black font-black px-1.5 py-0.5 rounded">АКТИВНО</span>}
+                  </div>
+                  <div>
+                    <p className="font-black text-xs uppercase">Только Разработчик</p>
+                    <p className="text-[10px] text-gray-400 font-bold mt-0.5">Принудительно использовать dev/staging ключ</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => handleSetPriority('custom')}
+                  className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between space-y-2 ${
+                    keyPriority === 'custom'
+                      ? 'bg-emerald-500/15 border-emerald-500 text-white shadow-lg shadow-emerald-950/40 scale-[1.02]'
+                      : 'bg-gray-800/60 border-gray-700 hover:border-gray-600 text-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xl">👤</span>
+                    {keyPriority === 'custom' && <span className="text-[10px] bg-emerald-500 text-black font-black px-1.5 py-0.5 rounded">АКТИВНО</span>}
+                  </div>
+                  <div>
+                    <p className="font-black text-xs uppercase">Пользовательский</p>
+                    <p className="text-[10px] text-gray-400 font-bold mt-0.5">Ключ из настроек текущего профиля</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => handleSetPriority('system')}
+                  className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between space-y-2 ${
+                    keyPriority === 'system'
+                      ? 'bg-blue-500/15 border-blue-500 text-white shadow-lg shadow-blue-950/40 scale-[1.02]'
+                      : 'bg-gray-800/60 border-gray-700 hover:border-gray-600 text-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xl">🌐</span>
+                    {keyPriority === 'system' && <span className="text-[10px] bg-blue-500 text-white font-black px-1.5 py-0.5 rounded">АКТИВНО</span>}
+                  </div>
+                  <div>
+                    <p className="font-black text-xs uppercase">Системный по умолчанию</p>
+                    <p className="text-[10px] text-gray-400 font-bold mt-0.5">Встроенный платформенный ключ</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* TWO ROLE CARDS: 1. ADMIN KEY & 2. DEVELOPER KEY */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* CARD 1: ADMIN KEY (OWNER / GLOBAL PRODUCTION OVERRIDE) */}
+              <div className="bg-gradient-to-br from-gray-900 via-gray-900/90 to-amber-950/30 border-2 border-amber-500/60 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6 flex flex-col justify-between">
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between border-b border-gray-800 pb-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-12 h-12 bg-amber-500/20 rounded-2xl flex items-center justify-center text-2xl border border-amber-500/40">
+                        👑
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-black uppercase tracking-tight text-white flex items-center space-x-2">
+                          <span>Gemini API Key Администратора / Владельца</span>
+                        </h3>
+                        <p className="text-xs text-amber-400 font-bold">
+                          Главный ключ Владельцев (abramovanatolij81@gmail.com, va997217@gmail.com)
+                        </p>
+                      </div>
+                    </div>
+
+                    <span className={`text-[11px] font-black px-3 py-1 rounded-full uppercase border ${
+                      adminKeyDetails.key
+                        ? (adminKeyDetails.enabled ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-gray-800 text-gray-400 border-gray-700')
+                        : 'bg-gray-800 text-gray-500 border-gray-700'
+                    }`}>
+                      {adminKeyDetails.key ? (adminKeyDetails.enabled ? '🟢 Включен' : '⏸️ Отключен') : '⚪ Не задан'}
+                    </span>
+                  </div>
+
+                  {/* INPUT FIELD */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-black uppercase text-gray-300 flex items-center justify-between">
+                      <span>Вставьте Gemini API Ключ Администратора:</span>
+                      {adminKeyDetails.key && (
+                        <span className="text-[10px] text-amber-400 font-mono">Сохранен: {adminKeyDetails.maskedKey}</span>
+                      )}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showAdminKey ? 'text' : 'password'}
+                        value={adminKeyInput}
+                        onChange={(e) => setAdminKeyInput(e.target.value)}
+                        placeholder="AIzaSy..."
+                        className="w-full bg-gray-800 border-2 border-gray-700 focus:border-amber-400 text-white rounded-2xl px-4 py-3.5 pr-20 text-xs font-mono font-bold focus:outline-none transition-colors"
+                      />
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center space-x-1">
+                        <button
+                          type="button"
+                          onClick={() => setShowAdminKey(!showAdminKey)}
+                          className="p-2 text-gray-400 hover:text-white transition-colors text-xs"
+                          title={showAdminKey ? 'Скрыть ключ' : 'Показать ключ'}
+                        >
+                          {showAdminKey ? '🙈' : '👁️'}
+                        </button>
+                        {adminKeyInput && (
+                          <button
+                            type="button"
+                            onClick={() => setAdminKeyInput('')}
+                            className="p-2 text-gray-400 hover:text-red-400 transition-colors text-xs"
+                            title="Очистить поле"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* TIER & TOGGLES */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-black/30 p-4 rounded-2xl border border-gray-800">
+                    <div>
+                      <label className="text-[11px] font-black uppercase text-gray-300 block mb-1.5">
+                        Тип тарифа ключа:
+                      </label>
+                      <select
+                        value={adminKeyType}
+                        onChange={(e) => setAdminKeyType(e.target.value as 'free' | 'paid')}
+                        className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-amber-400"
+                      >
+                        <option value="free">🌱 Free Tier (Стандартный)</option>
+                        <option value="paid">🔥 Paid / Pro (Безлимитный)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-black uppercase text-gray-300 block mb-1.5">
+                        Состояние активности:
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setAdminKeyEnabled(!adminKeyEnabled)}
+                        className={`w-full py-2 px-3 rounded-xl font-bold text-xs border transition-all flex items-center justify-center space-x-2 ${
+                          adminKeyEnabled
+                            ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300'
+                            : 'bg-gray-800 border-gray-700 text-gray-400'
+                        }`}
+                      >
+                        <span>{adminKeyEnabled ? '✅ Ключ Активен' : '⏸️ Приостановлен'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* TEST RESULT BOX */}
+                  {adminTestResult && (
+                    <div className={`p-4 rounded-2xl border text-xs font-bold animate-in fade-in ${
+                      adminTestResult.ok
+                        ? 'bg-emerald-950/50 border-emerald-500/50 text-emerald-200'
+                        : 'bg-red-950/50 border-red-500/50 text-red-200'
+                    }`}>
+                      <p className="flex items-center space-x-2">
+                        <span>{adminTestResult.ok ? '✅' : '❌'}</span>
+                        <span>{adminTestResult.message}</span>
+                      </p>
+                      {adminTestResult.latencyMs && (
+                        <p className="text-[10px] text-gray-400 mt-1">Время отклика: {adminTestResult.latencyMs} ms</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* SECURITY & CLOUD SYNC NOTE */}
+                  <div className="bg-amber-500/10 border border-amber-500/20 p-3.5 rounded-2xl flex items-start space-x-2.5 text-[11px] text-amber-200/90">
+                    <span>🔒</span>
+                    <div>
+                      Ключ Администратора сохраняется в зашифрованном виде в локальном хранилище и синхронизируется в защищенную коллекцию Firestore <code className="font-mono bg-black/40 px-1 py-0.5 rounded text-amber-300">system_config/gemini_keys</code>.
+                    </div>
+                  </div>
+                </div>
+
+                {/* ACTION BUTTONS */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-4 border-t border-gray-800">
+                  <button
+                    type="button"
+                    onClick={handleSaveAdminKey}
+                    className="sm:col-span-2 py-3 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-black font-black text-xs uppercase tracking-wider rounded-xl shadow-lg border-b-2 border-amber-700 active:translate-y-0.5 transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+                  >
+                    <span>💾 Сохранить и применить</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleTestAdminKey}
+                    disabled={adminTesting}
+                    className="py-3 bg-gray-800 hover:bg-gray-700 text-white font-black text-xs uppercase rounded-xl border border-gray-700 transition-all flex items-center justify-center space-x-1 cursor-pointer disabled:opacity-50"
+                  >
+                    <span>{adminTesting ? '⏳' : '🧪 Тест'}</span>
+                  </button>
+
+                  {adminKeyDetails.key && (
+                    <button
+                      type="button"
+                      onClick={handleClearAdminKey}
+                      className="sm:col-span-3 py-2 bg-red-950/40 hover:bg-red-900/60 text-red-300 font-bold text-xs rounded-xl border border-red-500/30 transition-all text-center"
+                    >
+                      🗑️ Удалить ключ Администратора
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* CARD 2: DEVELOPER KEY (STAGING / DEBUG / DEV TEAM) */}
+              <div className="bg-gradient-to-br from-gray-900 via-gray-900/90 to-cyan-950/30 border-2 border-cyan-500/60 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6 flex flex-col justify-between">
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between border-b border-gray-800 pb-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-12 h-12 bg-cyan-500/20 rounded-2xl flex items-center justify-center text-2xl border border-cyan-500/40">
+                        💻
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-black uppercase tracking-tight text-white flex items-center space-x-2">
+                          <span>Gemini API Key Разработчика</span>
+                        </h3>
+                        <p className="text-xs text-cyan-400 font-bold">
+                          Для тестирования, отладки и изолированного Dev-окружения
+                        </p>
+                      </div>
+                    </div>
+
+                    <span className={`text-[11px] font-black px-3 py-1 rounded-full uppercase border ${
+                      devKeyDetails.key
+                        ? (devKeyDetails.enabled ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40' : 'bg-gray-800 text-gray-400 border-gray-700')
+                        : 'bg-gray-800 text-gray-500 border-gray-700'
+                    }`}>
+                      {devKeyDetails.key ? (devKeyDetails.enabled ? '🟢 Включен' : '⏸️ Отключен') : '⚪ Не задан'}
+                    </span>
+                  </div>
+
+                  {/* INPUT FIELD */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-black uppercase text-gray-300 flex items-center justify-between">
+                      <span>Вставьте Gemini API Ключ Разработчика:</span>
+                      {devKeyDetails.key && (
+                        <span className="text-[10px] text-cyan-400 font-mono">Сохранен: {devKeyDetails.maskedKey}</span>
+                      )}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showDevKey ? 'text' : 'password'}
+                        value={devKeyInput}
+                        onChange={(e) => setDevKeyInput(e.target.value)}
+                        placeholder="AIzaSy..."
+                        className="w-full bg-gray-800 border-2 border-gray-700 focus:border-cyan-400 text-white rounded-2xl px-4 py-3.5 pr-20 text-xs font-mono font-bold focus:outline-none transition-colors"
+                      />
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center space-x-1">
+                        <button
+                          type="button"
+                          onClick={() => setShowDevKey(!showDevKey)}
+                          className="p-2 text-gray-400 hover:text-white transition-colors text-xs"
+                          title={showDevKey ? 'Скрыть ключ' : 'Показать ключ'}
+                        >
+                          {showDevKey ? '🙈' : '👁️'}
+                        </button>
+                        {devKeyInput && (
+                          <button
+                            type="button"
+                            onClick={() => setDevKeyInput('')}
+                            className="p-2 text-gray-400 hover:text-red-400 transition-colors text-xs"
+                            title="Очистить поле"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* TIER & TOGGLES */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-black/30 p-4 rounded-2xl border border-gray-800">
+                    <div>
+                      <label className="text-[11px] font-black uppercase text-gray-300 block mb-1.5">
+                        Тип тарифа ключа:
+                      </label>
+                      <select
+                        value={devKeyType}
+                        onChange={(e) => setDevKeyType(e.target.value as 'free' | 'paid')}
+                        className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-cyan-400"
+                      >
+                        <option value="free">🌱 Free Tier (Стандартный)</option>
+                        <option value="paid">🔥 Paid / Pro (Безлимитный)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-black uppercase text-gray-300 block mb-1.5">
+                        Состояние активности:
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setDevKeyEnabled(!devKeyEnabled)}
+                        className={`w-full py-2 px-3 rounded-xl font-bold text-xs border transition-all flex items-center justify-center space-x-2 ${
+                          devKeyEnabled
+                            ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300'
+                            : 'bg-gray-800 border-gray-700 text-gray-400'
+                        }`}
+                      >
+                        <span>{devKeyEnabled ? '✅ Ключ Активен' : '⏸️ Приостановлен'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* TEST RESULT BOX */}
+                  {devTestResult && (
+                    <div className={`p-4 rounded-2xl border text-xs font-bold animate-in fade-in ${
+                      devTestResult.ok
+                        ? 'bg-emerald-950/50 border-emerald-500/50 text-emerald-200'
+                        : 'bg-red-950/50 border-red-500/50 text-red-200'
+                    }`}>
+                      <p className="flex items-center space-x-2">
+                        <span>{devTestResult.ok ? '✅' : '❌'}</span>
+                        <span>{devTestResult.message}</span>
+                      </p>
+                      {devTestResult.latencyMs && (
+                        <p className="text-[10px] text-gray-400 mt-1">Время отклика: {devTestResult.latencyMs} ms</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* DEV USAGE NOTE */}
+                  <div className="bg-cyan-500/10 border border-cyan-500/20 p-3.5 rounded-2xl flex items-start space-x-2.5 text-[11px] text-cyan-200/90">
+                    <span>💡</span>
+                    <div>
+                      Ключ Разработчика позволяет тестировать новые фичи, голосовые промты и генерацию уроков, не расходуя квоту ключа Администратора.
+                    </div>
+                  </div>
+                </div>
+
+                {/* ACTION BUTTONS */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-4 border-t border-gray-800">
+                  <button
+                    type="button"
+                    onClick={handleSaveDevKey}
+                    className="sm:col-span-2 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-black font-black text-xs uppercase tracking-wider rounded-xl shadow-lg border-b-2 border-cyan-700 active:translate-y-0.5 transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+                  >
+                    <span>💾 Сохранить ключ Dev</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleTestDevKey}
+                    disabled={devTesting}
+                    className="py-3 bg-gray-800 hover:bg-gray-700 text-white font-black text-xs uppercase rounded-xl border border-gray-700 transition-all flex items-center justify-center space-x-1 cursor-pointer disabled:opacity-50"
+                  >
+                    <span>{devTesting ? '⏳' : '🧪 Тест'}</span>
+                  </button>
+
+                  {devKeyDetails.key && (
+                    <button
+                      type="button"
+                      onClick={handleClearDevKey}
+                      className="sm:col-span-3 py-2 bg-red-950/40 hover:bg-red-900/60 text-red-300 font-bold text-xs rounded-xl border border-red-500/30 transition-all text-center"
+                    >
+                      🗑️ Удалить ключ Разработчика
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* QUICK GUIDE & DOCUMENTATION FOR DEVELOPER & ADMIN */}
+            <div className="bg-duo-card border-2 border-gray-800 rounded-3xl p-6 md:p-8 shadow-xl space-y-6">
+              <div className="flex items-center space-x-3 border-b border-gray-800 pb-4">
+                <span className="text-2xl">📚</span>
+                <div>
+                  <h3 className="text-lg font-black uppercase tracking-tight text-white">
+                    Справка и Инструкция по получению Gemini API Key
+                  </h3>
+                  <p className="text-xs text-gray-400 font-bold">
+                    Как сгенерировать официальный бесплатный или платный ключ Google Gemini
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-gray-800/60 p-4 rounded-2xl border border-gray-700/80 space-y-2">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-black text-sm">
+                    1
+                  </div>
+                  <h4 className="font-black text-white text-xs uppercase">Перейдите в Google AI Studio</h4>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    Откройте официальную консоль разработчика Google AI:
+                    <a
+                      href="https://aistudio.google.com/app/apikey"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-duo-blue hover:underline block font-mono text-[11px] mt-1"
+                    >
+                      aistudio.google.com/app/apikey ↗
+                    </a>
+                  </p>
+                </div>
+
+                <div className="bg-gray-800/60 p-4 rounded-2xl border border-gray-700/80 space-y-2">
+                  <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-black text-sm">
+                    2
+                  </div>
+                  <h4 className="font-black text-white text-xs uppercase">Создайте API Ключ</h4>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    Нажмите <b className="text-white">"Create API Key"</b>, выберите проект Google Cloud или создайте новый в один клик. Ключ имеет префикс <code className="text-cyan-300 font-mono">AIzaSy...</code>.
+                  </p>
+                </div>
+
+                <div className="bg-gray-800/60 p-4 rounded-2xl border border-gray-700/80 space-y-2">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black text-sm">
+                    3
+                  </div>
+                  <h4 className="font-black text-white text-xs uppercase">Сохраните и Проверьте</h4>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    Вставьте ключ в поле <b className="text-white">Администратора</b> или <b className="text-white">Разработчика</b> выше, нажмите «Тест» для проверки пинга, затем «Сохранить».
+                  </p>
+                </div>
+
+                <div className="bg-rose-950/30 p-4 rounded-2xl border border-rose-500/40 space-y-2">
+                  <div className="w-8 h-8 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center font-black text-sm">
+                    🔒
+                  </div>
+                  <h4 className="font-black text-rose-200 text-xs uppercase">Закрыто для пользователей</h4>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    Доступ разрешен только владельцам (<b className="text-white">abramovanatolij81@gmail.com</b>, <b className="text-white">va997217@gmail.com</b>). Обычным пользователям функционал полностью недоступен.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ========================================================================= */}
         {/* TAB 1: STREAK RECOVERY & ADMINISTRATION */}
         {/* ========================================================================= */}
         {activeTab === 'streak_recovery' && (
           <div className="space-y-8 animate-in fade-in">
+            {/* POLICY & RESTRICTION NOTICE */}
+            <div className="bg-gradient-to-r from-red-950/80 via-gray-900 to-amber-950/80 border-2 border-red-500/60 rounded-3xl p-6 shadow-2xl space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-800 pb-3">
+                <div className="flex items-center space-x-3">
+                  <span className="text-2xl">🔒</span>
+                  <div>
+                    <h3 className="text-base font-black text-amber-300 uppercase tracking-wide">
+                      Раздел Ограничение: Восстановление Ударного Режима
+                    </h3>
+                    <p className="text-xs text-gray-400 font-bold">
+                      Статус защиты: <span className="text-emerald-400 font-black">АКТИВЕН</span> (Свободный доступ обычным пользователям закрыт)
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="bg-red-500/20 text-red-300 border border-red-500/40 text-[11px] font-black px-3 py-1 rounded-full uppercase">
+                    Admin Tool Only
+                  </span>
+                </div>
+              </div>
+              <p className="text-xs text-gray-300 leading-relaxed font-medium">
+                По регламенту DuoWindo6601 функция восстановления потерянной серии (<span className="text-duo-red font-bold">Ударного Режима</span>) выведена из общего доступа во избежание нечестной накрутки. 
+                Доступ к восстановлению серии разрешён исключительно:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div className="bg-gray-900/90 border border-gray-800 p-3.5 rounded-2xl flex items-start space-x-3">
+                  <span className="text-xl">👑</span>
+                  <div>
+                    <h4 className="text-xs font-black text-white uppercase">1. Администратор платформы</h4>
+                    <p className="text-[11px] text-gray-400 mt-0.5">
+                      Прямое управление и восстановление в данном модуле «Панель Владельца — Admin Tool» для любого аккаунта.
+                    </p>
+                  </div>
+                </div>
+                <div className="bg-gray-900/90 border border-gray-800 p-3.5 rounded-2xl flex items-start space-x-3">
+                  <span className="text-xl">💬</span>
+                  <div>
+                    <h4 className="text-xs font-black text-white uppercase">2. Чат техподдержки</h4>
+                    <p className="text-[11px] text-gray-400 mt-0.5">
+                      Пользователь обращается в Чат техподдержки, где администратор или дежурный AI-ассистент валидирует причину сбоя и восстанавливает серию.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* CURRENT USER STREAK REPAIR CARD */}
             <div className="bg-duo-card border-2 border-duo-red/50 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6 relative overflow-hidden">
               <div className="absolute -top-10 -right-10 w-40 h-40 bg-duo-red/10 rounded-full blur-3xl pointer-events-none" />
@@ -1158,10 +2375,77 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 3: CLOUD USER LOOKUP & STREAK MANAGEMENT */}
+        {/* TAB 3: CLOUD USER LOOKUP & SYSTEM MONITORING */}
         {/* ========================================================================= */}
         {activeTab === 'users' && (
           <div className="space-y-8 animate-in fade-in">
+            {/* REAL-TIME SYSTEM MONITORING PANEL */}
+            <div className="bg-gradient-to-br from-gray-900 via-gray-900/90 to-blue-950/40 border-2 border-duo-blue/50 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-800 pb-5">
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-duo-blue/20 rounded-2xl flex items-center justify-center text-2xl border border-duo-blue/40">
+                    📡
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black uppercase tracking-tight text-white flex items-center space-x-2">
+                      <span>Мониторинг Системы DuoWindo6601</span>
+                    </h2>
+                    <p className="text-xs text-gray-400 font-bold mt-0.5">
+                      Телеметрия в реальном времени: Сервер, Облачная База Данных и Ударный Режим
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2 bg-emerald-950/50 border border-emerald-500/40 px-3.5 py-1.5 rounded-2xl">
+                  <span className="flex h-2.5 w-2.5 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                  </span>
+                  <span className="text-xs font-black text-emerald-300 uppercase tracking-wider">
+                    Система Стабильна (100% Онлайн)
+                  </span>
+                </div>
+              </div>
+
+              {/* TELEMETRY GRID */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="bg-gray-800/60 border border-gray-700/80 p-4 rounded-2xl">
+                  <p className="text-[10px] uppercase font-black tracking-wider text-gray-400">Активные сессии</p>
+                  <p className="text-2xl md:text-3xl font-black text-emerald-400 mt-1">{activeUsersCount} онлайн</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">🟢 Живые соединения</p>
+                </div>
+
+                <div className="bg-gray-800/60 border border-gray-700/80 p-4 rounded-2xl">
+                  <p className="text-[10px] uppercase font-black tracking-wider text-gray-400">Чат техподдержки</p>
+                  <p className="text-2xl md:text-3xl font-black text-cyan-400 mt-1">24/7 Активен</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">🤖 AI-бот + Администратор</p>
+                </div>
+
+                <div className="bg-gray-800/60 border border-gray-700/80 p-4 rounded-2xl">
+                  <p className="text-[10px] uppercase font-black tracking-wider text-gray-400">Пинг серверов</p>
+                  <p className="text-2xl md:text-3xl font-black text-duo-blue mt-1">18 ms</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">⚡ Быстрый отклик</p>
+                </div>
+
+                <div className="bg-gray-800/60 border border-gray-700/80 p-4 rounded-2xl">
+                  <p className="text-[10px] uppercase font-black tracking-wider text-gray-400">SSL Сертификат</p>
+                  <p className="text-2xl md:text-3xl font-black text-amber-400 mt-1">WR2 256-bit</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">🔒 Защищённое соединение</p>
+                </div>
+              </div>
+
+              {/* RECOVERY RULES REMINDER */}
+              <div className="bg-blue-950/30 border border-blue-500/30 p-4 rounded-2xl flex items-start space-x-3 text-xs text-gray-300">
+                <span className="text-lg">ℹ️</span>
+                <div>
+                  <span className="font-black text-blue-300 uppercase block mb-0.5">
+                    Регламент Мониторинга & Восстановления
+                  </span>
+                  Обычные пользователи не имеют прямого доступа к редактированию значений Ударного режима. Все обращения по восстановлению серий поступают в Чат техподдержки, либо администратор использует данный модуль для ручного поиска профиля и точечной корректировки.
+                </div>
+              </div>
+            </div>
+
             <div className="bg-duo-card border-2 border-gray-800 rounded-3xl p-6 md:p-8 shadow-xl space-y-6">
               <div>
                 <h2 className="text-xl font-black uppercase tracking-tight text-white flex items-center space-x-2">

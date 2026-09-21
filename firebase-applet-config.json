@@ -6,5 +6,7 @@
   "firestoreDatabaseId": "ai-studio-duowindo6601-ac3a0196-45b1-4ae3-8955-997a0a00e286",
   "storageBucket": "silicon-stone-ssjh2.firebasestorage.app",
   "messagingSenderId": "91952527642",
-  "measurementId": ""
+  "measurementId": "",
+  "oAuthClientId": "91952527642-6rcp242p6fsj93bf2anauoea94o2uo7o.apps.googleusercontent.com",
+  "recaptchaSiteKey": ""
 }

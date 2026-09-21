@@ -35,6 +35,87 @@ const server = http.createServer((req, res) => {
   const parsedUrl = new URL(req.url, 'http://localhost');
   const pathname = decodeURIComponent(parsedUrl.pathname);
   
+  // Handle server-side Gemini API proxy to bypass geo-restrictions
+  if (pathname.startsWith('/api/gemini-proxy')) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', '*');
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204;
+      res.end();
+      return;
+    }
+    const targetPath = pathname.replace(/^\/api\/gemini-proxy/, '') + (parsedUrl.search || '');
+    const targetUrl = `https://generativelanguage.googleapis.com${targetPath}`;
+    
+    const chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', async () => {
+      const bodyBuffer = chunks.length ? Buffer.concat(chunks) : undefined;
+      const headers = {};
+      for (const [k, v] of Object.entries(req.headers)) {
+        if (v && typeof v === 'string' && !['host', 'connection', 'content-length'].includes(k.toLowerCase())) {
+          headers[k] = v;
+        }
+      }
+      
+      const serverKey = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
+      if (!headers['x-goog-api-key'] || headers['x-goog-api-key'] === 'undefined' || headers['x-goog-api-key'].trim() === '') {
+        if (serverKey) {
+          headers['x-goog-api-key'] = serverKey;
+        }
+      }
+      
+      try {
+        const googleRes = await fetch(targetUrl, {
+          method: req.method,
+          headers,
+          body: bodyBuffer
+        });
+        res.statusCode = googleRes.status;
+        const contentType = googleRes.headers.get('content-type');
+        if (contentType) res.setHeader('content-type', contentType);
+        const arrayBuffer = await googleRes.arrayBuffer();
+        res.end(Buffer.from(arrayBuffer));
+      } catch (err) {
+        console.error('[Gemini Server Proxy Error]:', err);
+        res.statusCode = 502;
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify({
+          error: {
+            code: 502,
+            message: 'Failed to proxy request: ' + (err?.message || err)
+          }
+        }));
+      }
+    });
+    return;
+  }
+
+  // Handle MCP (Model Context Protocol) & Jules by Google Labs API debug status
+  if (pathname.startsWith('/api/mcp/status')) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', '*');
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204;
+      res.end();
+      return;
+    }
+    const renderMcpKey = process.env.RENDER_MCP_API_KEY || 'rnd_yJ0QbFmEPVzGFlD6OwWG4o8Rg6t8';
+    res.statusCode = 200;
+    res.setHeader('content-type', 'application/json');
+    res.end(JSON.stringify({
+      mcpEnabled: true,
+      julesDebugging: true,
+      mcpServer: 'render-mcp',
+      renderApiKeyConfigured: !!renderMcpKey,
+      maskedKey: renderMcpKey ? `${renderMcpKey.substring(0, 8)}••••${renderMcpKey.substring(renderMcpKey.length - 4)}` : null,
+      timestamp: new Date().toISOString()
+    }));
+    return;
+  }
+
   // Translate URL to file path in the 'dist' directory
   let filePath = path.join(DIST_DIR, pathname === '/' ? 'index.html' : pathname);
 

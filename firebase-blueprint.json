@@ -7,6 +7,13 @@
       "properties": {
         "name": { "type": "string", "description": "The user's display name" },
         "username": { "type": "string", "description": "The user's unique handle" },
+        "phone": { "type": "string", "description": "User phone number" },
+        "hidePhone": { "type": "boolean", "description": "Hide phone number flag" },
+        "email": { "type": "string", "description": "User email address" },
+        "hideEmail": { "type": "boolean", "description": "Hide email address flag" },
+        "link": { "type": "string", "description": "User profile link or website" },
+        "hideLink": { "type": "boolean", "description": "Hide profile link flag" },
+        "authProvider": { "type": "string", "description": "Authentication provider" },
         "avatarColor": { "type": "string", "description": "The background color of the avatar" },
         "avatarImage": { "type": "string", "description": "Base64 avatar image string" },
         "avatarUrl": { "type": "string", "description": "Avatar image URL" },
@@ -22,15 +29,18 @@
         "mistakes": { "type": "array", "description": "List of active mistakes to review" },
         "learnedWords": { "type": "array", "description": "List of words successfully learned" },
         "achievements": { "type": "array", "description": "List of unlocked achievements" },
-        "language": { "type": "string", "enum": ["ru", "en", "de", "fr", "es", "ja", "zh"], "description": "Interface language" },
+        "language": { "type": "string", "enum": ["ru", "en", "de", "fr", "es", "ja", "zh", "ar"], "description": "Interface language" },
         "country": { "type": "string", "description": "User's country" },
         "preferredVoice": { "type": "string", "description": "Voice used for TTS" },
         "voiceProvider": { "type": "string", "enum": ["gemini", "google", "yandex", "system"], "description": "Selected TTS provider" },
         "chessStats": { "type": "object", "description": "Chess puzzle statistics" },
+        "dailyAiRequestsCount": { "type": "integer", "description": "Number of Gemini API requests used today" },
+        "bonusAiRequests": { "type": "integer", "description": "Bonus Gemini API requests purchased or gifted" },
+        "lastAiRequestDate": { "type": "string", "description": "Date YYYY-MM-DD of last Gemini API request" },
         "createdAt": { "type": "string", "format": "date-time", "description": "Profile creation timestamp" },
         "updatedAt": { "type": "string", "format": "date-time", "description": "Profile last update timestamp" }
       },
-      "required": ["name", "energy", "hearts", "subscription", "streak", "gems", "xp", "language", "country"]
+      "required": ["name"]
     },
     "Feedback": {
       "title": "User Feedback",
@@ -51,6 +61,38 @@
         "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
       },
       "required": ["userId", "userName", "rating", "comment", "createdAt"]
+    },
+    "SupportTicket": {
+      "title": "Support Ticket",
+      "description": "User support ticket sent to technical support",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "User handle or ID" },
+        "userName": { "type": "string", "description": "Name of user submitting ticket" },
+        "email": { "type": "string", "description": "Contact email" },
+        "subject": { "type": "string", "description": "Subject of the inquiry" },
+        "message": { "type": "string", "description": "Detailed question or issue" },
+        "targetEmails": { "type": "array", "description": "Support staff recipient emails" },
+        "status": { "type": "string", "description": "Status of the ticket" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["userId", "userName", "message", "status"]
+    },
+    "SystemConfig": {
+      "title": "System Configuration",
+      "description": "Global settings, Gemini API keys and server flags managed by administrators",
+      "type": "object",
+      "properties": {
+        "adminApiKey": { "type": "string", "description": "Admin Gemini API key" },
+        "adminKeyType": { "type": "string", "enum": ["free", "paid"], "description": "Admin key tier" },
+        "adminKeyEnabled": { "type": "boolean", "description": "Whether admin key is enabled" },
+        "devApiKey": { "type": "string", "description": "Developer Gemini API key" },
+        "devKeyType": { "type": "string", "enum": ["free", "paid"], "description": "Developer key tier" },
+        "devKeyEnabled": { "type": "boolean", "description": "Whether developer key is enabled" },
+        "keyPriority": { "type": "string", "description": "Active key priority strategy" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp" },
+        "updatedBy": { "type": "string", "description": "Email or ID of updating administrator" }
+      }
     }
   },
   "firestore": {
@@ -61,6 +103,14 @@
     "/feedback/{feedbackId}": {
       "schema": "Feedback",
       "description": "Public user feedback and app reviews for DuoWindo6601"
+    },
+    "/support_tickets/{ticketId}": {
+      "schema": "SupportTicket",
+      "description": "Support tickets submitted by users"
+    },
+    "/system_config/{configId}": {
+      "schema": "SystemConfig",
+      "description": "Global system configurations and API keys restricted to administrators"
     }
   }
 }

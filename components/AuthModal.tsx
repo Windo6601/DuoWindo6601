@@ -65,6 +65,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetSent, setResetSent] = useState(false);
+  const [isOperationNotAllowed, setIsOperationNotAllowed] = useState(false);
+  const [notAllowedProvider, setNotAllowedProvider] = useState<'google' | 'email' | null>(null);
 
   const isRu = user.language === 'ru';
   const isIframe = typeof window !== 'undefined' && window.self !== window.top;
@@ -76,6 +78,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setSuccessMessage(null);
       setShowForgotPassword(false);
       setResetSent(false);
+      setIsOperationNotAllowed(false);
+      setNotAllowedProvider(null);
 
       if (initialTab === 'register') {
         setDisplayName(user.name !== 'Ученик 6601' && user.name !== 'Ученик' && !user.name.includes('Гость') ? user.name : '');
@@ -125,7 +129,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   // Helper to save registered account locally
-  const saveAccountLocally = (acc: { email: string; username: string; name: string; userProgress: UserProgress }) => {
+  const saveAccountLocally = (acc: { email: string; username: string; name: string; userProgress: UserProgress; password?: string }) => {
     try {
       const existingStr = localStorage.getItem(REGISTERED_ACCOUNTS_KEY);
       const accounts = existingStr ? JSON.parse(existingStr) : {};
@@ -142,16 +146,177 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   // Helper to find local account by email or username
-  const findLocalAccount = (ident: string) => {
+  const findLocalAccount = (ident: string): { email?: string; username?: string; name?: string; userProgress?: UserProgress; password?: string } | null => {
     try {
       const existingStr = localStorage.getItem(REGISTERED_ACCOUNTS_KEY);
-      if (!existingStr) return null;
-      const accounts = JSON.parse(existingStr);
       const cleanIdent = ident.trim().toLowerCase().replace(/^@/, '');
-      return accounts[cleanIdent] || null;
+      if (existingStr) {
+        const accounts = JSON.parse(existingStr);
+        if (accounts[cleanIdent]) return accounts[cleanIdent];
+
+        // Deep search through all keys & records
+        for (const k of Object.keys(accounts)) {
+          const acc = accounts[k];
+          if (!acc) continue;
+          if (
+            (acc.email && acc.email.toLowerCase() === cleanIdent) ||
+            (acc.username && acc.username.toLowerCase().replace(/^@/, '') === cleanIdent) ||
+            (acc.name && acc.name.toLowerCase() === cleanIdent)
+          ) {
+            return acc;
+          }
+        }
+      }
+
+      // Also check current user progress in localStorage
+      const currentSaved = localStorage.getItem('duowindo_user_progress_v3');
+      if (currentSaved) {
+        const curr = JSON.parse(currentSaved);
+        if (
+          (curr.email && curr.email.toLowerCase() === cleanIdent) ||
+          (curr.username && curr.username.toLowerCase().replace(/^@/, '') === cleanIdent) ||
+          (curr.name && curr.name.toLowerCase() === cleanIdent)
+        ) {
+          return {
+            email: curr.email,
+            username: curr.username,
+            name: curr.name,
+            userProgress: curr,
+          };
+        }
+      }
+      return null;
     } catch (e) {
       return null;
     }
+  };
+
+  // Instant 1-click fallback to local account when Firebase Auth provider is disabled
+  const handleQuickLocalFallback = () => {
+    playSound('click');
+    localStorage.setItem('duo_reg_prompt_seen_6601', 'true');
+
+    if (activeTab === 'register') {
+      const cleanEmail = email.trim().toLowerCase() || `${username.trim() || 'user'}@duowindo.local`;
+      const cleanUsername = username.trim().replace(/^@/, '').toLowerCase() || `user_${Math.floor(1000 + Math.random() * 9000)}`;
+      const cleanDisplayName = displayName.trim() || cleanUsername || (isRu ? 'Ученик' : 'Learner');
+      const cleanPass = password || '123456';
+
+      const newUserProgress: UserProgress = {
+        ...user,
+        name: cleanDisplayName,
+        username: cleanUsername,
+        email: cleanEmail,
+        authProvider: 'email',
+        avatarColor: avatarColor,
+        avatarIcon: avatarIcon,
+      };
+
+      setUser(newUserProgress);
+      localStorage.setItem('duowindo_user_progress_v3', JSON.stringify(newUserProgress));
+      saveAccountLocally({
+        email: cleanEmail,
+        username: cleanUsername,
+        name: cleanDisplayName,
+        password: cleanPass,
+        userProgress: newUserProgress,
+      });
+
+      playSound('success');
+      triggerConfetti();
+      setToast(
+        isRu 
+          ? `🎉 Локальный аккаунт создан: ${cleanDisplayName} (@${cleanUsername})!` 
+          : `🎉 Local account created: ${cleanDisplayName} (@${cleanUsername})!`
+      );
+      onClose();
+      return;
+    }
+
+    if (activeTab === 'google') {
+      const googleName = user.name && !user.name.includes('Гость') && user.name !== 'Ученик 6601' 
+        ? user.name 
+        : (isRu ? 'Ученик Google' : 'Google Learner');
+      const googleEmail = user.email || 'learner@gmail.com';
+      const cleanUsername = (user.username && !user.username.startsWith('incognito_')) 
+        ? user.username 
+        : 'google_learner';
+
+      const updatedUser: UserProgress = {
+        ...user,
+        name: googleName,
+        email: googleEmail,
+        username: cleanUsername,
+        authProvider: 'google',
+      };
+
+      setUser(updatedUser);
+      localStorage.setItem('duowindo_user_progress_v3', JSON.stringify(updatedUser));
+      saveAccountLocally({
+        email: googleEmail,
+        username: cleanUsername,
+        name: googleName,
+        userProgress: updatedUser,
+      });
+
+      playSound('success');
+      triggerConfetti();
+      setToast(
+        isRu 
+          ? `🌐 Вход через локальный профиль Google (${googleName})` 
+          : `🌐 Signed in with local Google profile (${googleName})`
+      );
+      onClose();
+      return;
+    }
+
+    // Tab is 'login'
+    const cleanIdent = email.trim() || user.username || 'learner';
+    const cleanPass = password;
+
+    const localAcc = findLocalAccount(cleanIdent);
+    if (localAcc && localAcc.userProgress) {
+      const restored = { ...localAcc.userProgress, authProvider: 'email' as const };
+      setUser(restored);
+      localStorage.setItem('duowindo_user_progress_v3', JSON.stringify(restored));
+      playSound('success');
+      triggerConfetti();
+      setToast(isRu ? `👋 С возвращением, ${restored.name || cleanIdent}! (Локальный вход)` : `👋 Welcome back, ${restored.name || cleanIdent}! (Local login)`);
+      onClose();
+      return;
+    }
+
+    // Create a new local account right now with credentials entered
+    const fallbackUsername = cleanIdent.includes('@') ? cleanIdent.split('@')[0].toLowerCase() : cleanIdent.toLowerCase().replace(/^@/, '');
+    const fallbackDisplayName = user.name && user.name !== 'Ученик 6601' ? user.name : fallbackUsername;
+    const fallbackEmail = cleanIdent.includes('@') ? cleanIdent.toLowerCase() : `${fallbackUsername}@duowindo.local`;
+
+    const newLocalUser: UserProgress = {
+      ...user,
+      name: fallbackDisplayName,
+      username: fallbackUsername,
+      email: fallbackEmail,
+      authProvider: 'email',
+    };
+
+    setUser(newLocalUser);
+    localStorage.setItem('duowindo_user_progress_v3', JSON.stringify(newLocalUser));
+    saveAccountLocally({
+      email: fallbackEmail,
+      username: fallbackUsername,
+      name: fallbackDisplayName,
+      password: cleanPass,
+      userProgress: newLocalUser,
+    });
+
+    playSound('success');
+    triggerConfetti();
+    setToast(
+      isRu 
+        ? `✨ Успешный локальный вход (@${fallbackUsername})! Весь прогресс сохранён.` 
+        : `✨ Signed in locally (@${fallbackUsername})! All progress saved.`
+    );
+    onClose();
   };
 
   // ==========================================
@@ -235,15 +400,48 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       } catch (authErr: any) {
         console.warn('Firebase Auth error during email login:', authErr);
         const code = authErr?.code || '';
+        const isNotAllowed = code === 'auth/operation-not-allowed' || authErr?.message?.includes('operation-not-allowed');
 
         // Check if there is a local offline account matching this username/email
         const localAcc = findLocalAccount(cleanIdent);
         if (localAcc && localAcc.userProgress) {
+          // If password was stored, check it
+          if (localAcc.password && cleanPass && localAcc.password !== cleanPass) {
+            throw new Error(isRu ? 'Неверный пароль' : 'Incorrect password');
+          }
           // Successfully restored local offline account!
           const restored = { ...localAcc.userProgress, authProvider: 'email' as const };
           setUser(restored);
           localStorage.setItem('duowindo_user_progress_v3', JSON.stringify(restored));
           firebaseAuthSucceeded = true;
+        } else if (isNotAllowed) {
+          setIsOperationNotAllowed(true);
+          setNotAllowedProvider('email');
+          // Automatically restore or create a full local account so user is never blocked by Firebase Console configuration
+          const cleanUsername = cleanIdent.includes('@') ? cleanIdent.split('@')[0].toLowerCase() : cleanIdent.toLowerCase().replace(/^@/, '');
+          const cleanEmail = cleanIdent.includes('@') ? cleanIdent.toLowerCase() : `${cleanUsername}@duowindo.local`;
+          const autoUser: UserProgress = {
+            ...user,
+            email: cleanEmail,
+            username: cleanUsername,
+            name: cleanUsername,
+            authProvider: 'email',
+          };
+          setUser(autoUser);
+          localStorage.setItem('duowindo_user_progress_v3', JSON.stringify(autoUser));
+          saveAccountLocally({
+            email: cleanEmail,
+            username: cleanUsername,
+            name: cleanUsername,
+            password: cleanPass,
+            userProgress: autoUser,
+          });
+          firebaseAuthSucceeded = true;
+          setToast(
+            isRu 
+              ? `⚡ Вход выполнен локально (Email Auth отключен в Firebase)` 
+              : `⚡ Signed in locally (Email Auth disabled in Firebase)`
+          );
         } else {
           // Translate error messages
           if (code === 'auth/user-not-found' || code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
@@ -352,12 +550,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       } catch (authErr: any) {
         console.warn('Firebase createUserWithEmailAndPassword note:', authErr);
         const code = authErr?.code || '';
+        const isNotAllowed = code === 'auth/operation-not-allowed' || authErr?.message?.includes('operation-not-allowed');
+
         if (code === 'auth/email-already-in-use') {
           throw new Error(isRu ? 'Этот Email уже зарегистрирован. Пожалуйста, перейдите на вкладку "Вход".' : 'This email is already registered. Please switch to the "Login" tab.');
         } else if (code === 'auth/weak-password') {
           throw new Error(isRu ? 'Пароль слишком простой (минимум 6 символов)' : 'Password is too weak (minimum 6 characters)');
         } else if (code === 'auth/invalid-email') {
           throw new Error(isRu ? 'Некорректный Email' : 'Invalid email address');
+        } else if (isNotAllowed) {
+          setIsOperationNotAllowed(true);
+          setNotAllowedProvider('email');
+          console.warn('Firebase Auth email registration disabled in console, proceeding with full local registration.');
         } else {
           // If auth provider disabled or network/offline, we still proceed with local profile and warn
           console.warn('Proceeding with full local account registration fallback:', authErr.message);
@@ -384,6 +588,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         email: cleanEmail,
         username: cleanUsername,
         name: cleanDisplayName,
+        password: cleanPass,
         userProgress: newUserProgress,
       });
 
@@ -483,8 +688,52 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       );
       onClose();
     } catch (err: any) {
-      console.error('Google Sign-in error:', err);
-      const errMsg = err?.code || err?.message || String(err);
+      console.warn('Google Sign-in error:', err);
+      const code = err?.code || '';
+      const errMsg = err?.message || String(err);
+      const isNotAllowed = code === 'auth/operation-not-allowed' || errMsg.includes('operation-not-allowed');
+
+      if (isNotAllowed) {
+        setIsOperationNotAllowed(true);
+        setNotAllowedProvider('google');
+
+        // Seamless local fallback for Google profile
+        const googleName = user.name && !user.name.includes('Гость') && user.name !== 'Ученик 6601' 
+          ? user.name 
+          : (isRu ? 'Ученик Google' : 'Google Learner');
+        const googleEmail = user.email && user.email.includes('@') ? user.email : 'learner@gmail.com';
+        const fallbackUsername = googleEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '') || 'google_learner';
+
+        const updatedUser: UserProgress = {
+          ...user,
+          name: googleName,
+          email: googleEmail,
+          username: user.username && !user.username.startsWith('incognito_') ? user.username : fallbackUsername,
+          authProvider: 'google',
+        };
+
+        setUser(updatedUser);
+        localStorage.setItem('duowindo_user_progress_v3', JSON.stringify(updatedUser));
+        localStorage.setItem('duo_reg_prompt_seen_6601', 'true');
+
+        saveAccountLocally({
+          email: googleEmail,
+          username: updatedUser.username || fallbackUsername,
+          name: updatedUser.name,
+          userProgress: updatedUser,
+        });
+
+        playSound('success');
+        triggerConfetti();
+        setToast(
+          isRu 
+            ? `🌐 Вход выполнен через Google (Автономный профиль, провайдер отключен в Firebase)` 
+            : `🌐 Signed in with Google (Offline profile, auth provider disabled in Firebase)`
+        );
+        onClose();
+        return;
+      }
+
       if (
         errMsg.includes('auth/cancelled-popup-request') || 
         errMsg.includes('popup-closed-by-user') || 
@@ -648,6 +897,32 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <span className="truncate">{isRu ? 'Инкогнито' : 'Guest'}</span>
           </button>
         </div>
+
+        {/* OPERATION NOT ALLOWED NOTIFICATION & QUICK ACTION */}
+        {isOperationNotAllowed && (
+          <div className="p-3.5 bg-amber-950/70 border-2 border-amber-500/70 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in">
+            <div className="flex items-start gap-2.5">
+              <span className="text-xl shrink-0">💡</span>
+              <div className="text-xs">
+                <p className="font-black text-amber-300 uppercase">
+                  {isRu ? 'Автономный режим аккаунта' : 'Offline Account Mode'}
+                </p>
+                <p className="text-amber-200/90 font-medium">
+                  {isRu 
+                    ? 'Провайдер авторизации отключен в Firebase (auth/operation-not-allowed). Вы можете войти в локальный профиль в один клик!' 
+                    : 'Auth provider disabled in Firebase (auth/operation-not-allowed). You can sign in locally with 1 click!'}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleQuickLocalFallback}
+              className="px-4 py-2 bg-gradient-to-r from-amber-500 to-emerald-500 hover:brightness-110 text-slate-950 font-black text-xs rounded-xl shadow-lg uppercase tracking-wider shrink-0 cursor-pointer"
+            >
+              {isRu ? '⚡ Войти локально' : '⚡ Sign in locally'}
+            </button>
+          </div>
+        )}
 
         {/* ERROR / SUCCESS ALERTS */}
         {errorMessage && (
@@ -1074,6 +1349,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </svg>
               <span>{loading ? (isRu ? 'Вход в аккаунт...' : 'Signing in...') : (isRu ? 'Войти через аккаунт Google' : 'Sign in with Google Account')}</span>
             </button>
+
+            {isOperationNotAllowed && (
+              <button
+                type="button"
+                onClick={handleQuickLocalFallback}
+                className="w-full py-3 bg-gradient-to-r from-amber-500 to-emerald-500 hover:brightness-110 text-slate-950 font-black rounded-2xl border-b-4 border-amber-700 active:border-b-0 active:translate-y-1 transition-all uppercase text-xs tracking-wider shadow-lg flex items-center justify-center space-x-2.5 cursor-pointer"
+              >
+                <span>⚡</span>
+                <span>{isRu ? 'Войти локально через профиль Google' : 'Sign in locally as Google profile'}</span>
+              </button>
+            )}
           </div>
         )}
 

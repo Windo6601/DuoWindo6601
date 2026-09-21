@@ -10,6 +10,7 @@ interface FeedbackScreenProps {
   playSound: (type: 'click' | 'correct' | 'wrong' | 'fanfare' | 'streak') => void;
   setToast: (msg: string) => void;
   onOpenAdminDashboard?: () => void;
+  onOpenSupportChat?: () => void;
   onOpenIncognitoRestrictions?: () => void;
   onOpenRegister?: () => void;
   courses?: Course[];
@@ -533,6 +534,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
   playSound,
   setToast,
   onOpenAdminDashboard,
+  onOpenSupportChat,
   onOpenIncognitoRestrictions,
   onOpenRegister,
   courses = [],
@@ -671,29 +673,13 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
   const [supportSubmitting, setSupportSubmitting] = useState(false);
   const [supportSuccess, setSupportSuccess] = useState(false);
 
-  // Privacy toggles for Contacts: Hide Phone & Hide Email
-  const [hideSupportPhone, setHideSupportPhone] = useState<boolean>(() => {
-    if (typeof localStorage !== 'undefined') {
-      return localStorage.getItem('dw_hide_support_phone') === 'true';
-    }
-    return false;
-  });
+  // Privacy toggle for Contacts: Hide Email
   const [hideSupportEmail, setHideSupportEmail] = useState<boolean>(() => {
     if (typeof localStorage !== 'undefined') {
       return localStorage.getItem('dw_hide_support_email') === 'true';
     }
     return false;
   });
-
-  const toggleHideSupportPhone = () => {
-    setHideSupportPhone(prev => {
-      const next = !prev;
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('dw_hide_support_phone', String(next));
-      }
-      return next;
-    });
-  };
 
   const toggleHideSupportEmail = () => {
     setHideSupportEmail(prev => {
@@ -713,11 +699,6 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
       return `${maskedUser}@${domain}`;
     }
     return '••••••••@••••••';
-  };
-
-  const formatSupportPhone = (phone: string) => {
-    if (!hideSupportPhone) return phone;
-    return '+7 (800) •••-••-01';
   };
 
   // Sync admin mode when user changes
@@ -1540,24 +1521,6 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
                   type="button"
                   onClick={() => {
                     playSound('click');
-                    toggleHideSupportPhone();
-                    setToast(hideSupportPhone ? 'Номер телефона техподдержки отображен' : 'Номер телефона техподдержки скрыт 🔒');
-                  }}
-                  className={`px-3 py-1.5 rounded-xl border text-[11px] font-black transition-all flex items-center space-x-1.5 shadow-sm active:scale-95 ${
-                    hideSupportPhone
-                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30'
-                      : 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-750'
-                  }`}
-                  title={hideSupportPhone ? 'Показать номер телефона' : 'Скрыть номер телефона'}
-                >
-                  <span>{hideSupportPhone ? '🔒' : '📱'}</span>
-                  <span>{hideSupportPhone ? 'Номер скрыт' : 'Скрыть номер'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    playSound('click');
                     toggleHideSupportEmail();
                     setToast(hideSupportEmail ? 'Email адреса техподдержки отображены' : 'Email адреса техподдержки скрыты 🔒');
                   }}
@@ -1574,43 +1537,42 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
               </div>
             </div>
 
-            {/* Support Contacts Grid: Phone Hotline & Emails */}
+            {/* Support Contacts Grid: Online Support Chat & Emails */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-gray-700">
-              {/* Support Phone Hotline */}
-              <div className="bg-gray-900/90 p-4 rounded-2xl border border-amber-500/30 hover:border-amber-500/60 transition-all flex flex-col justify-between space-y-3">
+              {/* Support Online Chat */}
+              <div className="bg-gray-900/90 p-4 rounded-2xl border border-duo-blue/40 hover:border-duo-blue/70 transition-all flex flex-col justify-between space-y-3 shadow-lg">
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-1.5">
                     <span className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
-                      <span>📞</span> Телефон поддержки
+                      <span>💬</span> Поддержка Онлайн
                     </span>
-                    <span className="text-[10px] font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-md border border-amber-500/30">
-                      {hideSupportPhone ? '🔒 Скрыт' : 'Бесплатно'}
+                    <span className="text-[10px] font-black bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-md border border-emerald-500/30 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      Онлайн 24/7
                     </span>
                   </div>
-                  <div className="font-mono font-black text-sm text-amber-400 select-all break-all">
-                    {formatSupportPhone('+7 (800) 555-66-01')}
+                  <div className="font-sans font-black text-sm text-sky-400 flex items-center gap-1.5">
+                    <span>🦉 DuoSupport AI & Администратор</span>
                   </div>
                   <p className="text-[11px] text-gray-400 mt-1">
-                    Круглосуточная горячая линия DuoWindo6601 по всей России и СНГ.
+                    Круглосуточный онлайн-чат: моментальное восстановление ударного режима, решение вопросов и помощь с уроками.
                   </p>
                 </div>
                 <div className="flex items-center gap-2 pt-2 border-t border-gray-800">
-                  <a
-                    href="tel:+78005556601"
-                    className="flex-1 text-center py-2 px-3 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-95"
-                  >
-                    📞 Позвонить
-                  </a>
                   <button
                     type="button"
                     onClick={() => {
-                      navigator.clipboard.writeText('+78005556601');
-                      setToast('Телефон +7 (800) 555-66-01 скопирован в буфер обмена! 📋');
+                      playSound('click');
+                      if (onOpenSupportChat) {
+                        onOpenSupportChat();
+                      } else {
+                        const elem = document.getElementById('support-message-form');
+                        elem?.scrollIntoView({ behavior: 'smooth' });
+                      }
                     }}
-                    className="py-2 px-3 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-xl text-xs font-bold transition-all border border-gray-700"
-                    title="Скопировать телефон"
+                    className="flex-1 text-center py-2 px-3 bg-duo-blue hover:bg-sky-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5"
                   >
-                    📋 Копировать
+                    <span>💬</span> Открыть Онлайн-Чат
                   </button>
                 </div>
               </div>

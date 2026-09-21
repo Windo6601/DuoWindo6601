@@ -87,9 +87,21 @@ export enum AppScreen {
   TRANSLATOR = 'TRANSLATOR',
   VIDEO_CALL = 'VIDEO_CALL',
   CHESS_MATCH = 'CHESS_MATCH',
+  CHESS_ANALYSIS = 'CHESS_ANALYSIS',
   FEEDBACK = 'FEEDBACK',
   ADMIN_DASHBOARD = 'ADMIN_DASHBOARD',
+  SUPPORT_CHAT = 'SUPPORT_CHAT',
   BROWSER_WARNING = 'BROWSER_WARNING'
+}
+
+export interface SupportMessage {
+  id: string;
+  sender: 'user' | 'bot' | 'admin';
+  senderName: string;
+  text: string;
+  timestamp: string;
+  isStreakRepairAction?: boolean;
+  isIncognitoBlocked?: boolean;
 }
 
 export interface FeedbackReply {
@@ -134,6 +146,7 @@ export interface UserProgress {
   hideLink?: boolean;
   authProvider?: 'email' | 'google' | 'guest';
   isAdmin?: boolean;
+  role?: 'admin' | 'owner' | 'developer' | 'user' | string;
   avatarColor: string;
   avatarImage?: string; 
   avatarUrl?: string;
@@ -164,8 +177,13 @@ export interface UserProgress {
   streakRecoveryCount?: number;
   lastActiveDate?: string;
   dailyChallengeCompletedDate?: string;
+  dailyAiRequestsCount?: number;
+  bonusAiRequests?: number;
+  lastAiRequestDate?: string;
   hapticFeedback?: boolean;
   lastSyncedAt?: string;
+  customApiKey?: string;
+  customApiKeyType?: 'free' | 'paid';
   chessStats?: {
     games: number;
     wins: number;

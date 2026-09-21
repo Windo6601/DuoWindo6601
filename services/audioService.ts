@@ -18,16 +18,18 @@ export type SoundEffectType =
     | 'wrong' 
     | 'error'
     | 'click' 
-    | 'success' 
+    | 'success'
     | 'select' 
     | 'button_press' 
     | 'screen_transition' 
     | 'transition'
     | 'streak_update' 
     | 'freeze_use' 
-    | 'purchase';
+    | 'purchase'
+    | 'capture';
 
-export const triggerHapticFeedback = (type: SoundEffectType | 'correct' | 'wrong' | 'light' | 'medium' | 'heavy' | string) => {
+export const triggerHapticFeedback = (type: SoundEffectType | 'correct' | 'wrong' | 'light' | 'medium' | 'heavy' | string, enabled: boolean = true) => {
+    if (!enabled) return;
     try {
         if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'vibrate' in navigator && typeof navigator.vibrate === 'function') {
             if (type === 'correct') {
@@ -123,6 +125,29 @@ export const playSound = (type: SoundEffectType | string) => {
             
             osc.start(t);
             osc.stop(t + 0.05);
+        }
+        else if (type === 'capture') {
+            // Деревянный сочный стук взятия шахматной фигуры (Capture)
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(360, t);
+            osc.frequency.exponentialRampToValueAtTime(110, t + 0.08);
+            gain.gain.setValueAtTime(0.25, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+            osc.start(t);
+            osc.stop(t + 0.08);
+
+            // Резонансный низкий отклик
+            const osc2 = ctx.createOscillator();
+            const gain2 = ctx.createGain();
+            osc2.connect(gain2);
+            gain2.connect(ctx.destination);
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(180, t);
+            osc2.frequency.exponentialRampToValueAtTime(50, t + 0.1);
+            gain2.gain.setValueAtTime(0.2, t);
+            gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+            osc2.start(t);
+            osc2.stop(t + 0.1);
         }
         else if (type === 'screen_transition' || type === 'transition') {
             // Мягкий плавучий перебор при смене экранов

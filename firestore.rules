@@ -8,20 +8,20 @@ service cloud.firestore {
 
     // 2. User Profile rules
     match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-      allow delete: if isOwner(userId);
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isOwner(userId) || isAdmin();
+      allow delete: if isOwner(userId) || isAdmin();
 
-      allow create: if isOwner(userId) 
+      allow create: if (isOwner(userId) || isAdmin()) 
         && isValidId(userId) 
         && isValidUserProfile(incoming()) 
-        && incoming().createdAt == request.time 
-        && incoming().updatedAt == request.time;
+        && (!('createdAt' in incoming()) || incoming().createdAt == request.time)
+        && (!('updatedAt' in incoming()) || incoming().updatedAt == request.time);
 
-      allow update: if isOwner(userId) 
+      allow update: if (isOwner(userId) || isAdmin()) 
         && isValidUserProfile(incoming()) 
-        && incoming().createdAt == existing().createdAt 
-        && incoming().updatedAt == request.time;
+        && (!('createdAt' in existing()) || !('createdAt' in incoming()) || incoming().createdAt == existing().createdAt)
+        && (!('updatedAt' in incoming()) || incoming().updatedAt == request.time);
     }
 
     // 3. Feedback / Reviews rules
@@ -33,16 +33,36 @@ service cloud.firestore {
         && isValidId(feedbackId)
         && incoming().userId == request.auth.uid
         && isValidFeedback(incoming())
-        && incoming().createdAt == request.time;
+        && (!('createdAt' in incoming()) || incoming().createdAt == request.time);
 
       allow update: if isSignedIn()
         && isValidFeedback(incoming())
         && (
           incoming().userId == request.auth.uid ||
+          isAdmin() ||
           incoming().diff(existing()).affectedKeys().hasOnly(['likes', 'likedBy', 'replies', 'isPinned'])
         );
 
-      allow delete: if isSignedIn();
+      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+    }
+
+    // 4. Support Tickets rules
+    match /support_tickets/{ticketId} {
+      allow read: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    // 5. Test connection
+    match /test/connection {
+      allow read: if true;
+    }
+
+    // 6. System Configuration (Gemini API keys, priority, global settings)
+    match /system_config/{configId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
     }
 
     // --- HELPER FUNCTIONS ---
@@ -53,6 +73,14 @@ service cloud.firestore {
 
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'abramovanatolij81@gmail.com' ||
+        request.auth.token.email == 'va997217@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
     }
 
     function isValidId(id) {
@@ -68,25 +96,52 @@ service cloud.firestore {
     }
 
     function isValidUserProfile(data) {
-      return data.name is string && data.name.size() <= 100
+      return (!('name' in data) || (data.name is string && data.name.size() <= 100))
         && (!('username' in data) || (data.username is string && data.username.size() <= 100))
+        && (!('phone' in data) || (data.phone is string && data.phone.size() <= 50))
+        && (!('hidePhone' in data) || (data.hidePhone is bool))
+        && (!('email' in data) || (data.email is string && data.email.size() <= 200))
+        && (!('hideEmail' in data) || (data.hideEmail is bool))
+        && (!('link' in data) || (data.link is string && data.link.size() <= 300))
+        && (!('hideLink' in data) || (data.hideLink is bool))
+        && (!('authProvider' in data) || (data.authProvider is string && data.authProvider.size() <= 50))
         && (!('avatarUrl' in data) || (data.avatarUrl is string && data.avatarUrl.size() <= 2000))
         && (!('avatarImage' in data) || (data.avatarImage is string && data.avatarImage.size() <= 1000000))
         && (!('avatarIcon' in data) || (data.avatarIcon is string && data.avatarIcon.size() <= 50))
-        && data.avatarColor is string && data.avatarColor.size() <= 50
-        && data.energy is int && data.energy >= 0 && data.energy <= 10000
-        && data.hearts is int && data.hearts >= 0 && data.hearts <= 1000
-        && data.subscription is string && (data.subscription == 'free' || data.subscription == 'super' || data.subscription == 'max')
-        && data.streak is int && data.streak >= 0
-        && data.gems is int && data.gems >= 0
-        && data.xp is int && data.xp >= 0
-        && data.currentUnit is int && data.currentUnit >= 1
-        && data.completedLessons is list
-        && data.mistakes is list
-        && data.learnedWords is list
-        && data.achievements is list
-        && data.language is string && data.language.size() <= 5
-        && data.country is string && data.country.size() <= 100;
+        && (!('avatarColor' in data) || (data.avatarColor is string && data.avatarColor.size() <= 50))
+        && (!('energy' in data) || (data.energy is number && data.energy >= 0 && data.energy <= 100000))
+        && (!('hearts' in data) || (data.hearts is number && data.hearts >= 0 && data.hearts <= 10000))
+        && (!('subscription' in data) || (data.subscription is string && (data.subscription == 'free' || data.subscription == 'super' || data.subscription == 'max')))
+        && (!('streak' in data) || (data.streak is number && data.streak >= 0))
+        && (!('gems' in data) || (data.gems is number && data.gems >= 0))
+        && (!('xp' in data) || (data.xp is number && data.xp >= 0))
+        && (!('currentUnit' in data) || (data.currentUnit is number && data.currentUnit >= 0))
+        && (!('completedLessons' in data) || (data.completedLessons is list && data.completedLessons.size() <= 20000))
+        && (!('mistakes' in data) || (data.mistakes is list && data.mistakes.size() <= 1000))
+        && (!('learnedWords' in data) || (data.learnedWords is list && data.learnedWords.size() <= 20000))
+        && (!('achievements' in data) || (data.achievements is list && data.achievements.size() <= 1000))
+        && (!('language' in data) || (data.language is string && data.language.size() <= 15))
+        && (!('country' in data) || (data.country is string && data.country.size() <= 100))
+        && (!('preferredVoice' in data) || (data.preferredVoice is string && data.preferredVoice.size() <= 100))
+        && (!('voiceProvider' in data) || (data.voiceProvider is string && data.voiceProvider.size() <= 50))
+        && (!('streakFreezeCount' in data) || (data.streakFreezeCount is number && data.streakFreezeCount >= 0))
+        && (!('maxStreak' in data) || (data.maxStreak is number && data.maxStreak >= 0))
+        && (!('previousLostStreak' in data) || (data.previousLostStreak is number && data.previousLostStreak >= 0))
+        && (!('streakRecoveryCount' in data) || (data.streakRecoveryCount is number && data.streakRecoveryCount >= 0))
+        && (!('doubleXPActive' in data) || (data.doubleXPActive is bool))
+        && (!('infiniteEnergy' in data) || (data.infiniteEnergy is bool))
+        && (!('infiniteHearts' in data) || (data.infiniteHearts is bool))
+        && (!('nightMode' in data) || (data.nightMode is bool))
+        && (!('hapticFeedback' in data) || (data.hapticFeedback is bool))
+        && (!('autoTranslateFeedback' in data) || (data.autoTranslateFeedback is bool))
+        && (!('lastActiveDate' in data) || (data.lastActiveDate is string && data.lastActiveDate.size() <= 50))
+        && (!('dailyChallengeCompletedDate' in data) || (data.dailyChallengeCompletedDate is string && data.dailyChallengeCompletedDate.size() <= 50))
+        && (!('lastSyncedAt' in data) || (data.lastSyncedAt is string && data.lastSyncedAt.size() <= 50))
+        && (!('dailyAiRequestsCount' in data) || (data.dailyAiRequestsCount is number && data.dailyAiRequestsCount >= 0))
+        && (!('bonusAiRequests' in data) || (data.bonusAiRequests is number && data.bonusAiRequests >= 0))
+        && (!('lastAiRequestDate' in data) || (data.lastAiRequestDate is string && data.lastAiRequestDate.size() <= 50))
+        && (!('isAdmin' in data) || (data.isAdmin is bool))
+        && (!('chessStats' in data) || (data.chessStats is map));
     }
 
     function isValidFeedback(data) {
@@ -94,10 +149,10 @@ service cloud.firestore {
         && data.userName is string && data.userName.size() <= 100
         && (!('userAvatar' in data) || (data.userAvatar is string && data.userAvatar.size() <= 2000))
         && (!('userColor' in data) || (data.userColor is string && data.userColor.size() <= 50))
-        && data.rating is int && data.rating >= 1 && data.rating <= 5
+        && data.rating is number && data.rating >= 1 && data.rating <= 5
         && (!('category' in data) || (data.category is string && data.category.size() <= 50))
         && data.comment is string && data.comment.size() >= 1 && data.comment.size() <= 1000
-        && (!('likes' in data) || (data.likes is int && data.likes >= 0))
+        && (!('likes' in data) || (data.likes is number && data.likes >= 0))
         && (!('likedBy' in data) || (data.likedBy is list && data.likedBy.size() <= 5000))
         && (!('replies' in data) || (data.replies is list && data.replies.size() <= 500))
         && (!('isPinned' in data) || (data.isPinned is bool));
