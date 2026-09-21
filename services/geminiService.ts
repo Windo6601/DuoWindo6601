@@ -25,7 +25,7 @@ const sanitizeKey = (k: string): string => {
   return k.replace(/\s+/g, '');
 };
 
-export const DEFAULT_FALLBACK_GEMINI_KEY = 'AQ.Ab8RN6IXoROxZBrBMAnIEJMV3UJ_FX81W5azChx64oeFQCrDbg';
+export const DEFAULT_FALLBACK_GEMINI_KEY = '';
 
 export interface ActiveApiKeyInfo {
   source: 'admin' | 'dev' | 'custom' | 'system' | 'none';
