@@ -5,48 +5,80 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>DuoWindo6601</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Noto+Sans+Arabic:wght@400;600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
     <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ['"DIN Next Rounded"', 'Cairo', 'Nunito', 'sans-serif'],
-              din: ['"DIN Next Rounded"', 'Nunito', 'sans-serif'],
-              feather: ['"Feather"', 'sans-serif'],
-              arabic: ['"Cairo"', '"Noto Sans Arabic"', 'sans-serif'],
-            },
-            colors: {
-              duo: {
-                dark: '#131F24',
-                card: '#202F36',
-                green: '#58CC02',
-                greenDark: '#58A700', // For border-b
-                blue: '#1CB0F6',
-                blueDark: '#1899D6',
-                gray: '#E5E5E5',
-                grayDark: '#AFAFAF',
-                red: '#FF4B4B',
-                yellow: '#FFC800',
-                yellowDark: '#D6A600',
-                orange: '#FF9600'
-              }
-            },
-            keyframes: {
-              float: {
-                '0%, 100%': { transform: 'translateY(0px)' },
-                '50%': { transform: 'translateY(-10px)' },
-              }
-            },
-            animation: {
-              'float': 'float 3s ease-in-out infinite',
-              'spin-slow': 'spin 8s linear infinite',
-            }
-          }
+      // Global error handler for old browsers & external scripts
+      window.onerror = function(msg, url, line, col, error) {
+        if ((url && url.indexOf('tailwindcss') !== -1) || (msg && String(msg).indexOf('tailwindcss') !== -1) || (msg && String(msg).indexOf('Unexpected token') !== -1)) {
+          console.warn('Caught script error on outdated engine:', msg, url);
+          return true; // Suppress error popup/console alert
         }
-      }
+      };
+
+      // Safely load Tailwind Play CDN script only if the browser JS engine supports modern syntax
+      (function() {
+        var isModern = false;
+        try {
+          eval("const _a = {}; const _b = _a?.c ?? 'ok';");
+          isModern = true;
+        } catch (e) {
+          console.warn("Legacy browser engine detected: Tailwind Play CDN script bypassed to prevent SyntaxError.", e);
+          window.__IS_OUTDATED_BROWSER__ = true;
+        }
+
+        if (isModern) {
+          var twScript = document.createElement('script');
+          twScript.src = "https://cdn.tailwindcss.com";
+          twScript.onerror = function() {
+            console.warn("Tailwind CDN script failed to load.");
+          };
+          twScript.onload = function() {
+            if (typeof tailwind !== 'undefined') {
+              tailwind.config = {
+                theme: {
+                  extend: {
+                    fontFamily: {
+                      sans: ['"DIN Next Rounded"', 'Cairo', 'Rubik', 'Nunito', 'sans-serif'],
+                      din: ['"DIN Next Rounded"', 'Nunito', 'sans-serif'],
+                      feather: ['"Feather"', 'sans-serif'],
+                      arabic: ['"Cairo"', '"Amiri"', '"Noto Sans Arabic"', 'sans-serif'],
+                      hebrew: ['"Rubik"', '"Noto Sans Hebrew"', 'sans-serif'],
+                    },
+                    colors: {
+                      duo: {
+                        dark: '#131F24',
+                        card: '#202F36',
+                        green: '#58CC02',
+                        greenDark: '#58A700',
+                        blue: '#1CB0F6',
+                        blueDark: '#1899D6',
+                        gray: '#E5E5E5',
+                        grayDark: '#AFAFAF',
+                        red: '#FF4B4B',
+                        yellow: '#FFC800',
+                        yellowDark: '#D6A600',
+                        orange: '#FF9600'
+                      }
+                    },
+                    keyframes: {
+                      float: {
+                        '0%, 100%': { transform: 'translateY(0px)' },
+                        '50%': { transform: 'translateY(-10px)' },
+                      }
+                    },
+                    animation: {
+                      'float': 'float 3s ease-in-out infinite',
+                      'spin-slow': 'spin 8s linear infinite',
+                    }
+                  }
+                }
+              };
+            }
+          };
+          document.head.appendChild(twScript);
+        }
+      })();
     </script>
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400;1,700&family=Cairo:wght@400;600;700;800;900&family=Noto+Sans+Arabic:wght@400;600;700;800&family=Noto+Sans+Hebrew:wght@400;600;700;800&family=Nunito:wght@400;600;700;800&family=Rubik:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     <style>
       /* Duolingo DIN Next Rounded Typeface */
       @font-face {
@@ -95,26 +127,154 @@
         font-weight: 700;
       }
 
-      /* Arabic typography and RTL override U+202E helper */
+      /* Arabic & Hebrew typography helpers */
       .font-arabic {
-        font-family: 'Cairo', 'Noto Sans Arabic', sans-serif !important;
+        font-family: 'Cairo', 'Amiri', 'Noto Sans Arabic', sans-serif !important;
+      }
+      .font-hebrew {
+        font-family: 'Rubik', 'Noto Sans Hebrew', sans-serif !important;
       }
       .rtl-text {
         direction: rtl;
+        unicode-bidi: isolate;
         text-align: right;
       }
       .rtl-override {
         direction: rtl;
-        unicode-bidi: bidi-override;
+        unicode-bidi: isolate;
+      }
+      [dir="rtl"] {
+        text-align: right;
+        font-family: 'Cairo', 'Noto Sans Arabic', 'DIN Next Rounded', 'Nunito', sans-serif;
+      }
+      [dir="rtl"] code,
+      [dir="rtl"] pre,
+      [dir="rtl"] .ltr-preserve,
+      [dir="rtl"] input[type="text"],
+      [dir="rtl"] input[type="password"],
+      [dir="rtl"] textarea {
+        direction: ltr;
+        unicode-bidi: isolate;
+        text-align: left;
+      }
+      bdi, .bdi-isolate, [dir="auto"] {
+        unicode-bidi: isolate;
+      }
+      /* Prevent Arabic RTL from scrambling Russian Cyrillic & English */
+      [dir="rtl"] bdi,
+      [dir="rtl"] [dir="auto"],
+      [dir="rtl"] .bdi-isolate,
+      [dir="rtl"] .cyrillic-preserve {
+        unicode-bidi: isolate;
+        text-align: start;
+      }
+      [dir="rtl"] :is(p, span, h1, h2, h3, h4, h5, h6, input, textarea, button, a, select, label)[dir="auto"] {
+        unicode-bidi: isolate;
+      }
+      [dir="rtl"] .cyrillic-text,
+      [dir="rtl"] :is(.font-sans, p, span, h1, h2, h3, h4, h5, h6, input, textarea, button):lang(ru) {
+        direction: ltr;
+        unicode-bidi: isolate;
+        text-align: left;
       }
       /* RTL button flex layout helper */
       [dir="rtl"] .rtl-btn-flex,
       .rtl-btn-flex {
         flex-direction: row-reverse;
       }
+
+      /* RTL Directional-Aware CSS Utility */
+      .rtl-directional-aware {
+        direction: ltr;
+        unicode-bidi: isolate;
+      }
+      [dir="rtl"] .rtl-directional-aware,
+      .rtl-directional-aware[dir="rtl"] {
+        direction: rtl;
+        text-align: right;
+        unicode-bidi: isolate;
+      }
+      [dir="rtl"] .rtl-directional-aware.flex-row,
+      [dir="rtl"] .rtl-directional-aware .flex-row {
+        flex-direction: row-reverse;
+      }
+      [dir="rtl"] .rtl-directional-aware.flex,
+      [dir="rtl"] .rtl-directional-aware .flex {
+        direction: rtl;
+      }
+      [dir="rtl"] .rtl-directional-aware .ml-auto {
+        margin-left: 0 !important;
+        margin-right: auto !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .mr-auto {
+        margin-right: 0 !important;
+        margin-left: auto !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .space-x-1 > :not([hidden]) ~ :not([hidden]),
+      [dir="rtl"] .rtl-directional-aware.space-x-1 > :not([hidden]) ~ :not([hidden]) {
+        margin-left: 0 !important;
+        margin-right: 0.25rem !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .space-x-2 > :not([hidden]) ~ :not([hidden]),
+      [dir="rtl"] .rtl-directional-aware.space-x-2 > :not([hidden]) ~ :not([hidden]) {
+        margin-left: 0 !important;
+        margin-right: 0.5rem !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .space-x-3 > :not([hidden]) ~ :not([hidden]),
+      [dir="rtl"] .rtl-directional-aware.space-x-3 > :not([hidden]) ~ :not([hidden]) {
+        margin-left: 0 !important;
+        margin-right: 0.75rem !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .space-x-4 > :not([hidden]) ~ :not([hidden]),
+      [dir="rtl"] .rtl-directional-aware.space-x-4 > :not([hidden]) ~ :not([hidden]) {
+        margin-left: 0 !important;
+        margin-right: 1rem !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .space-x-6 > :not([hidden]) ~ :not([hidden]),
+      [dir="rtl"] .rtl-directional-aware.space-x-6 > :not([hidden]) ~ :not([hidden]) {
+        margin-left: 0 !important;
+        margin-right: 1.5rem !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .space-x-8 > :not([hidden]) ~ :not([hidden]),
+      [dir="rtl"] .rtl-directional-aware.space-x-8 > :not([hidden]) ~ :not([hidden]) {
+        margin-left: 0 !important;
+        margin-right: 2rem !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .right-4 {
+        right: auto !important;
+        left: 1rem !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .left-4 {
+        left: auto !important;
+        right: 1rem !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .right-5 {
+        right: auto !important;
+        left: 1.25rem !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .left-5 {
+        left: auto !important;
+        right: 1.25rem !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .right-0 {
+        right: auto !important;
+        left: 0 !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .left-0 {
+        left: auto !important;
+        right: 0 !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .text-left {
+        text-align: right !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .text-right {
+        text-align: left !important;
+      }
+      bdi, .bdi-isolate, [dir="auto"] {
+        unicode-bidi: plaintext;
+      }
     </style>
 
-<link rel="stylesheet" href="/index.css">
   <script type="importmap">
 {
   "imports": {
@@ -125,7 +285,8 @@
   }
 }
 </script>
-  <script type="module" crossorigin src="/assets/index-BbODIK9n.js"></script>
+  <script type="module" crossorigin src="/assets/index-CBijlT7e.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-CstHmv06.css">
 </head>
   <body>
     <div id="root"></div>
