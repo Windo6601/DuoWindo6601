@@ -144,7 +144,7 @@ export interface UserProgress {
   hideEmail?: boolean;
   link?: string;
   hideLink?: boolean;
-  authProvider?: 'email' | 'google' | 'guest';
+  authProvider?: 'email' | 'google' | 'github' | 'guest';
   isAdmin?: boolean;
   role?: 'admin' | 'owner' | 'developer' | 'user' | string;
   avatarColor: string;

@@ -9,7 +9,7 @@ import {
   User as FirebaseUser 
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db, googleProvider, handleFirestoreError, OperationType } from '../firebase';
+import { auth, db, googleProvider, githubProvider, handleFirestoreError, OperationType } from '../firebase';
 import { UserProgress } from '../types';
 
 export interface AuthModalProps {
@@ -66,7 +66,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [resetEmail, setResetEmail] = useState('');
   const [resetSent, setResetSent] = useState(false);
   const [isOperationNotAllowed, setIsOperationNotAllowed] = useState(false);
-  const [notAllowedProvider, setNotAllowedProvider] = useState<'google' | 'email' | null>(null);
+  const [notAllowedProvider, setNotAllowedProvider] = useState<'google' | 'github' | 'email' | null>(null);
 
   const isRu = user.language === 'ru';
   const isIframe = typeof window !== 'undefined' && window.self !== window.top;
@@ -233,29 +233,32 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
-    if (activeTab === 'google') {
-      const googleName = user.name && !user.name.includes('Гость') && user.name !== 'Ученик 6601' 
+    if (activeTab === 'google' || notAllowedProvider === 'github' || notAllowedProvider === 'google') {
+      const isGithub = notAllowedProvider === 'github';
+      const providerName = isGithub ? (isRu ? 'Ученик GitHub' : 'GitHub Learner') : (isRu ? 'Ученик Google' : 'Google Learner');
+      const authName = user.name && !user.name.includes('Гость') && user.name !== 'Ученик 6601' 
         ? user.name 
-        : (isRu ? 'Ученик Google' : 'Google Learner');
-      const googleEmail = user.email || 'learner@gmail.com';
+        : providerName;
+      const authEmail = user.email || (isGithub ? 'learner@github.com' : 'learner@gmail.com');
+      const defaultUsername = isGithub ? 'github_learner' : 'google_learner';
       const cleanUsername = (user.username && !user.username.startsWith('incognito_')) 
         ? user.username 
-        : 'google_learner';
+        : defaultUsername;
 
       const updatedUser: UserProgress = {
         ...user,
-        name: googleName,
-        email: googleEmail,
+        name: authName,
+        email: authEmail,
         username: cleanUsername,
-        authProvider: 'google',
+        authProvider: isGithub ? 'github' : 'google',
       };
 
       setUser(updatedUser);
       localStorage.setItem('duowindo_user_progress_v3', JSON.stringify(updatedUser));
       saveAccountLocally({
-        email: googleEmail,
+        email: authEmail,
         username: cleanUsername,
-        name: googleName,
+        name: authName,
         userProgress: updatedUser,
       });
 
@@ -263,8 +266,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       triggerConfetti();
       setToast(
         isRu 
-          ? `🌐 Вход через локальный профиль Google (${googleName})` 
-          : `🌐 Signed in with local Google profile (${googleName})`
+          ? `${isGithub ? '🐙' : '🌐'} Вход через локальный профиль ${isGithub ? 'GitHub' : 'Google'} (${authName})` 
+          : `${isGithub ? '🐙' : '🌐'} Signed in with local ${isGithub ? 'GitHub' : 'Google'} profile (${authName})`
       );
       onClose();
       return;
@@ -754,6 +757,137 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   // ==========================================
+  // HANDLER: GITHUB SIGN-IN
+  // ==========================================
+  const handleGithubAuth = async () => {
+    setErrorMessage(null);
+    setLoading(true);
+    playSound('click');
+
+    try {
+      const result = await signInWithPopup(auth, githubProvider);
+      setFirebaseUser(result.user);
+
+      // Load or create profile in Firestore
+      const userRef = doc(db, 'users', result.user.uid);
+      const docSnap = await getDoc(userRef);
+
+      const githubName = result.user.displayName || (isRu ? 'Ученик GitHub' : 'GitHub Learner');
+      const githubEmail = result.user.email || '';
+      const fallbackUsername = githubEmail 
+        ? githubEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '') 
+        : (result.user.displayName ? result.user.displayName.toLowerCase().replace(/[^a-z0-9_]/g, '') : `github_${Math.floor(1000 + Math.random() * 9000)}`);
+
+      let updatedUser: UserProgress;
+      if (docSnap.exists()) {
+        const cloudData = docSnap.data() as UserProgress;
+        updatedUser = {
+          ...user,
+          ...cloudData,
+          email: githubEmail || cloudData.email,
+          authProvider: 'github',
+        };
+      } else {
+        updatedUser = {
+          ...user,
+          name: githubName,
+          email: githubEmail,
+          username: user.username && !user.username.startsWith('incognito_') ? user.username : fallbackUsername,
+          authProvider: 'github',
+        };
+        await setDoc(userRef, {
+          ...updatedUser,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+      }
+
+      setUser(updatedUser);
+      localStorage.setItem('duowindo_user_progress_v3', JSON.stringify(updatedUser));
+      localStorage.setItem('duo_reg_prompt_seen_6601', 'true');
+
+      saveAccountLocally({
+        email: githubEmail,
+        username: updatedUser.username || fallbackUsername,
+        name: updatedUser.name,
+        userProgress: updatedUser,
+      });
+
+      playSound('success');
+      triggerConfetti();
+      setToast(
+        isRu 
+          ? `🐙 Успешный вход через GitHub (${result.user.displayName || result.user.email || 'GitHub'})` 
+          : `🐙 Signed in with GitHub (${result.user.displayName || result.user.email || 'GitHub'})`
+      );
+      onClose();
+    } catch (err: any) {
+      console.warn('GitHub Sign-in error:', err);
+      const code = err?.code || '';
+      const errMsg = err?.message || String(err);
+      const isNotAllowed = code === 'auth/operation-not-allowed' || errMsg.includes('operation-not-allowed');
+
+      if (isNotAllowed) {
+        setIsOperationNotAllowed(true);
+        setNotAllowedProvider('github');
+
+        // Seamless local fallback for GitHub profile
+        const githubName = user.name && !user.name.includes('Гость') && user.name !== 'Ученик 6601' 
+          ? user.name 
+          : (isRu ? 'Ученик GitHub' : 'GitHub Learner');
+        const githubEmail = user.email && user.email.includes('@') ? user.email : 'learner@github.com';
+        const fallbackUsername = githubEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '') || 'github_learner';
+
+        const updatedUser: UserProgress = {
+          ...user,
+          name: githubName,
+          email: githubEmail,
+          username: user.username && !user.username.startsWith('incognito_') ? user.username : fallbackUsername,
+          authProvider: 'github',
+        };
+
+        setUser(updatedUser);
+        localStorage.setItem('duowindo_user_progress_v3', JSON.stringify(updatedUser));
+        localStorage.setItem('duo_reg_prompt_seen_6601', 'true');
+
+        saveAccountLocally({
+          email: githubEmail,
+          username: updatedUser.username || fallbackUsername,
+          name: updatedUser.name,
+          userProgress: updatedUser,
+        });
+
+        playSound('success');
+        triggerConfetti();
+        setToast(
+          isRu 
+            ? `🐙 Вход выполнен через GitHub (Автономный профиль, включите GitHub в Firebase Console)` 
+            : `🐙 Signed in with GitHub (Offline profile, enable GitHub in Firebase Console)`
+        );
+        onClose();
+        return;
+      }
+
+      if (
+        errMsg.includes('auth/cancelled-popup-request') || 
+        errMsg.includes('popup-closed-by-user') || 
+        errMsg.includes('popup-blocked')
+      ) {
+        setErrorMessage(
+          isRu 
+            ? 'Окно авторизации GitHub было закрыто или заблокировано браузером. Разрешите всплывающие окна или откройте в новой вкладке.' 
+            : 'GitHub popup was closed or blocked. Please allow popups or open in a new tab.'
+        );
+      } else {
+        setErrorMessage(err.message || (isRu ? 'Ошибка входа через GitHub' : 'GitHub sign-in error'));
+      }
+      playSound('wrong');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ==========================================
   // HANDLER: FORGOT PASSWORD RESET
   // ==========================================
   const handleSendPasswordReset = async (e?: React.FormEvent) => {
@@ -823,13 +957,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <h3 className="text-lg sm:text-xl font-black text-white tracking-wide">
                 {activeTab === 'login' && (isRu ? 'Вход в аккаунт DuoWindo' : 'Sign in to DuoWindo')}
                 {activeTab === 'register' && (isRu ? 'Регистрация аккаунта' : 'Create DuoWindo Account')}
-                {activeTab === 'google' && (isRu ? 'Вход через Google' : 'Google Sign-In')}
+                {activeTab === 'google' && (isRu ? 'Вход через Google / GitHub' : 'Google & GitHub Sign-In')}
                 {activeTab === 'incognito' && (isRu ? 'Режим Инкогнито' : 'Incognito Guest Mode')}
               </h3>
               <p className="text-xs text-gray-400 font-medium">
                 {activeTab === 'login' && (isRu ? 'Войдите по Email или имени пользователя и паролю' : 'Sign in with Email or Username and password')}
                 {activeTab === 'register' && (isRu ? 'Создайте профиль с Email, никнеймом и паролем' : 'Register with Email, Username, and password')}
-                {activeTab === 'google' && (isRu ? 'Мгновенный вход и облачная синхронизация' : 'Instant cloud progress synchronization')}
+                {activeTab === 'google' && (isRu ? 'Мгновенный вход через Google или GitHub и синхронизация' : 'Instant cloud progress sync via Google or GitHub')}
                 {activeTab === 'incognito' && (isRu ? 'Играйте анонимно без регистрации и паролей' : 'Play anonymously without account')}
               </p>
             </div>
@@ -881,7 +1015,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             }`}
           >
             <span>🌐</span>
-            <span className="truncate">Google</span>
+            <span className="truncate">Google / GitHub</span>
           </button>
 
           <button
@@ -1072,30 +1206,44 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <span>{loading ? (isRu ? 'Вход в аккаунт...' : 'Signing in...') : (isRu ? 'Войти в аккаунт' : 'Sign In')}</span>
                 </button>
 
-                {/* QUICK GOOGLE SIGN IN BUTTON */}
+                {/* QUICK GOOGLE & GITHUB SIGN IN BUTTONS */}
                 <div className="relative py-2 text-center">
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-gray-800" />
                   </div>
                   <span className="relative px-3 bg-gray-900 text-[11px] text-gray-400 font-bold uppercase tracking-wider">
-                    {isRu ? 'или через' : 'or continue with'}
+                    {isRu ? 'или войти через' : 'or continue with'}
                   </span>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleGoogleAuth}
-                  disabled={loading}
-                  className="w-full py-3 bg-white hover:bg-gray-100 text-gray-900 font-black rounded-2xl border-b-4 border-gray-300 active:border-b-0 active:translate-y-1 transition-all text-xs uppercase tracking-wider shadow-md flex items-center justify-center space-x-2.5 cursor-pointer"
-                >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24">
-                    <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z" />
-                    <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.7-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z" />
-                    <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.1c0 2.8.7 5.4 1.9 7.8l3.7-2.9z" />
-                    <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16c1.8 3.7 5.6 7 10.1 7z" />
-                  </svg>
-                  <span>{isRu ? 'Войти через Google' : 'Sign in with Google'}</span>
-                </button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={handleGoogleAuth}
+                    disabled={loading}
+                    className="w-full py-3 bg-white hover:bg-gray-100 text-gray-900 font-black rounded-2xl border-b-4 border-gray-300 active:border-b-0 active:translate-y-1 transition-all text-xs uppercase tracking-wider shadow-md flex items-center justify-center space-x-2 cursor-pointer"
+                  >
+                    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                      <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z" />
+                      <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.7-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z" />
+                      <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.1c0 2.8.7 5.4 1.9 7.8l3.7-2.9z" />
+                      <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16c1.8 3.7 5.6 7 10.1 7z" />
+                    </svg>
+                    <span>Google</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleGithubAuth}
+                    disabled={loading}
+                    className="w-full py-3 bg-[#24292e] hover:bg-[#1b1f23] text-white font-black rounded-2xl border-b-4 border-black active:border-b-0 active:translate-y-1 transition-all text-xs uppercase tracking-wider shadow-md flex items-center justify-center space-x-2 cursor-pointer"
+                  >
+                    <svg className="w-4 h-4 shrink-0 fill-current" viewBox="0 0 24 24">
+                      <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+                    </svg>
+                    <span>GitHub</span>
+                  </button>
+                </div>
 
                 {/* SWITCH TO REGISTER LINK */}
                 <div className="pt-2 text-center border-t border-gray-800/80">
@@ -1335,20 +1483,34 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
             )}
 
-            <button
-              type="button"
-              onClick={handleGoogleAuth}
-              disabled={loading}
-              className="w-full py-4 bg-duo-blue hover:brightness-110 disabled:opacity-50 text-white font-black rounded-2xl border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all uppercase text-xs tracking-wider shadow-lg flex items-center justify-center space-x-2.5 cursor-pointer"
-            >
-              <svg className="w-5 h-5 bg-white rounded-full p-0.5 shrink-0" viewBox="0 0 24 24">
-                <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z" />
-                <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.7-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z" />
-                <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.1c0 2.8.7 5.4 1.9 7.8l3.7-2.9z" />
-                <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16c1.8 3.7 5.6 7 10.1 7z" />
-              </svg>
-              <span>{loading ? (isRu ? 'Вход в аккаунт...' : 'Signing in...') : (isRu ? 'Войти через аккаунт Google' : 'Sign in with Google Account')}</span>
-            </button>
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={handleGoogleAuth}
+                disabled={loading}
+                className="w-full py-4 bg-duo-blue hover:brightness-110 disabled:opacity-50 text-white font-black rounded-2xl border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all uppercase text-xs tracking-wider shadow-lg flex items-center justify-center space-x-2.5 cursor-pointer"
+              >
+                <svg className="w-5 h-5 bg-white rounded-full p-0.5 shrink-0" viewBox="0 0 24 24">
+                  <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z" />
+                  <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.7-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z" />
+                  <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.1c0 2.8.7 5.4 1.9 7.8l3.7-2.9z" />
+                  <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16c1.8 3.7 5.6 7 10.1 7z" />
+                </svg>
+                <span>{loading ? (isRu ? 'Вход в аккаунт...' : 'Signing in...') : (isRu ? 'Войти через аккаунт Google' : 'Sign in with Google Account')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleGithubAuth}
+                disabled={loading}
+                className="w-full py-4 bg-[#24292e] hover:bg-[#1b1f23] disabled:opacity-50 text-white font-black rounded-2xl border-b-4 border-black active:border-b-0 active:translate-y-1 transition-all uppercase text-xs tracking-wider shadow-lg flex items-center justify-center space-x-2.5 cursor-pointer"
+              >
+                <svg className="w-5 h-5 shrink-0 fill-current" viewBox="0 0 24 24">
+                  <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+                </svg>
+                <span>{loading ? (isRu ? 'Вход в аккаунт...' : 'Signing in...') : (isRu ? 'Войти через аккаунт GitHub' : 'Sign in with GitHub Account')}</span>
+              </button>
+            </div>
 
             {isOperationNotAllowed && (
               <button
@@ -1357,7 +1519,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 className="w-full py-3 bg-gradient-to-r from-amber-500 to-emerald-500 hover:brightness-110 text-slate-950 font-black rounded-2xl border-b-4 border-amber-700 active:border-b-0 active:translate-y-1 transition-all uppercase text-xs tracking-wider shadow-lg flex items-center justify-center space-x-2.5 cursor-pointer"
               >
                 <span>⚡</span>
-                <span>{isRu ? 'Войти локально через профиль Google' : 'Sign in locally as Google profile'}</span>
+                <span>
+                  {notAllowedProvider === 'github'
+                    ? (isRu ? 'Войти локально через профиль GitHub' : 'Sign in locally as GitHub profile')
+                    : (isRu ? 'Войти локально через профиль Google' : 'Sign in locally as Google profile')
+                  }
+                </span>
               </button>
             )}
           </div>

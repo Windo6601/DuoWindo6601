@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import confetti from 'canvas-confetti';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth, db, googleProvider, handleFirestoreError, OperationType } from './firebase';
+import { auth, db, googleProvider, githubProvider, handleFirestoreError, OperationType } from './firebase';
 import { AppScreen, Exercise, UserProgress, Course, WordToken, LeaderboardEntry, SubscriptionTier, RoleplayMessage } from './types';
 import { Chess, Square } from 'chess.js';
 import { generateExercise, checkAnswerWithAI, pingGeminiApi, speakText, startRoleplay, replyToRoleplay, generateIllusion, generateDrawing, checkDrawing, getFallbackExercise, getChessMove, getChessChatReply, translateText, getMistakeExplanation, generateLocalMistakeExplanation, generateIshihara, generateInterviewQuestion, getInterviewHint, generateReading, generateVideoCallRoleplayResponse } from './services/geminiService';
@@ -38,6 +38,16 @@ import { ChessInviteModal, ChessOpponent } from './components/ChessInviteModal';
 import { ChessAnalysisScreen } from './components/ChessAnalysisScreen';
 import { triggerHapticFeedback } from './services/audioService';
 import { CIS_ALPHABET_DATA, AlphabetItem, AlphabetCategory as CISAlphabetCategory } from './services/alphabetData';
+import {
+  initFirestoreCacheMaintenance,
+  recordFirestoreUserActivity,
+  getFirestoreCacheStatus,
+  purgeOldFirestoreCache,
+  simulateInactivityForTesting,
+  resetInactivityTimer,
+  FirestoreCacheStatus,
+  FIRESTORE_INACTIVITY_THRESHOLD_DAYS
+} from './services/firestoreCacheManager';
 
 // --- CHESS UTILS & TYPES ---
 type ChessColor = 'w' | 'b';
@@ -2977,12 +2987,64 @@ const getTodayChallenge = () => {
     return localStorage.getItem('duo_last_synced_time_6601') || new Date().toLocaleTimeString();
   });
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [firestoreCacheStatus, setFirestoreCacheStatus] = useState<FirestoreCacheStatus>(() => getFirestoreCacheStatus());
+  const [isPurgingFirestoreCache, setIsPurgingFirestoreCache] = useState<boolean>(false);
+
+  // Initialize automated Firestore cache maintenance (auto-purge if inactive > 30 days)
+  useEffect(() => {
+    initFirestoreCacheMaintenance((meta) => {
+      setFirestoreCacheStatus(getFirestoreCacheStatus());
+      setToast(user.language === 'ru' 
+        ? `🧹 Локальный кэш Firestore автоматически очищен (неактивность ${meta.inactiveDays} дн. > 30 дней)` 
+        : `🧹 Local Firestore cache auto-cleaned (inactive for ${meta.inactiveDays}d > 30 days)`);
+    });
+  }, []);
+
+  const handleManualPurgeFirestoreCache = async () => {
+    playSound('click');
+    triggerHapticFeedback('medium');
+    setIsPurgingFirestoreCache(true);
+    try {
+      const res = await purgeOldFirestoreCache('Manual user cleanup', true);
+      setFirestoreCacheStatus(getFirestoreCacheStatus());
+      if (res.success) {
+        playSound('streak_update');
+        setToast(user.language === 'ru' 
+          ? `🧹 Кэш Firestore успешно очищен (удалено ${res.freedDatabases.length} IndexedDB баз, память освобождена)` 
+          : `🧹 Firestore cache cleared (${res.freedDatabases.length} IndexedDB databases purged)`);
+      } else {
+        setToast(user.language === 'ru' ? 'Кэш уже пуст или актуален' : 'Cache is already clean');
+      }
+    } catch (e: any) {
+      setToast(user.language === 'ru' ? `⚠️ Ошибка очистки кэша: ${e.message}` : `⚠️ Cache purge error: ${e.message}`);
+    } finally {
+      setIsPurgingFirestoreCache(false);
+    }
+  };
+
+  const handleSimulateInactivity31Days = () => {
+    playSound('click');
+    const updatedStatus = simulateInactivityForTesting(31);
+    setFirestoreCacheStatus(updatedStatus);
+    setToast(user.language === 'ru' 
+      ? '⏳ Смоделирована неактивность 31 день (>30 дн.). Теперь автоочистка сработает при следующей проверке!' 
+      : '⏳ Simulated 31 days inactivity (>30d). Auto-cleanup is now ready to trigger!');
+  };
+
+  const handleResetInactivityTimer = () => {
+    playSound('click');
+    const updatedStatus = resetInactivityTimer();
+    setFirestoreCacheStatus(updatedStatus);
+    setToast(user.language === 'ru' ? '🔄 Таймер активности сброшен на текущее время' : '🔄 Activity timer reset to now');
+  };
 
   const handleForceSync = async () => {
     playSound('streak_update');
     triggerHapticFeedback('medium');
     setIsSyncing(true);
     try {
+      recordFirestoreUserActivity(true);
+      setFirestoreCacheStatus(getFirestoreCacheStatus());
       localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
       const nowStr = new Date().toLocaleTimeString(user.language === 'ru' ? 'ru-RU' : 'en-US', {
         hour: '2-digit',
@@ -3040,12 +3102,14 @@ const getTodayChallenge = () => {
             const cleanName = user.name && user.name !== "Ученик 6601" && !user.name.includes("Гость")
               ? user.name
               : (fUser.displayName || (fUser.email ? fUser.email.split('@')[0] : 'Ученик 6601'));
+            const providerId = fUser.providerData?.[0]?.providerId;
+            const detectedProvider = providerId === 'google.com' ? 'google' : (providerId === 'github.com' ? 'github' : 'email');
             const newUserProfile = {
               ...user,
               name: cleanName,
               username: cleanUsername,
               email: fUser.email || user.email || '',
-              authProvider: (fUser.providerData?.[0]?.providerId === 'google.com' ? 'google' : 'email') as 'google' | 'email',
+              authProvider: detectedProvider as 'google' | 'github' | 'email',
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp()
             };
@@ -3106,6 +3170,28 @@ const getTodayChallenge = () => {
         setToast("Окно авторизации было закрыто или заблокировано. Пожалуйста, разрешите всплывающие окна или откройте в новой вкладке.");
       } else {
         setToast("Ошибка входа: " + (err instanceof Error ? err.message : String(err)));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGithubSignIn = async () => {
+    playSound('click');
+    setLoading(true);
+    try {
+      await signInWithPopup(auth, githubProvider);
+    } catch (err: any) {
+      console.error("Error signing in with GitHub:", err);
+      const errMsg = err?.code || err?.message || String(err);
+      if (
+        errMsg.includes('auth/cancelled-popup-request') || 
+        errMsg.includes('popup-closed-by-user') || 
+        errMsg.includes('popup-blocked')
+      ) {
+        setToast("Окно авторизации GitHub было закрыто или заблокировано. Пожалуйста, разрешите всплывающие окна или откройте в новой вкладке.");
+      } else {
+        setToast("Ошибка входа GitHub: " + (err instanceof Error ? err.message : String(err)));
       }
     } finally {
       setLoading(false);
@@ -4918,6 +5004,113 @@ const getTodayChallenge = () => {
                                     : (user.language === 'ru' ? 'Принудительная синхронизация (Force Sync)' : 'Force Sync with Firestore')}
                             </span>
                         </button>
+                    </div>
+
+                    {/* FIRESTORE LOCAL CACHE CLEANUP & 30-DAY INACTIVITY MANAGER */}
+                    <div className="bg-duo-card border-2 border-indigo-500/50 rounded-3xl p-6 mb-6 shadow-xl space-y-4">
+                        <div className="flex items-center justify-between flex-wrap gap-3">
+                            <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-xl shadow-md">
+                                    🧹
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
+                                        <span>{user.language === 'ru' ? 'Очистка кэша Firestore (>30 дней)' : 'Firestore Cache Cleanup (>30 Days)'}</span>
+                                    </h3>
+                                    <p className="text-xs text-gray-400 font-bold">
+                                        {user.language === 'ru' 
+                                            ? 'Автоматическое удаление старого кэша IndexedDB при неактивности более 30 дней' 
+                                            : 'Automatic IndexedDB cache cleanup when user is inactive for more than 30 days'}
+                                    </p>
+                                </div>
+                            </div>
+                            <span className={`px-4 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider border flex items-center gap-1.5 shadow-sm ${
+                                firestoreCacheStatus.isInactiveOverThreshold 
+                                    ? 'bg-rose-500/20 text-rose-400 border-rose-500/40' 
+                                    : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
+                            }`}>
+                                <span className={`w-2 h-2 rounded-full ${firestoreCacheStatus.isInactiveOverThreshold ? 'bg-rose-400 animate-ping' : 'bg-emerald-400'}`}></span>
+                                <span>
+                                    {firestoreCacheStatus.isInactiveOverThreshold
+                                        ? (user.language === 'ru' ? 'Требуется очистка (>30 дн.)' : 'Purge Required (>30d)')
+                                        : (user.language === 'ru' ? 'Кэш оптимизирован' : 'Cache Optimized')}
+                                </span>
+                            </span>
+                        </div>
+
+                        {/* CACHE STATUS GRID */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-black/40 p-4 rounded-2xl border border-gray-800 text-xs font-din">
+                            <div className="space-y-1">
+                                <p className="text-gray-400 font-bold uppercase text-[10px] tracking-wider">
+                                    {user.language === 'ru' ? 'Порог неактивности:' : 'Inactivity Threshold:'}
+                                </p>
+                                <p className="font-black text-indigo-300 text-sm flex items-center gap-1.5">
+                                    <span>⏳</span>
+                                    <span>{firestoreCacheStatus.thresholdDays} {user.language === 'ru' ? 'дней' : 'days'}</span>
+                                </p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-gray-400 font-bold uppercase text-[10px] tracking-wider">
+                                    {user.language === 'ru' ? 'Период неактивности:' : 'Inactive Period:'}
+                                </p>
+                                <p className={`font-black text-sm flex items-center gap-1.5 ${firestoreCacheStatus.isInactiveOverThreshold ? 'text-rose-400' : 'text-gray-200'}`}>
+                                    <span>📅</span>
+                                    <span>{firestoreCacheStatus.inactiveDays} {user.language === 'ru' ? 'дн.' : 'd'}</span>
+                                </p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-gray-400 font-bold uppercase text-[10px] tracking-wider">
+                                    {user.language === 'ru' ? 'Последняя очистка:' : 'Last Cleaned:'}
+                                </p>
+                                <p className="font-black text-emerald-400 text-sm flex items-center gap-1.5 truncate">
+                                    <span>✨</span>
+                                    <span title={firestoreCacheStatus.lastCleanupDateString || ''}>
+                                        {firestoreCacheStatus.lastCleanupDateString || (user.language === 'ru' ? 'Не требовалась' : 'Not required yet')}
+                                    </span>
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* EXPLANATION NOTE */}
+                        <div className="p-3 bg-indigo-950/30 border border-indigo-800/40 rounded-xl text-xs text-indigo-200/80 leading-relaxed">
+                            💡 {user.language === 'ru'
+                                ? 'Если вы не заходите в приложение более 30 дней, локальный кэш Firestore (IndexedDB) автоматически очищается при следующем запуске, освобождая дисковое пространство браузера. Облачные данные в аккаунте сохраняются.'
+                                : 'If you remain inactive for more than 30 days, old local Firestore IndexedDB cache is automatically cleared on the next visit to reclaim browser disk storage. Your cloud account data remains safe.'}
+                        </div>
+
+                        {/* CACHE ACTIONS & SIMULATION */}
+                        <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                            <button
+                                onClick={handleManualPurgeFirestoreCache}
+                                disabled={isPurgingFirestoreCache}
+                                className="flex-1 py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider bg-rose-600 hover:bg-rose-500 text-white border-b-4 border-rose-800 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer disabled:opacity-50"
+                            >
+                                <span className={isPurgingFirestoreCache ? 'animate-spin' : ''}>🗑️</span>
+                                <span>
+                                    {isPurgingFirestoreCache
+                                        ? (user.language === 'ru' ? 'Очистка...' : 'Purging...')
+                                        : (user.language === 'ru' ? 'Очистить кэш сейчас' : 'Purge Cache Now')}
+                                </span>
+                            </button>
+
+                            <button
+                                onClick={handleSimulateInactivity31Days}
+                                title={user.language === 'ru' ? 'Смоделировать 31 день неактивности для проверки автоочистки' : 'Simulate 31 days inactivity to test auto-clean'}
+                                className="py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider bg-gray-800 hover:bg-gray-700 text-amber-300 border-b-4 border-gray-950 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                            >
+                                <span>🧪</span>
+                                <span>{user.language === 'ru' ? 'Тест: 31 день неактивности' : 'Test: 31d Inactivity'}</span>
+                            </button>
+
+                            <button
+                                onClick={handleResetInactivityTimer}
+                                title={user.language === 'ru' ? 'Сбросить таймер активности на сейчас' : 'Reset activity timer to now'}
+                                className="py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider bg-gray-800 hover:bg-gray-700 text-gray-300 border-b-4 border-gray-950 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                            >
+                                <span>🔄</span>
+                                <span>{user.language === 'ru' ? 'Сброс' : 'Reset'}</span>
+                            </button>
+                        </div>
                     </div>
 
                     {/* HAPTIC FEEDBACK TOGGLE */}

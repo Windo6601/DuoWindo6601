@@ -1,9 +1,58 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, GithubAuthProvider } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, getFirestore } from 'firebase/firestore';
 import firebaseConfig from './firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
+
+// Pre-init check: If user has been inactive for > 30 days, purge old local Firestore cache to reclaim browser storage
+if (typeof window !== 'undefined' && window.localStorage) {
+  try {
+    const lastActiveRaw = localStorage.getItem('duo_firestore_last_active');
+    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+    if (lastActiveRaw) {
+      const lastActive = parseInt(lastActiveRaw, 10);
+      if (!isNaN(lastActive) && Date.now() - lastActive >= THIRTY_DAYS_MS) {
+        const inactiveDays = parseFloat(((Date.now() - lastActive) / (1000 * 60 * 60 * 24)).toFixed(1));
+        console.warn(`[Firestore Pre-Init] User inactive for ${inactiveDays} days (> 30 days). Purging old local Firestore IndexedDB cache...`);
+        const projectId = firebaseConfig.projectId;
+        const databaseId = firebaseConfig.firestoreDatabaseId || '(default)';
+        if (window.indexedDB) {
+          const candidateDbNames = [
+            `firestore/[DEFAULT]/${projectId}/main`,
+            `firestore/[DEFAULT]/${databaseId}/main`,
+            `firestore/[DEFAULT]/${projectId}`,
+            `firestore/[DEFAULT]/${databaseId}`,
+            `firestore/[DEFAULT]/main`,
+            `firebase-heartbeat-database`
+          ];
+          for (const name of candidateDbNames) {
+            try {
+              window.indexedDB.deleteDatabase(name);
+            } catch (delErr) {
+              console.warn(`[Firestore Pre-Init] Could not delete ${name}:`, delErr);
+            }
+          }
+        }
+        localStorage.setItem('duo_firestore_cache_last_cleanup', Date.now().toString());
+        localStorage.setItem('duo_firestore_cache_cleanup_meta', JSON.stringify({
+          timestamp: Date.now(),
+          dateString: new Date().toLocaleString(),
+          reason: `Automatic startup purge after ${inactiveDays} days of inactivity (> 30 days)`,
+          freedDatabases: ['Firestore IndexedDB cache'],
+          freedStorageKeys: [],
+          inactiveDays
+        }));
+        // Update last active so it doesn't repeatedly clear on every reload
+        localStorage.setItem('duo_firestore_last_active', Date.now().toString());
+      }
+    } else {
+      localStorage.setItem('duo_firestore_last_active', Date.now().toString());
+    }
+  } catch (checkErr) {
+    console.warn('[Firestore Pre-Init] Inactivity check error:', checkErr);
+  }
+}
 
 // Initialize Firestore with long polling and multi-tab persistent local cache safely
 let db: any;
@@ -27,6 +76,7 @@ export { db };
 
 export const auth = getAuth();
 export const googleProvider = new GoogleAuthProvider();
+export const githubProvider = new GithubAuthProvider();
 
 export enum OperationType {
   CREATE = 'create',

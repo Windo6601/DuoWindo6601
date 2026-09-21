@@ -1,3 +1,34 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "DIN Next Rounded", Cairo, Rubik, Nunito, sans-serif;
+  --font-din: "DIN Next Rounded", Nunito, sans-serif;
+  --font-feather: Feather, sans-serif;
+  --font-arabic: Cairo, Amiri, "Noto Sans Arabic", sans-serif;
+  --font-hebrew: Rubik, "Noto Sans Hebrew", sans-serif;
+
+  --color-duo-dark: #131F24;
+  --color-duo-card: #202F36;
+  --color-duo-green: #58CC02;
+  --color-duo-greenDark: #58A700;
+  --color-duo-blue: #1CB0F6;
+  --color-duo-blueDark: #1899D6;
+  --color-duo-gray: #E5E5E5;
+  --color-duo-grayDark: #AFAFAF;
+  --color-duo-red: #FF4B4B;
+  --color-duo-yellow: #FFC800;
+  --color-duo-yellowDark: #D6A600;
+  --color-duo-orange: #FF9600;
+
+  --animate-float: float 3s ease-in-out infinite;
+  --animate-spin-slow: spin 8s linear infinite;
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+  }
+}
+
 /* Global styles & fallback */
 body {
   margin: 0;

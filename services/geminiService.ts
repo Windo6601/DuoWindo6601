@@ -16,8 +16,8 @@ import {
   getGeminiKeyPriority
 } from "./aiLimitManager";
 
-export const MODEL_FREE = "gemini-3.6-flash";
-export const MODEL_PRO = "gemini-3.1-pro-preview";
+export const MODEL_FREE = "gemini-2.5-flash";
+export const MODEL_PRO = "gemini-2.5-pro";
 const TTS_MODEL = "gemini-2.5-flash-preview-tts";
 
 const sanitizeKey = (k: string): string => {
@@ -146,8 +146,8 @@ const audioCache = new Map<string, string>();
  */
 async function callGeminiWithRetry<T>(
   apiCall: () => Promise<T>,
-  maxRetries: number = 2,
-  initialDelay: number = 1500,
+  maxRetries: number = 3,
+  initialDelay: number = 1000,
   skipLimitCheck: boolean = true
 ): Promise<T> {
   let lastError: any;
@@ -195,21 +195,22 @@ async function callGeminiWithRetry<T>(
         errorMessage.includes('quota') ||
         errorMessage.includes('Overloaded');
       
-      if (isRateLimit) {
+      if (isRateLimit && attempt < maxRetries) {
+        // Exponential backoff with jitter
+        const jitter = Math.random() * 600;
+        const delay = Math.min((initialDelay * Math.pow(1.8, attempt)) + jitter, 5000);
+        console.warn(`Gemini API Rate Limit (${errorStatus || '429'}). Retrying in ${Math.round(delay)}ms... (Attempt ${attempt + 1}/${maxRetries})`);
+        await new Promise(res => setTimeout(res, delay));
+        continue;
+      }
+
+      if (isRateLimit && attempt >= maxRetries) {
         if (!isCustomApiKeySkipped()) {
           const usage = getTodayAiUsage();
           triggerAiLimitModal(usage);
         }
       }
 
-      if (isRateLimit && attempt < maxRetries) {
-        // Exponential backoff with jitter
-        const jitter = Math.random() * 800;
-        const delay = (initialDelay * Math.pow(2, attempt)) + jitter;
-        console.warn(`Gemini API Rate Limit (${errorStatus}). Retrying in ${Math.round(delay)}ms... (Attempt ${attempt + 1}/${maxRetries})`);
-        await new Promise(res => setTimeout(res, delay));
-        continue;
-      }
       throw error;
     }
   }
