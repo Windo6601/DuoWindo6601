@@ -898,6 +898,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <p className="text-xs text-gray-300 font-bold">
                 Модерация, Мониторинг и Восстановление Ударного Режима
               </p>
+              <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1 text-[10px] font-bold">
+                <span className="bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-md">
+                  👑 Профиль Администратора: НЕ ЗАКРЫТ (Открыт)
+                </span>
+                <span className="bg-sky-950/80 text-sky-300 border border-sky-500/40 px-2 py-0.5 rounded-md">
+                  🔑 Полный Вход: НЕ ЗАКРЫТ (Активен)
+                </span>
+              </div>
             </div>
           </div>
 
@@ -1117,13 +1125,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               ←
             </button>
             <div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 flex-wrap gap-1">
                 <h1 className="text-xl md:text-2xl font-black uppercase tracking-tight text-amber-400 flex items-center space-x-2">
                   <span>👑</span>
                   <span>Панель Владельца — Admin Tool</span>
                 </h1>
                 <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
                   Доступ только администратора
+                </span>
+                <span className="bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">
+                  👑 Профиль открыт (Не закрыт)
                 </span>
               </div>
               <p className="text-[11px] text-gray-400 font-bold">

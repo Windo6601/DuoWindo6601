@@ -16,16 +16,16 @@ import {
   getGeminiKeyPriority
 } from "./aiLimitManager";
 
-export const MODEL_FREE = "gemini-2.5-flash";
-export const MODEL_PRO = "gemini-2.5-pro";
-const TTS_MODEL = "gemini-2.5-flash-preview-tts";
+export const MODEL_FREE = "gemini-3.6-flash";
+export const MODEL_PRO = "gemini-3.6-flash";
+const TTS_MODEL = "gemini-3.1-flash-tts-preview";
 
 const sanitizeKey = (k: string): string => {
   if (!k) return '';
   return k.replace(/\s+/g, '');
 };
 
-export const DEFAULT_FALLBACK_GEMINI_KEY = 'AQ.Ab8RN6IXoROxZBrBMAnIEJMV3UJ_FX81W5azChx64oeFQCrDbg';
+export const DEFAULT_FALLBACK_GEMINI_KEY = 'AQ.Ab8RN6Ky0t2F2VWU9-tlJjneqxCv-RegKUBSTB2DgCXCOe_2Rg';
 
 export interface ActiveApiKeyInfo {
   source: 'admin' | 'dev' | 'custom' | 'system' | 'none';
@@ -142,28 +142,27 @@ const TOPICS = ['приветствия', 'еда', 'семья', 'путеше�
 const audioCache = new Map<string, string>();
 
 /**
- * Utility to call Gemini API with exponential backoff retry for 429/503 errors and Tier limit enforcement.
+ * 1. Обработка ошибки 429 с Exponential Backoff + Jitter
+ * Выполняет вызов Gemini API с экспоненциальной задержкой (1s, 2s, 4s, 8s, 16s...)
+ * и случайным джиттером (0-500ms), предотвращая одновременные повторные всплески.
  */
-async function callGeminiWithRetry<T>(
+export async function fetchGeminiWithRetry<T>(
   apiCall: () => Promise<T>,
-  maxRetries: number = 3,
-  initialDelay: number = 1000,
-  skipLimitCheck: boolean = true
+  retries: number = 5,
+  baseDelay: number = 1000
 ): Promise<T> {
-  let lastError: any;
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+  for (let attempt = 0; attempt < retries; attempt++) {
     try {
       const result = await apiCall();
       recordAiUsage();
       return result;
     } catch (error: any) {
-      lastError = error;
-      const errorMessage = error?.message || "";
-      const errorStatus = error?.status || 0;
-      
       if (error instanceof GeminiLimitExceededError) {
         throw error;
       }
+
+      const errorMessage = String(error?.message || error || "");
+      const errorStatus = error?.status || 0;
 
       const isPermissionDenied = 
         errorStatus === 403 || 
@@ -186,35 +185,119 @@ async function callGeminiWithRetry<T>(
         throw new Error("Региональное ограничение Google API (User location is not supported). Запросы направляются через Cloud Proxy.");
       }
 
+      const lowerMsg = errorMessage.toLowerCase();
       const isRateLimit = 
         errorStatus === 429 || 
         errorStatus === 503 ||
         errorMessage.includes('429') || 
         errorMessage.includes('503') ||
         errorMessage.includes('RESOURCE_EXHAUSTED') ||
+        errorMessage.includes('ResourceExhausted') ||
         errorMessage.includes('quota') ||
-        errorMessage.includes('Overloaded');
-      
-      if (isRateLimit && attempt < maxRetries) {
-        // Exponential backoff with jitter
-        const jitter = Math.random() * 600;
-        const delay = Math.min((initialDelay * Math.pow(1.8, attempt)) + jitter, 5000);
-        console.warn(`Gemini API Rate Limit (${errorStatus || '429'}). Retrying in ${Math.round(delay)}ms... (Attempt ${attempt + 1}/${maxRetries})`);
-        await new Promise(res => setTimeout(res, delay));
-        continue;
-      }
+        errorMessage.includes('Overloaded') ||
+        lowerMsg.includes('rate exceeded') ||
+        lowerMsg.includes('rate_exceeded') ||
+        lowerMsg.includes('rate limit') ||
+        lowerMsg.includes('ratelimit') ||
+        lowerMsg.includes('too many requests') ||
+        lowerMsg.includes('exceeded');
 
-      if (isRateLimit && attempt >= maxRetries) {
-        if (!isCustomApiKeySkipped()) {
+      const isLastAttempt = attempt === retries - 1;
+
+      if (!isRateLimit || isLastAttempt) {
+        if (isRateLimit && isLastAttempt && !isCustomApiKeySkipped()) {
           const usage = getTodayAiUsage();
           triggerAiLimitModal(usage);
         }
+        throw error;
       }
 
-      throw error;
+      // Экспоненциальный рост (1s, 2s, 4s, 8s, 16s...) + случайный джиттер 0-500ms
+      const backoffDelay = (baseDelay * Math.pow(2, attempt)) + (Math.random() * 500);
+      console.warn(`[429] Лимит запросов. Повтор ${attempt + 1}/${retries} через ${Math.round(backoffDelay)}ms...`);
+      
+      await new Promise(resolve => setTimeout(resolve, backoffDelay));
     }
   }
-  throw lastError;
+  throw new Error("Достигнуто максимальное число попыток повтора к Gemini API");
+}
+
+interface RateLimiterTask<T> {
+  apiCallTask: () => Promise<T>;
+  resolve: (value: T | PromiseLike<T>) => void;
+  reject: (reason?: any) => void;
+}
+
+/**
+ * 2. Клиентский Rate Limiter и Очередь Запросов
+ * Распределяет запросы во времени согласно ограничениям бесплатного тарифа (12 RPM = 1 запрос в 5 секунд)
+ */
+export class GeminiRateLimiterQueue {
+  private delayBetweenRequests: number;
+  private queue: RateLimiterTask<any>[] = [];
+  private isProcessing: boolean = false;
+
+  constructor(requestsPerMinute: number = 12) {
+    // 60,000ms / 12 = 5,000ms между запросами (безопасный запас относительно лимита в 15 RPM)
+    this.delayBetweenRequests = (60 * 1000) / requestsPerMinute;
+  }
+
+  async enqueue<T>(apiCallTask: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      this.queue.push({ apiCallTask, resolve, reject });
+      this.processQueue();
+    });
+  }
+
+  private async processQueue(): Promise<void> {
+    if (this.isProcessing || this.queue.length === 0) return;
+    this.isProcessing = true;
+
+    while (this.queue.length > 0) {
+      const task = this.queue.shift();
+      if (!task) break;
+      const { apiCallTask, resolve, reject } = task;
+
+      try {
+        const result = await fetchGeminiWithRetry(apiCallTask);
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+
+      // Пауза перед обработкой следующего элемента очереди
+      if (this.queue.length > 0) {
+        await new Promise(r => setTimeout(r, this.delayBetweenRequests));
+      }
+    }
+
+    this.isProcessing = false;
+  }
+
+  getQueueLength(): number {
+    return this.queue.length;
+  }
+
+  isBusy(): boolean {
+    return this.isProcessing;
+  }
+}
+
+// Глобальный экземпляр очереди с ограничением частоты запросов (12 RPM)
+export const geminiRateLimiter = new GeminiRateLimiterQueue(12);
+
+/**
+ * Центральный шлюз вызова Gemini API:
+ * Маршрутизирует вызовы через очередь ограничения частоты (12 RPM) и
+ * механизм Exponential Backoff + Jitter при ошибках 429.
+ */
+export async function callGeminiWithRetry<T>(
+  apiCall: () => Promise<T>,
+  retries: number = 5,
+  baseDelay: number = 1000,
+  _skipLimitCheck: boolean = true
+): Promise<T> {
+  return geminiRateLimiter.enqueue(() => fetchGeminiWithRetry(apiCall, retries, baseDelay));
 }
 
 function decode(base64: string) {
@@ -743,28 +826,112 @@ export const generateLocalMistakeExplanation = (
     original: string, 
     userAnswer: string, 
     correctAnswer: string, 
-    userLanguage: string
+    userLanguage: string,
+    isCorrectAnswer: boolean = false,
+    exerciseType?: string
 ): string => {
-    const isRu = userLanguage === 'Russian' || userLanguage === 'ru' || userLanguage === 'Russian';
+    const isRu = userLanguage === 'Russian' || userLanguage === 'ru';
     const cleanUser = (userAnswer || "").trim();
     const cleanCorrect = (correctAnswer || "").trim();
     const cleanOriginal = (original || "").trim();
 
+    // 1. Ishihara Test
+    if (exerciseType === 'ishihara' || cleanOriginal.toLowerCase().includes('ishihara')) {
+        if (isRu) {
+            return `⚡ **Офлайн-разбор (Цветовой тест Ишихары):**\n\n` +
+                   `• **Ваш ввод:** "${cleanUser || 'Пусто'}"\n` +
+                   `• **Правильное число:** **${cleanCorrect}**\n\n` +
+                   `🔍 **Пояснение:** Тестовая таблица Ишихары состоит из разноцветных точек разного диаметра. Число составлено из цветовых оттенков спектра, которые позволяют оценить восприятие красного и зеленого спектров.\n\n` +
+                   `📌 **Совет:** Проверяйте таблицы при хорошем освещении экрана.`;
+        } else {
+            return `⚡ **Offline Breakdown (Ishihara Color Test):**\n\n` +
+                   `• **Your input:** "${cleanUser || 'None'}"\n` +
+                   `• **Correct number:** **${cleanCorrect}**\n\n` +
+                   `🔍 **Explanation:** Ishihara plates use specific color-spectrum dots to test red-green color perception.\n\n` +
+                   `📌 **Tip:** View the test plate at eye level with adequate screen brightness.`;
+        }
+    }
+
+    // 2. Chess Exercises
+    if (exerciseType === 'chess') {
+        if (isRu) {
+            return `⚡ **Офлайн-анализ позиции DuoWindo6601:**\n\n` +
+                   `♟️ **Тема:** Тактический мотив и развитие фигур.\n` +
+                   `• **Ключевая идея:** Контроль центральных полей, безопасность короля и создание связок против фигур соперника.\n\n` +
+                   `💡 **Совет гроссмейстера:** Перед каждым ходом проверяйте, какие фигуры соперника остались без защиты (висячие фигуры) и есть ли возможность поставить шах или мат.`;
+        } else {
+            return `⚡ **Offline Chess Analysis:**\n\n` +
+                   `♟️ **Topic:** Tactical motif & piece coordination.\n` +
+                   `• **Key Idea:** Control central squares, ensure king safety, and seek undefended pieces.\n\n` +
+                   `💡 **Grandmaster Tip:** Before committing a move, check for opponent checks, captures, and tactical threats.`;
+        }
+    }
+
+    // 3. Drawing Exercises
+    if (exerciseType === 'drawing') {
+        if (isRu) {
+            return `⚡ **Офлайн-разбор написания символа:**\n\n` +
+                   `• **Символ:** **${cleanCorrect}**\n` +
+                   `• **Оригинал:** ${cleanOriginal}\n\n` +
+                   `✍️ **Правило написания:** Соблюдайте порядок штрихов — сверху вниз и слева направо. Четкие пропорции помогают мгновенно распознавать символ в текстах.\n\n` +
+                   `🌟 **Практика:** Попробуйте нарисовать символ еще раз для закрепления мышечной памяти!`;
+        } else {
+            return `⚡ **Offline Character Breakdown:**\n\n` +
+                   `• **Target Character:** **${cleanCorrect}**\n` +
+                   `• **Prompt:** ${cleanOriginal}\n\n` +
+                   `✍️ **Stroke Rule:** Write strokes from top to bottom and left to right.\n\n` +
+                   `🌟 **Tip:** Repeat the stroke movement to strengthen muscle memory!`;
+        }
+    }
+
+    // 4. Speech / Pronunciation
+    if (exerciseType === 'speech') {
+        if (isRu) {
+            return `⚡ **Офлайн-разбор произношения:**\n\n` +
+                   `• **Произнесенная фраза:** "${cleanUser || 'Речь не распознана'}"\n` +
+                   `• **Эталонная фраза:** "${cleanCorrect}"\n\n` +
+                   `🎙️ **Рекомендация:** Старайтесь произносить слова плавно, соблюдая ударение в ключевых слогах. Нажмите на иконку динамика 🔊, чтобы прослушать эталонную интонацию еще раз.`;
+        } else {
+            return `⚡ **Offline Pronunciation Breakdown:**\n\n` +
+                   `• **Your Speech:** "${cleanUser || 'No speech detected'}"\n` +
+                   `• **Target Phrase:** "${cleanCorrect}"\n\n` +
+                   `🎙️ **Tip:** Focus on word stress and syllable rhythm. Tap the speaker icon 🔊 to listen to native audio again.`;
+        }
+    }
+
+    // 5. General Translation / Multiple choice / Word bank
+    const normUser = cleanUser.toLowerCase().replace(/[.,!?;:«»""'']/g, "").trim();
+    const normCorrect = cleanCorrect.toLowerCase().replace(/[.,!?;:«»""'']/g, "").trim();
+
+    // When the user answered correctly
+    if (isCorrectAnswer || normUser === normCorrect) {
+        if (isRu) {
+            let res = `🎉 **Отличный ответ! (Офлайн-анализ):**\n\n`;
+            res += `• **Исходная фраза:** "${cleanOriginal}"\n`;
+            res += `• **Ваш правильный перевод:** "${cleanCorrect}"\n\n`;
+            res += `📚 **Грамматический разбор:**\n`;
+            res += `Все слова подобраны верно и стоят в правильном грамматическом порядке. Смысловая связь и контекст соблюдены на 100%.\n\n`;
+            res += `✨ **Совет:** Продолжайте в том же духе, вы уверенно осваиваете эту тему!`;
+            return res;
+        } else {
+            let res = `🎉 **Great Job! (Offline Breakdown):**\n\n`;
+            res += `• **Original:** "${cleanOriginal}"\n`;
+            res += `• **Your Correct Translation:** "${cleanCorrect}"\n\n`;
+            res += `📚 **Grammar Analysis:**\n`;
+            res += `All words and syntax structures are accurately placed with correct agreement.\n\n`;
+            res += `✨ **Tip:** Keep this momentum going!`;
+            return res;
+        }
+    }
+
+    // If answer was empty
     if (!cleanUser || cleanUser === "(No speech detected)" || cleanUser === "No input") {
         return isRu
-            ? `💡 **Анализ ответа:**\nВы не ввели ответ или речь не была услышана.\n\n✅ **Правильный ответ:** ${cleanCorrect}\n📌 **Оригинал:** ${cleanOriginal}`
-            : `💡 **Answer Breakdown:**\nNo answer was entered or detected.\n\n✅ **Correct Answer:** ${cleanCorrect}\n📌 **Original:** ${cleanOriginal}`;
+            ? `⚡ **Офлайн-анализ ответа:**\n\nВы не ввели ответ или не выбрали карточки со словами.\n\n✅ **Правильный ответ:** ${cleanCorrect}\n📌 **Оригинальная фраза:** ${cleanOriginal}\n\n💡 **Совет:** Составьте фразу, выбирая предложенные блоки по порядку.`
+            : `⚡ **Offline Answer Breakdown:**\n\nNo words or input were selected.\n\n✅ **Correct Answer:** ${cleanCorrect}\n📌 **Original Phrase:** ${cleanOriginal}\n\n💡 **Tip:** Tap the word bank tokens in sequential order.`;
     }
 
-    const normUser = cleanUser.toLowerCase().replace(/[.,!?;:]/g, "");
-    const normCorrect = cleanCorrect.toLowerCase().replace(/[.,!?;:]/g, "");
-
-    if (normUser === normCorrect) {
-        return isRu
-            ? `💡 **Анализ ответа:**\nВаш ответ почти верен! Обратите внимание на знаки препинания или заглавные буквы.\n\n✅ **Эталон:** ${cleanCorrect}`
-            : `💡 **Answer Breakdown:**\nYour answer is essentially correct! Check punctuation or capitalization.\n\n✅ **Target:** ${cleanCorrect}`;
-    }
-
+    // Compare words
     const userWords = normUser.split(/\s+/).filter(Boolean);
     const correctWords = normCorrect.split(/\s+/).filter(Boolean);
 
@@ -772,28 +939,38 @@ export const generateLocalMistakeExplanation = (
     const extraWords = userWords.filter(uw => !correctWords.includes(uw));
 
     if (isRu) {
-        let text = `💡 **Анализ ошибки:**\n`;
+        let text = `⚡ **Офлайн-анализ ошибки DuoWindo6601:**\n\n`;
+        text += `• **Фраза для перевода:** "${cleanOriginal}"\n`;
         text += `• **Ваш ответ:** "${cleanUser}"\n`;
-        text += `• **Правильный ответ:** "${cleanCorrect}"\n\n`;
+        text += `• **Правильный эталон:** "${cleanCorrect}"\n\n`;
+        
         if (missingWords.length > 0) {
-            text += `🔍 **Пропущенные слова:** ${missingWords.join(', ')}\n`;
+            text += `🔍 **Пропущенные слова:** ${missingWords.map(w => `«${w}»`).join(', ')}\n`;
         }
         if (extraWords.length > 0) {
-            text += `⚠️ **Неверные или лишние слова:** ${extraWords.join(', ')}\n`;
+            text += `⚠️ **Лишние или неточные слова:** ${extraWords.map(w => `«${w}»`).join(', ')}\n`;
         }
-        text += `\n📌 **Совет:** Сравните форму и порядок слов с эталоном.`;
+        if (missingWords.length === 0 && extraWords.length === 0 && normUser !== normCorrect) {
+            text += `🔄 **Порядок слов:** Слова верные, но порядок расположения в предложении отличается от эталона.\n`;
+        }
+        text += `\n📌 **Совет:** Обратите внимание на согласование частей речи и порядок слов в предложении.`;
         return text;
     } else {
-        let text = `💡 **Mistake Analysis:**\n`;
-        text += `• **Your answer:** "${cleanUser}"\n`;
-        text += `• **Correct answer:** "${cleanCorrect}"\n\n`;
+        let text = `⚡ **Offline Mistake Breakdown:**\n\n`;
+        text += `• **Original Phrase:** "${cleanOriginal}"\n`;
+        text += `• **Your Answer:** "${cleanUser}"\n`;
+        text += `• **Target Translation:** "${cleanCorrect}"\n\n`;
+        
         if (missingWords.length > 0) {
-            text += `🔍 **Missing words:** ${missingWords.join(', ')}\n`;
+            text += `🔍 **Missing words:** ${missingWords.map(w => `"${w}"`).join(', ')}\n`;
         }
         if (extraWords.length > 0) {
-            text += `⚠️ **Incorrect or extra words:** ${extraWords.join(', ')}\n`;
+            text += `⚠️ **Extra or mismatched words:** ${extraWords.map(w => `"${w}"`).join(', ')}\n`;
         }
-        text += `\n📌 **Tip:** Compare word forms and order with the target sentence.`;
+        if (missingWords.length === 0 && extraWords.length === 0 && normUser !== normCorrect) {
+            text += `🔄 **Word Order:** The words are correct, but their order differs from the standard target sentence.\n`;
+        }
+        text += `\n📌 **Tip:** Compare the word sequence and grammatical structure with the target model.`;
         return text;
     }
 };
@@ -802,44 +979,57 @@ export const getMistakeExplanation = async (
     original: string, 
     userAnswer: string, 
     correctAnswer: string, 
-    userLanguage: string
+    userLanguage: string,
+    isCorrectAnswer: boolean = false,
+    exerciseType?: string,
+    isOffline: boolean = false
 ): Promise<string> => {
-    const ai = createGenAiClient();
-    const prompt = `You are a friendly language tutor similar to Duolingo.
-    The student made a mistake.
-    Original phrase: "${original}"
-    Student's answer: "${userAnswer}"
-    Correct answer: "${correctAnswer}"
-    
-    Explain briefly and clearly (max 50 words) why the student's answer is wrong or how the grammar works.
-    Respond in this language: ${userLanguage}.
-    Do not be technical, be encouraging.`;
+    // 1. Instant offline fallback if offline or no network
+    if (isOffline || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+        return generateLocalMistakeExplanation(original, userAnswer, correctAnswer, userLanguage, isCorrectAnswer, exerciseType);
+    }
 
     try {
-        const response = await callGeminiWithRetry(async () => {
-            return ai.models.generateContent({
+        const ai = createGenAiClient();
+        const isRu = userLanguage === 'Russian' || userLanguage === 'ru';
+        
+        const prompt = isCorrectAnswer
+          ? `You are DuoWindo6601, a friendly language tutor similar to Duolingo Max.
+The student answered CORRECTLY!
+Original phrase: "${original}"
+Correct answer: "${correctAnswer}"
+Explain briefly and clearly (max 60 words) why this answer is correct, highlighting key grammar or vocabulary points.
+Respond in this language: ${isRu ? 'Russian' : 'English'}.
+Be enthusiastic, encouraging, and clear.`
+          : `You are DuoWindo6601, a friendly language tutor similar to Duolingo Max.
+The student made a mistake in their exercise.
+Original phrase: "${original}"
+Student's answer: "${userAnswer}"
+Correct answer: "${correctAnswer}"
+
+Explain briefly and clearly (max 60 words) why the student's answer is incorrect, how the grammar or vocabulary works, and give a friendly tip.
+Respond in this language: ${isRu ? 'Russian' : 'English'}.
+Do not be overly technical, be supportive.`;
+
+        try {
+            const response = await ai.models.generateContent({
                 model: MODEL_PRO,
                 contents: prompt
             });
-        });
-        if (response.text?.trim()) return response.text.trim();
-    } catch (e1) {
-        console.warn("MODEL_PRO explanation failed, trying fallback model...", e1);
-    }
-
-    try {
-        const response = await callGeminiWithRetry(async () => {
-            return ai.models.generateContent({
+            if (response.text?.trim()) return response.text.trim();
+        } catch (e1) {
+            console.warn("MODEL_PRO explanation failed, trying fallback model...", e1);
+            const response = await ai.models.generateContent({
                 model: MODEL_FREE,
                 contents: prompt
             });
-        });
-        if (response.text?.trim()) return response.text.trim();
-    } catch (e2) {
-        console.warn("MODEL_FREE explanation failed, using local breakdown...", e2);
+            if (response.text?.trim()) return response.text.trim();
+        }
+    } catch (err) {
+        console.warn("Gemini explanation offline fallback:", err);
     }
 
-    return generateLocalMistakeExplanation(original, userAnswer, correctAnswer, userLanguage);
+    return generateLocalMistakeExplanation(original, userAnswer, correctAnswer, userLanguage, isCorrectAnswer, exerciseType);
 };
 
 const CIS_OFFLINE_DICTIONARY: Record<string, Record<string, string>> = {

@@ -12,16 +12,8 @@ service cloud.firestore {
       allow list: if isOwner(userId) || isAdmin();
       allow delete: if isOwner(userId) || isAdmin();
 
-      allow create: if (isOwner(userId) || isAdmin()) 
-        && isValidId(userId) 
-        && isValidUserProfile(incoming()) 
-        && (!('createdAt' in incoming()) || incoming().createdAt == request.time)
-        && (!('updatedAt' in incoming()) || incoming().updatedAt == request.time);
-
-      allow update: if (isOwner(userId) || isAdmin()) 
-        && isValidUserProfile(incoming()) 
-        && (!('createdAt' in existing()) || !('createdAt' in incoming()) || incoming().createdAt == existing().createdAt)
-        && (!('updatedAt' in incoming()) || incoming().updatedAt == request.time);
+      allow create: if (isOwner(userId) || isAdmin()) && isValidId(userId);
+      allow update: if isOwner(userId) || isAdmin();
     }
 
     // 3. Feedback / Reviews rules

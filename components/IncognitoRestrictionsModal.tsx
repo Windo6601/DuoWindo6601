@@ -1,13 +1,22 @@
 import React from 'react';
 import { CloseIcon } from './Icons';
+import { UserProgress } from '../types';
+import { 
+  isIncognitoLoginClosed, 
+  getDaysUntilIncognitoClosure, 
+  getFormattedClosureDate,
+  downloadIncognitoDataFile 
+} from '../services/incognitoService';
 
 export interface IncognitoRestrictionsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onOpenRegister: (tab?: 'register' | 'incognito' | 'google') => void;
+  onOpenRegister: (tab?: 'login' | 'register' | 'incognito' | 'google') => void;
   onGoogleSignIn: () => void;
   language?: string;
   playSound: (type: 'click' | 'correct' | 'wrong' | 'fanfare' | 'streak') => void;
+  user?: UserProgress;
+  onOpenExport?: () => void;
 }
 
 export const INCOGNITO_RESTRICTIONS = [
@@ -152,10 +161,25 @@ export const IncognitoRestrictionsModal: React.FC<IncognitoRestrictionsModalProp
   onGoogleSignIn,
   language = 'ru',
   playSound,
+  user,
+  onOpenExport,
 }) => {
   if (!isOpen) return null;
 
   const isRu = language === 'ru';
+  const isClosed = isIncognitoLoginClosed();
+  const daysLeft = getDaysUntilIncognitoClosure();
+  const closureDateStr = getFormattedClosureDate(language);
+
+  const handleExportClick = () => {
+    playSound('click');
+    if (onOpenExport) {
+      onClose();
+      onOpenExport();
+    } else if (user) {
+      downloadIncognitoDataFile(user, language);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[250] bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in">
@@ -166,16 +190,16 @@ export const IncognitoRestrictionsModal: React.FC<IncognitoRestrictionsModalProp
             playSound('click');
             onClose();
           }}
-          className="absolute top-4 right-4 text-gray-400 hover:text-white p-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition-colors z-10"
+          className="absolute top-4 right-4 text-gray-400 hover:text-white p-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition-colors z-10 cursor-pointer"
           title={isRu ? 'Закрыть' : 'Close'}
         >
           <CloseIcon className="w-6 h-6" />
         </button>
 
         {/* MODAL HEADER */}
-        <div className="text-center space-y-2 pb-4 border-b border-gray-800 shrink-0 pr-8 sm:pr-0">
+        <div className="text-center space-y-2 pb-3 border-b border-gray-800 shrink-0 pr-8 sm:pr-0">
           <div className="inline-flex items-center justify-center space-x-2 px-3.5 py-1.5 rounded-full bg-amber-950/80 border border-amber-500/50 text-amber-300 text-xs font-black uppercase tracking-wider shadow-inner">
-            <span className="text-base">🚫</span>
+            <span className="text-base">{isClosed ? '🛑' : '🚫'}</span>
             <span>{isRu ? 'Режим Ограничения в Инкогнито' : 'Incognito Restricted Mode'}</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-white flex items-center justify-center gap-2">
@@ -188,8 +212,56 @@ export const IncognitoRestrictionsModal: React.FC<IncognitoRestrictionsModalProp
           </p>
         </div>
 
+        {/* 10 ОКТЯБРЯ 2026 CLOSURE & EXPORT NOTICE BANNER */}
+        <div className={`mt-3 p-3.5 rounded-2xl border ${
+          isClosed 
+            ? 'bg-rose-950/50 border-rose-500/60 text-rose-200' 
+            : 'bg-amber-950/40 border-amber-500/60 text-amber-200'
+        } shrink-0 space-y-2 text-left`}>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center space-x-2">
+              <span className="text-xl">{isClosed ? '🛑' : '⚠️'}</span>
+              <h4 className="font-black text-xs sm:text-sm uppercase tracking-wide">
+                {isClosed 
+                  ? (isRu ? `Вход в Инкогнито закрыт с ${closureDateStr}` : `Incognito closed since ${closureDateStr}`) 
+                  : (isRu ? '10 октября 2026 года вход в Режим Инкогнито закрывается!' : 'Incognito closes on October 10, 2026!')}
+              </h4>
+            </div>
+            {(onOpenExport || user) && (
+              <button
+                type="button"
+                onClick={handleExportClick}
+                className="py-1.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-xs uppercase tracking-wider flex items-center space-x-1.5 shadow cursor-pointer"
+              >
+                <span>💾</span>
+                <span>{isRu ? 'Экспорт данных' : 'Export Data'}</span>
+              </button>
+            )}
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-amber-200 font-bold">
+              {isRu
+                ? 'После 10 октября 2026 года Режим Инкогнито будет недоступен, и его нельзя будет восстановить в DuoWindo6601.'
+                : 'After October 10, 2026, Incognito Mode will be unavailable and cannot be restored in DuoWindo6601.'}
+            </p>
+            <p className="text-xs text-gray-300 font-medium">
+              {isRu
+                ? 'Если вы хотите сохранить какой-либо контент, мы рекомендуем заранее экспортировать данные Firebase Firestore & Auth через Раздел «Профиль» и Раздел «Настройки» или выполнить Полный Вход.'
+                : 'If you want to save any content, we recommend exporting your Firebase Firestore & Auth data in advance via the Profile and Settings sections or performing Full Sign-In.'}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-[10px] font-bold">
+            <span className="bg-emerald-950/70 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-lg">
+              ✅ {isRu ? 'Полный Вход не закрыт' : 'Full Sign-In Active'}
+            </span>
+            <span className="bg-amber-950/70 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-lg">
+              👑 {isRu ? 'Администратор профиль не закрыт' : 'Admin Profile Active'}
+            </span>
+          </div>
+        </div>
+
         {/* 8 RESTRICTIONS LIST */}
-        <div className="overflow-y-auto my-4 pr-1 sm:pr-2 space-y-3 flex-1 custom-scrollbar">
+        <div className="overflow-y-auto my-3 pr-1 sm:pr-2 space-y-3 flex-1 custom-scrollbar">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
             {INCOGNITO_RESTRICTIONS.map((item, idx) => (
               <div
@@ -244,24 +316,46 @@ export const IncognitoRestrictionsModal: React.FC<IncognitoRestrictionsModalProp
               onClick={() => {
                 playSound('click');
                 onClose();
-                onGoogleSignIn();
+                onOpenRegister('login');
               }}
-              className="flex-1 sm:flex-initial px-4 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-2xl font-black text-xs uppercase tracking-wider border-b-4 border-purple-800 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center space-x-2 shadow-lg cursor-pointer"
+              className="flex-1 sm:flex-initial px-4 py-3 bg-duo-blue hover:bg-sky-500 text-white rounded-2xl font-black text-xs uppercase tracking-wider border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center space-x-1.5 shadow-lg cursor-pointer"
             >
               <span>🔑</span>
-              <span>Google</span>
+              <span>{isRu ? 'Полный Вход' : 'Full Sign-In'}</span>
             </button>
+            {(onOpenExport || user) && (
+              <button
+                onClick={handleExportClick}
+                className="flex-1 sm:flex-initial px-4 py-3 bg-sky-700 hover:bg-sky-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider border-b-4 border-sky-900 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center space-x-1.5 shadow-lg cursor-pointer"
+              >
+                <span>💾</span>
+                <span>{isRu ? 'Экспорт' : 'Export'}</span>
+              </button>
+            )}
           </div>
 
-          <button
-            onClick={() => {
-              playSound('click');
-              onClose();
-            }}
-            className="w-full sm:w-auto px-4 py-3 text-xs font-bold text-gray-400 hover:text-gray-200 transition-colors uppercase tracking-wider cursor-pointer"
-          >
-            {isRu ? 'Продолжить как Инкогнито ↗' : 'Continue Incognito ↗'}
-          </button>
+          {isClosed ? (
+            <button
+              onClick={() => {
+                playSound('click');
+                onClose();
+                onOpenRegister('login');
+              }}
+              className="w-full sm:w-auto px-4 py-3 text-xs font-bold text-amber-400 hover:text-amber-300 transition-colors uppercase tracking-wider cursor-pointer"
+            >
+              {isRu ? 'Вход закрыт с 10.10.2026 • Полный Вход ↗' : 'Entry closed since 10.10.2026 • Full Login ↗'}
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                playSound('click');
+                onClose();
+              }}
+              className="w-full sm:w-auto px-4 py-3 text-xs font-bold text-gray-400 hover:text-gray-200 transition-colors uppercase tracking-wider cursor-pointer"
+            >
+              {isRu ? 'Продолжить как Инкогнито ↗' : 'Continue Incognito ↗'}
+            </button>
+          )}
         </div>
       </div>
     </div>

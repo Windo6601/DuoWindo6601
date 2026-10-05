@@ -9,8 +9,15 @@ import {
   User as FirebaseUser 
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db, googleProvider, githubProvider, handleFirestoreError, OperationType } from '../firebase';
+import { auth, db, googleProvider, handleFirestoreError, OperationType } from '../firebase';
 import { UserProgress } from '../types';
+import { 
+  isIncognitoLoginClosed, 
+  getDaysUntilIncognitoClosure, 
+  getFormattedClosureDate, 
+  downloadIncognitoDataFile, 
+  copyIncognitoDataToClipboard 
+} from '../services/incognitoService';
 
 export interface AuthModalProps {
   isOpen: boolean;
@@ -24,6 +31,8 @@ export interface AuthModalProps {
   playSound: (name: string) => void;
   setToast: (msg: string | null) => void;
   onOpenIncognitoRestrictions?: () => void;
+  onOpenIncognitoExport?: () => void;
+  onOpenFirebaseExport?: () => void;
 }
 
 // Local accounts storage key for fallback / offline lookup by @username or email
@@ -41,6 +50,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   playSound,
   setToast,
   onOpenIncognitoRestrictions,
+  onOpenIncognitoExport,
+  onOpenFirebaseExport,
 }) => {
   const [activeTab, setActiveTab] = useState<'login' | 'register' | 'google' | 'incognito'>('login');
 
@@ -66,10 +77,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [resetEmail, setResetEmail] = useState('');
   const [resetSent, setResetSent] = useState(false);
   const [isOperationNotAllowed, setIsOperationNotAllowed] = useState(false);
-  const [notAllowedProvider, setNotAllowedProvider] = useState<'google' | 'github' | 'email' | null>(null);
+  const [notAllowedProvider, setNotAllowedProvider] = useState<'google' | 'email' | null>(null);
+  const [exportCopied, setExportCopied] = useState(false);
 
   const isRu = user.language === 'ru';
   const isIframe = typeof window !== 'undefined' && window.self !== window.top;
+  const incognitoClosed = isIncognitoLoginClosed();
+  const daysUntilClosure = getDaysUntilIncognitoClosure();
+  const closureDateLabel = getFormattedClosureDate(user.language);
 
   useEffect(() => {
     if (isOpen) {
@@ -233,32 +248,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
-    if (activeTab === 'google' || notAllowedProvider === 'github' || notAllowedProvider === 'google') {
-      const isGithub = notAllowedProvider === 'github';
-      const providerName = isGithub ? (isRu ? 'Ученик GitHub' : 'GitHub Learner') : (isRu ? 'Ученик Google' : 'Google Learner');
-      const authName = user.name && !user.name.includes('Гость') && user.name !== 'Ученик 6601' 
+    if (activeTab === 'google') {
+      const googleName = user.name && !user.name.includes('Гость') && user.name !== 'Ученик 6601' 
         ? user.name 
-        : providerName;
-      const authEmail = user.email || (isGithub ? 'learner@github.com' : 'learner@gmail.com');
-      const defaultUsername = isGithub ? 'github_learner' : 'google_learner';
+        : (isRu ? 'Ученик Google' : 'Google Learner');
+      const googleEmail = user.email || 'learner@gmail.com';
       const cleanUsername = (user.username && !user.username.startsWith('incognito_')) 
         ? user.username 
-        : defaultUsername;
+        : 'google_learner';
 
       const updatedUser: UserProgress = {
         ...user,
-        name: authName,
-        email: authEmail,
+        name: googleName,
+        email: googleEmail,
         username: cleanUsername,
-        authProvider: isGithub ? 'github' : 'google',
+        authProvider: 'google',
       };
 
       setUser(updatedUser);
       localStorage.setItem('duowindo_user_progress_v3', JSON.stringify(updatedUser));
       saveAccountLocally({
-        email: authEmail,
+        email: googleEmail,
         username: cleanUsername,
-        name: authName,
+        name: googleName,
         userProgress: updatedUser,
       });
 
@@ -266,8 +278,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       triggerConfetti();
       setToast(
         isRu 
-          ? `${isGithub ? '🐙' : '🌐'} Вход через локальный профиль ${isGithub ? 'GitHub' : 'Google'} (${authName})` 
-          : `${isGithub ? '🐙' : '🌐'} Signed in with local ${isGithub ? 'GitHub' : 'Google'} profile (${authName})`
+          ? `🌐 Вход через локальный профиль Google (${googleName})` 
+          : `🌐 Signed in with local Google profile (${googleName})`
       );
       onClose();
       return;
@@ -757,137 +769,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   // ==========================================
-  // HANDLER: GITHUB SIGN-IN
-  // ==========================================
-  const handleGithubAuth = async () => {
-    setErrorMessage(null);
-    setLoading(true);
-    playSound('click');
-
-    try {
-      const result = await signInWithPopup(auth, githubProvider);
-      setFirebaseUser(result.user);
-
-      // Load or create profile in Firestore
-      const userRef = doc(db, 'users', result.user.uid);
-      const docSnap = await getDoc(userRef);
-
-      const githubName = result.user.displayName || (isRu ? 'Ученик GitHub' : 'GitHub Learner');
-      const githubEmail = result.user.email || '';
-      const fallbackUsername = githubEmail 
-        ? githubEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '') 
-        : (result.user.displayName ? result.user.displayName.toLowerCase().replace(/[^a-z0-9_]/g, '') : `github_${Math.floor(1000 + Math.random() * 9000)}`);
-
-      let updatedUser: UserProgress;
-      if (docSnap.exists()) {
-        const cloudData = docSnap.data() as UserProgress;
-        updatedUser = {
-          ...user,
-          ...cloudData,
-          email: githubEmail || cloudData.email,
-          authProvider: 'github',
-        };
-      } else {
-        updatedUser = {
-          ...user,
-          name: githubName,
-          email: githubEmail,
-          username: user.username && !user.username.startsWith('incognito_') ? user.username : fallbackUsername,
-          authProvider: 'github',
-        };
-        await setDoc(userRef, {
-          ...updatedUser,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        }, { merge: true });
-      }
-
-      setUser(updatedUser);
-      localStorage.setItem('duowindo_user_progress_v3', JSON.stringify(updatedUser));
-      localStorage.setItem('duo_reg_prompt_seen_6601', 'true');
-
-      saveAccountLocally({
-        email: githubEmail,
-        username: updatedUser.username || fallbackUsername,
-        name: updatedUser.name,
-        userProgress: updatedUser,
-      });
-
-      playSound('success');
-      triggerConfetti();
-      setToast(
-        isRu 
-          ? `🐙 Успешный вход через GitHub (${result.user.displayName || result.user.email || 'GitHub'})` 
-          : `🐙 Signed in with GitHub (${result.user.displayName || result.user.email || 'GitHub'})`
-      );
-      onClose();
-    } catch (err: any) {
-      console.warn('GitHub Sign-in error:', err);
-      const code = err?.code || '';
-      const errMsg = err?.message || String(err);
-      const isNotAllowed = code === 'auth/operation-not-allowed' || errMsg.includes('operation-not-allowed');
-
-      if (isNotAllowed) {
-        setIsOperationNotAllowed(true);
-        setNotAllowedProvider('github');
-
-        // Seamless local fallback for GitHub profile
-        const githubName = user.name && !user.name.includes('Гость') && user.name !== 'Ученик 6601' 
-          ? user.name 
-          : (isRu ? 'Ученик GitHub' : 'GitHub Learner');
-        const githubEmail = user.email && user.email.includes('@') ? user.email : 'learner@github.com';
-        const fallbackUsername = githubEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '') || 'github_learner';
-
-        const updatedUser: UserProgress = {
-          ...user,
-          name: githubName,
-          email: githubEmail,
-          username: user.username && !user.username.startsWith('incognito_') ? user.username : fallbackUsername,
-          authProvider: 'github',
-        };
-
-        setUser(updatedUser);
-        localStorage.setItem('duowindo_user_progress_v3', JSON.stringify(updatedUser));
-        localStorage.setItem('duo_reg_prompt_seen_6601', 'true');
-
-        saveAccountLocally({
-          email: githubEmail,
-          username: updatedUser.username || fallbackUsername,
-          name: updatedUser.name,
-          userProgress: updatedUser,
-        });
-
-        playSound('success');
-        triggerConfetti();
-        setToast(
-          isRu 
-            ? `🐙 Вход выполнен через GitHub (Автономный профиль, включите GitHub в Firebase Console)` 
-            : `🐙 Signed in with GitHub (Offline profile, enable GitHub in Firebase Console)`
-        );
-        onClose();
-        return;
-      }
-
-      if (
-        errMsg.includes('auth/cancelled-popup-request') || 
-        errMsg.includes('popup-closed-by-user') || 
-        errMsg.includes('popup-blocked')
-      ) {
-        setErrorMessage(
-          isRu 
-            ? 'Окно авторизации GitHub было закрыто или заблокировано браузером. Разрешите всплывающие окна или откройте в новой вкладке.' 
-            : 'GitHub popup was closed or blocked. Please allow popups or open in a new tab.'
-        );
-      } else {
-        setErrorMessage(err.message || (isRu ? 'Ошибка входа через GitHub' : 'GitHub sign-in error'));
-      }
-      playSound('wrong');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ==========================================
   // HANDLER: FORGOT PASSWORD RESET
   // ==========================================
   const handleSendPasswordReset = async (e?: React.FormEvent) => {
@@ -915,9 +796,54 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   // ==========================================
+  // HANDLERS: INCOGNITO EXPORT
+  // ==========================================
+  const handleDownloadIncognitoData = () => {
+    playSound('correct');
+    const filename = downloadIncognitoDataFile(user, user.language);
+    setToast(
+      isRu 
+        ? `💾 Файл ${filename} успешно сохранён!` 
+        : `💾 File ${filename} successfully downloaded!`
+    );
+  };
+
+  const handleCopyIncognitoData = async () => {
+    playSound('click');
+    const ok = await copyIncognitoDataToClipboard(user, user.language);
+    if (ok) {
+      setExportCopied(true);
+      setToast(
+        isRu 
+          ? '📋 Данные Режима Инкогнито скопированы в буфер обмена!' 
+          : '📋 Incognito data copied to clipboard!'
+      );
+      setTimeout(() => setExportCopied(false), 3000);
+    } else {
+      playSound('wrong');
+      setToast(isRu ? '❌ Не удалось скопировать данные' : '❌ Failed to copy data');
+    }
+  };
+
+  // ==========================================
   // HANDLER: CONTINUE AS INCOGNITO
   // ==========================================
   const handleContinueIncognito = () => {
+    if (incognitoClosed) {
+      playSound('wrong');
+      setErrorMessage(
+        isRu 
+          ? `🚫 Вход в Режим Инкогнито (Без аккаунта) закрыт с 10 октября 2026 года! Пожалуйста, используйте Полный Вход (Email / Google) или зарегистрируйтесь.` 
+          : `🚫 Incognito Mode entry is closed since October 10, 2026! Please use Full Sign-In (Email / Google) or create an account.`
+      );
+      setToast(
+        isRu 
+          ? '🚫 Вход в Режим Инкогнито закрыт с 10.10.2026. Полный Вход и Профиль Администратора открыты.' 
+          : '🚫 Incognito login closed since Oct 10, 2026. Full Login & Admin Profile remain active.'
+      );
+      return;
+    }
+
     playSound('click');
     localStorage.setItem('duo_reg_prompt_seen_6601', 'true');
     const assignedUsername = (user.username && !user.username.startsWith('user_')) 
@@ -951,20 +877,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {activeTab === 'login' && '🔑'}
               {activeTab === 'register' && '📝'}
               {activeTab === 'google' && '🌐'}
-              {activeTab === 'incognito' && '🕵️'}
+              {activeTab === 'incognito' && (incognitoClosed ? '🔒' : '🕵️')}
             </div>
             <div>
               <h3 className="text-lg sm:text-xl font-black text-white tracking-wide">
-                {activeTab === 'login' && (isRu ? 'Вход в аккаунт DuoWindo' : 'Sign in to DuoWindo')}
+                {activeTab === 'login' && (isRu ? 'Полный Вход в DuoWindo' : 'Full Sign-In to DuoWindo')}
                 {activeTab === 'register' && (isRu ? 'Регистрация аккаунта' : 'Create DuoWindo Account')}
-                {activeTab === 'google' && (isRu ? 'Вход через Google / GitHub' : 'Google & GitHub Sign-In')}
-                {activeTab === 'incognito' && (isRu ? 'Режим Инкогнито' : 'Incognito Guest Mode')}
+                {activeTab === 'google' && (isRu ? 'Вход через Google' : 'Google Sign-In')}
+                {activeTab === 'incognito' && (incognitoClosed 
+                  ? (isRu ? 'Режим Инкогнито (Вход закрыт)' : 'Incognito Mode (Closed)') 
+                  : (isRu ? 'Режим Инкогнито' : 'Incognito Guest Mode'))}
               </h3>
               <p className="text-xs text-gray-400 font-medium">
-                {activeTab === 'login' && (isRu ? 'Войдите по Email или имени пользователя и паролю' : 'Sign in with Email or Username and password')}
+                {activeTab === 'login' && (isRu ? 'Полный Вход по Email, имени пользователя и паролю' : 'Full Sign-In with Email or Username & password')}
                 {activeTab === 'register' && (isRu ? 'Создайте профиль с Email, никнеймом и паролем' : 'Register with Email, Username, and password')}
-                {activeTab === 'google' && (isRu ? 'Мгновенный вход через Google или GitHub и синхронизация' : 'Instant cloud progress sync via Google or GitHub')}
-                {activeTab === 'incognito' && (isRu ? 'Играйте анонимно без регистрации и паролей' : 'Play anonymously without account')}
+                {activeTab === 'google' && (isRu ? 'Мгновенный вход и облачная синхронизация' : 'Instant cloud progress synchronization')}
+                {activeTab === 'incognito' && (incognitoClosed
+                  ? (isRu ? 'Вход без аккаунта закрыт с 10 октября 2026 г. Доступен экспорт данных.' : 'Login without account closed since Oct 10, 2026. Data export available.')
+                  : (isRu ? 'Играйте анонимно без регистрации и паролей (закрывается 10.10.2026)' : 'Play anonymously without account (closes Oct 10, 2026)'))}
               </p>
             </div>
           </div>
@@ -989,7 +919,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             }`}
           >
             <span>🔑</span>
-            <span className="truncate">{isRu ? 'Вход' : 'Login'}</span>
+            <span className="truncate">{isRu ? 'Полный Вход' : 'Full Login'}</span>
           </button>
 
           <button
@@ -1015,20 +945,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             }`}
           >
             <span>🌐</span>
-            <span className="truncate">Google / GitHub</span>
+            <span className="truncate">Google</span>
           </button>
 
           <button
             type="button"
             onClick={() => { playSound('click'); setActiveTab('incognito'); setErrorMessage(null); setShowForgotPassword(false); }}
-            className={`py-2.5 px-2 rounded-xl font-black text-xs transition-all flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer ${
+            className={`py-2.5 px-2 rounded-xl font-black text-xs transition-all flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer relative ${
               activeTab === 'incognito'
-                ? 'bg-amber-600 text-white shadow-lg border-b-2 border-amber-800'
-                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'
+                ? (incognitoClosed 
+                    ? 'bg-rose-900 text-white shadow-lg border-b-2 border-rose-950' 
+                    : 'bg-amber-600 text-white shadow-lg border-b-2 border-amber-800')
+                : (incognitoClosed 
+                    ? 'text-rose-400 hover:text-rose-300 hover:bg-rose-950/40' 
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50')
             }`}
           >
-            <span>🕵️</span>
+            <span>{incognitoClosed ? '🔒' : '🕵️'}</span>
             <span className="truncate">{isRu ? 'Инкогнито' : 'Guest'}</span>
+            {incognitoClosed && (
+              <span className="text-[8px] bg-rose-600 text-white px-1 py-0.2 rounded font-black hidden sm:inline ml-0.5">
+                {isRu ? 'Закрыт' : 'Closed'}
+              </span>
+            )}
           </button>
         </div>
 
@@ -1206,44 +1145,30 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <span>{loading ? (isRu ? 'Вход в аккаунт...' : 'Signing in...') : (isRu ? 'Войти в аккаунт' : 'Sign In')}</span>
                 </button>
 
-                {/* QUICK GOOGLE & GITHUB SIGN IN BUTTONS */}
+                {/* QUICK GOOGLE SIGN IN BUTTON */}
                 <div className="relative py-2 text-center">
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-gray-800" />
                   </div>
                   <span className="relative px-3 bg-gray-900 text-[11px] text-gray-400 font-bold uppercase tracking-wider">
-                    {isRu ? 'или войти через' : 'or continue with'}
+                    {isRu ? 'или через' : 'or continue with'}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <button
-                    type="button"
-                    onClick={handleGoogleAuth}
-                    disabled={loading}
-                    className="w-full py-3 bg-white hover:bg-gray-100 text-gray-900 font-black rounded-2xl border-b-4 border-gray-300 active:border-b-0 active:translate-y-1 transition-all text-xs uppercase tracking-wider shadow-md flex items-center justify-center space-x-2 cursor-pointer"
-                  >
-                    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                      <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z" />
-                      <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.7-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z" />
-                      <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.1c0 2.8.7 5.4 1.9 7.8l3.7-2.9z" />
-                      <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16c1.8 3.7 5.6 7 10.1 7z" />
-                    </svg>
-                    <span>Google</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleGithubAuth}
-                    disabled={loading}
-                    className="w-full py-3 bg-[#24292e] hover:bg-[#1b1f23] text-white font-black rounded-2xl border-b-4 border-black active:border-b-0 active:translate-y-1 transition-all text-xs uppercase tracking-wider shadow-md flex items-center justify-center space-x-2 cursor-pointer"
-                  >
-                    <svg className="w-4 h-4 shrink-0 fill-current" viewBox="0 0 24 24">
-                      <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
-                    </svg>
-                    <span>GitHub</span>
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={handleGoogleAuth}
+                  disabled={loading}
+                  className="w-full py-3 bg-white hover:bg-gray-100 text-gray-900 font-black rounded-2xl border-b-4 border-gray-300 active:border-b-0 active:translate-y-1 transition-all text-xs uppercase tracking-wider shadow-md flex items-center justify-center space-x-2.5 cursor-pointer"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24">
+                    <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z" />
+                    <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.7-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z" />
+                    <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.1c0 2.8.7 5.4 1.9 7.8l3.7-2.9z" />
+                    <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16c1.8 3.7 5.6 7 10.1 7z" />
+                  </svg>
+                  <span>{isRu ? 'Войти через Google' : 'Sign in with Google'}</span>
+                </button>
 
                 {/* SWITCH TO REGISTER LINK */}
                 <div className="pt-2 text-center border-t border-gray-800/80">
@@ -1483,34 +1408,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
             )}
 
-            <div className="space-y-3">
-              <button
-                type="button"
-                onClick={handleGoogleAuth}
-                disabled={loading}
-                className="w-full py-4 bg-duo-blue hover:brightness-110 disabled:opacity-50 text-white font-black rounded-2xl border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all uppercase text-xs tracking-wider shadow-lg flex items-center justify-center space-x-2.5 cursor-pointer"
-              >
-                <svg className="w-5 h-5 bg-white rounded-full p-0.5 shrink-0" viewBox="0 0 24 24">
-                  <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z" />
-                  <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.7-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z" />
-                  <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.1c0 2.8.7 5.4 1.9 7.8l3.7-2.9z" />
-                  <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16c1.8 3.7 5.6 7 10.1 7z" />
-                </svg>
-                <span>{loading ? (isRu ? 'Вход в аккаунт...' : 'Signing in...') : (isRu ? 'Войти через аккаунт Google' : 'Sign in with Google Account')}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleGithubAuth}
-                disabled={loading}
-                className="w-full py-4 bg-[#24292e] hover:bg-[#1b1f23] disabled:opacity-50 text-white font-black rounded-2xl border-b-4 border-black active:border-b-0 active:translate-y-1 transition-all uppercase text-xs tracking-wider shadow-lg flex items-center justify-center space-x-2.5 cursor-pointer"
-              >
-                <svg className="w-5 h-5 shrink-0 fill-current" viewBox="0 0 24 24">
-                  <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
-                </svg>
-                <span>{loading ? (isRu ? 'Вход в аккаунт...' : 'Signing in...') : (isRu ? 'Войти через аккаунт GitHub' : 'Sign in with GitHub Account')}</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleGoogleAuth}
+              disabled={loading}
+              className="w-full py-4 bg-duo-blue hover:brightness-110 disabled:opacity-50 text-white font-black rounded-2xl border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all uppercase text-xs tracking-wider shadow-lg flex items-center justify-center space-x-2.5 cursor-pointer"
+            >
+              <svg className="w-5 h-5 bg-white rounded-full p-0.5 shrink-0" viewBox="0 0 24 24">
+                <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z" />
+                <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.7-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z" />
+                <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.1c0 2.8.7 5.4 1.9 7.8l3.7-2.9z" />
+                <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16c1.8 3.7 5.6 7 10.1 7z" />
+              </svg>
+              <span>{loading ? (isRu ? 'Вход в аккаунт...' : 'Signing in...') : (isRu ? 'Войти через аккаунт Google' : 'Sign in with Google Account')}</span>
+            </button>
 
             {isOperationNotAllowed && (
               <button
@@ -1519,12 +1430,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 className="w-full py-3 bg-gradient-to-r from-amber-500 to-emerald-500 hover:brightness-110 text-slate-950 font-black rounded-2xl border-b-4 border-amber-700 active:border-b-0 active:translate-y-1 transition-all uppercase text-xs tracking-wider shadow-lg flex items-center justify-center space-x-2.5 cursor-pointer"
               >
                 <span>⚡</span>
-                <span>
-                  {notAllowedProvider === 'github'
-                    ? (isRu ? 'Войти локально через профиль GitHub' : 'Sign in locally as GitHub profile')
-                    : (isRu ? 'Войти локально через профиль Google' : 'Sign in locally as Google profile')
-                  }
-                </span>
+                <span>{isRu ? 'Войти локально через профиль Google' : 'Sign in locally as Google profile'}</span>
               </button>
             )}
           </div>
@@ -1534,39 +1440,205 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {/* TAB 4: INCOGNITO / GUEST */}
         {/* ========================================== */}
         {activeTab === 'incognito' && (
-          <div className="space-y-4 animate-in fade-in py-1">
-            <div className="bg-emerald-950/40 border-2 border-emerald-500/50 p-4 sm:p-5 rounded-2xl space-y-3 text-left">
-              <div className="flex items-center space-x-3">
-                <span className="text-3xl shrink-0">🕵️</span>
+          <div className="space-y-3.5 animate-in fade-in py-1">
+            {/* CLOSURE STATUS BANNER */}
+            <div className={`p-4 rounded-2xl border-2 ${
+              incognitoClosed 
+                ? 'bg-rose-950/60 border-rose-500/70 text-rose-200 shadow-[0_0_20px_rgba(244,63,94,0.2)]' 
+                : 'bg-amber-950/50 border-amber-500/70 text-amber-200 shadow-[0_0_20px_rgba(245,158,11,0.15)]'
+            } space-y-2 text-left`}>
+              <div className="flex items-center space-x-2.5">
+                <span className="text-2xl shrink-0">{incognitoClosed ? '🛑' : '⚠️'}</span>
                 <div>
-                  <h4 className="font-black text-base text-emerald-300 uppercase">
-                    {t('incognitoTitle')}
+                  <h4 className="font-black text-sm text-white uppercase tracking-wide">
+                    {incognitoClosed
+                      ? (isRu 
+                          ? 'Вход в Режим Инкогнито закрыт с 10 октября 2026 г.' 
+                          : 'Incognito Login Closed since October 10, 2026')
+                      : (isRu 
+                          ? '10 октября 2026 года вход в Режим Инкогнито закрывается!' 
+                          : 'Incognito Login closes on October 10, 2026!')}
                   </h4>
-                  <p className="text-xs text-emerald-200/80 font-bold">
-                    {t('fullIncognitoTitle')}
-                  </p>
+                  <span className="text-[11px] font-bold opacity-80 block">
+                    {incognitoClosed
+                      ? (isRu ? 'Новые сессии без аккаунта заблокированы' : 'New anonymous sessions are blocked')
+                      : (isRu ? `Осталось дней до закрытия: ${daysUntilClosure > 0 ? daysUntilClosure : 0}` : `Days remaining: ${daysUntilClosure > 0 ? daysUntilClosure : 0}`)}
+                  </span>
                 </div>
               </div>
-              <ul className="text-xs text-gray-300 font-bold space-y-1.5 pl-2 list-disc list-inside">
+              <div className="space-y-1">
+                <p className="text-xs text-amber-200 font-bold leading-relaxed">
+                  {isRu
+                    ? 'После 10 октября 2026 года Режим Инкогнито будет недоступен, и его нельзя будет восстановить в DuoWindo6601.'
+                    : 'After October 10, 2026, Incognito Mode will be unavailable and cannot be restored in DuoWindo6601.'}
+                </p>
+                <p className="text-[11px] text-gray-300 font-medium leading-relaxed">
+                  {isRu
+                    ? 'Если вы хотите сохранить какой-либо контент, мы рекомендуем заранее экспортировать данные Firebase Firestore & Auth через Раздел «Профиль» и Раздел «Настройки» или выполнить Полный Вход в систему.'
+                    : 'If you want to save any content, we recommend exporting your Firebase Firestore & Auth data in advance via the Profile and Settings sections or performing Full Sign-In.'}
+                </p>
+              </div>
+              
+              {/* STATUS CONFIRMATION PILLS */}
+              <div className="pt-1 flex flex-wrap gap-2 text-[11px] font-bold">
+                <span className="bg-emerald-950/80 text-emerald-300 border border-emerald-500/50 px-2 py-0.5 rounded-lg flex items-center space-x-1">
+                  <span>✅</span>
+                  <span>{isRu ? 'Полный Вход: НЕ ЗАКРЫТ (Работает)' : 'Full Sign-In: Active & Unclosed'}</span>
+                </span>
+                <span className="bg-amber-950/80 text-amber-300 border border-amber-500/50 px-2 py-0.5 rounded-lg flex items-center space-x-1">
+                  <span>👑</span>
+                  <span>{isRu ? 'Профиль Администратора: НЕ ЗАКРЫТ' : 'Admin Profile: Active & Unclosed'}</span>
+                </span>
+              </div>
+            </div>
+
+            {/* DATA EXPORT CARD (NEW FEATURE) */}
+            <div className="bg-gray-950/90 border-2 border-emerald-500/50 p-4 rounded-2xl space-y-3 text-left shadow-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <span className="text-xl">💾</span>
+                  <h4 className="font-black text-xs sm:text-sm text-white uppercase tracking-wide">
+                    {isRu ? 'Экспорт данных Режим Инкогнито' : 'Incognito Data Export'}
+                  </h4>
+                </div>
+                <span className="text-[10px] text-emerald-300 bg-emerald-950/90 border border-emerald-500/40 px-2 py-0.5 rounded-lg font-mono font-bold">
+                  JSON Резервная копия
+                </span>
+              </div>
+
+              <p className="text-[11px] text-gray-300 font-medium leading-relaxed">
+                {isRu
+                  ? 'Сохраните все результаты текущей гостевой сессии: пройденные уроки, заработанный XP, стрик, выученные слова и шахматную статистику.'
+                  : 'Save all your guest session progress: completed lessons, earned XP, streak, vocabulary, and chess stats.'}
+              </p>
+
+              {/* STATS PREVIEW PILLS */}
+              <div className="grid grid-cols-4 gap-1.5 text-center text-xs">
+                <div className="bg-gray-900 border border-gray-800 p-1.5 rounded-xl">
+                  <div className="font-black text-white">{user.xp || 0}</div>
+                  <div className="text-[9px] text-gray-400 font-bold uppercase">{isRu ? 'XP' : 'XP'}</div>
+                </div>
+                <div className="bg-gray-900 border border-gray-800 p-1.5 rounded-xl">
+                  <div className="font-black text-amber-400">{user.streak || 0} дн.</div>
+                  <div className="text-[9px] text-gray-400 font-bold uppercase">{isRu ? 'Стрик' : 'Streak'}</div>
+                </div>
+                <div className="bg-gray-900 border border-gray-800 p-1.5 rounded-xl">
+                  <div className="font-black text-duo-blue">{user.completedLessons?.length || 0}</div>
+                  <div className="text-[9px] text-gray-400 font-bold uppercase">{isRu ? 'Уроков' : 'Lessons'}</div>
+                </div>
+                <div className="bg-gray-900 border border-gray-800 p-1.5 rounded-xl">
+                  <div className="font-black text-emerald-400">{user.learnedWords?.length || 0}</div>
+                  <div className="text-[9px] text-gray-400 font-bold uppercase">{isRu ? 'Слов' : 'Words'}</div>
+                </div>
+              </div>
+
+              {/* EXPORT ACTION BUTTONS */}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleDownloadIncognitoData}
+                  className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow border-b-2 border-emerald-800 active:translate-y-0.5 transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+                >
+                  <span>📥</span>
+                  <span>{isRu ? 'Скачать .JSON' : 'Download .JSON'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyIncognitoData}
+                  className="py-2.5 px-3 bg-sky-600 hover:bg-sky-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow border-b-2 border-sky-800 active:translate-y-0.5 transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+                >
+                  <span>{exportCopied ? '✅' : '📋'}</span>
+                  <span>{exportCopied ? (isRu ? 'Скопировано!' : 'Copied!') : (isRu ? 'В буфер обмена' : 'To Clipboard')}</span>
+                </button>
+              </div>
+
+              {onOpenIncognitoExport && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    playSound('click');
+                    onOpenIncognitoExport();
+                  }}
+                  className="w-full py-2 bg-gray-900 hover:bg-gray-800 text-gray-300 font-bold rounded-xl border border-gray-700 transition-colors text-[11px] uppercase tracking-wider flex items-center justify-center space-x-1 cursor-pointer"
+                >
+                  <span>🔍</span>
+                  <span>{isRu ? 'Подробный просмотр и управление экспортом' : 'Detailed Export Viewer'}</span>
+                </button>
+              )}
+
+              {onOpenFirebaseExport && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    playSound('click');
+                    onOpenFirebaseExport();
+                  }}
+                  className="w-full py-2 bg-gradient-to-r from-amber-600/30 to-orange-600/30 hover:from-amber-600/50 hover:to-orange-600/50 text-amber-300 font-bold rounded-xl border border-amber-500/40 transition-colors text-[11px] uppercase tracking-wider flex items-center justify-center space-x-1 cursor-pointer"
+                >
+                  <span>🔥</span>
+                  <span>{isRu ? 'Экспорт данных Firebase Firestore & Auth' : 'Export Firebase Firestore & Auth'}</span>
+                </button>
+              )}
+            </div>
+
+            {/* INCOGNITO RULES & LIMITS LIST */}
+            <div className="bg-gray-950/60 border border-gray-800 p-3.5 rounded-2xl space-y-2 text-left">
+              <h5 className="font-bold text-xs text-gray-300 uppercase tracking-wide">
+                {t('incognitoTitle')}
+              </h5>
+              <ul className="text-xs text-gray-400 font-medium space-y-1 pl-2 list-disc list-inside">
                 <li>{t('noSignupPasswordsRule')}</li>
                 <li>{t('allProgressLocalRule')}</li>
-                <li>{t('canRegisterAnytimeRule')}</li>
-                <li className="text-amber-300 font-extrabold">
+                <li className="text-amber-300/90 font-bold">
                   {isRu 
-                    ? '🔒 Ограничение: Подписки Super и Max требуют создания аккаунта' 
-                    : '🔒 Restriction: Super & Max subscriptions require an account'}
+                    ? '🔒 Подписки Super/Max и глобальная лига требуют Полный Вход' 
+                    : '🔒 Super/Max subscriptions & leagues require Full Sign-In'}
                 </li>
               </ul>
             </div>
 
-            <button
-              type="button"
-              onClick={handleContinueIncognito}
-              className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all uppercase text-xs tracking-wider shadow-lg flex items-center justify-center space-x-2 cursor-pointer"
-            >
-              <span>🕵️</span>
-              <span>{t('continueGuestBtn')}</span>
-            </button>
+            {/* MAIN ACTION: CONTINUE OR SWITCH TO FULL LOGIN */}
+            {incognitoClosed ? (
+              <div className="space-y-2 pt-1">
+                <button
+                  type="button"
+                  disabled
+                  className="w-full py-3.5 bg-gray-900 border-2 border-rose-500/50 text-rose-300 font-black rounded-2xl text-xs uppercase tracking-wider flex items-center justify-center space-x-2 cursor-not-allowed opacity-80"
+                >
+                  <span>🛑</span>
+                  <span>{isRu ? 'Вход в Инкогнито закрыт с 10 октября 2026 г.' : 'Incognito Entry Closed since Oct 10, 2026'}</span>
+                </button>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { playSound('click'); setActiveTab('login'); }}
+                    className="w-full py-3 bg-duo-blue hover:brightness-110 text-white font-black rounded-2xl border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all uppercase text-xs tracking-wider shadow-lg flex items-center justify-center space-x-1.5 cursor-pointer"
+                  >
+                    <span>🔑</span>
+                    <span>{isRu ? 'Полный Вход (Email / Никнейм)' : 'Full Sign-In'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { playSound('click'); setActiveTab('register'); }}
+                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all uppercase text-xs tracking-wider shadow-lg flex items-center justify-center space-x-1.5 cursor-pointer"
+                  >
+                    <span>📝</span>
+                    <span>{isRu ? 'Создать аккаунт (Регистрация)' : 'Create Account'}</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleContinueIncognito}
+                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all uppercase text-xs tracking-wider shadow-lg flex items-center justify-center space-x-2 cursor-pointer"
+              >
+                <span>🕵️</span>
+                <span>{t('continueGuestBtn')}</span>
+              </button>
+            )}
 
             {onOpenIncognitoRestrictions && (
               <button
@@ -1575,7 +1647,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   playSound('click');
                   onOpenIncognitoRestrictions();
                 }}
-                className="w-full py-3 bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 font-bold rounded-2xl border border-amber-500/50 transition-all text-xs uppercase tracking-wider flex items-center justify-center space-x-2 shadow-md cursor-pointer"
+                className="w-full py-2.5 bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 font-bold rounded-2xl border border-amber-500/40 transition-all text-xs uppercase tracking-wider flex items-center justify-center space-x-2 shadow cursor-pointer"
               >
                 <span>🚫</span>
                 <span>{isRu ? 'Что заблокировано в Инкогнито? (8 функций)' : 'What is blocked in Incognito? (8 features)'}</span>
@@ -1586,13 +1658,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         {/* FOOTER QUICK LINK */}
         <div className="pt-2 text-center border-t border-gray-800 flex items-center justify-between text-xs text-gray-400 font-medium">
-          <button
-            type="button"
-            onClick={handleContinueIncognito}
-            className="hover:text-white transition-colors underline cursor-pointer"
-          >
-            {t('skipContinueIncognitoBtn')}
-          </button>
+          {incognitoClosed ? (
+            <button
+              type="button"
+              onClick={() => { playSound('click'); setActiveTab('login'); }}
+              className="text-amber-400 hover:text-amber-300 font-bold transition-colors underline cursor-pointer flex items-center space-x-1"
+            >
+              <span>🔑</span>
+              <span>{isRu ? 'Вход без аккаунта закрыт с 10.10.2026 — Выполнить Полный Вход' : 'Entry without account is closed — Use Full Sign-In'}</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleContinueIncognito}
+              className="hover:text-white transition-colors underline cursor-pointer"
+            >
+              {t('skipContinueIncognitoBtn')}
+            </button>
+          )}
           <span className="text-[11px] text-gray-500">DuoWindo 6601 v1.0.2</span>
         </div>
 

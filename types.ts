@@ -144,7 +144,7 @@ export interface UserProgress {
   hideEmail?: boolean;
   link?: string;
   hideLink?: boolean;
-  authProvider?: 'email' | 'google' | 'github' | 'guest';
+  authProvider?: 'email' | 'google' | 'guest';
   isAdmin?: boolean;
   role?: 'admin' | 'owner' | 'developer' | 'user' | string;
   avatarColor: string;
@@ -184,11 +184,34 @@ export interface UserProgress {
   lastSyncedAt?: string;
   customApiKey?: string;
   customApiKeyType?: 'free' | 'paid';
+  theme?: 'light' | 'dark' | 'system';
+  preventAccountDeletion?: boolean;
+  placementTests?: Record<string, { moduleIndex: number; score: number; completedAt: string }>;
   chessStats?: {
     games: number;
     wins: number;
     elo: number;
   };
+}
+
+export interface PlacementQuestion {
+  id: string;
+  level: 'A1' | 'A2' | 'B1' | 'B2';
+  question: string;
+  questionRu?: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+}
+
+export interface PlacementResult {
+  courseId: string;
+  score: number;
+  total: number;
+  percentage: number;
+  suggestedModule: number;
+  levelTitle: string;
+  levelDescription: string;
 }
 
 export interface LeaderboardEntry {

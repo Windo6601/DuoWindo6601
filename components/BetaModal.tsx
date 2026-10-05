@@ -233,6 +233,33 @@ export const BetaModal: React.FC<BetaModalProps> = ({
               </div>
             </button>
 
+            {/* Quick Theme Switcher */}
+            <button
+              onClick={() => {
+                playSound('click');
+                const isCurrentLight = user.theme === 'light' || (!user.theme && user.nightMode === false);
+                const nextTheme = isCurrentLight ? 'dark' : 'light';
+                setUser(prev => ({
+                  ...prev,
+                  theme: nextTheme,
+                  nightMode: nextTheme === 'dark'
+                }));
+              }}
+              className="p-4 bg-gray-800/80 hover:bg-gray-750 border border-gray-700 hover:border-amber-400/50 rounded-2xl text-left transition-all group hover:scale-[1.02] shadow-md flex items-start space-x-3 cursor-pointer"
+            >
+              <div className="text-2xl p-2 bg-black/40 rounded-xl border border-gray-700">
+                {user.theme === 'light' || (!user.theme && user.nightMode === false) ? '☀️' : '🌙'}
+              </div>
+              <div>
+                <span className="font-black text-sm block text-gray-200 group-hover:text-white">
+                  {user.theme === 'light' || (!user.theme && user.nightMode === false) ? 'Тема: Светлая (Клик для Тёмной)' : 'Тема: Тёмная (Клик для Светлой)'}
+                </span>
+                <span className="text-[11px] text-gray-400 font-medium block mt-0.5">
+                  Быстрое переключение оформления интерфейса
+                </span>
+              </div>
+            </button>
+
           </div>
         </div>
 

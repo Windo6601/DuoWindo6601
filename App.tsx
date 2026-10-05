@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import confetti from 'canvas-confetti';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth, db, googleProvider, githubProvider, handleFirestoreError, OperationType } from './firebase';
+import { auth, db, googleProvider, handleFirestoreError, OperationType } from './firebase';
 import { AppScreen, Exercise, UserProgress, Course, WordToken, LeaderboardEntry, SubscriptionTier, RoleplayMessage } from './types';
 import { Chess, Square } from 'chess.js';
 import { generateExercise, checkAnswerWithAI, pingGeminiApi, speakText, startRoleplay, replyToRoleplay, generateIllusion, generateDrawing, checkDrawing, getFallbackExercise, getChessMove, getChessChatReply, translateText, getMistakeExplanation, generateLocalMistakeExplanation, generateIshihara, generateInterviewQuestion, getInterviewHint, generateReading, generateVideoCallRoleplayResponse } from './services/geminiService';
@@ -29,6 +29,21 @@ import { SupportChatScreen } from './components/SupportChatScreen';
 import { ActivityChart } from './components/ActivityChart';
 import { VocabularyBank } from './components/VocabularyBank';
 import { IncognitoRestrictionsModal } from './components/IncognitoRestrictionsModal';
+import { IncognitoDataExportModal } from './components/IncognitoDataExportModal';
+import { FirebaseExportModal } from './components/FirebaseExportModal';
+import { DataDeletionModal, isUserAdminAccount } from './components/DataDeletionModal';
+import { DataTransferExpertModal } from './components/DataTransferExpertModal';
+import { PlacementTestModal } from './components/PlacementTestModal';
+import { 
+  downloadFirebaseExportFile, 
+  copyFirebaseExportToClipboard 
+} from './services/firebaseExportService';
+import { 
+  isIncognitoLoginClosed, 
+  getDaysUntilIncognitoClosure, 
+  getFormattedClosureDate, 
+  downloadIncognitoDataFile 
+} from './services/incognitoService';
 import { AiLimitModal } from './components/AiLimitModal';
 import { AiLimitSection } from './components/AiLimitSection';
 import { GeminiRefillSection } from './components/GeminiRefillSection';
@@ -2782,9 +2797,10 @@ const TRANSLATIONS: Record<string, any> = {
   }
 };
 
-const sanitizeForFirestore = (obj: any) => {
+const sanitizeForFirestore = (obj: any, isUpdate = false) => {
   const cleaned: any = {};
   for (const key of Object.keys(obj)) {
+    if (isUpdate && key === 'createdAt') continue;
     if (obj[key] !== undefined) {
       cleaned[key] = obj[key];
     }
@@ -3056,7 +3072,7 @@ const getTodayChallenge = () => {
         await setDoc(userRef, sanitizeForFirestore({
           ...user,
           updatedAt: serverTimestamp()
-        }), { merge: true });
+        }, true), { merge: true });
         setLastSyncTime(nowStr);
         localStorage.setItem('duo_last_synced_time_6601', nowStr);
         setToast(user.language === 'ru' ? `☁️ Облачная синхронизация Firestore завершена (${nowStr})` : `☁️ Cloud sync completed with Firestore (${nowStr})`);
@@ -3102,14 +3118,12 @@ const getTodayChallenge = () => {
             const cleanName = user.name && user.name !== "Ученик 6601" && !user.name.includes("Гость")
               ? user.name
               : (fUser.displayName || (fUser.email ? fUser.email.split('@')[0] : 'Ученик 6601'));
-            const providerId = fUser.providerData?.[0]?.providerId;
-            const detectedProvider = providerId === 'google.com' ? 'google' : (providerId === 'github.com' ? 'github' : 'email');
             const newUserProfile = {
               ...user,
               name: cleanName,
               username: cleanUsername,
               email: fUser.email || user.email || '',
-              authProvider: detectedProvider as 'google' | 'github' | 'email',
+              authProvider: (fUser.providerData?.[0]?.providerId === 'google.com' ? 'google' : 'email') as 'google' | 'email',
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp()
             };
@@ -3142,7 +3156,7 @@ const getTodayChallenge = () => {
           await setDoc(userRef, sanitizeForFirestore({
             ...user,
             updatedAt: serverTimestamp()
-          }), { merge: true });
+          }, true), { merge: true });
         } catch (err) {
           console.error("Error updating profile in Firestore:", err);
           handleFirestoreError(err, OperationType.UPDATE, `users/${firebaseUser.uid}`);
@@ -3170,28 +3184,6 @@ const getTodayChallenge = () => {
         setToast("Окно авторизации было закрыто или заблокировано. Пожалуйста, разрешите всплывающие окна или откройте в новой вкладке.");
       } else {
         setToast("Ошибка входа: " + (err instanceof Error ? err.message : String(err)));
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGithubSignIn = async () => {
-    playSound('click');
-    setLoading(true);
-    try {
-      await signInWithPopup(auth, githubProvider);
-    } catch (err: any) {
-      console.error("Error signing in with GitHub:", err);
-      const errMsg = err?.code || err?.message || String(err);
-      if (
-        errMsg.includes('auth/cancelled-popup-request') || 
-        errMsg.includes('popup-closed-by-user') || 
-        errMsg.includes('popup-blocked')
-      ) {
-        setToast("Окно авторизации GitHub было закрыто или заблокировано. Пожалуйста, разрешите всплывающие окна или откройте в новой вкладке.");
-      } else {
-        setToast("Ошибка входа GitHub: " + (err instanceof Error ? err.message : String(err)));
       }
     } finally {
       setLoading(false);
@@ -3365,7 +3357,163 @@ const getTodayChallenge = () => {
   // Registration, Login & Incognito Auth Modal states & handlers
   const [showRegisterModal, setShowRegisterModal] = useState<boolean>(false);
   const [showIncognitoRestrictionsModal, setShowIncognitoRestrictionsModal] = useState<boolean>(false);
+  const [showIncognitoExportModal, setShowIncognitoExportModal] = useState<boolean>(false);
+  const [showFirebaseExportModal, setShowFirebaseExportModal] = useState<boolean>(false);
   const [regInitialTab, setRegInitialTab] = useState<'login' | 'register' | 'google' | 'incognito'>('register');
+
+  const incognitoClosed = isIncognitoLoginClosed();
+  const daysUntilClosure = getDaysUntilIncognitoClosure();
+  const closureDateLabel = getFormattedClosureDate(user.language);
+
+  // New features modal states (Deletion, Transfer Expert, Placement Test)
+  const [showDataDeletionModal, setShowDataDeletionModal] = useState<boolean>(false);
+  const [showDataTransferModal, setShowDataTransferModal] = useState<boolean>(false);
+  const [showPlacementTestModal, setShowPlacementTestModal] = useState<boolean>(false);
+  const [placementCourse, setPlacementCourse] = useState<Course | null>(null);
+
+  // Synchronized theme detection (light vs dark mode)
+  const isLightMode = useMemo(() => {
+    const theme = user.theme;
+    if (theme === 'light') return true;
+    if (theme === 'dark') return false;
+    if (user.nightMode === false) return true;
+    if (user.nightMode === true) return false;
+    if (theme === 'system' && typeof window !== 'undefined' && window.matchMedia) {
+      return !window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return false;
+  }, [user.theme, user.nightMode]);
+
+  // Global Theme Effect (Syncs light/dark/system theme to HTML & body classes)
+  useEffect(() => {
+    if (isLightMode) {
+      document.documentElement.classList.add('light', 'theme-light');
+      document.documentElement.classList.remove('dark');
+      document.body.classList.add('theme-light');
+      document.documentElement.setAttribute('data-theme', 'light');
+    } else {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light', 'theme-light');
+      document.body.classList.remove('theme-light');
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  }, [isLightMode]);
+
+  // Instant one-click toggle between Light and Dark mode with sound & toast
+  const toggleTheme = () => {
+    playSound('click');
+    const nextTheme: 'light' | 'dark' = isLightMode ? 'dark' : 'light';
+    setUser(prev => {
+      const updated: UserProgress = {
+        ...prev,
+        theme: nextTheme,
+        nightMode: nextTheme === 'dark'
+      };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    setToast(nextTheme === 'light' 
+      ? (user.language === 'ru' ? '☀️ Светлая тема включена' : '☀️ Light mode enabled') 
+      : (user.language === 'ru' ? '🌙 Тёмная тема включена' : '🌙 Dark mode enabled')
+    );
+  };
+
+  // Permanently delete all local application data (double confirmation)
+  const handleWipeAllLocalData = () => {
+    // If admin account - strictly prohibited
+    if (isUserAdminAccount(user, firebaseUser)) {
+      playSound('wrong');
+      setToast(
+        user.language === 'ru'
+          ? '⛔ Запрещено: аккаунт и данные администрации защищены от удаления!'
+          : '⛔ Prohibited: Administration account and data are protected from deletion!'
+      );
+      setShowDataDeletionModal(false);
+      return;
+    }
+
+    // If user enabled protection toggle
+    if (user.preventAccountDeletion) {
+      playSound('wrong');
+      setToast(
+        user.language === 'ru'
+          ? '🔒 Защита включена! Удаление аккаунта и локальных данных заблокировано в настройках.'
+          : '🔒 Deletion blocked by protection setting in Profile / Settings.'
+      );
+      setShowDataDeletionModal(false);
+      return;
+    }
+
+    // Reset local data
+    localStorage.removeItem(STORAGE_KEY);
+    sessionStorage.clear();
+    const cleanUser: UserProgress = {
+      name: user.language === 'ru' ? 'Новый ученик' : 'New Learner',
+      avatarColor: 'bg-duo-blue',
+      energy: 25,
+      hearts: 5,
+      streak: 0,
+      gems: 100,
+      xp: 0,
+      currentUnit: 1,
+      completedLessons: [],
+      mistakes: [],
+      learnedWords: [],
+      achievements: [],
+      subscription: 'free',
+      language: user.language || 'ru',
+      country: user.country || 'Russia',
+      theme: user.theme || 'dark',
+      preventAccountDeletion: false,
+    };
+
+    setUser(cleanUser);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanUser));
+    setShowDataDeletionModal(false);
+    setScreen(AppScreen.PATH);
+    playSound('correct');
+    setToast(
+      user.language === 'ru'
+        ? '🗑️ Все локальные данные приложения успешно безвозвратно удалены'
+        : '🗑️ All local application data has been permanently wiped'
+    );
+  };
+  const handleQuickDownloadFirebase = async () => {
+    playSound('correct');
+    try {
+      const filename = await downloadFirebaseExportFile(user, firebaseUser);
+      setToast(
+        user.language === 'ru'
+          ? `🔥 Экспорт Firebase сохранён: ${filename}`
+          : `🔥 Firebase export saved: ${filename}`
+      );
+    } catch {
+      playSound('wrong');
+      setToast(user.language === 'ru' ? '❌ Ошибка при скачивании файла' : '❌ Failed to download file');
+    }
+  };
+
+  const handleQuickCopyFirebase = async () => {
+    playSound('click');
+    try {
+      const success = await copyFirebaseExportToClipboard(user, firebaseUser);
+      if (success) {
+        setToast(
+          user.language === 'ru'
+            ? '📋 Данные Firebase Firestore & Auth скопированы в буфер!'
+            : '📋 Firebase Firestore & Auth data copied to clipboard!'
+        );
+      } else {
+        playSound('wrong');
+        setToast(user.language === 'ru' ? '❌ Не удалось скопировать данные' : '❌ Failed to copy data');
+      }
+    } catch {
+      playSound('wrong');
+      setToast(user.language === 'ru' ? '❌ Ошибка копирования' : '❌ Copy failed');
+    }
+  };
 
   // AI Daily Limit Modal states & handlers
   const [isAiLimitModalOpen, setIsAiLimitModalOpen] = useState<boolean>(false);
@@ -3509,7 +3657,7 @@ const getTodayChallenge = () => {
         await setDoc(userRef, sanitizeForFirestore({
           ...updatedUser,
           updatedAt: serverTimestamp()
-        }), { merge: true });
+        }, true), { merge: true });
       } catch (err) {
         console.error("Error saving updated profile to Firestore:", err);
       }
@@ -4326,7 +4474,11 @@ const getTodayChallenge = () => {
   
   const handleExplainMistake = async () => {
     playSound('click');
-    if (user.subscription !== 'max') {
+    const isOffline = offlineMode || (typeof navigator !== 'undefined' && !navigator.onLine);
+
+    // In online mode without MAX subscription, invite user to upgrade to MAX.
+    // In offline mode or with MAX, allow accessing the answer explanation immediately!
+    if (!isOffline && user.subscription !== 'max') {
       if (isIncognitoUser) {
         setToast(
           user.language === 'ru'
@@ -4347,18 +4499,23 @@ const getTodayChallenge = () => {
     setShowExplanationModal(true);
     if (explanation) return;
     setExplanationLoading(true);
+
     let userAnswer = "";
     if (currentExercise.type === 'speech') userAnswer = transcriptRef.current || "(No speech detected)";
     else if (currentExercise.type === 'ishihara') userAnswer = ishiharaInput || "No input";
-    else userAnswer = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text).join(' ');
+    else if (selectedWordIds.length > 0) userAnswer = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text).join(' ');
+    else if (feedback.status === 'correct') userAnswer = currentExercise.targetTranslation;
+
+    const isCorrect = feedback.status === 'correct';
     const correctAnswer = currentExercise.type === 'speech' ? currentExercise.originalSentence : currentExercise.targetTranslation;
     const original = currentExercise.type === 'ishihara' ? "Ishihara Test" : currentExercise.originalSentence;
     const userLang = user.language === 'en' ? 'English' : 'Russian';
+
     try {
-      const explanationText = await getMistakeExplanation(original, userAnswer, correctAnswer, userLang);
-      setExplanation(explanationText);
+      const explanationText = await getMistakeExplanation(original, userAnswer, correctAnswer, userLang, isCorrect, currentExercise.type, isOffline);
+      setExplanation(explanationText || generateLocalMistakeExplanation(original, userAnswer, correctAnswer, userLang, isCorrect, currentExercise.type));
     } catch (e) {
-      setExplanation(generateLocalMistakeExplanation(original, userAnswer, correctAnswer, userLang));
+      setExplanation(generateLocalMistakeExplanation(original, userAnswer, correctAnswer, userLang, isCorrect, currentExercise.type));
     } finally {
       setExplanationLoading(false);
     }
@@ -4391,6 +4548,8 @@ const getTodayChallenge = () => {
     setLoading(true);
     setScreen(AppScreen.LESSON);
     setFeedback({ status: 'idle', message: '' });
+    setExplanation('');
+    setShowExplanationModal(false);
     setSelectedWordIds([]);
     setPaths([]);
     setIshiharaInput("");
@@ -4519,7 +4678,7 @@ const getTodayChallenge = () => {
   const handleNavigation = (s: AppScreen) => { playSound('screen_transition'); setScreen(s); };
 
   const ChessNavIcon: React.FC<{ className?: string }> = ({ className }) => (
-    <ChessPieceIcon type="n" color="b" className={className} />
+    <ChessPieceIcon type="n" color={isLightMode ? 'w' : 'b'} className={className} />
   );
 
   const NAV_ITEMS = [
@@ -4547,24 +4706,47 @@ const getTodayChallenge = () => {
 
     return (
       <div className={simulatorMode === 'none' 
-        ? `${user.nightMode ? 'bg-[#08080d] brightness-95' : 'bg-duo-dark'} min-h-screen text-white flex flex-col lg:flex-row font-din selection:bg-duo-blue/30 overflow-x-hidden w-full transition-colors duration-500`
-        : `w-full h-full text-white flex flex-col font-din selection:bg-duo-blue/30 overflow-y-auto no-scrollbar relative ${user.nightMode ? 'bg-[#08080d] brightness-95' : 'bg-duo-dark'} transition-colors duration-500`
+        ? `${isLightMode ? 'bg-[#F0F2F5] text-slate-900' : (user.nightMode ? 'bg-[#08080d] brightness-95 text-white' : 'bg-duo-dark text-white')} min-h-screen flex flex-col lg:flex-row font-din selection:bg-duo-blue/30 overflow-x-hidden w-full transition-colors duration-500`
+        : `w-full h-full ${isLightMode ? 'bg-[#F0F2F5] text-slate-900' : (user.nightMode ? 'bg-[#08080d] brightness-95 text-white' : 'bg-duo-dark text-white')} flex flex-col font-din selection:bg-duo-blue/30 overflow-y-auto no-scrollbar relative transition-colors duration-500`
       }>
       {/* SIDEBAR */}
-      <aside className={isSimulatingMobile ? "hidden" : "hidden lg:flex flex-col w-64 fixed left-0 h-full border-r border-gray-800 p-6 z-50 bg-duo-dark"}>
-        <h1 className="text-3xl font-black text-duo-green mb-10 italic tracking-tighter font-din">DUOWINDO</h1>
-        <nav className="space-y-2">
+      <aside className={isSimulatingMobile ? "hidden" : `hidden lg:flex flex-col w-64 fixed left-0 h-full border-r ${isLightMode ? 'border-slate-200 bg-white shadow-sm' : 'border-gray-800 bg-duo-dark'} p-6 z-50 overflow-y-auto no-scrollbar transition-colors`}>
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-3xl font-black text-duo-green italic tracking-tighter font-din">DUOWINDO</h1>
+          <button
+            onClick={toggleTheme}
+            className={`p-2 rounded-xl border transition-all cursor-pointer ${
+              isLightMode
+                ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300 shadow-sm'
+                : 'bg-gray-800/80 hover:bg-gray-700 text-indigo-300 border-gray-700'
+            }`}
+            title={isLightMode ? 'Светлая тема (клик для тёмной)' : 'Тёмная тема (клик для светлой)'}
+          >
+            <span className="text-base select-none">{isLightMode ? '☀️' : '🌙'}</span>
+          </button>
+        </div>
+        <nav className="space-y-1.5 flex-1">
           {NAV_ITEMS.map(item => {
             const todayStr = new Date().toISOString().split('T')[0];
             const isTodayChallengePending = item.screen === AppScreen.PATH && 
               user.dailyChallengeCompletedDate !== todayStr && 
               dailyChallengeDismissedDate !== todayStr;
             return (
-              <button key={item.screen} onClick={() => handleNavigation(item.screen)} className={`flex items-center space-x-4 w-full px-4 py-4 rounded-2xl border-2 transition-all relative ${screen === item.screen ? 'bg-duo-blue/10 border-duo-blue/40 text-duo-blue' : 'border-transparent text-gray-500 hover:bg-white/5 hover:text-white'}`}>
+              <button 
+                key={item.screen} 
+                onClick={() => handleNavigation(item.screen)} 
+                className={`flex items-center space-x-4 w-full px-4 py-3.5 rounded-2xl border-2 transition-all relative cursor-pointer ${
+                  screen === item.screen 
+                    ? 'bg-duo-blue/10 border-duo-blue/40 text-duo-blue font-black' 
+                    : isLightMode 
+                      ? 'border-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900' 
+                      : 'border-transparent text-gray-400 hover:bg-white/5 hover:text-white'
+                }`}
+              >
                 <div className="relative">
                   <item.icon className="w-6 h-6" />
                   {isTodayChallengePending && (
-                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-duo-orange rounded-full border-2 border-duo-dark animate-pulse" />
+                    <span className={`absolute -top-1 -right-1 w-2.5 h-2.5 bg-duo-orange rounded-full border-2 ${isLightMode ? 'border-white' : 'border-duo-dark'} animate-pulse`} />
                   )}
                 </div>
                 <span className="font-bold text-xs uppercase tracking-widest">{item.label}</span>
@@ -4572,24 +4754,45 @@ const getTodayChallenge = () => {
             );
           })}
           {isIncognitoUser && (
-            <button
-              onClick={openIncognitoRestrictionsModal}
-              className="flex items-center space-x-3 w-full px-4 py-3 rounded-2xl border border-amber-500/40 bg-amber-950/30 hover:bg-amber-900/50 text-amber-300 transition-all text-left shadow-inner mt-4 group cursor-pointer"
-              title="Режим Ограничения в Инкогнито (8 функций заблокировано)"
-            >
-              <span className="text-xl group-hover:scale-110 transition-transform">🚫</span>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <span className="font-black text-[11px] uppercase tracking-wider block leading-tight text-amber-200">
-                    {user.language === 'ru' ? 'Ограничения' : 'Restrictions'}
+            <>
+              <button
+                onClick={openIncognitoRestrictionsModal}
+                className="flex items-center space-x-3 w-full px-4 py-3 rounded-2xl border border-amber-500/40 bg-amber-950/30 hover:bg-amber-900/50 text-amber-300 transition-all text-left shadow-inner mt-4 group cursor-pointer"
+                title="Режим Ограничения в Инкогнито (8 функций заблокировано)"
+              >
+                <span className="text-xl group-hover:scale-110 transition-transform">🚫</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="font-black text-[11px] uppercase tracking-wider block leading-tight text-amber-200">
+                      {user.language === 'ru' ? 'Ограничения' : 'Restrictions'}
+                    </span>
+                    <span className="bg-amber-500 text-black text-[9px] font-black px-1.5 py-0.5 rounded-full">8</span>
+                  </div>
+                  <span className="text-[10px] text-amber-400/70 font-bold block truncate">
+                    {user.language === 'ru' ? 'Что заблокировано' : 'Blocked features'}
                   </span>
-                  <span className="bg-amber-500 text-black text-[9px] font-black px-1.5 py-0.5 rounded-full">8</span>
                 </div>
-                <span className="text-[10px] text-amber-400/70 font-bold block truncate">
-                  {user.language === 'ru' ? 'Что заблокировано' : 'Blocked features'}
-                </span>
-              </div>
-            </button>
+              </button>
+
+              <button
+                onClick={() => {
+                  playSound('click');
+                  setShowIncognitoExportModal(true);
+                }}
+                className="flex items-center space-x-3 w-full px-4 py-2.5 rounded-2xl border border-emerald-500/40 bg-emerald-950/30 hover:bg-emerald-900/50 text-emerald-300 transition-all text-left shadow-inner mt-2 group cursor-pointer"
+                title="Экспорт данных Режим Инкогнито (Без аккаунта)"
+              >
+                <span className="text-xl group-hover:scale-110 transition-transform">💾</span>
+                <div className="flex-1 min-w-0">
+                  <span className="font-black text-[11px] uppercase tracking-wider block leading-tight text-emerald-200">
+                    {user.language === 'ru' ? 'Экспорт данных' : 'Export Data'}
+                  </span>
+                  <span className="text-[10px] text-emerald-400/70 font-bold block truncate">
+                    {user.language === 'ru' ? 'Резервная копия .JSON' : '.JSON Backup'}
+                  </span>
+                </div>
+              </button>
+            </>
           )}
         </nav>
       </aside>
@@ -4597,7 +4800,7 @@ const getTodayChallenge = () => {
       <main className={isSimulatingMobile ? "flex-1 relative pb-44 min-h-screen w-full" : "flex-1 lg:ml-64 relative pb-44 lg:pb-0 min-h-screen"}>
         {/* HEADER */}
         {screen !== AppScreen.LESSON && screen !== AppScreen.VIDEO_CALL && (
-          <header className="sticky top-0 z-40 bg-duo-dark/95 backdrop-blur-md p-2.5 sm:p-4 border-b border-gray-800 flex flex-col space-y-2 sm:space-y-4 shadow-xl">
+          <header className={`sticky top-0 z-40 ${isLightMode ? 'bg-white/95 border-slate-200' : 'bg-duo-dark/95 border-gray-800'} backdrop-blur-md p-2.5 sm:p-4 border-b flex flex-col space-y-2 sm:space-y-4 shadow-sm transition-colors`}>
              <div className="flex justify-between items-center max-w-5xl mx-auto w-full">
                 <div className="flex items-center space-x-3 sm:space-x-5">
                   <div className="flex items-center text-duo-red font-bold text-sm sm:text-lg"><FireIcon className="w-5 h-5 sm:w-6 sm:h-6 mr-1" /> {user.streak}</div>
@@ -4606,23 +4809,40 @@ const getTodayChallenge = () => {
                 </div>
                  <div className="flex items-center space-x-2">
                     {isIncognitoUser ? (
-                      <button 
-                        onClick={() => openRegisterModal('register')} 
-                        className="px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/50 hover:scale-105 transition-all flex items-center space-x-1.5 shadow-md cursor-pointer"
-                        title="Режим Инкогнито (Без аккаунта) — Нажмите для регистрации"
-                      >
-                        <span>🕵️</span>
-                        <span className="hidden sm:inline">
-                          {t('incognito')}
-                        </span>
-                        <span className="text-[10px] bg-emerald-500/30 text-emerald-200 px-1.5 py-0.5 rounded-md font-bold">
-                          {user.username ? `@${user.username}` : 'Гость'}
-                        </span>
-                      </button>
+                      <>
+                        <button 
+                          onClick={() => openRegisterModal('register')} 
+                          className="px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/50 hover:scale-105 transition-all flex items-center space-x-1.5 shadow-md cursor-pointer"
+                          title="Режим Инкогнито (Без аккаунта) — Нажмите для регистрации"
+                        >
+                          <span>🕵️</span>
+                          <span className="hidden sm:inline">
+                            {t('incognito')}
+                          </span>
+                          <span className="text-[10px] bg-emerald-500/30 text-emerald-200 px-1.5 py-0.5 rounded-md font-bold">
+                            {user.username ? `@${user.username}` : 'Гость'}
+                          </span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            playSound('click');
+                            setShowIncognitoExportModal(true);
+                          }}
+                          className="px-2.5 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider bg-sky-950/80 hover:bg-sky-900 text-sky-300 border border-sky-500/50 hover:scale-105 transition-all flex items-center space-x-1 shadow-md cursor-pointer"
+                          title="Экспорт данных Режим Инкогнито (Без аккаунта)"
+                        >
+                          <span>💾</span>
+                          <span className="hidden sm:inline">{user.language === 'ru' ? 'Экспорт' : 'Export'}</span>
+                        </button>
+                      </>
                     ) : (
                       <button 
                         onClick={() => openRegisterModal('register')} 
-                        className="px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider bg-gray-800 hover:bg-gray-700 text-white border border-gray-700 hover:scale-105 transition-all flex items-center space-x-1 shadow-md cursor-pointer"
+                        className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider ${
+                          isLightMode 
+                            ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300' 
+                            : 'bg-gray-800 hover:bg-gray-700 text-white border-gray-700'
+                        } border hover:scale-105 transition-all flex items-center space-x-1 shadow-md cursor-pointer`}
                         title="Регистрация / Вход / Инкогнито"
                       >
                         <span>👤</span>
@@ -4639,7 +4859,9 @@ const getTodayChallenge = () => {
                         ? "bg-red-950/80 hover:bg-red-900 text-red-300 border-red-500/60 animate-pulse"
                         : systemInfo.warningType === "old_browser"
                           ? "bg-amber-950/80 hover:bg-amber-900 text-amber-300 border-amber-500/60"
-                          : "bg-gray-800/80 hover:bg-gray-700 text-emerald-400 border-gray-700"
+                          : isLightMode
+                            ? "bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300"
+                            : "bg-gray-800/80 hover:bg-gray-700 text-emerald-400 border-gray-700"
                     }`}
                     title="Информация о системе и ОС (Windows 7/8/8.1/10/11 & XP/Vista)"
                   >
@@ -4653,7 +4875,27 @@ const getTodayChallenge = () => {
                     </span>
                   </button>
 
-{/* QUICK LANGUAGE SWITCHER */}
+                  {/* QUICK THEME TOGGLE BUTTON (☀️ Светлая / 🌙 Тёмная) */}
+                  <button
+                    onClick={toggleTheme}
+                    className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center space-x-1.5 shadow-md cursor-pointer border hover:scale-105 active:scale-95 ${
+                      isLightMode
+                        ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300 ring-1 ring-amber-300/60 shadow-amber-200/50'
+                        : 'bg-indigo-950/80 hover:bg-indigo-900 text-indigo-200 border-indigo-500/50 shadow-indigo-950/50'
+                    }`}
+                    title={user.language === 'ru' 
+                      ? (isLightMode ? 'Светлая тема (нажмите для переключения на тёмную)' : 'Тёмная тема (нажмите для переключения на светлую)') 
+                      : (isLightMode ? 'Light theme (click for dark)' : 'Dark theme (click for light)')}
+                  >
+                    <span className="text-sm select-none">{isLightMode ? '☀️' : '🌙'}</span>
+                    <span className="hidden sm:inline font-black">
+                      {user.language === 'ru' 
+                        ? (isLightMode ? 'Светлая' : 'Тёмная') 
+                        : (isLightMode ? 'Light' : 'Dark')}
+                    </span>
+                  </button>
+
+                  {/* QUICK LANGUAGE SWITCHER */}
                     <div className="relative group">
                       <button 
                         onClick={() => {
@@ -4662,7 +4904,11 @@ const getTodayChallenge = () => {
                           const nextIdx = (langs.indexOf(user.language) + 1) % langs.length;
                           setUser({ ...user, language: langs[nextIdx] as any });
                         }}
-                        className="px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider bg-duo-blue/20 hover:bg-duo-blue/30 text-duo-blue border border-duo-blue/50 hover:scale-105 transition-all flex items-center space-x-1 shadow-md cursor-pointer"
+                        className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider ${
+                          isLightMode 
+                            ? 'bg-sky-50 hover:bg-sky-100 text-sky-800 border-sky-300' 
+                            : 'bg-duo-blue/20 hover:bg-duo-blue/30 text-duo-blue border-duo-blue/50'
+                        } hover:scale-105 transition-all flex items-center space-x-1 shadow-md cursor-pointer border`}
                         title="Переключить язык интерфейса (RU, EN, DE, FR, ES, JA, ZH, AR)"
                       >
                         <span>🌐</span>
@@ -4671,7 +4917,11 @@ const getTodayChallenge = () => {
                     </div>
                     <button 
                       onClick={() => { playSound('click'); setShowBetaModal(true); }} 
-                      className="px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-500/50 hover:scale-105 transition-all flex items-center space-x-1 shadow-md cursor-pointer"
+                      className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider ${
+                        isLightMode 
+                          ? 'bg-purple-100 hover:bg-purple-200 text-purple-900 border-purple-300' 
+                          : 'bg-purple-900/60 hover:bg-purple-800 text-purple-200 border-purple-500/50'
+                      } hover:scale-105 transition-all flex items-center space-x-1 shadow-md cursor-pointer border`}
                       title="Доступ бета-тестирование DuoWindo6601"
                     >
                       <span className="animate-pulse">🧪</span>
@@ -4679,22 +4929,101 @@ const getTodayChallenge = () => {
                     </button>
                     <button 
                       onClick={() => { playSound('click'); setShowBrowserModal(true); setShowSystemInfoModal(true); }} 
-                      className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider ${isOutdatedBrowserDetected ? 'bg-amber-950 text-amber-300 border border-amber-500/80 animate-pulse' : 'bg-gray-800/80 text-gray-300 border border-gray-700 hover:text-white'} hover:scale-105 transition-all flex items-center space-x-1 shadow-md cursor-pointer`}
+                      className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider ${
+                        isOutdatedBrowserDetected 
+                          ? 'bg-amber-950 text-amber-300 border border-amber-500/80 animate-pulse' 
+                          : isLightMode 
+                            ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' 
+                            : 'bg-gray-800/80 text-gray-300 border border-gray-700 hover:text-white'
+                      } hover:scale-105 transition-all flex items-center space-x-1 shadow-md cursor-pointer border`}
                       title="Предупреждение о браузере / Поддержка"
                     >
                       <span>{isOutdatedBrowserDetected ? '⚠️' : '🌐'}</span>
                       <span className="hidden md:inline">Браузер</span>
                     </button>
-                    <button onClick={() => { playSound('click'); setScreen(AppScreen.SUBSCRIPTION); }} className={`px-4 py-1.5 rounded-xl text-[12px] font-black border-b-4 uppercase tracking-widest transition-transform hover:scale-105 ${user.subscription === 'max' ? 'bg-black border-gray-700 text-duo-blue shadow-[0_0_10px_rgba(28,176,246,0.5)]' : user.subscription === 'super' ? 'bg-gradient-to-r from-blue-500 to-purple-500 border-purple-700 text-white' : 'bg-duo-blue border-blue-800 text-white'}`}>{user.subscription === 'free' ? t('free') : user.subscription === 'super' ? 'SUPER' : 'MAX'}</button>
+                    <button onClick={() => { playSound('click'); setScreen(AppScreen.SUBSCRIPTION); }} className={`px-4 py-1.5 rounded-xl text-[12px] font-black border-b-4 uppercase tracking-widest transition-transform hover:scale-105 ${
+                      user.subscription === 'max' 
+                        ? (isLightMode ? 'bg-indigo-600 border-indigo-800 text-white shadow-md' : 'bg-black border-gray-700 text-duo-blue shadow-[0_0_10px_rgba(28,176,246,0.5)]')
+                        : user.subscription === 'super' 
+                          ? 'bg-gradient-to-r from-blue-500 to-purple-500 border-purple-700 text-white' 
+                          : 'bg-duo-blue border-blue-800 text-white'
+                    }`}>{user.subscription === 'free' ? t('free') : user.subscription === 'super' ? 'SUPER' : 'MAX'}</button>
                  </div>
              </div>
              <div className="flex items-center space-x-3 overflow-x-auto no-scrollbar py-2 max-w-5xl mx-auto w-full px-4">
                 {COURSES.slice(0, 5).map(c => (
-                  <button key={c.id} onClick={() => { playSound('select'); setCurrentCourse(c); setScreen(AppScreen.PATH); }} className={`flex-shrink-0 w-14 h-11 rounded-2xl border-2 flex items-center justify-center transition-all ${currentCourse.id === c.id ? 'border-duo-blue bg-duo-blue/15 scale-110 shadow-lg' : 'border-gray-800 bg-duo-card hover:border-gray-600'}`}>{SPECIAL_IDS.includes(c.id) ? <span className="text-xl font-bold">{c.id === 'math' ? 'Σ' : c.id === 'music' ? '♫' : c.id === 'chess' ? '♔' : c.id === 'hv' ? '🐉' : '🖖'}</span> : <img src={`https://flagcdn.com/w40/${c.flagCode}.png`} className="w-8 rounded-sm shadow-sm" alt={c.name} />}</button>
+                  <button key={c.id} onClick={() => { playSound('select'); setCurrentCourse(c); setScreen(AppScreen.PATH); }} className={`flex-shrink-0 w-14 h-11 rounded-2xl border-2 flex items-center justify-center transition-all ${
+                    currentCourse.id === c.id 
+                      ? 'border-duo-blue bg-duo-blue/15 scale-110 shadow-lg' 
+                      : isLightMode 
+                        ? 'border-slate-200 bg-white hover:border-slate-300 text-slate-800 shadow-sm' 
+                        : 'border-gray-800 bg-duo-card hover:border-gray-600'
+                  }`}>{SPECIAL_IDS.includes(c.id) ? <span className="text-xl font-bold">{c.id === 'math' ? 'Σ' : c.id === 'music' ? '♫' : c.id === 'chess' ? '♔' : c.id === 'hv' ? '🐉' : '🖖'}</span> : <img src={`https://flagcdn.com/w40/${c.flagCode}.png`} className="w-8 rounded-sm shadow-sm" alt={c.name} />}</button>
                 ))}
-                <button onClick={() => { playSound('click'); setScreen(AppScreen.COURSE_SELECT); }} className="flex-shrink-0 w-14 h-11 rounded-2xl border-2 border-gray-700 hover:bg-gray-800 flex items-center justify-center transition-all"><PlusIcon className="w-6 h-6 text-gray-400" /></button>
+                <button onClick={() => { playSound('click'); setScreen(AppScreen.COURSE_SELECT); }} className={`flex-shrink-0 w-14 h-11 rounded-2xl border-2 ${isLightMode ? 'border-slate-200 bg-white hover:bg-slate-100 text-slate-600 shadow-sm' : 'border-gray-700 hover:bg-gray-800 text-gray-400'} flex items-center justify-center transition-all`}><PlusIcon className="w-6 h-6 text-gray-400" /></button>
              </div>
           </header>
+        )}
+
+        {/* INCOGNITO CLOSURE NOTICE & DATA EXPORT BANNER */}
+        {isIncognitoUser && (
+          <div className="bg-gradient-to-r from-amber-950/90 via-slate-900 to-emerald-950/90 border-b-2 border-amber-500/50 px-3 sm:px-6 py-2.5 shadow-md">
+            <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs text-left">
+              <div className="flex items-center space-x-2.5">
+                <span className="text-xl sm:text-2xl shrink-0">{incognitoClosed ? '🛑' : '⚠️'}</span>
+                <div>
+                  <div className="flex items-center space-x-2 flex-wrap">
+                    <span className="font-black text-amber-300 uppercase tracking-wide">
+                      {incognitoClosed 
+                        ? (user.language === 'ru' ? 'Режим Инкогнито закрыт с 10.10.2026' : 'Incognito Entry Closed since Oct 10, 2026') 
+                        : (user.language === 'ru' ? '10 октября 2026 года вход в Режим Инкогнито закрывается!' : 'Incognito Login closes on Oct 10, 2026!')}
+                    </span>
+                    <span className="bg-emerald-950 text-emerald-300 border border-emerald-500/40 text-[9px] font-black px-1.5 py-0.5 rounded">
+                      {user.language === 'ru' ? 'Полный Вход и Профиль Администратора открыты' : 'Full Sign-In & Admin Profile Active'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-300 font-medium mt-0.5">
+                    {user.language === 'ru' 
+                      ? 'После 10 октября 2026 года недоступна Инкогнито и ее нельзя будет восстановить в DuoWindo6601. Если вы хотите сохранить какой-либо контент, мы рекомендуем заранее экспортировать данные Firebase Firestore & Auth через Раздел «Профиль» и Раздел «Настройки» или выполнить Полный Вход.' 
+                      : 'After October 10, 2026, Incognito will be unavailable and cannot be restored in DuoWindo6601. If you want to save any content, we recommend exporting your Firebase Firestore & Auth data in advance via the Profile and Settings sections or performing Full Sign-In.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2 w-full sm:w-auto shrink-0 justify-end flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    playSound('click');
+                    setShowIncognitoExportModal(true);
+                  }}
+                  className="flex-1 sm:flex-initial px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl border-b-2 border-emerald-800 active:translate-y-0.5 transition-all text-xs uppercase tracking-wider flex items-center justify-center space-x-1 shadow cursor-pointer"
+                >
+                  <span>💾</span>
+                  <span>{user.language === 'ru' ? 'Экспорт данных' : 'Export Data'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    playSound('click');
+                    setShowFirebaseExportModal(true);
+                  }}
+                  className="flex-1 sm:flex-initial px-3 py-1.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-black rounded-xl border-b-2 border-amber-800 active:translate-y-0.5 transition-all text-xs uppercase tracking-wider flex items-center justify-center space-x-1 shadow cursor-pointer"
+                >
+                  <span>🔥</span>
+                  <span>{user.language === 'ru' ? 'Firebase Экспорт' : 'Firebase Export'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openRegisterModal('login')}
+                  className="flex-1 sm:flex-initial px-3 py-1.5 bg-duo-blue hover:bg-sky-500 text-white font-black rounded-xl border-b-2 border-duo-blueDark active:translate-y-0.5 transition-all text-xs uppercase tracking-wider flex items-center justify-center space-x-1 shadow cursor-pointer"
+                >
+                  <span>🔑</span>
+                  <span>{user.language === 'ru' ? 'Полный Вход' : 'Full Sign-In'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* ... (Other Screens) ... */}
@@ -5006,6 +5335,101 @@ const getTodayChallenge = () => {
                         </button>
                     </div>
 
+                    {/* FIREBASE FIRESTORE & AUTH DATA EXPORT SECTION */}
+                    <div className="bg-duo-card border-2 border-amber-500/50 rounded-3xl p-6 mb-6 shadow-xl space-y-4">
+                        <div className="flex items-center justify-between flex-wrap gap-3">
+                            <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-xl shadow-md">
+                                    🔥
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
+                                        <span>{user.language === 'ru' ? 'Экспорт данных Firebase Firestore & Auth' : 'Firebase Firestore & Auth Export'}</span>
+                                        <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full font-bold uppercase">
+                                            JSON
+                                        </span>
+                                    </h3>
+                                    <p className="text-xs text-gray-400 font-bold">
+                                        {user.language === 'ru' 
+                                            ? 'Выгрузка профиля, прогресса, уроков, отзывов и учетной записи аутентификации' 
+                                            : 'Export user profile, progress, lessons, feedback and authentication metadata'}
+                                    </p>
+                                </div>
+                            </div>
+                            <span className="px-3 py-1 bg-black/40 border border-gray-700 rounded-xl text-xs font-mono text-amber-300">
+                                {firebaseUser ? `Auth: ${firebaseUser.email || firebaseUser.uid.slice(0, 8)}` : (user.language === 'ru' ? 'Локальный / Offline' : 'Local / Offline')}
+                            </span>
+                        </div>
+
+                        {/* INCOGNITO CLOSURE & EXPORT ADVICE BANNER */}
+                        <div className="p-3.5 bg-black/40 border border-amber-500/50 rounded-2xl text-xs space-y-1 text-left">
+                            <div className="flex items-center space-x-1.5 text-amber-300 font-black uppercase text-[11px]">
+                                <span>⚠️</span>
+                                <span>{user.language === 'ru' ? 'Предупреждение о сохранении контента' : 'Content Retention Warning'}</span>
+                            </div>
+                            <p className="font-bold text-gray-200">
+                                {user.language === 'ru'
+                                    ? 'После 10 октября 2026 года недоступна Инкогнито и ее нельзя будет восстановить в DuoWindo6601.'
+                                    : 'After October 10, 2026, Incognito will be unavailable and cannot be restored in DuoWindo6601.'}
+                            </p>
+                            <p className="text-[11px] text-gray-300">
+                                {user.language === 'ru'
+                                    ? 'Если вы хотите сохранить какой-либо контент, мы рекомендуем заранее экспортировать данные Firebase Firestore & Auth через Раздел «Профиль» и Раздел «Настройки» или выполнить Полный Вход.'
+                                    : 'If you want to save any content, we recommend exporting your Firebase Firestore & Auth data in advance via the Profile and Settings sections or performing Full Sign-In.'}
+                            </p>
+                        </div>
+
+                        {/* EXPORT DETAILS PREVIEW */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs font-din">
+                            <div className="bg-black/40 p-2.5 rounded-xl border border-gray-800">
+                                <span className="text-gray-400 block text-[10px] uppercase font-bold">{user.language === 'ru' ? 'База данных' : 'Database'}</span>
+                                <span className="text-amber-300 font-black truncate block">Firestore</span>
+                            </div>
+                            <div className="bg-black/40 p-2.5 rounded-xl border border-gray-800">
+                                <span className="text-gray-400 block text-[10px] uppercase font-bold">{user.language === 'ru' ? 'Аутентификация' : 'Authentication'}</span>
+                                <span className="text-emerald-400 font-black truncate block">{firebaseUser ? 'Firebase Auth' : (user.language === 'ru' ? 'Гость / Локально' : 'Guest / Local')}</span>
+                            </div>
+                            <div className="bg-black/40 p-2.5 rounded-xl border border-gray-800">
+                                <span className="text-gray-400 block text-[10px] uppercase font-bold">{user.language === 'ru' ? 'Прогресс XP' : 'Total XP'}</span>
+                                <span className="text-white font-black block">{user.xp || 0} XP</span>
+                            </div>
+                            <div className="bg-black/40 p-2.5 rounded-xl border border-gray-800">
+                                <span className="text-gray-400 block text-[10px] uppercase font-bold">{user.language === 'ru' ? 'Пройдено уроков' : 'Lessons'}</span>
+                                <span className="text-duo-blue font-black block">{user.completedLessons?.length || 0}</span>
+                            </div>
+                        </div>
+
+                        {/* EXPORT ACTION BUTTONS */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                            <button
+                                onClick={() => {
+                                    playSound('click');
+                                    setShowFirebaseExportModal(true);
+                                }}
+                                className="sm:col-span-1 py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white border-b-4 border-amber-800 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                            >
+                                <span>🔥</span>
+                                <span>{user.language === 'ru' ? 'Открыть экспорт' : 'Open Export'}</span>
+                            </button>
+
+                            <button
+                                onClick={handleQuickDownloadFirebase}
+                                className="py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider bg-emerald-600 hover:bg-emerald-500 text-white border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                            >
+                                <span>📥</span>
+                                <span>{user.language === 'ru' ? 'Скачать .JSON' : 'Download .JSON'}</span>
+                            </button>
+
+                            <button
+                                onClick={handleQuickCopyFirebase}
+                                className="py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider bg-gray-800 hover:bg-gray-700 text-amber-300 border-b-4 border-gray-950 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                            >
+                                <span>📋</span>
+                                <span>{user.language === 'ru' ? 'Копировать JSON' : 'Copy JSON'}</span>
+                            </button>
+                        </div>
+                    </div>
+
                     {/* FIRESTORE LOCAL CACHE CLEANUP & 30-DAY INACTIVITY MANAGER */}
                     <div className="bg-duo-card border-2 border-indigo-500/50 rounded-3xl p-6 mb-6 shadow-xl space-y-4">
                         <div className="flex items-center justify-between flex-wrap gap-3">
@@ -5244,52 +5668,215 @@ const getTodayChallenge = () => {
                       </button>
                     </div>
 
-                    {/* NIGHT MODE TOGGLE */}
-                    <div className="bg-gray-800/80 border-2 border-purple-500/40 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-inner mt-3">
-                      <div className="flex items-start space-x-3">
-                        <span className="text-2xl p-2 bg-purple-950/60 rounded-xl border border-purple-500/40">🌙</span>
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <h4 className="font-extrabold text-sm text-white uppercase tracking-wider">
-                              {user.language === 'ru' ? 'Ночная тема' : 'Night Mode'}
-                            </h4>
-                            <span className="bg-purple-500/30 text-purple-300 text-[10px] font-black px-2 py-0.5 rounded-md border border-purple-500/50 uppercase">
-                              Theme
-                            </span>
+                    {/* GLOBAL THEME SWITCHER */}
+                    <div className="bg-gray-800/80 border-2 border-indigo-500/40 rounded-2xl p-4 flex flex-col space-y-3 shadow-inner mt-3 text-left">
+                      <div className="flex items-start justify-between flex-wrap gap-2">
+                        <div className="flex items-start space-x-3">
+                          <span className="text-2xl p-2 bg-indigo-950/60 rounded-xl border border-indigo-500/40">
+                            {user.theme === 'light' ? '☀️' : user.theme === 'system' ? '💻' : '🌙'}
+                          </span>
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <h4 className="font-extrabold text-sm text-white uppercase tracking-wider">
+                                {user.language === 'ru' ? 'Тема оформления (Светлая / Темная)' : 'Theme Mode (Light / Dark)'}
+                              </h4>
+                              <span className="bg-indigo-500/30 text-indigo-300 text-[10px] font-black px-2 py-0.5 rounded-md border border-indigo-500/50 uppercase">
+                                UI Theme
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-300 font-medium mt-1">
+                              {user.language === 'ru'
+                                ? 'Глобальный переключатель между светлым, темным и системным режимами интерфейса'
+                                : 'Global switch between light, dark, and system interface modes'}
+                            </p>
                           </div>
-                          <p className="text-xs text-gray-300 font-medium mt-1">
-                            {user.language === 'ru'
-                              ? 'Переключение цветовой палитры приложения на более темные тона для комфортного вечернего обучения'
-                              : 'Switch application palette to darker tones for comfortable evening learning'}
-                          </p>
                         </div>
                       </div>
 
-                      <button
-                        onClick={() => {
-                          playSound('click');
-                          const newVal = !(user.nightMode ?? false);
-                          setUser((prev) => {
-                            const updated = { ...prev, nightMode: newVal };
-                            localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-                            return updated;
-                          });
-                          setToast(newVal
-                            ? (user.language === 'ru' ? '🌙 Ночная тема включена!' : '🌙 Night Mode enabled!')
-                            : (user.language === 'ru' ? '☀️ Дневная тема включена' : '☀️ Day Mode enabled')
-                          );
-                        }}
-                        className={`w-14 h-8 rounded-full p-1 transition-colors duration-300 flex-shrink-0 cursor-pointer ${
-                          (user.nightMode ?? false) ? 'bg-purple-600 border-2 border-purple-400' : 'bg-gray-700 border-2 border-gray-600'
-                        }`}
-                        title="Переключить Ночную тему"
-                      >
-                        <div
-                          className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-300 ${
-                            (user.nightMode ?? false) ? 'translate-x-6' : 'translate-x-0'
+                      {/* 3 THEME PILLS */}
+                      <div className="grid grid-cols-3 gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            playSound('click');
+                            setUser(prev => {
+                              const updated = { ...prev, theme: 'light' as const, nightMode: false };
+                              localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+                              return updated;
+                            });
+                            setToast(user.language === 'ru' ? '☀️ Светлая тема включена' : '☀️ Light Mode enabled');
+                          }}
+                          className={`py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-1.5 border-2 transition-all cursor-pointer ${
+                            user.theme === 'light'
+                              ? 'bg-amber-500 text-white border-amber-400 shadow-md ring-2 ring-amber-300'
+                              : isLightMode 
+                                ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm' 
+                                : 'bg-gray-900 border-gray-700 text-gray-300 hover:bg-gray-800'
                           }`}
-                        />
-                      </button>
+                        >
+                          <span>☀️</span>
+                          <span>{user.language === 'ru' ? 'Светлая' : 'Light'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            playSound('click');
+                            setUser(prev => {
+                              const updated = { ...prev, theme: 'dark' as const, nightMode: true };
+                              localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+                              return updated;
+                            });
+                            setToast(user.language === 'ru' ? '🌙 Тёмная тема включена' : '🌙 Dark Mode enabled');
+                          }}
+                          className={`py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-1.5 border-2 transition-all cursor-pointer ${
+                            user.theme === 'dark' || (!user.theme && (user.nightMode ?? true))
+                              ? 'bg-indigo-600 text-white border-indigo-400 shadow-md ring-2 ring-indigo-400'
+                              : isLightMode 
+                                ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm' 
+                                : 'bg-gray-900 border-gray-700 text-gray-300 hover:bg-gray-800'
+                          }`}
+                        >
+                          <span>🌙</span>
+                          <span>{user.language === 'ru' ? 'Тёмная' : 'Dark'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            playSound('click');
+                            setUser(prev => {
+                              const updated = { ...prev, theme: 'system' as const };
+                              localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+                              return updated;
+                            });
+                            setToast(user.language === 'ru' ? '💻 Системная тема' : '💻 System Theme');
+                          }}
+                          className={`py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-1.5 border-2 transition-all cursor-pointer ${
+                            user.theme === 'system'
+                              ? 'bg-sky-600 text-white border-sky-400 shadow-md ring-2 ring-sky-400'
+                              : isLightMode 
+                                ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm' 
+                                : 'bg-gray-900 border-gray-700 text-gray-300 hover:bg-gray-800'
+                          }`}
+                        >
+                          <span>💻</span>
+                          <span>{user.language === 'ru' ? 'Система' : 'System'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* DATA SECURITY & EXPERT MIGRATION SECTION */}
+                    <div className="bg-gray-800/80 border-2 border-red-500/40 rounded-2xl p-4 flex flex-col space-y-3 shadow-inner mt-3 text-left">
+                      <div className="flex items-start justify-between flex-wrap gap-2">
+                        <div className="flex items-start space-x-3">
+                          <span className="text-2xl p-2 bg-red-950/60 rounded-xl border border-red-500/40">🛡️</span>
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <h4 className="font-extrabold text-sm text-white uppercase tracking-wider">
+                                {user.language === 'ru' ? 'Безопасность и удаление данных' : 'Data Security & Deletion'}
+                              </h4>
+                              <span className="bg-red-500/30 text-red-300 text-[10px] font-black px-2 py-0.5 rounded-md border border-red-500/50 uppercase">
+                                Security
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-300 font-medium mt-1">
+                              {user.language === 'ru'
+                                ? 'Запрет удаления аккаунта и локальных данных приложения или полный сброс'
+                                : 'Protection against account & local data deletion or full reset'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* ADMIN ACCOUNT PROTECTION BADGE */}
+                      {isUserAdminAccount(user, firebaseUser) && (
+                        <div className="p-3 bg-red-950/80 border border-red-500 rounded-xl text-xs space-y-1">
+                          <div className="flex items-center space-x-1.5 text-red-300 font-black uppercase text-[11px]">
+                            <span>⛔</span>
+                            <span>{user.language === 'ru' ? 'Защита администрации: удаление запрещено' : 'Admin Protection: Deletion Prohibited'}</span>
+                          </div>
+                          <p className="text-gray-200 text-[11px] font-bold">
+                            {user.language === 'ru'
+                              ? 'Запретить удаление аккаунта администрации и запретить удалять все данные администрации о локальном приложении. Учетная запись администратора защищена.'
+                              : 'Administration account and data deletion is strictly prohibited by security rules.'}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* TOGGLE: PREVENT ACCOUNT & DATA DELETION */}
+                      <div className="flex items-center justify-between p-3 bg-black/40 border border-gray-700 rounded-xl">
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-black text-white flex items-center gap-1.5">
+                            <span>🔒</span>
+                            <span>{user.language === 'ru' ? 'Запретить удаление аккаунта и данных' : 'Prevent Account & Data Deletion'}</span>
+                          </span>
+                          <span className="text-[10px] text-gray-400 block font-medium">
+                            {user.language === 'ru'
+                              ? 'Блокирует любые попытки очистки данных и удаления аккаунта'
+                              : 'Locks out any attempts to wipe data or delete account'}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            playSound('click');
+                            const newVal = !Boolean(user.preventAccountDeletion);
+                            setUser(prev => {
+                              const updated = { ...prev, preventAccountDeletion: newVal };
+                              localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+                              return updated;
+                            });
+                            setToast(
+                              newVal
+                                ? (user.language === 'ru' ? '🔒 Запрет удаления включен!' : '🔒 Deletion protection enabled!')
+                                : (user.language === 'ru' ? '🔓 Запрет удаления выключен' : '🔓 Deletion protection disabled')
+                            );
+                          }}
+                          className={`w-12 h-7 rounded-full p-1 transition-colors duration-300 flex-shrink-0 cursor-pointer ${
+                            user.preventAccountDeletion ? 'bg-emerald-600 border border-emerald-400' : 'bg-gray-700 border border-gray-600'
+                          }`}
+                        >
+                          <div
+                            className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-300 ${
+                              user.preventAccountDeletion ? 'translate-x-5' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* ACTION BUTTONS: EXPERT TRANSFER & DATA DELETION */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            playSound('click');
+                            setShowDataTransferModal(true);
+                          }}
+                          className="py-3 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black text-xs uppercase tracking-wider rounded-xl border-b-4 border-indigo-900 active:translate-y-0.5 transition-all flex items-center justify-center space-x-1.5 shadow cursor-pointer"
+                        >
+                          <span>🛠️</span>
+                          <span>{user.language === 'ru' ? 'Эксперт: Перенести данные' : 'Expert: Transfer Data'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            playSound('click');
+                            setShowDataDeletionModal(true);
+                          }}
+                          className={`py-3 px-4 font-black text-xs uppercase tracking-wider rounded-xl border-b-4 active:translate-y-0.5 transition-all flex items-center justify-center space-x-1.5 shadow cursor-pointer ${
+                            isUserAdminAccount(user, firebaseUser)
+                              ? 'bg-gray-800 text-red-400 border-gray-900 hover:bg-gray-750'
+                              : user.preventAccountDeletion
+                              ? 'bg-gray-800 text-amber-400 border-gray-900 hover:bg-gray-750'
+                              : 'bg-red-600 hover:bg-red-500 text-white border-red-900'
+                          }`}
+                        >
+                          <span>💣</span>
+                          <span>{user.language === 'ru' ? 'Удалить все данные' : 'Wipe All Data'}</span>
+                        </button>
+                      </div>
                     </div>
                     </div>
                     <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl">
@@ -7104,6 +7691,19 @@ const getTodayChallenge = () => {
                                      {t('loggedInAs').split('{user}')[1]}
                                   </div>
                                   <p className="text-xs text-green-400 font-medium">{t('progressSynced')}</p>
+
+                                  {/* FIREBASE FIRESTORE & AUTH EXPORT BUTTON */}
+                                  <button 
+                                     onClick={() => {
+                                        playSound('click');
+                                        setShowFirebaseExportModal(true);
+                                     }}
+                                     className="w-full py-3 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-500 hover:to-orange-500 text-white font-black rounded-2xl border-b-4 border-amber-900 active:border-b-0 active:translate-y-1 transition-all text-xs uppercase flex items-center justify-center space-x-2 shadow-lg cursor-pointer"
+                                  >
+                                     <span>🔥</span>
+                                     <span>{user.language === 'ru' ? 'Экспорт данных Firebase Firestore & Auth' : 'Export Firebase Firestore & Auth'}</span>
+                                  </button>
+
                                   <button 
                                      onClick={handleSignOut} 
                                      className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-2xl border-b-4 border-red-800 active:border-b-0 active:translate-y-1 transition-all text-xs uppercase"
@@ -7113,16 +7713,68 @@ const getTodayChallenge = () => {
                                </div>
                             ) : (
                                <div className="space-y-3 w-full">
-                                  <div className="bg-emerald-950/50 border border-emerald-500/50 p-3 rounded-2xl text-left space-y-1.5">
-                                     <div className="flex items-center space-x-2">
-                                        <span className="text-base">🕵️</span>
-                                        <span className="font-black text-xs text-emerald-300 uppercase">
-                                           {t('incognitoTitle')}
+                                  <div className={`border p-3.5 rounded-2xl text-left space-y-2 ${
+                                     incognitoClosed 
+                                        ? 'bg-rose-950/40 border-rose-500/60' 
+                                        : 'bg-emerald-950/50 border-emerald-500/50'
+                                  }`}>
+                                     <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-2">
+                                           <span className="text-base">{incognitoClosed ? '🛑' : '🕵️'}</span>
+                                           <span className="font-black text-xs text-white uppercase">
+                                              {t('incognitoTitle')}
+                                           </span>
+                                        </div>
+                                        <span className="text-[10px] bg-black/40 border border-gray-700 px-2 py-0.5 rounded-lg text-gray-300 font-mono">
+                                           {user.username ? `@${user.username}` : 'guest'}
                                         </span>
                                      </div>
-                                     <p className="text-[11px] text-emerald-200/80 font-bold leading-normal">
-                                        {t('savedLocallyAs').replace('{username}', user.username || 'incognito')}
-                                     </p>
+
+                                     <div className="p-3 bg-black/40 border border-amber-500/40 rounded-xl space-y-1 text-left">
+                                        <p className="text-[11px] text-amber-300 font-bold leading-normal">
+                                           ⚠️ {user.language === 'ru'
+                                              ? 'После 10 октября 2026 года недоступна Инкогнито и ее нельзя будет восстановить в DuoWindo6601.'
+                                              : 'After October 10, 2026, Incognito will be unavailable and cannot be restored in DuoWindo6601.'}
+                                        </p>
+                                        <p className="text-[10px] text-gray-300 font-medium leading-relaxed">
+                                           {user.language === 'ru'
+                                              ? 'Если вы хотите сохранить какой-либо контент, мы рекомендуем заранее экспортировать данные Firebase Firestore & Auth через Раздел «Профиль» и Раздел «Настройки» или выполнить Полный Вход.'
+                                              : 'If you want to save any content, we recommend exporting your Firebase Firestore & Auth data in advance via the Profile and Settings sections or performing Full Sign-In.'}
+                                        </p>
+                                     </div>
+
+                                     <div className="flex flex-wrap gap-1.5 text-[10px] font-bold pt-0.5">
+                                        <span className="bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-md">
+                                           ✅ {user.language === 'ru' ? 'Полный Вход не закрыт' : 'Full Sign-In Active'}
+                                        </span>
+                                        <span className="bg-amber-950/80 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-md">
+                                           👑 {user.language === 'ru' ? 'Администратор профиль не закрыт' : 'Admin Profile Active'}
+                                        </span>
+                                     </div>
+
+                                     {/* EXPORT DATA BUTTON */}
+                                     <button
+                                        onClick={() => {
+                                           playSound('click');
+                                           setShowIncognitoExportModal(true);
+                                        }}
+                                        className="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow border-b-2 border-emerald-800 active:translate-y-0.5 transition-all flex items-center justify-center space-x-1.5 cursor-pointer mt-1"
+                                     >
+                                        <span>💾</span>
+                                        <span>{user.language === 'ru' ? 'Экспорт данных Режим Инкогнито' : 'Export Incognito Data'}</span>
+                                     </button>
+
+                                     {/* EXPORT FIREBASE (FIRESTORE & AUTH) BUTTON */}
+                                     <button
+                                        onClick={() => {
+                                           playSound('click');
+                                           setShowFirebaseExportModal(true);
+                                        }}
+                                        className="w-full py-2.5 px-3 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow border-b-2 border-amber-800 active:translate-y-0.5 transition-all flex items-center justify-center space-x-1.5 cursor-pointer mt-1.5"
+                                     >
+                                        <span>🔥</span>
+                                        <span>{user.language === 'ru' ? 'Экспорт Firebase Firestore & Auth' : 'Export Firebase Firestore & Auth'}</span>
+                                     </button>
                                   </div>
 
                                   {isIframe && (
@@ -7140,10 +7792,10 @@ const getTodayChallenge = () => {
                                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
                                      <button 
                                         onClick={() => openRegisterModal("login")} 
-                                        className="w-full py-3 bg-duo-green hover:bg-duo-greenDark text-white font-black rounded-2xl border-b-4 border-duo-greenDark active:border-b-0 active:translate-y-1 transition-all text-xs uppercase flex items-center justify-center space-x-1 shadow-lg cursor-pointer"
+                                        className="w-full py-3 bg-duo-blue hover:bg-sky-500 text-white font-black rounded-2xl border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all text-xs uppercase flex items-center justify-center space-x-1 shadow-lg cursor-pointer"
                                      >
                                         <span>🔑</span>
-                                        <span>{user.language === "ru" ? "Вход" : "Log In"}</span>
+                                        <span>{user.language === "ru" ? "Полный Вход" : "Full Sign-In"}</span>
                                      </button>
 
                                      <button 
@@ -7461,8 +8113,8 @@ const getTodayChallenge = () => {
       {/* MOBILE NAV */}
       {screen !== AppScreen.LESSON && screen !== AppScreen.VIDEO_CALL && (
         <nav className={isSimulatingMobile
-          ? "fixed bottom-0 left-0 w-full bg-duo-dark/95 backdrop-blur-xl border-t border-gray-800 p-3 sm:p-4 flex justify-around z-50 pb-8 sm:pb-6 shadow-2xl safe-bottom"
-          : "lg:hidden fixed bottom-0 left-0 w-full bg-duo-dark/95 backdrop-blur-xl border-t border-gray-800 p-3 sm:p-4 flex justify-around z-50 pb-8 sm:pb-6 shadow-2xl safe-bottom"
+          ? `fixed bottom-0 left-0 w-full ${isLightMode ? 'bg-white/95 border-slate-200' : 'bg-duo-dark/95 border-gray-800'} backdrop-blur-xl border-t p-3 sm:p-4 flex justify-around z-50 pb-8 sm:pb-6 shadow-2xl safe-bottom`
+          : `lg:hidden fixed bottom-0 left-0 w-full ${isLightMode ? 'bg-white/95 border-slate-200' : 'bg-duo-dark/95 border-gray-800'} backdrop-blur-xl border-t p-3 sm:p-4 flex justify-around z-50 pb-8 sm:pb-6 shadow-2xl safe-bottom`
         }>
           {NAV_ITEMS.map(item => {
             const todayStr = new Date().toISOString().split('T')[0];
@@ -7470,10 +8122,10 @@ const getTodayChallenge = () => {
               user.dailyChallengeCompletedDate !== todayStr && 
               dailyChallengeDismissedDate !== todayStr;
             return (
-              <button key={item.screen} onClick={() => handleNavigation(item.screen)} className={`transition-all duration-300 relative ${screen === item.screen ? 'text-duo-blue scale-125 -translate-y-2' : 'text-gray-500'}`}>
+              <button key={item.screen} onClick={() => handleNavigation(item.screen)} className={`transition-all duration-300 relative cursor-pointer ${screen === item.screen ? 'text-duo-blue scale-125 -translate-y-2' : isLightMode ? 'text-slate-500 hover:text-slate-900' : 'text-gray-500 hover:text-white'}`}>
                 <item.icon className="w-8 h-8" />
                 {isTodayChallengePending && (
-                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-duo-orange rounded-full border-2 border-duo-dark animate-pulse" />
+                  <span className={`absolute -top-1 -right-1 w-3 h-3 bg-duo-orange rounded-full border-2 ${isLightMode ? 'border-white' : 'border-duo-dark'} animate-pulse`} />
                 )}
               </button>
             );
@@ -7524,6 +8176,8 @@ const getTodayChallenge = () => {
         playSound={playSound}
         setToast={setToast}
         onOpenIncognitoRestrictions={openIncognitoRestrictionsModal}
+        onOpenIncognitoExport={() => setShowIncognitoExportModal(true)}
+        onOpenFirebaseExport={() => setShowFirebaseExportModal(true)}
         initialTab={regInitialTab}
       />
 
@@ -7535,7 +8189,77 @@ const getTodayChallenge = () => {
         onGoogleSignIn={handleGoogleSignIn}
         language={user.language}
         playSound={playSound}
+        user={user}
+        onOpenExport={() => setShowIncognitoExportModal(true)}
       />
+
+      {/* INCOGNITO DATA EXPORT MODAL */}
+      <IncognitoDataExportModal
+        isOpen={showIncognitoExportModal}
+        onClose={() => setShowIncognitoExportModal(false)}
+        user={user}
+        onOpenRegister={openRegisterModal}
+        language={user.language}
+        playSound={playSound}
+        setToast={setToast}
+      />
+
+      {/* FIREBASE FIRESTORE & AUTH EXPORT MODAL */}
+      <FirebaseExportModal
+        isOpen={showFirebaseExportModal}
+        onClose={() => setShowFirebaseExportModal(false)}
+        user={user}
+        firebaseUser={firebaseUser}
+        language={user.language}
+        playSound={playSound}
+        setToast={setToast}
+        onOpenRegister={openRegisterModal}
+      />
+
+      {/* DUOWINDO6601 BETA TESTING CENTER MODAL */}
+      {showBetaModal && (
+        <BetaModal
+          user={user}
+          setUser={setUser}
+          onClose={() => setShowBetaModal(false)}
+          onOpenAdmin={() => {
+            setShowBetaModal(false);
+            setScreen(AppScreen.ADMIN_DASHBOARD);
+          }}
+          onOpenSystemInfo={() => {
+            setShowBetaModal(false);
+            setShowSystemInfoModal(true);
+          }}
+          onOpenFeedback={() => {
+            setShowBetaModal(false);
+            setScreen(AppScreen.FEEDBACK);
+          }}
+          courses={COURSES}
+          onSelectCourse={(course) => {
+            setCurrentCourse(course);
+            localStorage.setItem('duo_course_id_6601', course.id);
+            setScreen(AppScreen.PATH);
+            setShowBetaModal(false);
+          }}
+          onDismissBanner={() => {
+            setBetaDismissed(true);
+            localStorage.setItem('duo_beta_dismissed', 'true');
+            setShowBetaModal(false);
+          }}
+          playSound={playSound}
+        />
+      )}
+
+      {/* SYSTEM INFO & COMPATIBILITY MODAL */}
+      {showSystemInfoModal && (
+        <SystemInfoModal
+          systemInfo={systemInfo}
+          simMode={simSystemMode}
+          onSetSimMode={setSimSystemMode}
+          onClose={() => setShowSystemInfoModal(false)}
+          lang={user.language}
+        />
+      )}
 
       {/* GEMINI AI DAILY LIMIT MODAL */}
       <AiLimitModal
@@ -8529,9 +9253,14 @@ const getTodayChallenge = () => {
 
             <div className="flex items-center space-x-2 bg-gradient-to-r from-purple-600/20 via-indigo-600/20 to-sky-600/20 border border-purple-500/30 px-4 py-1.5 rounded-full">
               <span className="text-xl">🦉</span>
-              <span className="text-xs md:text-sm font-black text-purple-300 uppercase tracking-wider flex items-center gap-1">
+              <span className="text-xs md:text-sm font-black text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
                 <span>DuoWindo6601 Max</span>
                 <SparklesIcon className="w-4 h-4 text-amber-400" />
+                {(offlineMode || (typeof navigator !== 'undefined' && !navigator.onLine)) && (
+                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] font-black px-2 py-0.5 rounded-md ml-1">
+                    ⚡ {user.language === 'ru' ? 'Офлайн' : 'Offline'}
+                  </span>
+                )}
               </span>
             </div>
 
@@ -8570,9 +9299,26 @@ const getTodayChallenge = () => {
                 </div>
               ) : (
                 <>
-                  <div className="text-base md:text-lg leading-relaxed font-sans space-y-3 pr-1 whitespace-pre-wrap">
+                  <div className="text-base md:text-lg leading-relaxed font-sans space-y-2 pr-1 whitespace-pre-line text-left">
                     <div className="font-medium text-gray-800 dark:text-gray-200">
-                      {explanation}
+                      {explanation.split('\n').map((line, idx) => {
+                        if (!line.trim()) return <div key={idx} className="h-1.5" />;
+                        const parts = line.split(/(\*\*.*?\*\*)/g);
+                        return (
+                          <p key={idx} className="mb-1 leading-relaxed">
+                            {parts.map((p, pIdx) => {
+                              if (p.startsWith('**') && p.endsWith('**')) {
+                                return (
+                                  <strong key={pIdx} className="font-black text-indigo-600 dark:text-amber-400">
+                                    {p.slice(2, -2)}
+                                  </strong>
+                                );
+                              }
+                              return p;
+                            })}
+                          </p>
+                        );
+                      })}
                     </div>
                   </div>
 
