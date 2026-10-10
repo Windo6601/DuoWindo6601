@@ -76,7 +76,7 @@ app.use('/api/gemini-proxy', express.raw({ type: '*/*', limit: '50mb' }), async 
 
 // MCP (Model Context Protocol) & Jules debugging status endpoint
 app.get('/api/mcp/status', (_req, res) => {
-  const renderMcpKey = process.env.RENDER_MCP_API_KEY || 'rnd_yJ0QbFmEPVzGFlD6OwWG4o8Rg6t8';
+  const renderMcpKey = process.env.RENDER_MCP_API_KEY || '';
   res.json({
     mcpEnabled: true,
     julesDebugging: true,

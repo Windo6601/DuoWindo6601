@@ -37,6 +37,20 @@ export function getDaysUntilIncognitoClosure(): number {
 }
 
 /**
+ * Checks if tomorrow is the closure date (October 10, 2026) or less than 24h remains.
+ */
+export function isIncognitoClosingTomorrow(): boolean {
+  if (isIncognitoLoginClosed()) return false;
+  const now = new Date();
+  // Guaranteed true on October 9, 2026 in both local & UTC time
+  const isOct9 = (now.getFullYear() === 2026 && now.getMonth() === 9 && now.getDate() === 9) ||
+                (now.getUTCFullYear() === 2026 && now.getUTCMonth() === 9 && now.getUTCDate() === 9);
+  if (isOct9) return true;
+  const days = getDaysUntilIncognitoClosure();
+  return days <= 1;
+}
+
+/**
  * Formatted closure date string for display.
  */
 export function getFormattedClosureDate(language: string = 'ru'): string {
@@ -51,14 +65,56 @@ export function getFormattedClosureDate(language: string = 'ru'): string {
 }
 
 /**
+ * Dynamic synchronized title reflecting whether it is today (Oct 10, 2026), tomorrow, or already closed.
+ */
+export function getIncognitoClosureTitle(language: string = 'ru'): string {
+  const isRu = language === 'ru';
+  const now = new Date();
+  const isOct10 = (now.getFullYear() === 2026 && now.getMonth() === 9 && now.getDate() === 10) ||
+                  (now.getUTCFullYear() === 2026 && now.getUTCMonth() === 9 && now.getUTCDate() === 10);
+  if (isOct10 || isIncognitoLoginClosed()) {
+    return isRu
+      ? 'Вход в Инкогнито недоступен'
+      : 'Incognito Entry Unavailable';
+  }
+  if (isIncognitoClosingTomorrow()) {
+    return isRu
+      ? 'Завтра 10 октября 2026 года вход в Режим Инкогнито станет недоступен'
+      : 'Tomorrow, Oct 10, 2026, Incognito Mode entry will become unavailable';
+  }
+  return isRu
+    ? '10 октября 2026 года вход в Режим Инкогнито станет недоступен'
+    : 'Incognito Mode entry will close on October 10, 2026';
+}
+
+/**
+ * Synchronized active status messages for unclosed features.
+ */
+export function getSynchronizedActiveStatuses(language: string = 'ru') {
+  const isRu = language === 'ru';
+  return {
+    fullAuth: isRu ? 'Полный Вход и регистрация: НЕ ЗАКРЫТ (Работает)' : 'Full Sign-In & Registration: NOT CLOSED (Active)',
+    adminProfile: isRu ? 'Профиль Администратора: НЕ ЗАКРЫТ' : 'Admin Profile: NOT CLOSED',
+  };
+}
+
+/**
  * Official warning notice:
- * "После 10 октября 2026 год недоступна Инкогнито и ее нельзя будет восстановить в DuoWindo6601. Если вы хотите сохранить какой-либо контент, мы рекомендуем заранее экспортировать данные Firebase Firestore & Auth через Раздел «Профиль» и Раздел «Настройки»."
+ * "Сегодня 10 октября 2026 года вход в Режим Инкогнито уже недоступен..."
  */
 export function getIncognitoPermanentClosureWarning(language: string = 'ru'): string {
+  const now = new Date();
+  const isOct10OrLater = (now.getFullYear() === 2026 && now.getMonth() === 9 && now.getDate() >= 10) ||
+                         (now.getUTCFullYear() === 2026 && now.getUTCMonth() === 9 && now.getUTCDate() >= 10) ||
+                         isIncognitoLoginClosed();
   if (language === 'ru') {
-    return 'После 10 октября 2026 года Режим Инкогнито будет недоступен, и его нельзя будет восстановить в DuoWindo6601. Если вы хотите сохранить какой-либо контент, мы рекомендуем заранее экспортировать данные Firebase Firestore & Auth через Раздел «Профиль» и Раздел «Настройки».';
+    return isOct10OrLater
+      ? '10 октября 2026 года вход в Режим Инкогнито недоступен, и его нельзя будет восстановить в DuoWindo6601. Синхронизирован актуальный статус не закрытия: Полный Вход и регистрация работают без ограничений, профиль Администратора доступен.'
+      : 'После 10 октября 2026 года вход в Режим Инкогнито станет недоступен, и его нельзя будет восстановить в DuoWindo6601. Если вы хотите сохранить какой-либо контент, мы рекомендуем заранее экспортировать данные Firebase Firestore & Auth через Раздел «Профиль» и Раздел «Настройки» или выполнить Полный Вход в систему (Полный Вход и регистрация: НЕ ЗАКРЫТ, Профиль Администратора: НЕ ЗАКРЫТ).';
   }
-  return 'After October 10, 2026, Incognito Mode will be unavailable and cannot be restored in DuoWindo6601. If you want to save any content, we recommend exporting your Firebase Firestore & Auth data in advance via the Profile and Settings sections.';
+  return isOct10OrLater
+    ? 'On October 10, 2026, entry into Incognito Mode is unavailable and cannot be restored in DuoWindo6601. Synchronized actual unclosed status: Full Sign-In & registration operate normally, Admin Profile is active.'
+    : 'After October 10, 2026, Incognito Mode will become unavailable and cannot be restored in DuoWindo6601. If you want to save any content, we recommend exporting your Firebase Firestore & Auth data in advance via the Profile and Settings sections or performing Full Sign-In (Full Sign-In & Registration: NOT CLOSED, Admin Profile: NOT CLOSED).';
 }
 
 /**

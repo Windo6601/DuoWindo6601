@@ -584,9 +584,9 @@ export function getMcpConfig(): McpConfig {
   if (typeof window === 'undefined') {
     return {
       enabled: true,
-      renderApiKey: 'rnd_yJ0QbFmEPVzGFlD6OwWG4o8Rg6t8',
+      renderApiKey: '',
       julesDebugEnabled: true,
-      maskedKey: 'rnd_yJ0Q••••6t8',
+      maskedKey: '••••••••',
       mcpServerUrl: 'https://api.render.com/v1/mcp'
     };
   }
@@ -596,7 +596,7 @@ export function getMcpConfig(): McpConfig {
     const rawJules = localStorage.getItem(JULES_DEBUG_ENABLED_STORAGE);
     const julesDebugEnabled = rawJules !== 'false';
     const storedKey = localStorage.getItem(RENDER_MCP_API_KEY_STORAGE);
-    const key = (storedKey && storedKey.trim()) ? storedKey.trim() : 'rnd_yJ0QbFmEPVzGFlD6OwWG4o8Rg6t8';
+    const key = (storedKey && storedKey.trim()) ? storedKey.trim() : '';
     const masked = key.length > 8
       ? `${key.substring(0, 8)}••••${key.substring(key.length - 4)}`
       : '••••••••';
@@ -611,9 +611,9 @@ export function getMcpConfig(): McpConfig {
     console.warn("getMcpConfig error:", e);
     return {
       enabled: true,
-      renderApiKey: 'rnd_yJ0QbFmEPVzGFlD6OwWG4o8Rg6t8',
+      renderApiKey: '',
       julesDebugEnabled: true,
-      maskedKey: 'rnd_yJ0Q••••6t8',
+      maskedKey: '••••••••',
       mcpServerUrl: 'https://api.render.com/v1/mcp'
     };
   }

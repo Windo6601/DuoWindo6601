@@ -103,8 +103,11 @@ export const SendIcon: React.FC<{ className?: string }> = ({ className }) => (
 );
 
 export const AlphabetIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg viewBox="0 0 100 100" className={className}>
-    <text x="50%" y="70%" dominantBaseline="middle" textAnchor="middle" fontSize="60" fill="#1CB0F6" fontWeight="bold" fontFamily="serif">あ</text>
+  <svg viewBox="0 0 100 100" className={className} fill="none">
+    <rect x="14" y="16" width="72" height="68" rx="20" fill="currentColor" fillOpacity="0.18" />
+    <rect x="14" y="14" width="72" height="68" rx="20" stroke="currentColor" strokeWidth="7" />
+    <path d="M30 65 L46 27 L62 65 M35 52 L57 52" stroke="currentColor" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+    <text x="68" y="65" fontSize="30" fontWeight="900" fill="currentColor" fontFamily="system-ui, -apple-system, sans-serif">а</text>
   </svg>
 );
 

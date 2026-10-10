@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { UndoIcon, EyeIcon, VolumeIcon, TrashIcon } from './Icons';
+import { ALPHABET_HANDWRITING_ITEMS, pointsToSvgPath } from '../services/handwritingData';
 
 interface Point {
   x: number;
@@ -248,6 +249,12 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     }
   };
 
+  const matchingData = ALPHABET_HANDWRITING_ITEMS.find(
+    l => l.char.toUpperCase() === character.toUpperCase() || 
+         l.name.toUpperCase() === character.toUpperCase() || 
+         l.id.toLowerCase().includes(character.toLowerCase())
+  );
+
   return (
     <div className="flex-1 flex flex-col items-center justify-center relative overflow-hidden touch-none select-none min-h-0 w-full max-w-sm mx-auto px-2">
       <h2 className="text-xs md:text-sm font-bold mb-2 text-center tracking-tight text-gray-300 uppercase">
@@ -276,6 +283,37 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
           {/* Vertical center axis line */}
           <line x1="50%" y1="0" x2="50%" y2="100%" stroke="#cbd5e1" strokeWidth="1.5" strokeDasharray="4 4" />
         </svg>
+
+        {/* GUIDED STROKE SCHEME WITH NUMBERS */}
+        {matchingData && showTrace && (
+          <svg className="absolute inset-0 w-full h-full pointer-events-none select-none z-0" viewBox="0 0 100 100">
+            {matchingData.strokes.map(s => {
+              const start = s.start || s.startPoint;
+              const svgD = s.svgPath || (Array.isArray(s.path) ? pointsToSvgPath(s.path) : (s.path as any));
+              return (
+                <g key={s.id}>
+                  <path
+                    d={svgD}
+                    fill="none"
+                    stroke="#0284c7"
+                    strokeWidth="3.5"
+                    strokeDasharray="4 4"
+                    strokeLinecap="round"
+                    opacity={0.65}
+                  />
+                  {start && (
+                    <>
+                      <circle cx={start.x} cy={start.y} r="3" fill="#10b981" stroke="#fff" strokeWidth="0.8" />
+                      <text x={start.x} y={start.y + 1} textAnchor="middle" dominantBaseline="middle" fill="#fff" fontSize="2.5" fontWeight="bold">
+                        {s.id}
+                      </text>
+                    </>
+                  )}
+                </g>
+              );
+            })}
+          </svg>
+        )}
 
         {/* TRACE LAYER WITH PROPORTIONAL LETTER SIZE */}
         <div

@@ -16,7 +16,10 @@ import {
   getDaysUntilIncognitoClosure, 
   getFormattedClosureDate, 
   downloadIncognitoDataFile, 
-  copyIncognitoDataToClipboard 
+  copyIncognitoDataToClipboard,
+  isIncognitoClosingTomorrow,
+  getIncognitoClosureTitle,
+  getSynchronizedActiveStatuses
 } from '../services/incognitoService';
 
 export interface AuthModalProps {
@@ -1448,46 +1451,42 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 : 'bg-amber-950/50 border-amber-500/70 text-amber-200 shadow-[0_0_20px_rgba(245,158,11,0.15)]'
             } space-y-2 text-left`}>
               <div className="flex items-center space-x-2.5">
-                <span className="text-2xl shrink-0">{incognitoClosed ? '🛑' : '⚠️'}</span>
+                <span className="text-2xl shrink-0">{incognitoClosed ? '🛑' : '🚫'}</span>
                 <div>
                   <h4 className="font-black text-sm text-white uppercase tracking-wide">
-                    {incognitoClosed
-                      ? (isRu 
-                          ? 'Вход в Режим Инкогнито закрыт с 10 октября 2026 г.' 
-                          : 'Incognito Login Closed since October 10, 2026')
-                      : (isRu 
-                          ? '10 октября 2026 года вход в Режим Инкогнито закрывается!' 
-                          : 'Incognito Login closes on October 10, 2026!')}
+                    {getIncognitoClosureTitle(user.language)}
                   </h4>
-                  <span className="text-[11px] font-bold opacity-80 block">
+                  <span className="text-[11px] font-bold opacity-80 block text-amber-300">
                     {incognitoClosed
                       ? (isRu ? 'Новые сессии без аккаунта заблокированы' : 'New anonymous sessions are blocked')
-                      : (isRu ? `Осталось дней до закрытия: ${daysUntilClosure > 0 ? daysUntilClosure : 0}` : `Days remaining: ${daysUntilClosure > 0 ? daysUntilClosure : 0}`)}
+                      : (isIncognitoClosingTomorrow() 
+                          ? (isRu ? 'Срок действия истекает сегодня ночью (00:00, 10.10.2026)' : 'Expiring tonight (00:00, Oct 10, 2026)')
+                          : (isRu ? `Осталось дней до закрытия: ${daysUntilClosure > 0 ? daysUntilClosure : 0}` : `Days remaining: ${daysUntilClosure > 0 ? daysUntilClosure : 0}`))}
                   </span>
                 </div>
               </div>
               <div className="space-y-1">
                 <p className="text-xs text-amber-200 font-bold leading-relaxed">
                   {isRu
-                    ? 'После 10 октября 2026 года Режим Инкогнито будет недоступен, и его нельзя будет восстановить в DuoWindo6601.'
-                    : 'After October 10, 2026, Incognito Mode will be unavailable and cannot be restored in DuoWindo6601.'}
+                    ? '10 октября 2026 года вход в Режим Инкогнито недоступен, и его нельзя будет восстановить в DuoWindo6601.'
+                    : 'On October 10, 2026, entry into Incognito Mode is unavailable and cannot be restored in DuoWindo6601.'}
                 </p>
                 <p className="text-[11px] text-gray-300 font-medium leading-relaxed">
                   {isRu
-                    ? 'Если вы хотите сохранить какой-либо контент, мы рекомендуем заранее экспортировать данные Firebase Firestore & Auth через Раздел «Профиль» и Раздел «Настройки» или выполнить Полный Вход в систему.'
-                    : 'If you want to save any content, we recommend exporting your Firebase Firestore & Auth data in advance via the Profile and Settings sections or performing Full Sign-In.'}
+                    ? 'Синхронизирован актуальный статус не закрытия: Полный Вход и регистрация работают без ограничений, профиль Администратора доступен.'
+                    : 'Synchronized actual unclosed status: Full Sign-In & registration operate normally, Administrator profile is active.'}
                 </p>
               </div>
               
               {/* STATUS CONFIRMATION PILLS */}
-              <div className="pt-1 flex flex-wrap gap-2 text-[11px] font-bold">
-                <span className="bg-emerald-950/80 text-emerald-300 border border-emerald-500/50 px-2 py-0.5 rounded-lg flex items-center space-x-1">
+              <div className="pt-1.5 flex flex-wrap gap-2 text-[11px] font-bold">
+                <span className="bg-emerald-950/90 text-emerald-300 border border-emerald-500/60 px-2.5 py-1 rounded-xl flex items-center space-x-1.5 shadow-sm">
                   <span>✅</span>
-                  <span>{isRu ? 'Полный Вход: НЕ ЗАКРЫТ (Работает)' : 'Full Sign-In: Active & Unclosed'}</span>
+                  <span>{isRu ? 'Полный Вход и регистрация: НЕ ЗАКРЫТ (Работает)' : 'Full Sign-In & Registration: NOT CLOSED (Active)'}</span>
                 </span>
-                <span className="bg-amber-950/80 text-amber-300 border border-amber-500/50 px-2 py-0.5 rounded-lg flex items-center space-x-1">
+                <span className="bg-amber-950/90 text-amber-300 border border-amber-500/60 px-2.5 py-1 rounded-xl flex items-center space-x-1.5 shadow-sm">
                   <span>👑</span>
-                  <span>{isRu ? 'Профиль Администратора: НЕ ЗАКРЫТ' : 'Admin Profile: Active & Unclosed'}</span>
+                  <span>{isRu ? 'Профиль Администратора: НЕ ЗАКРЫТ' : 'Admin Profile: NOT CLOSED'}</span>
                 </span>
               </div>
             </div>
@@ -1606,7 +1605,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   className="w-full py-3.5 bg-gray-900 border-2 border-rose-500/50 text-rose-300 font-black rounded-2xl text-xs uppercase tracking-wider flex items-center justify-center space-x-2 cursor-not-allowed opacity-80"
                 >
                   <span>🛑</span>
-                  <span>{isRu ? 'Вход в Инкогнито закрыт с 10 октября 2026 г.' : 'Incognito Entry Closed since Oct 10, 2026'}</span>
+                  <span>{isRu ? 'Вход в Инкогнито недоступен' : 'Incognito Entry Unavailable'}</span>
                 </button>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

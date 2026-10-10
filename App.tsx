@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
@@ -42,8 +43,23 @@ import {
   isIncognitoLoginClosed, 
   getDaysUntilIncognitoClosure, 
   getFormattedClosureDate, 
-  downloadIncognitoDataFile 
+  downloadIncognitoDataFile,
+  isIncognitoClosingTomorrow,
+  getIncognitoClosureTitle,
+  getSynchronizedActiveStatuses
 } from './services/incognitoService';
+import { 
+  DUOWINDO6601_OFFICIAL_CATALOG, 
+  formatLearnerCount, 
+  searchCatalog,
+  SPEAKER_LANGUAGES,
+  getCoursesForSpeaker,
+  getLocalizedLanguageName,
+  getLocalizedCatalogTitle,
+  LANGUAGE_TRANSLATIONS,
+  SpeakerLanguageOption
+} from './services/duowindo6601Catalog';
+import { ALL_COUNTRIES, getLocalizedCountryName } from './services/countryTranslationService';
 import { AiLimitModal } from './components/AiLimitModal';
 import { AiLimitSection } from './components/AiLimitSection';
 import { GeminiRefillSection } from './components/GeminiRefillSection';
@@ -52,6 +68,7 @@ import { AuthModal } from './components/AuthModal';
 import { ChessInviteModal, ChessOpponent } from './components/ChessInviteModal';
 import { ChessAnalysisScreen } from './components/ChessAnalysisScreen';
 import { triggerHapticFeedback } from './services/audioService';
+import { LettersScreen } from './components/LettersScreen';
 import { CIS_ALPHABET_DATA, AlphabetItem, AlphabetCategory as CISAlphabetCategory } from './services/alphabetData';
 import {
   initFirestoreCacheMaintenance,
@@ -293,6 +310,30 @@ const CIS_COURSES: Course[] = [
   { id: 'tg', name: 'Tajik', localName: 'Таджикский (Таджикистан)', flagCode: 'tj', themeColor: 'bg-green-600', themeBorder: 'border-green-800', mascotVariant: 'default' },
 ];
 
+const HARDEST_COURSES: Course[] = [
+  { id: 'tab', name: 'Tabasaran', localName: 'Табасаранский (Табасаран)', flagCode: 'ru', themeColor: 'bg-purple-600', themeBorder: 'border-purple-800', mascotVariant: 'default' },
+  { id: 'hu', name: 'Hungarian', localName: 'Венгерский (Magyar)', flagCode: 'hu', themeColor: 'bg-red-500', themeBorder: 'border-red-700', mascotVariant: 'default' },
+  { id: 'eu', name: 'Basque', localName: 'Баскский (Euskara)', flagCode: 'es', themeColor: 'bg-emerald-600', themeBorder: 'border-emerald-800', mascotVariant: 'default' },
+  { id: 'fi', name: 'Finnish', localName: 'Финский (Suomi)', flagCode: 'fi', themeColor: 'bg-blue-600', themeBorder: 'border-blue-800', mascotVariant: 'default' },
+  { id: 'nv', name: 'Navajo', localName: 'Навахо (Diné bizaad)', flagCode: 'us', themeColor: 'bg-amber-600', themeBorder: 'border-amber-800', mascotVariant: 'default' },
+  { id: 'is', name: 'Icelandic', localName: 'Исландский (Íslenska)', flagCode: 'is', themeColor: 'bg-indigo-600', themeBorder: 'border-indigo-800', mascotVariant: 'default' },
+  { id: 'pl', name: 'Polish', localName: 'Польский (Polski)', flagCode: 'pl', themeColor: 'bg-rose-500', themeBorder: 'border-rose-700', mascotVariant: 'default' },
+];
+
+const HARDEST_LANGUAGE_INFO: Record<string, { badge: string; reasonRu: string; reasonEn: string; rank: string }> = {
+  tab: { badge: '🏆 Рекорд Гиннесса', reasonRu: '48–53 падежа существительных, сложнейшая эргативная грамматика', reasonEn: 'Guinness Record: 48–53 noun cases, intricate ergative grammar', rank: '#1' },
+  hu: { badge: '⚡ Уральский гигант', reasonRu: '18–35 падежей, сингармонизм гласных, агглютинация суффиксов', reasonEn: '18–35 noun cases, vowel harmony, agglutinative affixes', rank: '#2' },
+  eu: { badge: '🗿 Древний изолят', reasonRu: 'Язык-изолят Европы, полиперсональное спряжение глаголов', reasonEn: 'European language isolate, polypersonal verb conjugation', rank: '#3' },
+  fi: { badge: '❄️ 15 падежей', reasonRu: '15 падежей, чередование ступеней согласных, отсутствие предлогов', reasonEn: '15 noun cases, consonant gradation, no prepositions', rank: '#4' },
+  nv: { badge: '🪶 Язык шифровальщиков', reasonRu: 'Полисинтетический строй, 4 тона, префиксы формы и одушевленности', reasonEn: 'Code Talkers language, polysynthetic verb structure, 4 tones', rank: '#5' },
+  is: { badge: '⚔️ Язык викингов', reasonRu: 'Древнескандинавская морфология, 4 падежа, пуризм словаря', reasonEn: 'Old Norse archaic grammar, 4 cases, strict linguistic purism', rank: '#6' },
+  pl: { badge: '🌪️ Фонетический шторм', reasonRu: '7 падежей, ряды шипящих согласных, сложнейшие исключения', reasonEn: '7 cases, dense consonant clusters (szcz, rz), complex aspects', rank: '#7' },
+  ja: { badge: '🏯 3 системы письма', reasonRu: 'Кандзи + Хирагана + Катакана, система почтительности кейго', reasonEn: '3 writing scripts (Kanji/Kana), complex keigo honorifics', rank: '#8' },
+  zh: { badge: '🏮 Тоновая иероглифика', reasonRu: '4 тона + нейтральный, тысячи логограмм, счётные слова', reasonEn: '4 tones, logographic characters, extensive homophones', rank: '#9' },
+  ar: { badge: '📜 Трёхсогласный корень', reasonRu: 'Корневая морфология, письмо справа налево, двойственное число', reasonEn: 'Triconsonantal root system, right-to-left abjad script, dual form', rank: '#10' },
+  ko: { badge: '🎎 Иерархия вежливости', reasonRu: '7 уровней уважительности, частицы-послелоги, агглютинация', reasonEn: '7 speech politeness levels, postpositions, SOV word order', rank: '#11' },
+};
+
 const WORLD_COURSES: Course[] = [
   { id: 'en', name: 'English', localName: 'Английский', flagCode: 'us', themeColor: 'bg-duo-blue', themeBorder: 'border-duo-blueDark', mascotVariant: 'default' },
   { id: 'de', name: 'German', localName: 'Немецкий', flagCode: 'de', themeColor: 'bg-orange-500', themeBorder: 'border-orange-700', mascotVariant: 'default' },
@@ -307,6 +348,11 @@ const WORLD_COURSES: Course[] = [
   { id: 'he', name: 'Hebrew', localName: 'Иврит', flagCode: 'il', themeColor: 'bg-blue-600', themeBorder: 'border-blue-800', mascotVariant: 'default' },
 ];
 
+const ALL_HARDEST_COURSES: Course[] = [
+  ...HARDEST_COURSES,
+  ...WORLD_COURSES.filter(c => ['ja', 'zh', 'ar', 'ko'].includes(c.id))
+];
+
 const SPECIAL_COURSES: Course[] = [
   { id: 'math', name: 'Mathematics', localName: 'Математика', flagCode: 'math', themeColor: 'bg-duo-blue', themeBorder: 'border-duo-blueDark', mascotVariant: 'math' },
   { id: 'music', name: 'Music', localName: 'Музыка', flagCode: 'music', themeColor: 'bg-pink-500', themeBorder: 'border-pink-700', mascotVariant: 'music' },
@@ -314,10 +360,11 @@ const SPECIAL_COURSES: Course[] = [
 ];
 
 const SPECIAL_IDS = ['math', 'music', 'chess', 'hv', 'tlh'];
-const CONLANG_IDS = ['nv', 'yi', 'hv', 'tlh'];
+const CONLANG_IDS = ['yi', 'hv', 'tlh'];
 const CIS_IDS = CIS_COURSES.map(c => c.id);
 
 const COURSES: Course[] = [
+  ...HARDEST_COURSES,
   ...WORLD_COURSES,
   ...CIS_COURSES,
   ...SPECIAL_COURSES,
@@ -697,11 +744,291 @@ const ALPHABET_SETS: Record<string, AlphabetCategory[]> = {
       script: 'special',
       items: ['ך', 'ם', 'ן', 'ף', 'ץ']
     }
+  ],
+  'hu': [
+    {
+      title: 'Magyar ábécé (Венгерский алфавит — 44 буквы)',
+      description: 'Уникальный алфавит с двойными и тройными согласными (cs, dz, dzs, gy, ly, ny, sz, ty, zs)',
+      script: 'latin',
+      items: [
+        { char: 'A', name: 'a', sound: '[ɒ]', word: 'Alma', translation: 'Яблоко' },
+        { char: 'Á', name: 'á', sound: '[aː]', word: 'Álom', translation: 'Мечта / Сон' },
+        { char: 'B', name: 'bé', sound: '[b]', word: 'Bor', translation: 'Вино' },
+        { char: 'C', name: 'cé', sound: '[ts]', word: 'Cica', translation: 'Котёнок' },
+        { char: 'Cs', name: 'csé', sound: '[tʃ]', word: 'Család', translation: 'Семья' },
+        { char: 'D', name: 'dé', sound: '[d]', word: 'Dió', translation: 'Орех' },
+        { char: 'Dz', name: 'dzé', sound: '[dz]', word: 'Edző', translation: 'Тренер' },
+        { char: 'Dzs', name: 'dzsé', sound: '[dʒ]', word: 'Dzsip', translation: 'Джип' },
+        { char: 'E', name: 'e', sound: '[ɛ]', word: 'Erdő', translation: 'Лес' },
+        { char: 'É', name: 'é', sound: '[eː]', word: 'Élet', translation: 'Жизнь' },
+        { char: 'F', name: 'ef', sound: '[f]', word: 'Fa', translation: 'Дерево' },
+        { char: 'G', name: 'gé', sound: '[ɡ]', word: 'Gomba', translation: 'Гриб' },
+        { char: 'Gy', name: 'gyé', sound: '[ɟ]', word: 'Gyerek', translation: 'Ребёнок' },
+        { char: 'H', name: 'há', sound: '[h]', word: 'Ház', translation: 'Дом' },
+        { char: 'I', name: 'i', sound: '[i]', word: 'Ing', translation: 'Рубашка' },
+        { char: 'Í', name: 'í', sound: '[iː]', word: 'Ír', translation: 'Писать' },
+        { char: 'J', name: 'jé', sound: '[j]', word: 'Jó', translation: 'Хороший' },
+        { char: 'K', name: 'ká', sound: '[k]', word: 'Kéz', translation: 'Рука' },
+        { char: 'L', name: 'el', sound: '[l]', word: 'Ló', translation: 'Лошадь' },
+        { char: 'Ly', name: 'ej / el-ypsilon', sound: '[j]', word: 'Lyuk', translation: 'Дыра' },
+        { char: 'M', name: 'em', sound: '[m]', word: 'Madár', translation: 'Птица' },
+        { char: 'N', name: 'en', sound: '[n]', word: 'Nap', translation: 'Солнце / День' },
+        { char: 'Ny', name: 'eny', sound: '[ɲ]', word: 'Nyelv', translation: 'Язык' },
+        { char: 'O', name: 'o', sound: '[o]', word: 'Orr', translation: 'Нос' },
+        { char: 'Ó', name: 'ó', sound: '[oː]', word: 'Óra', translation: 'Часы' },
+        { char: 'Ö', name: 'ö', sound: '[ø]', word: 'Öt', translation: 'Пять' },
+        { char: 'Ő', name: 'ő', sound: '[øː]', word: 'Ősz', translation: 'Осень' },
+        { char: 'P', name: 'pé', sound: '[p]', word: 'Pénz', translation: 'Деньги' },
+        { char: 'R', name: 'er', sound: '[r]', word: 'Reggel', translation: 'Утро' },
+        { char: 'S', name: 'es', sound: '[ʃ]', word: 'Szép (s=[ш])', translation: 'Красивый' },
+        { char: 'Sz', name: 'esz', sound: '[s]', word: 'Szó', translation: 'Слово' },
+        { char: 'T', name: 'té', sound: '[t]', word: 'Tűz', translation: 'Огонь' },
+        { char: 'Ty', name: 'tyé', sound: '[c]', word: 'Tyúk', translation: 'Курица' },
+        { char: 'U', name: 'u', sound: '[u]', word: 'Utca', translation: 'Улица' },
+        { char: 'Ú', name: 'ú', sound: '[uː]', word: 'Új', translation: 'Новый' },
+        { char: 'Ü', name: 'ü', sound: '[y]', word: 'Üveg', translation: 'Стекло' },
+        { char: 'Ű', name: 'ű', sound: '[yː]', word: 'Űr', translation: 'Космос' },
+        { char: 'V', name: 'vé', sound: '[v]', word: 'Víz', translation: 'Вода' },
+        { char: 'Z', name: 'zé', sound: '[z]', word: 'Zene', translation: 'Музыка' },
+        { char: 'Zs', name: 'zsé', sound: '[ʒ]', word: 'Zseb', translation: 'Карман' }
+      ]
+    }
+  ],
+  'fi': [
+    {
+      title: 'Suomen aakkoset (Финский алфавит — 29 букв)',
+      description: 'Фонетический алфавит с гармонией гласных (Ä, Ö, Y) и долгими звуками',
+      script: 'latin',
+      items: [
+        { char: 'A', name: 'aa', sound: '[ɑ]', word: 'Aurinko', translation: 'Солнце' },
+        { char: 'B', name: 'bee', sound: '[b]', word: 'Banaani', translation: 'Банан' },
+        { char: 'C', name: 'see', sound: '[s]/[k]', word: 'Celsius', translation: 'Цельсий' },
+        { char: 'D', name: 'dee', sound: '[d]', word: 'Kotiin (D)', translation: 'Домой' },
+        { char: 'E', name: 'ee', sound: '[e]', word: 'Elämä', translation: 'Жизнь' },
+        { char: 'F', name: 'äf', sound: '[f]', word: 'Farkut', translation: 'Джинсы' },
+        { char: 'G', name: 'gee', sound: '[ɡ]', word: 'Helsinki (ng)', translation: 'Хельсинки' },
+        { char: 'H', name: 'hoo', sound: '[h]', word: 'Hevonen', translation: 'Лошадь' },
+        { char: 'I', name: 'ii', sound: '[i]', word: 'Ilta', translation: 'Вечер' },
+        { char: 'J', name: 'jii', sound: '[j]', word: 'Järvi', translation: 'Озеро' },
+        { char: 'K', name: 'koo', sound: '[k]', word: 'Kissa', translation: 'Кот' },
+        { char: 'L', name: 'äl', sound: '[l]', word: 'Lumi', translation: 'Снег' },
+        { char: 'M', name: 'äm', sound: '[m]', word: 'Maa', translation: 'Земля / Страна' },
+        { char: 'N', name: 'än', sound: '[n]', word: 'Nainen', translation: 'Женщина' },
+        { char: 'O', name: 'oo', sound: '[o]', word: 'Ovi', translation: 'Дверь' },
+        { char: 'P', name: 'pee', sound: '[p]', word: 'Puu', translation: 'Дерево' },
+        { char: 'R', name: 'är', sound: '[r]', word: 'Rakkaus', translation: 'Любовь' },
+        { char: 'S', name: 'äs', sound: '[s]', word: 'Suomi', translation: 'Финляндия' },
+        { char: 'T', name: 'tee', sound: '[t]', word: 'Talo', translation: 'Дом' },
+        { char: 'U', name: 'uu', sound: '[u]', word: 'Uusi', translation: 'Новый' },
+        { char: 'V', name: 'vee', sound: '[v]', word: 'Vesi', translation: 'Вода' },
+        { char: 'Y', name: 'yy', sound: '[y]', word: 'Yö', translation: 'Ночь' },
+        { char: 'Ä', name: 'ää', sound: '[æ]', word: 'Äiti', translation: 'Мама' },
+        { char: 'Ö', name: 'öö', sound: '[ø]', word: 'Öljy', translation: 'Масло' },
+        { char: 'Å', name: 'ruotsalainen oo', sound: '[oː]', word: 'Åland', translation: 'Аландские о-ва' }
+      ]
+    }
+  ],
+  'is': [
+    {
+      title: 'Íslenska stafrófið (Исландский алфавит — 32 буквы)',
+      description: 'Древнескандинавские рунические буквы Торн (Þ) и Эд (Ð)',
+      script: 'latin',
+      items: [
+        { char: 'A', name: 'a', sound: '[a]', word: 'Afi', translation: 'Дедушка' },
+        { char: 'Á', name: 'á', sound: '[au]', word: 'Ást', translation: 'Любовь' },
+        { char: 'B', name: 'bé', sound: '[p]', word: 'Bók', translation: 'Книга' },
+        { char: 'D', name: 'dé', sound: '[t]', word: 'Dagur', translation: 'День' },
+        { char: 'Ð', name: 'eð', sound: '[ð]', word: 'Maður', translation: 'Человек / Мужчина' },
+        { char: 'E', name: 'e', sound: '[ɛ]', word: 'Eldur', translation: 'Огонь' },
+        { char: 'É', name: 'é', sound: '[jɛ]', word: 'Ég', translation: 'Я' },
+        { char: 'F', name: 'eff', sound: '[f]/[v]', word: 'Fjall', translation: 'Гора' },
+        { char: 'G', name: 'ge', sound: '[k]/[ɣ]', word: 'Góður', translation: 'Хороший' },
+        { char: 'H', name: 'há', sound: '[h]', word: 'Hús', translation: 'Дом' },
+        { char: 'I', name: 'i', sound: '[ɪ]', word: 'Ísland', translation: 'Исландия' },
+        { char: 'Í', name: 'í', sound: '[i]', word: 'Ís', translation: 'Лёд' },
+        { char: 'J', name: 'joð', sound: '[j]', word: 'Jörð', translation: 'Земля' },
+        { char: 'K', name: 'ká', sound: '[kʰ]', word: 'Köttur', translation: 'Кот' },
+        { char: 'L', name: 'ell', sound: '[l]/[tl]', word: 'Ljós', translation: 'Свет' },
+        { char: 'M', name: 'emm', sound: '[m]', word: 'Mamma', translation: 'Мама' },
+        { char: 'N', name: 'enn', sound: '[n]', word: 'Nótt', translation: 'Ночь' },
+        { char: 'O', name: 'o', sound: '[ɔ]', word: 'Ormur', translation: 'Змей' },
+        { char: 'Ó', name: 'ó', sound: '[ou]', word: 'Ósk', translation: 'Желание' },
+        { char: 'P', name: 'pé', sound: '[pʰ]', word: 'Pabbi', translation: 'Папа' },
+        { char: 'R', name: 'err', sound: '[r]', word: 'Rigning', translation: 'Дождь' },
+        { char: 'S', name: 'ess', sound: '[s]', word: 'Sól', translation: 'Солнце' },
+        { char: 'T', name: 'té', sound: '[tʰ]', word: 'Tími', translation: 'Время' },
+        { char: 'U', name: 'u', sound: '[ʏ]', word: 'Ull', translation: 'Шерсть' },
+        { char: 'Ú', name: 'ú', sound: '[u]', word: 'Úlfar', translation: 'Волки' },
+        { char: 'V', name: 'vaff', sound: '[v]', word: 'Vatn', translation: 'Вода' },
+        { char: 'Þ', name: 'þorn', sound: '[θ]', word: 'Þakka', translation: 'Благодарить' },
+        { char: 'Æ', name: 'æ', sound: '[ai]', word: 'Æska', translation: 'Молодость' },
+        { char: 'Ö', name: 'ö', sound: '[œ]', word: 'Örn', translation: 'Орёл' }
+      ]
+    }
+  ],
+  'pl': [
+    {
+      title: 'Alfabet polski (Польский алфавит — 32 буквы)',
+      description: 'Богатейшая система носовых гласных (Ą, Ę) и шипящих (Ć, Ł, Ń, Ś, Ź, Ż)',
+      script: 'latin',
+      items: [
+        { char: 'A', name: 'a', sound: '[a]', word: 'Anioł', translation: 'Ангел' },
+        { char: 'Ą', name: 'ą', sound: '[ɔ̃]', word: 'Mąż', translation: 'Муж' },
+        { char: 'B', name: 'be', sound: '[b]', word: 'Brat', translation: 'Брат' },
+        { char: 'C', name: 'ce', sound: '[ts]', word: 'Czas', translation: 'Время' },
+        { char: 'Ć', name: 'cie', sound: '[tɕ]', word: 'Ćma', translation: 'Мотылёк' },
+        { char: 'D', name: 'de', sound: '[d]', word: 'Dom', translation: 'Дом' },
+        { char: 'E', name: 'e', sound: '[ɛ]', word: 'Ekran', translation: 'Экран' },
+        { char: 'Ę', name: 'ę', sound: '[ɛ̃]', word: 'Ręka', translation: 'Рука' },
+        { char: 'F', name: 'ef', sound: '[f]', word: 'Film', translation: 'Фильм' },
+        { char: 'G', name: 'gie', sound: '[ɡ]', word: 'Góra', translation: 'Гора' },
+        { char: 'H', name: 'ha', sound: '[x]', word: 'Herbata', translation: 'Чай' },
+        { char: 'I', name: 'i', sound: '[i]', word: 'Iskra', translation: 'Искра' },
+        { char: 'J', name: 'jot', sound: '[j]', word: 'Jutro', translation: 'Завтра' },
+        { char: 'K', name: 'ka', sound: '[k]', word: 'Kot', translation: 'Кот' },
+        { char: 'L', name: 'el', sound: '[l]', word: 'Las', translation: 'Лес' },
+        { char: 'Ł', name: 'eł', sound: '[w]', word: 'Łódź', translation: 'Лодка' },
+        { char: 'M', name: 'em', sound: '[m]', word: 'Mama', translation: 'Мама' },
+        { char: 'N', name: 'en', sound: '[n]', word: 'Noc', translation: 'Ночь' },
+        { char: 'Ń', name: 'eń', sound: '[ɲ]', word: 'Koń', translation: 'Конь' },
+        { char: 'O', name: 'o', sound: '[ɔ]', word: 'Okno', translation: 'Окно' },
+        { char: 'Ó', name: 'ó kreskowane', sound: '[u]', word: 'Ósmy', translation: 'Восьмой' },
+        { char: 'P', name: 'pe', sound: '[p]', word: 'Polska', translation: 'Польша' },
+        { char: 'R', name: 'er', sound: '[r]', word: 'Rzeka', translation: 'Река' },
+        { char: 'S', name: 'es', sound: '[s]', word: 'Słońce', translation: 'Солнце' },
+        { char: 'Ś', name: 'eś', sound: '[ɕ]', word: 'Śnieg', translation: 'Снег' },
+        { char: 'T', name: 'te', sound: '[t]', word: 'Tydzień', translation: 'Неделя' },
+        { char: 'U', name: 'u', sound: '[u]', word: 'Ulica', translation: 'Улица' },
+        { char: 'W', name: 'wu', sound: '[v]', word: 'Woda', translation: 'Вода' },
+        { char: 'Y', name: 'igrek', sound: '[ɨ]', word: 'Syn', translation: 'Сын' },
+        { char: 'Z', name: 'zet', sound: '[z]', word: 'Zima', translation: 'Зима' },
+        { char: 'Ź', name: 'ziet', sound: '[ʑ]', word: 'Źródło', translation: 'Источник' },
+        { char: 'Ż', name: 'żet z kropką', sound: '[ʐ]', word: 'Życie', translation: 'Жизнь' }
+      ]
+    }
+  ],
+  'eu': [
+    {
+      title: 'Euskal alfabetoa (Баскский алфавит — 27 букв)',
+      description: 'Древнейший изолированный язык Европы с диграфами ts, tx, tz',
+      script: 'latin',
+      items: [
+        { char: 'A', name: 'a', sound: '[a]', word: 'Aita', translation: 'Отец' },
+        { char: 'B', name: 'be', sound: '[b]', word: 'Begi', translation: 'Глаз' },
+        { char: 'D', name: 'de', sound: '[d]', word: 'Diru', translation: 'Деньги' },
+        { char: 'E', name: 'e', sound: '[e]', word: 'Etxeko', translation: 'Домашний' },
+        { char: 'F', name: 'efe', sound: '[f]', word: 'Festa', translation: 'Праздник' },
+        { char: 'G', name: 'ge', sound: '[ɡ]', word: 'Gau', translation: 'Ночь' },
+        { char: 'H', name: 'hatxe', sound: '[h]', word: 'Haur', translation: 'Ребёнок' },
+        { char: 'I', name: 'i', sound: '[i]', word: 'Izar', translation: 'Звезда' },
+        { char: 'J', name: 'jota', sound: '[x]/[j]', word: 'Jan', translation: 'Есть / Кушать' },
+        { char: 'K', name: 'ka', sound: '[k]', word: 'Katu', translation: 'Кот' },
+        { char: 'L', name: 'ele', sound: '[l]', word: 'Lur', translation: 'Земля' },
+        { char: 'M', name: 'eme', sound: '[m]', word: 'Mendi', translation: 'Гора' },
+        { char: 'N', name: 'ene', sound: '[n]', word: 'Neskato', translation: 'Девочка' },
+        { char: 'Ñ', name: 'eñe', sound: '[ɲ]', word: 'Iñaki', translation: 'Имя Иньяки' },
+        { char: 'O', name: 'o', sound: '[o]', word: 'Ogi', translation: 'Хлеб' },
+        { char: 'P', name: 'pe', sound: '[p]', word: 'Pake', translation: 'Мир' },
+        { char: 'R', name: 'erre', sound: '[r]', word: 'Rojua', translation: 'Красный' },
+        { char: 'S', name: 'ese', sound: '[s̺]', word: 'Sua', translation: 'Огонь' },
+        { char: 'T', name: 'te', sound: '[t]', word: 'Txoria', translation: 'Птица' },
+        { char: 'U', name: 'u', sound: '[u]', word: 'Ura', translation: 'Вода' },
+        { char: 'Z', name: 'zeta', sound: '[s̻]', word: 'Zeru', translation: 'Небо' }
+      ]
+    }
+  ],
+  'nv': [
+    {
+      title: 'Diné bizaad (Алфавит навахо)',
+      description: 'Язык легендарных шифровальщиков навахо: гортанные смычки, носовые гласные и 4 тона',
+      script: 'latin',
+      items: [
+        { char: 'A', name: 'a', sound: '[ɑ]', word: 'Abíní', translation: 'Утро' },
+        { char: 'B', name: 'bé', sound: '[p]', word: 'Bizaad', translation: 'Язык / Слово' },
+        { char: 'Ch', name: 'ch', sound: '[tʃʰ]', word: 'Chidí', translation: 'Автомобиль' },
+        { char: 'Chʼ', name: 'ch glottal', sound: '[tʃʼ]', word: 'Chʼah', translation: 'Шляпа' },
+        { char: 'D', name: 'dé', sound: '[t]', word: 'Diné', translation: 'Навахо / Народ' },
+        { char: 'Dl', name: 'dl', sound: '[tɬ]', word: 'Dlóóʼ', translation: 'Суслик' },
+        { char: 'Dz', name: 'dz', sound: '[ts]', word: 'Dzidzé', translation: 'Ягода' },
+        { char: 'E', name: 'e', sound: '[e]', word: 'Eʼeʼaah', translation: 'Запад' },
+        { char: 'G', name: 'gé', sound: '[k]', word: 'Góola', translation: 'Золото' },
+        { char: 'H', name: 'há', sound: '[x]', word: 'Hosh', translation: 'Кактус' },
+        { char: 'I', name: 'i', sound: '[i]', word: 'Iiná', translation: 'Жизнь' },
+        { char: 'J', name: 'jé', sound: '[tʃ]', word: 'Jóhonaaʼéí', translation: 'Солнце' },
+        { char: 'K', name: 'ká', sound: '[kʰ]', word: 'Kǫʼ', translation: 'Огонь' },
+        { char: 'Kʼ', name: 'k glottal', sound: '[kʼ]', word: 'Kʼad', translation: 'Сейчас' },
+        { char: 'L', name: 'el', sound: '[l]', word: 'Lį́į́ʼ', translation: 'Лошадь' },
+        { char: 'Ł', name: 'barred l', sound: '[ɬ]', word: 'Łóóʼ', translation: 'Рыба' },
+        { char: 'M', name: 'em', sound: '[m]', word: 'Mósí', translation: 'Кошка' },
+        { char: 'N', name: 'en', sound: '[n]', word: 'Níłchʼi', translation: 'Ветер' },
+        { char: 'O', name: 'o', sound: '[o]', word: 'Ooljééʼ', translation: 'Луна' },
+        { char: 'S', name: 'es', sound: '[s]', word: 'Są́', translation: 'Мудрость' },
+        { char: 'Sh', name: 'esh', sound: '[ʃ]', word: 'Shash', translation: 'Медведь' },
+        { char: 'T', name: 'té', sound: '[tʰ]', word: 'Tó', translation: 'Вода' },
+        { char: 'Tʼ', name: 't glottal', sound: '[tʼ]', word: 'Tʼáá', translation: 'Просто / Только' },
+        { char: 'W', name: 'we', sound: '[w]', word: 'Wózhchʼį́į́d', translation: 'Март' },
+        { char: 'Y', name: 'ye', sound: '[j]', word: 'Yáʼátʼééh', translation: 'Привет' },
+        { char: 'Z', name: 'zet', sound: '[z]', word: 'Zas', translation: 'Снег' }
+      ]
+    }
+  ],
+  'tab': [
+    {
+      title: 'Табасаран чIал (Табасаранский алфавит — Рекорд Гиннесса)',
+      description: 'Дагестанский язык с 48–53 падежами, глухими и смычно-гортанными согласными (кI, пI, тI, цI, чI)',
+      script: 'cyrillic',
+      items: [
+        { char: 'А', name: 'а', sound: '[a]', word: 'Абай', translation: 'Отец' },
+        { char: 'Аь', name: 'аь', sound: '[æ]', word: 'Аьхю', translation: 'Большой' },
+        { char: 'Б', name: 'бэ', sound: '[b]', word: 'Баб', translation: 'Мать' },
+        { char: 'В', name: 'вэ', sound: '[v]', word: 'Варж', translation: 'Молот' },
+        { char: 'Г', name: 'гэ', sound: '[g]', word: 'Гъяр', translation: 'Поле' },
+        { char: 'Гъ', name: 'гъ', sound: '[ʁ]', word: 'Гъум', translation: 'Песок' },
+        { char: 'Гь', name: 'гь', sound: '[h]', word: 'Гьял', translation: 'Состояние' },
+        { char: 'Д', name: 'дэ', sound: '[d]', word: 'Дад', translation: 'Отец' },
+        { char: 'Ж', name: 'жэ', sound: '[ʒ]', word: 'Жэннет', translation: 'Рай' },
+        { char: 'Жв', name: 'жв лабиал', sound: '[ʒʷ]', word: 'Жвув', translation: 'Сам' },
+        { char: 'З', name: 'зэ', sound: '[z]', word: 'Зул', translation: 'Осень' },
+        { char: 'И', name: 'и', sound: '[i]', word: 'Ицци', translation: 'Сладкий' },
+        { char: 'Й', name: 'йот', sound: '[j]', word: 'Йигъ', translation: 'День' },
+        { char: 'К', name: 'ка', sound: '[k]', word: 'Ккун', translation: 'Любить' },
+        { char: 'Къ', name: 'къ увуляр', sound: '[qʼ]', word: 'Къакъ', translation: 'Курица' },
+        { char: 'Кь', name: 'кь эйектив', sound: '[kʲʼ]', word: 'КьатI', translation: 'Кусок' },
+        { char: 'КI', name: 'кI гортанный', sound: '[kʼ]', word: 'КIул', translation: 'Голова' },
+        { char: 'Л', name: 'эл', sound: '[l]', word: 'Лазим', translation: 'Нужный' },
+        { char: 'М', name: 'эм', sound: '[m]', word: 'МагIна', translation: 'Смысл' },
+        { char: 'Н', name: 'эн', sound: '[n]', word: 'НивкI', translation: 'Сон' },
+        { char: 'П', name: 'пэ', sound: '[p]', word: 'Пул', translation: 'Деньги' },
+        { char: 'ПI', name: 'пI гортанный', sound: '[pʼ]', word: 'ПIини', translation: 'Черешня' },
+        { char: 'Р', name: 'эр', sound: '[r]', word: 'Ряхь', translation: 'Дорога' },
+        { char: 'С', name: 'эс', sound: '[s]', word: 'Саб', translation: 'Один' },
+        { char: 'Т', name: 'тэ', sound: '[t]', word: 'ТIул', translation: 'Обычай' },
+        { char: 'ТI', name: 'тI гортанный', sound: '[tʼ]', word: 'ТIуб', translation: 'Палец' },
+        { char: 'У', name: 'у', sound: '[u]', word: 'Узу', translation: 'Я' },
+        { char: 'Уь', name: 'уь', sound: '[y]', word: 'Уьмур', translation: 'Жизнь' },
+        { char: 'Х', name: 'ха', sound: '[χ]', word: 'Хал', translation: 'Дом' },
+        { char: 'Хъ', name: 'хъ увуляр', sound: '[qʰ]', word: 'Хъадагъу', translation: 'Взять' },
+        { char: 'Хь', name: 'хь веляр', sound: '[xʲ]', word: 'Хьял', translation: 'Завтра' },
+        { char: 'Ц', name: 'цэ', sound: '[ts]', word: 'ЦIа', translation: 'Огонь' },
+        { char: 'ЦI', name: 'цI гортанный', sound: '[tsʼ]', word: 'ЦIийи', translation: 'Новый' },
+        { char: 'Ч', name: 'чэ', sound: '[tʃ]', word: 'ЧIал', translation: 'Язык' },
+        { char: 'ЧI', name: 'чI гортанный', sound: '[tʃʼ]', word: 'ЧIвур', translation: 'Лицо' },
+        { char: 'Ш', name: 'ша', sound: '[ʃ]', word: 'Шубуб', translation: 'Три' },
+        { char: 'Ъ', name: 'твёрдый знак', sound: '[ʔ]', word: 'Аьгъю', translation: 'Знание' }
+      ]
+    }
   ]
 };
 
 const ALPHABETS: Record<string, string[]> = {
   'ru': ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ё', 'Ж', 'З', 'И', 'Й', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ', 'Ъ', 'Ы', 'Ь', 'Э', 'Ю', 'Я'],
+  'hu': ['A', 'Á', 'B', 'C', 'Cs', 'D', 'Dz', 'Dzs', 'E', 'É', 'F', 'G', 'Gy', 'H', 'I', 'Í', 'J', 'K', 'L', 'Ly', 'M', 'N', 'Ny', 'O', 'Ó', 'Ö', 'Ő', 'P', 'R', 'S', 'Sz', 'T', 'Ty', 'U', 'Ú', 'Ü', 'Ű', 'V', 'Z', 'Zs'],
+  'fi': ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'Å', 'Ä', 'Ö'],
+  'is': ['A', 'Á', 'B', 'D', 'Ð', 'E', 'É', 'F', 'G', 'H', 'I', 'Í', 'J', 'K', 'L', 'M', 'N', 'O', 'Ó', 'P', 'R', 'S', 'T', 'U', 'Ú', 'V', 'X', 'Y', 'Ý', 'Þ', 'Æ', 'Ö'],
+  'pl': ['A', 'Ą', 'B', 'C', 'Ć', 'D', 'E', 'Ę', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'Ł', 'M', 'N', 'Ń', 'O', 'Ó', 'P', 'R', 'S', 'Ś', 'T', 'U', 'W', 'Y', 'Z', 'Ź', 'Ż'],
+  'eu': ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'Ñ', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'],
+  'nv': ['A', 'B', 'Ch', 'Chʼ', 'D', 'Dl', 'Dz', 'E', 'G', 'Gh', 'H', 'Hw', 'I', 'J', 'K', 'Kʼ', 'Kw', 'L', 'Ł', 'M', 'N', 'O', 'S', 'Sh', 'T', 'Tʼ', 'Tł', 'Tłʼ', 'Ts', 'Tsʼ', 'W', 'X', 'Y', 'Z', 'Zh'],
+  'tab': ['А', 'Аь', 'Б', 'В', 'Г', 'Гъ', 'Гь', 'Д', 'Е', 'Ё', 'Ж', 'Жв', 'З', 'И', 'Й', 'К', 'Къ', 'Кь', 'КI', 'Л', 'М', 'Н', 'О', 'П', 'ПI', 'Р', 'С', 'Т', 'ТI', 'У', 'Уь', 'Ф', 'Х', 'Хъ', 'Хь', 'Ц', 'ЦI', 'Ч', 'ЧI', 'Чв', 'ЧIв', 'Ш', 'Шв', 'Щ', 'Ъ', 'Ы', 'Ь', 'Э', 'Ю', 'Я'],
   'be': ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ё', 'Ж', 'З', 'І', 'Й', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ў', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Ы', 'Ь', 'Э', 'Ю', 'Я'],
   'uk': ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е', 'Є', 'Ж', 'З', 'И', 'І', 'Ї', 'Й', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ', 'Ь', 'Ю', 'Я'],
   'mo': ['A', 'Ă', 'Â', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'Î', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'Ș', 'T', 'Ț', 'U', 'V', 'W', 'X', 'Y', 'Z'],
@@ -731,20 +1058,11 @@ const ALPHABETS: Record<string, string[]> = {
 
 const STORAGE_KEY = 'duowindo6601_user_progress_v1';
 
-const COUNTRIES = [
-  { code: 'ru', name: 'Russia', local: 'Россия' },
-  { code: 'us', name: 'United States', local: 'США' },
-  { code: 'de', name: 'Germany', local: 'Германия' },
-  { code: 'fr', name: 'France', local: 'Франция' },
-  { code: 'es', name: 'Spain', local: 'Испания' },
-  { code: 'sa', name: 'Saudi Arabia', local: 'Саудовская Аравия' },
-  { code: 'cn', name: 'China', local: 'Китай' },
-  { code: 'jp', name: 'Japan', local: 'Япония' },
-  { code: 'gb', name: 'United Kingdom', local: 'Великобритания' },
-  { code: 'kz', name: 'Kazakhstan', local: 'Казахстан' },
-  { code: 'by', name: 'Belarus', local: 'Беларусь' },
-  { code: 'uz', name: 'Uzbekistan', local: 'Узбекистан' },
-];
+const COUNTRIES = ALL_COUNTRIES.map(c => ({
+  code: c.code,
+  name: c.name,
+  local: c.translations['ru'] || c.name,
+}));
 
 const USER_TRANSLATIONS: Record<string, Record<string, string>> = {
   "home": {
@@ -1410,11 +1728,15 @@ const TRANSLATIONS: Record<string, any> = {
     coursesAndRegions: 'Курсы и Языковые регионы',
     searchPlaceholder: '🔍 Поиск языка или региона...',
     allCourses: 'Все курсы',
+    hardestLanguages: 'Сложные языки (TOP)',
     cisLanguages: 'СНГ языки (15)',
     worldLanguages: 'Мировые языки',
     subjectsAndGames: 'Предметы & Игры',
     rfRegions: 'Регионы РФ',
     searchResults: 'Результаты поиска',
+    hardestSectionTitle: 'Самые сложные языки мира',
+    hardestSectionDesc: 'Языки с рекордным количеством падежей, уникальной грамматикой, полиперсональным строем и тонами',
+    extremeDifficulty: 'Экстремальная сложность',
     cisSectionTitle: 'Языки СНГ и стран-соседей',
     worldSectionTitle: 'Популярные мировые языки',
     specialSectionTitle: 'Специальные предметы и Игры',
@@ -1434,6 +1756,7 @@ const TRANSLATIONS: Record<string, any> = {
     testAndroidBtn: '🤖 Тест Android',
     home: 'ГЛАВНАЯ', practice: 'ПРАКТИКА', leaderboard: 'РЕЙТИНГ', shop: 'МАГАЗИН', profile: 'ПРОФИЛЬ', feedback: 'ОТЗЫВЫ',
     lang_ru: 'Русский', lang_en: 'Английский', lang_de: 'Немецкий', lang_fr: 'Французский', lang_es: 'Испанский', lang_ja: 'Японский', lang_zh: 'Китайский',
+    lang_hu: 'Венгерский', lang_fi: 'Финский', lang_is: 'Исландский', lang_pl: 'Польский', lang_eu: 'Баскский', lang_nv: 'Навахо', lang_tab: 'Табасаранский',
     videoCallDesc: 'Живое общение с AI партнером', storiesAndWriting: 'Истории и Письмо', leaderboardDesc: 'Топ-3 переходят в Серебряную лигу',
     sslCertificateTitle: 'Сертификат SSL (WR2 / Новый сайт)', sslCertificateDesc: 'Данное подтверждение: издатель сертификата — сайт WR2. Серверу успешно удалось предоставить журналы прозрачности.',
     edit: 'Изменить', mobileSimulatorBench: 'Тест-стенд Мобильный Симулятор', mobileSimulatorDesc: 'Интерактивный эмулятор iOS и Android для проверки адаптивности на ПК.',
@@ -1585,11 +1908,15 @@ const TRANSLATIONS: Record<string, any> = {
     coursesAndRegions: 'Courses & Language Regions',
     searchPlaceholder: '🔍 Search language or region...',
     allCourses: 'All Courses',
+    hardestLanguages: 'Hardest Languages (TOP)',
     cisLanguages: 'CIS Languages (15)',
     worldLanguages: 'World Languages',
     subjectsAndGames: 'Subjects & Games',
     rfRegions: 'RF Regions',
     searchResults: 'Search Results',
+    hardestSectionTitle: "World's Hardest Languages",
+    hardestSectionDesc: 'Languages with record case systems, polysynthetic structures, polypersonal agreement and extreme complexity',
+    extremeDifficulty: 'Extreme Difficulty',
     cisSectionTitle: 'CIS & Neighboring Languages',
     worldSectionTitle: 'World Popular Languages',
     specialSectionTitle: 'Special Subjects & Games',
@@ -1609,6 +1936,7 @@ const TRANSLATIONS: Record<string, any> = {
     testAndroidBtn: '🤖 Test Android',
     home: 'HOME', practice: 'PRACTICE', leaderboard: 'LEADERBOARD', shop: 'SHOP', profile: 'PROFILE', feedback: 'FEEDBACK',
     lang_ru: 'Russian', lang_en: 'English', lang_de: 'German', lang_fr: 'French', lang_es: 'Spanish', lang_ja: 'Japanese', lang_zh: 'Chinese',
+    lang_hu: 'Hungarian', lang_fi: 'Finnish', lang_is: 'Icelandic', lang_pl: 'Polish', lang_eu: 'Basque', lang_nv: 'Navajo', lang_tab: 'Tabasaran',
     videoCallDesc: 'Live communication with an AI partner', storiesAndWriting: 'Stories & Writing', leaderboardDesc: 'Top 3 advance to Silver League',
     sslCertificateTitle: 'SSL Certificate (WR2 / New Site)', sslCertificateDesc: 'Confirmation that certificate issuer is WR2 site. Server successfully presented transparency logs.',
     edit: 'Edit', mobileSimulatorBench: 'Mobile Simulator Test Bench', mobileSimulatorDesc: 'Interactive iOS & Android emulator for testing layouts on PC.',
@@ -2926,6 +3254,7 @@ const getTodayChallenge = () => {
       if (lang === 'es') return 'Matemáticas';
       if (lang === 'ja') return '数学';
       if (lang === 'zh') return '数学';
+      if (lang === 'ar') return 'الرياضيات';
       return 'Mathematics';
     }
     if (c.id === 'music') {
@@ -2935,27 +3264,56 @@ const getTodayChallenge = () => {
       if (lang === 'es') return 'Música';
       if (lang === 'ja') return '音楽';
       if (lang === 'zh') return '音乐';
+      if (lang === 'ar') return 'الموسيقى';
       return 'Music';
     }
+    const rfTranslations: Record<string, Record<string, string>> = {
+      'rf-tatar': { ru: 'Татарский', en: 'Tatar', de: 'Tatarisch', fr: 'Tatar', es: 'Tártaro', ja: 'タタール語', zh: '鞑靼语', ar: 'التترية' },
+      'rf-bashkir': { ru: 'Башкирский', en: 'Bashkir', de: 'Baschkirisch', fr: 'Bachkir', es: 'Bashkir', ja: 'バシキール語', zh: '巴什基尔语', ar: 'الباشكيرية' },
+      'rf-sakha': { ru: 'Якутский (Саха)', en: 'Yakut (Sakha)', de: 'Jakutisch', fr: 'Iakoute', es: 'Yakuto', ja: 'ヤクート語', zh: '雅库特语', ar: 'الياقوتية' },
+      'rf-buryat': { ru: 'Бурятский', en: 'Buryat', de: 'Burjatisch', fr: 'Bouriate', es: 'Buriato', ja: 'ブリヤート語', zh: '布里亚特语', ar: 'البورياتية' },
+      'rf-chuvash': { ru: 'Чувашский', en: 'Chuvash', de: 'Tschuwaschisch', fr: 'Tchouvache', es: 'Chuvasio', ja: 'チュヴァシ語', zh: '楚瓦什语', ar: 'التشوفاشية' },
+      'rf-tuvan': { ru: 'Тувинский', en: 'Tuvan', de: 'Tuwinisch', fr: 'Touvain', es: 'Tuvano', ja: 'トゥバ語', zh: '图瓦语', ar: 'التوفية' },
+      'rf-ossetian': { ru: 'Осетинский', en: 'Ossetian', de: 'Ossetisch', fr: 'Ossète', es: 'Osetio', ja: 'オセチア語', zh: '奥塞梯语', ar: 'الأوسيتية' },
+      'rf-chechen': { ru: 'Чеченский', en: 'Chechen', de: 'Tschetschenisch', fr: 'Tchétchène', es: 'Checheno', ja: 'チェチェン語', zh: '车臣语', ar: 'الشيشانية' },
+      'rf-avare': { ru: 'Аварский', en: 'Avar', de: 'Awarisch', fr: 'Avar', es: 'Ávaro', ja: 'アヴァル語', zh: '阿瓦尔语', ar: 'الأفارية' },
+      'rf-udmurt': { ru: 'Удмуртский', en: 'Udmurt', de: 'Udmurtisch', fr: 'Oudmourte', es: 'Udmurto', ja: 'ウドムルト語', zh: '乌德穆尔特语', ar: 'الأودمورتية' },
+      'rf-mari': { ru: 'Марийский', en: 'Mari', de: 'Mari', fr: 'Mari', es: 'Mari', ja: 'マリ語', zh: '马里语', ar: 'المارية' },
+      'rf-mordvin': { ru: 'Мордовский (Эрзя/Мокша)', en: 'Mordvin', de: 'Mordwinisch', fr: 'Mordve', es: 'Mordvino', ja: 'モルドヴィン語', zh: '莫尔多瓦语', ar: 'الموردفينية' },
+      'rf-kalmyk': { ru: 'Калмыцкий', en: 'Kalmyk', de: 'Kalmückisch', fr: 'Kalmouk', es: 'Calmuco', ja: 'カルムイク語', zh: '卡尔梅克语', ar: 'الكالميكية' },
+    };
+    if (rfTranslations[c.id]?.[lang]) {
+      return rfTranslations[c.id][lang];
+    }
     const cisTranslations: Record<string, Record<string, string>> = {
-      ru: { en: 'Russian', de: 'Russisch', fr: 'Russe', es: 'Ruso', ja: 'ロシア語', zh: '俄语', ru: 'Русский' },
-      be: { en: 'Belarusian', de: 'Weißrussisch', fr: 'Biélorusse', es: 'Bielorruso', ja: 'ベラルーシ語', zh: '白俄罗斯语', ru: 'Белорусский' },
-      uk: { en: 'Ukrainian', de: 'Ukrainisch', fr: 'Ukrainien', es: 'Ucraniano', ja: 'ウクライナ語', zh: '乌克兰语', ru: 'Украинский' },
-      mo: { en: 'Moldavian', de: 'Moldauisch', fr: 'Moldave', es: 'Moldavo', ja: 'モルドバ語', zh: '摩尔多瓦语', ru: 'Молдавский' },
-      lt: { en: 'Lithuanian', de: 'Litauisch', fr: 'Lituanien', es: 'Lituano', ja: 'リトアニア語', zh: '立陶宛语', ru: 'Литовский' },
-      lv: { en: 'Latvian', de: 'Lettisch', fr: 'Letton', es: 'Letón', ja: 'ラトビア語', zh: '拉脱维亚语', ru: 'Латышский' },
-      et: { en: 'Estonian', de: 'Estnisch', fr: 'Estonien', es: 'Estonio', ja: 'エストニア語', zh: '爱沙尼亚语', ru: 'Эстонский' },
-      ka: { en: 'Georgian', de: 'Georgisch', fr: 'Géorgien', es: 'Georgiano', ja: 'グルジア語', zh: '格鲁吉亚语', ru: 'Грузинский' },
-      hy: { en: 'Armenian', de: 'Armenisch', fr: 'Arménien', es: 'Armenio', ja: 'アルメニア語', zh: '亚美尼亚语', ru: 'Армянский' },
-      az: { en: 'Azerbaijani', de: 'Aserbaidschanisch', fr: 'Azerbaïdjanais', es: 'Azerbaiyano', ja: 'アゼルバイジャン語', zh: '阿塞拜疆语', ru: 'Азербайджанский' },
-      kk: { en: 'Kazakh', de: 'Kasachisch', fr: 'Kazakh', es: 'Kazajo', ja: 'カザフ語', zh: '哈萨克语', ru: 'Казахский' },
-      uz: { en: 'Uzbek', de: 'Usbekisch', fr: 'Ouzbek', es: 'Uzbeko', ja: 'ウズベク語', zh: '乌兹别克语', ru: 'Узбекский' },
-      tk: { en: 'Turkmen', de: 'Turkmenisch', fr: 'Turkmène', es: 'Turcomano', ja: 'トルクメン語', zh: '土库曼语', ru: 'Туркменский' },
-      ky: { en: 'Kyrgyz', de: 'Kirgisisch', fr: 'Kirghize', es: 'Kirguís', ja: 'キルギス語', zh: '吉尔吉斯语', ru: 'Киргизский' },
-      tg: { en: 'Tajik', de: 'Tadschikisch', fr: 'Tadjik', es: 'Tayiko', ja: 'タジк语', zh: '塔吉克语', ru: 'Таджикский' }
+      ru: { en: 'Russian', de: 'Russisch', fr: 'Russe', es: 'Ruso', ja: 'ロシア語', zh: '俄语', ru: 'Русский', ar: 'الروسية' },
+      be: { en: 'Belarusian', de: 'Weißrussisch', fr: 'Biélorusse', es: 'Bielorruso', ja: 'ベラルーシ語', zh: '白俄罗斯语', ru: 'Белорусский', ar: 'البيلاروسية' },
+      uk: { en: 'Ukrainian', de: 'Ukrainisch', fr: 'Ukrainien', es: 'Ucraniano', ja: 'ウクライナ語', zh: '乌克兰语', ru: 'Украинский', ar: 'الأوكرانية' },
+      mo: { en: 'Moldavian', de: 'Moldauisch', fr: 'Moldave', es: 'Moldavo', ja: 'モルドバ語', zh: '摩尔多瓦语', ru: 'Молдавский', ar: 'المولدوفية' },
+      lt: { en: 'Lithuanian', de: 'Litauisch', fr: 'Lituanien', es: 'Lituano', ja: 'リトアニア語', zh: '立陶宛语', ru: 'Литовский', ar: 'الليتوانية' },
+      lv: { en: 'Latvian', de: 'Lettisch', fr: 'Letton', es: 'Letón', ja: 'ラトビア語', zh: '拉脱维亚语', ru: 'Латышский', ar: 'اللاتفية' },
+      et: { en: 'Estonian', de: 'Estnisch', fr: 'Estonien', es: 'Estonio', ja: 'エストニア語', zh: '爱沙尼亚语', ru: 'Эстонский', ar: 'الإستونية' },
+      ka: { en: 'Georgian', de: 'Georgisch', fr: 'Géorgien', es: 'Georgiano', ja: 'グルジア語', zh: '格鲁吉亚语', ru: 'Грузинский', ar: 'الجورجية' },
+      hy: { en: 'Armenian', de: 'Armenisch', fr: 'Arménien', es: 'Armenio', ja: 'アルメニア語', zh: '亚美尼亚语', ru: 'Армянский', ar: 'الأرمنية' },
+      az: { en: 'Azerbaijani', de: 'Aserbaidschanisch', fr: 'Azerbaïdjanais', es: 'Azerbaiyano', ja: 'アゼルバイジャン語', zh: '阿塞拜疆语', ru: 'Азербайджанский', ar: 'الأذربيجانية' },
+      kk: { en: 'Kazakh', de: 'Kasachisch', fr: 'Kazakh', es: 'Kazajo', ja: 'カザフ語', zh: '哈萨克语', ru: 'Казахский', ar: 'الكازاخية' },
+      uz: { en: 'Uzbek', de: 'Usbekisch', fr: 'Ouzbek', es: 'Uzbeko', ja: 'ウズベク語', zh: '乌兹别克语', ru: 'Узбекский', ar: 'الأوزبكية' },
+      tk: { en: 'Turkmen', de: 'Turkmenisch', fr: 'Turkmène', es: 'Turcomano', ja: 'トルクメン語', zh: '土库曼语', ru: 'Туркменский', ar: 'التركمانية' },
+      ky: { en: 'Kyrgyz', de: 'Kirgisisch', fr: 'Kirghize', es: 'Kirguís', ja: 'キルギス語', zh: '吉尔吉斯语', ru: 'Киргизский', ar: 'القيرغيزية' },
+      tg: { en: 'Tajik', de: 'Tadschikisch', fr: 'Tadjik', es: 'Tayiko', ja: 'タジク語', zh: '塔吉克语', ru: 'Таджикский', ar: 'الطاجيكية' },
+      hu: { en: 'Hungarian', de: 'Ungarisch', fr: 'Hongrois', es: 'Húngaro', ja: 'ハンガリー語', zh: '匈牙利语', ru: 'Венгерский', ar: 'المجرية' },
+      fi: { en: 'Finnish', de: 'Finnisch', fr: 'Finnois', es: 'Finlandés', ja: 'フィンランド語', zh: '芬兰语', ru: 'Финский', ar: 'الفنلندية' },
+      is: { en: 'Icelandic', de: 'Isländisch', fr: 'Islandais', es: 'Islandés', ja: 'アイスランド語', zh: '冰岛语', ru: 'Исландский', ar: 'الآيسلندية' },
+      pl: { en: 'Polish', de: 'Polnisch', fr: 'Polonais', es: 'Polaco', ja: 'ポーランド語', zh: '波兰语', ru: 'Польский', ar: 'البولندية' },
+      eu: { en: 'Basque', de: 'Baskisch', fr: 'Basque', es: 'Vasco', ja: 'バスク語', zh: '巴斯克语', ru: 'Баскский', ar: 'الباسكية' },
+      nv: { en: 'Navajo', de: 'Navajo', fr: 'Navajo', es: 'Navajo', ja: 'ナバホ語', zh: '纳瓦霍语', ru: 'Навахо', ar: 'النافاهو' },
+      tab: { en: 'Tabasaran', de: 'Tabassaranisch', fr: 'Tabassaran', es: 'Tabasarán', ja: 'タバサラン語', zh: '塔巴萨兰语', ru: 'Табасаранский', ar: 'التبرسرانية' }
     };
     if (cisTranslations[c.id]?.[lang]) {
       return cisTranslations[c.id][lang];
+    }
+    if (c.name && LANGUAGE_TRANSLATIONS[c.name]?.[lang]) {
+      return LANGUAGE_TRANSLATIONS[c.name][lang];
     }
     if (lang === 'ru') return c.localName || c.name;
     return c.name;
@@ -3806,7 +4164,8 @@ const getTodayChallenge = () => {
   const [translatorOutput, setTranslatorOutput] = useState("");
   const [transTarget, setTransTarget] = useState<Course>(currentCourse);
 
-  const [courseRegionTab, setCourseRegionTab] = useState<'all' | 'cis' | 'world' | 'special' | 'rf'>('all');
+  const [courseRegionTab, setCourseRegionTab] = useState<'all' | 'speaker' | 'hardest' | 'cis' | 'world' | 'special' | 'rf' | 'catalog'>('all');
+  const [speakerLanguage, setSpeakerLanguage] = useState<string>(() => user.language || 'ru');
   const [courseSearch, setCourseSearch] = useState("");
 
   // VIDEO CALL STATE
@@ -3900,6 +4259,122 @@ const getTodayChallenge = () => {
      const currentUser: LeaderboardEntry = { id: 'user', name: user.name, xp: user.xp, color: user.avatarColor };
      return [...bots, currentUser].sort((a, b) => b.xp - a.xp);
   }, [user.xp, user.name, user.avatarColor]);
+
+  // DAILY LEADERBOARD (24-Hour Reset & Daily XP Tracking)
+  const [leaderboardTab, setLeaderboardTab] = useState<'daily' | 'allTime'>('daily');
+  const [dailyResetCountdown, setDailyResetCountdown] = useState<string>('24:00:00');
+  const [dailyXp, setDailyXp] = useState<number>(() => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const savedDate = localStorage.getItem('duowindo_daily_xp_date');
+      if (savedDate === today) {
+        const val = parseInt(localStorage.getItem('duowindo_daily_xp') || '0', 10);
+        return isNaN(val) ? 0 : val;
+      } else {
+        localStorage.setItem('duowindo_daily_xp_date', today);
+        localStorage.setItem('duowindo_daily_xp', '0');
+        return 0;
+      }
+    } catch {
+      return 0;
+    }
+  });
+
+  // Track XP increases and accumulate into dailyXp
+  const prevUserXpRef = useRef<number>(user.xp);
+  useEffect(() => {
+    const diff = user.xp - prevUserXpRef.current;
+    if (diff > 0) {
+      const today = new Date().toISOString().split('T')[0];
+      const savedDate = localStorage.getItem('duowindo_daily_xp_date');
+      let currentVal = dailyXp;
+      if (savedDate !== today) {
+        currentVal = 0;
+        localStorage.setItem('duowindo_daily_xp_date', today);
+      }
+      const newVal = currentVal + diff;
+      setDailyXp(newVal);
+      localStorage.setItem('duowindo_daily_xp', String(newVal));
+    }
+    prevUserXpRef.current = user.xp;
+  }, [user.xp, dailyXp]);
+
+  // Daily reset check every second and countdown to 24h reset
+  useEffect(() => {
+    const checkReset = () => {
+      const now = new Date();
+      const today = now.toISOString().split('T')[0];
+      const savedDate = localStorage.getItem('duowindo_daily_xp_date');
+      if (savedDate && savedDate !== today) {
+        localStorage.setItem('duowindo_daily_xp_date', today);
+        localStorage.setItem('duowindo_daily_xp', '0');
+        setDailyXp(0);
+      }
+      const midnight = new Date(now);
+      midnight.setHours(24, 0, 0, 0);
+      const diffMs = midnight.getTime() - now.getTime();
+      const h = Math.floor(diffMs / (1000 * 60 * 60));
+      const m = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      const s = Math.floor((diffMs % (1000 * 60)) / 1000);
+      setDailyResetCountdown(
+        `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+      );
+    };
+    checkReset();
+    const interval = setInterval(checkReset, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Daily Leaderboard Data (XP gains for today only)
+  const dailyLeaderboardData = useMemo(() => {
+    const baseDaily = Math.max(15, dailyXp);
+    const dailyBots: LeaderboardEntry[] = [
+      { id: 'db1', name: 'Илон', xp: Math.floor(baseDaily * 1.35) + 30, color: 'bg-purple-600' },
+      { id: 'db2', name: 'Гермиона', xp: Math.floor(baseDaily * 1.15) + 20, color: 'bg-red-600' },
+      { id: 'db3', name: 'Наруто', xp: Math.max(10, Math.floor(baseDaily * 0.9)), color: 'bg-orange-500' },
+      { id: 'db4', name: 'Шерлок', xp: Math.max(10, Math.floor(baseDaily * 0.75)), color: 'bg-blue-600' },
+      { id: 'db5', name: 'Валл-И', xp: Math.max(5, Math.floor(baseDaily * 0.55)), color: 'bg-yellow-500' },
+      { id: 'db6', name: 'Марио', xp: Math.max(5, Math.floor(baseDaily * 0.4)), color: 'bg-red-500' },
+      { id: 'db7', name: 'Пикачу', xp: Math.max(5, Math.floor(baseDaily * 0.25)), color: 'bg-yellow-400' },
+    ];
+    const currentUser: LeaderboardEntry = { id: 'user', name: user.name, xp: dailyXp, color: user.avatarColor || 'bg-duo-blue' };
+    return [...dailyBots, currentUser].sort((a, b) => b.xp - a.xp);
+  }, [dailyXp, user.name, user.avatarColor]);
+
+  // Download Local Progress (full user state from localStorage backup)
+  const handleDownloadLocalProgress = useCallback(() => {
+    playSound('click');
+    try {
+      const rawUser = localStorage.getItem(STORAGE_KEY);
+      const parsedUser = rawUser ? JSON.parse(rawUser) : user;
+      const backupData = {
+        app: 'DuoWindo6601',
+        version: '1.0.2',
+        backupType: 'Local Progress Backup',
+        exportedAt: new Date().toISOString(),
+        user: parsedUser,
+        localStorageSnapshot: {
+          [STORAGE_KEY]: parsedUser,
+          duowindo_daily_xp: localStorage.getItem('duowindo_daily_xp') || '0',
+          duowindo_daily_xp_date: localStorage.getItem('duowindo_daily_xp_date') || new Date().toISOString().split('T')[0],
+          duowindo_leaderboard_lang: localStorage.getItem('duowindo_leaderboard_lang') || 'ru'
+        }
+      };
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `duowindo6601_local_progress_${user.username || 'user'}_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setToast(user.language === 'ru' ? '💾 Локальный прогресс успешно скачан!' : '💾 Local progress downloaded successfully!');
+    } catch (err) {
+      console.error(err);
+      setToast(user.language === 'ru' ? '❌ Ошибка при скачивании локального прогресса' : '❌ Error downloading local progress');
+    }
+  }, [user, playSound]);
 
   // Video Call Effect
   useEffect(() => {
@@ -4683,6 +5158,10 @@ const getTodayChallenge = () => {
 
   const NAV_ITEMS = [
     { screen: AppScreen.PATH, icon: HomeIcon, label: t('home') },
+    { screen: AppScreen.ALPHABET, icon: AlphabetIcon, label: user.language === 'ru' ? 'Письма' : t('alphabet') },
+    { screen: AppScreen.TRANSLATOR, icon: BookIcon, label: user.language === 'ru' ? 'Переводчик DuoWindo6601' : 'Translator DuoWindo6601' },
+    { screen: AppScreen.FEEDBACK, icon: StarIcon, label: user.language === 'ru' ? 'Отзывы о DuoWindo6601' : 'Reviews DuoWindo6601' },
+    { screen: AppScreen.SUPPORT_CHAT, icon: ChatBubbleIcon, label: user.language === 'ru' ? 'Чат техподдержки DuoWindo6601' : 'Support Chat DuoWindo6601' },
     { screen: AppScreen.CHESS_MATCH, icon: ChessNavIcon, label: t('playChess') },
     { screen: AppScreen.PRACTICE, icon: DumbbellIcon, label: t('practice') },
     { screen: AppScreen.VOCABULARY, icon: NewWordIcon, label: user.language === 'ru' ? 'Банк слов' : 'Vocabulary' },
@@ -4691,10 +5170,20 @@ const getTodayChallenge = () => {
     { screen: AppScreen.SHOP, icon: ChestIcon, label: t('shop') },
     { screen: AppScreen.SUBSCRIPTION, icon: SparklesIcon, label: user.language === 'ru' ? 'Лимит & Подписка' : 'Limit & Subscription' },
     { screen: AppScreen.PROFILE, icon: UserIcon, label: t('profile') },
-    { screen: AppScreen.FEEDBACK, icon: StarIcon, label: user.language === 'ru' ? 'Отзывы' : 'Reviews' },
-    { screen: AppScreen.SUPPORT_CHAT, icon: ChatBubbleIcon, label: user.language === 'ru' ? 'Техподдержка' : 'Support Chat' },
-    { screen: AppScreen.TRANSLATOR, icon: BookIcon, label: t('translator') },
     ...(user.isAdmin ? [{ screen: AppScreen.ADMIN_DASHBOARD, icon: GearIcon, label: 'Admin Tool 🛡️' }] : [])
+  ];
+
+  const MOBILE_NAV_SCREENS = [
+    AppScreen.PATH,
+    AppScreen.ALPHABET,
+    AppScreen.TRANSLATOR,
+    AppScreen.FEEDBACK,
+    AppScreen.SUPPORT_CHAT,
+    AppScreen.CHESS_MATCH,
+    AppScreen.PRACTICE,
+    AppScreen.LEADERBOARD,
+    AppScreen.SHOP,
+    AppScreen.PROFILE
   ];
 
   const renderAppLayout = () => {
@@ -4915,6 +5404,55 @@ const getTodayChallenge = () => {
                         <span className="font-black">{user.language.toUpperCase()}</span>
                       </button>
                     </div>
+
+                    {/* TRANSLATOR QUICK BUTTON */}
+                    <button 
+                      onClick={() => { playSound('click'); setScreen(AppScreen.TRANSLATOR); }} 
+                      className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider ${
+                        screen === AppScreen.TRANSLATOR
+                          ? 'bg-blue-600 text-white border-blue-400 ring-2 ring-blue-400'
+                          : isLightMode 
+                            ? 'bg-blue-50 hover:bg-blue-100 text-blue-800 border-blue-300' 
+                            : 'bg-blue-950/80 hover:bg-blue-900 text-blue-200 border-blue-500/50'
+                      } hover:scale-105 transition-all flex items-center space-x-1 shadow-md cursor-pointer border`}
+                      title="Переводчик DuoWindo6601"
+                    >
+                      <span>📖</span>
+                      <span className="hidden md:inline">{user.language === 'ru' ? 'Переводчик' : 'Translator'}</span>
+                    </button>
+
+                    {/* REVIEWS QUICK BUTTON */}
+                    <button 
+                      onClick={() => { playSound('click'); setScreen(AppScreen.FEEDBACK); }} 
+                      className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider ${
+                        screen === AppScreen.FEEDBACK
+                          ? 'bg-amber-600 text-white border-amber-400 ring-2 ring-amber-400'
+                          : isLightMode 
+                            ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300' 
+                            : 'bg-amber-950/80 hover:bg-amber-900 text-amber-200 border-amber-500/50'
+                      } hover:scale-105 transition-all flex items-center space-x-1 shadow-md cursor-pointer border`}
+                      title="Отзывы о DuoWindo6601"
+                    >
+                      <span>⭐</span>
+                      <span className="hidden md:inline">{user.language === 'ru' ? 'Отзывы' : 'Reviews'}</span>
+                    </button>
+
+                    {/* SUPPORT CHAT QUICK BUTTON */}
+                    <button 
+                      onClick={() => { playSound('click'); setScreen(AppScreen.SUPPORT_CHAT); }} 
+                      className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider ${
+                        screen === AppScreen.SUPPORT_CHAT
+                          ? 'bg-emerald-600 text-white border-emerald-400 ring-2 ring-emerald-400'
+                          : isLightMode 
+                            ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300' 
+                            : 'bg-emerald-950/80 hover:bg-emerald-900 text-emerald-200 border-emerald-500/50'
+                      } hover:scale-105 transition-all flex items-center space-x-1 shadow-md cursor-pointer border`}
+                      title="Чат техподдержки DuoWindo6601"
+                    >
+                      <span>💬</span>
+                      <span className="hidden md:inline">{user.language === 'ru' ? 'Поддержка' : 'Support'}</span>
+                    </button>
+
                     <button 
                       onClick={() => { playSound('click'); setShowBetaModal(true); }} 
                       className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider ${
@@ -4970,22 +5508,25 @@ const getTodayChallenge = () => {
           <div className="bg-gradient-to-r from-amber-950/90 via-slate-900 to-emerald-950/90 border-b-2 border-amber-500/50 px-3 sm:px-6 py-2.5 shadow-md">
             <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs text-left">
               <div className="flex items-center space-x-2.5">
-                <span className="text-xl sm:text-2xl shrink-0">{incognitoClosed ? '🛑' : '⚠️'}</span>
+                <span className="text-xl sm:text-2xl shrink-0">{incognitoClosed ? '🛑' : '🚫'}</span>
                 <div>
-                  <div className="flex items-center space-x-2 flex-wrap">
+                  <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                     <span className="font-black text-amber-300 uppercase tracking-wide">
-                      {incognitoClosed 
-                        ? (user.language === 'ru' ? 'Режим Инкогнито закрыт с 10.10.2026' : 'Incognito Entry Closed since Oct 10, 2026') 
-                        : (user.language === 'ru' ? '10 октября 2026 года вход в Режим Инкогнито закрывается!' : 'Incognito Login closes on Oct 10, 2026!')}
+                      {getIncognitoClosureTitle(user.language)}
                     </span>
-                    <span className="bg-emerald-950 text-emerald-300 border border-emerald-500/40 text-[9px] font-black px-1.5 py-0.5 rounded">
-                      {user.language === 'ru' ? 'Полный Вход и Профиль Администратора открыты' : 'Full Sign-In & Admin Profile Active'}
+                    <span className="bg-emerald-950/90 text-emerald-300 border border-emerald-500/50 text-[10px] font-black px-2 py-0.5 rounded-lg flex items-center space-x-1 shadow-sm">
+                      <span>✅</span>
+                      <span>{user.language === 'ru' ? 'Полный Вход и регистрация: НЕ ЗАКРЫТ (Работает)' : 'Full Sign-In & Registration: NOT CLOSED (Active)'}</span>
+                    </span>
+                    <span className="bg-amber-950/90 text-amber-300 border border-amber-500/50 text-[10px] font-black px-2 py-0.5 rounded-lg flex items-center space-x-1 shadow-sm">
+                      <span>👑</span>
+                      <span>{user.language === 'ru' ? 'Профиль Администратора: НЕ ЗАКРЫТ' : 'Admin Profile: NOT CLOSED'}</span>
                     </span>
                   </div>
                   <p className="text-[11px] text-gray-300 font-medium mt-0.5">
                     {user.language === 'ru' 
-                      ? 'После 10 октября 2026 года недоступна Инкогнито и ее нельзя будет восстановить в DuoWindo6601. Если вы хотите сохранить какой-либо контент, мы рекомендуем заранее экспортировать данные Firebase Firestore & Auth через Раздел «Профиль» и Раздел «Настройки» или выполнить Полный Вход.' 
-                      : 'After October 10, 2026, Incognito will be unavailable and cannot be restored in DuoWindo6601. If you want to save any content, we recommend exporting your Firebase Firestore & Auth data in advance via the Profile and Settings sections or performing Full Sign-In.'}
+                      ? '10 октября 2026 года вход в Режим Инкогнито недоступен, и его нельзя будет восстановить в DuoWindo6601. Синхронизирован актуальный статус не закрытия: Полный Вход и регистрация работают без ограничений, профиль Администратора доступен.' 
+                      : 'On October 10, 2026, entry into Incognito Mode is unavailable and cannot be restored in DuoWindo6601. Synchronized actual unclosed status: Full Sign-In & registration operate normally, Admin Profile is active.'}
                   </p>
                 </div>
               </div>
@@ -5027,131 +5568,25 @@ const getTodayChallenge = () => {
         )}
 
         {/* ... (Other Screens) ... */}
-        {screen === AppScreen.ALPHABET && (() => {
-            const currentCatList = ALPHABET_SETS[currentCourse.id];
-            const currentCat = currentCatList ? (currentCatList[alphabetTab] || currentCatList[0]) : null;
-            const alphabetItems = currentCat 
-                ? currentCat.items 
-                : (ALPHABETS[currentCourse.id] || ALPHABETS['en']);
-
-            return (
-            <div className="p-4 md:p-10 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-5">
-                <div className="flex flex-col items-center mb-6">
-                    <h2 className="text-3xl font-black uppercase tracking-widest text-white mb-2">{t('alphabet')}</h2>
-                    <p className="text-gray-400 font-bold text-lg">{getLocalizedCourseName(currentCourse)}</p>
-                    {currentCat?.description && (
-                        <p className="text-xs font-semibold text-gray-500 max-w-lg text-center mt-1">{currentCat.description}</p>
-                    )}
-                </div>
-
-                {/* CATEGORY TABS for CJK, CIS multi-script (Cyrillic/Latin), or special writing systems */}
-                {currentCatList && currentCatList.length > 1 && (
-                    <div className="flex items-center justify-center flex-wrap gap-2 mb-6">
-                        {currentCatList.map((cat, idx) => (
-                            <button
-                                key={cat.title}
-                                onClick={() => { playSound('click'); setAlphabetTab(idx); }}
-                                className={`px-5 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider transition-all border-b-4 ${
-                                    alphabetTab === idx
-                                        ? 'bg-duo-blue text-white border-duo-blueDark shadow-lg scale-105'
-                                        : 'bg-gray-800 text-gray-400 border-gray-900 hover:bg-gray-700'
-                                }`}
-                            >
-                                {cat.title}
-                            </button>
-                        ))}
-                    </div>
-                )}
-                
-                <div className="bg-duo-card border-2 border-gray-700 rounded-[2.5rem] p-6 md:p-8 shadow-2xl" dir={['ar', 'he'].includes(currentCourse.id) ? 'rtl' : 'ltr'}>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
-                        {alphabetItems.map((item, idx) => {
-                            const char = typeof item === 'string' ? item : item.char;
-                            const name = typeof item === 'object' ? item.name : undefined;
-                            const sound = typeof item === 'object' ? item.sound : undefined;
-                            const word = typeof item === 'object' ? item.word : undefined;
-                            const translation = typeof item === 'object' ? item.translation : undefined;
-                            const tips = typeof item === 'object' ? item.tips : undefined;
-
-                            return (
-                                <div 
-                                    key={`${char}_${idx}`}
-                                    className="bg-gray-800 border-b-4 border-gray-900 rounded-2xl p-3 flex flex-col items-center justify-between hover:bg-gray-750 hover:border-duo-blue transition-all group relative"
-                                >
-                                    <div className="flex items-center justify-between w-full mb-1">
-                                        <span className="text-[10px] font-bold text-gray-500 uppercase">{sound || name || ''}</span>
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                playSound('click');
-                                                speakText(char, currentCourse.id, false, user.preferredVoice, user.voiceProvider);
-                                            }}
-                                            title="Озвучить букву"
-                                            className="w-6 h-6 rounded-lg bg-gray-700 hover:bg-duo-blue flex items-center justify-center transition-colors text-gray-300 hover:text-white"
-                                        >
-                                            <VolumeIcon className="w-3.5 h-3.5" />
-                                        </button>
-                                    </div>
-
-                                    <button 
-                                        type="button"
-                                        onClick={() => startTraining('drawing', char)}
-                                        className="w-full flex flex-col items-center py-2 group-hover:scale-105 active:scale-95 transition-transform"
-                                        title="Нажмите, чтобы тренировать написание"
-                                    >
-                                        <span className={`text-3xl md:text-4xl font-black text-white group-hover:text-duo-blue transition-colors ${
-                                            currentCourse.id === 'ar' ? 'font-arabic' : currentCourse.id === 'he' ? 'font-hebrew' : ''
-                                        }`}>
-                                            {char}
-                                        </span>
-                                        {name && (
-                                            <span className="text-[11px] font-bold text-gray-300 mt-1 truncate max-w-full text-center">
-                                                {name}
-                                            </span>
-                                        )}
-                                        {word && (
-                                            <div className="mt-1 text-center w-full">
-                                                <span className="text-[10px] font-extrabold text-duo-green block truncate">{word}</span>
-                                                {translation && (
-                                                    <span className="text-[9px] font-medium text-gray-400 block truncate">{translation}</span>
-                                                )}
-                                            </div>
-                                        )}
-                                        {tips && (
-                                            <span className="text-[8px] font-semibold text-duo-yellow/90 mt-1 block truncate max-w-full text-center" title={tips}>
-                                                {tips}
-                                            </span>
-                                        )}
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => startTraining('drawing', char)}
-                                        className="w-full mt-2 py-1.5 rounded-xl bg-gray-700/60 hover:bg-duo-blue text-[10px] font-black uppercase text-gray-300 hover:text-white transition-colors flex items-center justify-center space-x-1"
-                                    >
-                                        <PenIcon className="w-3 h-3" />
-                                        <span>Писать</span>
-                                    </button>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-                
-                <div className="mt-8 flex justify-center">
-                    <button onClick={() => {
-                        const randomItem = alphabetItems[Math.floor(Math.random() * alphabetItems.length)];
-                        const randomChar = typeof randomItem === 'string' ? randomItem : (randomItem?.char || 'A');
-                        startTraining('drawing', randomChar);
-                    }} className="bg-duo-blue px-8 py-4 rounded-2xl font-black text-white uppercase tracking-widest border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all shadow-xl flex items-center space-x-3">
-                        <PenIcon className="w-6 h-6" />
-                        <span>Случайный Символ</span>
-                    </button>
-                </div>
-            </div>
-            );
-        })()}
+        {screen === AppScreen.ALPHABET && (
+          <LettersScreen
+            currentCourse={currentCourse}
+            user={user}
+            setUser={setUser}
+            onSaveProgress={(updatedUser) => {
+              setUser(updatedUser);
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUser));
+            }}
+            speakText={speakText}
+            isLightMode={isLightMode}
+            onBackToPath={() => setScreen(AppScreen.PATH)}
+            onSwitchCourse={(course) => {
+              setCurrentCourse(course);
+              localStorage.setItem('duo_course_id_6601', course.id);
+            }}
+            allCourses={COURSES}
+          />
+        )}
 
         {/* SETTINGS OVERLAY */}
         {screen === AppScreen.SETTINGS && (
@@ -5362,21 +5797,31 @@ const getTodayChallenge = () => {
                         </div>
 
                         {/* INCOGNITO CLOSURE & EXPORT ADVICE BANNER */}
-                        <div className="p-3.5 bg-black/40 border border-amber-500/50 rounded-2xl text-xs space-y-1 text-left">
+                        <div className="p-3.5 bg-black/40 border border-amber-500/50 rounded-2xl text-xs space-y-1.5 text-left">
                             <div className="flex items-center space-x-1.5 text-amber-300 font-black uppercase text-[11px]">
-                                <span>⚠️</span>
-                                <span>{user.language === 'ru' ? 'Предупреждение о сохранении контента' : 'Content Retention Warning'}</span>
+                                <span>🚫</span>
+                                <span>{getIncognitoClosureTitle(user.language)}</span>
                             </div>
                             <p className="font-bold text-gray-200">
                                 {user.language === 'ru'
-                                    ? 'После 10 октября 2026 года недоступна Инкогнито и ее нельзя будет восстановить в DuoWindo6601.'
-                                    : 'After October 10, 2026, Incognito will be unavailable and cannot be restored in DuoWindo6601.'}
+                                    ? '10 октября 2026 года вход в Режим Инкогнито недоступен, и его нельзя будет восстановить в DuoWindo6601.'
+                                    : 'On October 10, 2026, entry into Incognito Mode is unavailable and cannot be restored in DuoWindo6601.'}
                             </p>
                             <p className="text-[11px] text-gray-300">
                                 {user.language === 'ru'
-                                    ? 'Если вы хотите сохранить какой-либо контент, мы рекомендуем заранее экспортировать данные Firebase Firestore & Auth через Раздел «Профиль» и Раздел «Настройки» или выполнить Полный Вход.'
-                                    : 'If you want to save any content, we recommend exporting your Firebase Firestore & Auth data in advance via the Profile and Settings sections or performing Full Sign-In.'}
+                                    ? 'Синхронизирован актуальный статус не закрытия: Полный Вход и регистрация работают без ограничений, профиль Администратора доступен.'
+                                    : 'Synchronized actual unclosed status: Full Sign-In & registration operate normally, Admin Profile is active.'}
                             </p>
+                            <div className="flex flex-wrap gap-1.5 text-[10px] font-bold pt-1">
+                                <span className="bg-emerald-950/90 text-emerald-300 border border-emerald-500/60 px-2 py-0.5 rounded-lg flex items-center space-x-1">
+                                    <span>✅</span>
+                                    <span>{user.language === 'ru' ? 'Полный Вход и регистрация: НЕ ЗАКРЫТ (Работает)' : 'Full Sign-In & Registration: NOT CLOSED (Active)'}</span>
+                                </span>
+                                <span className="bg-amber-950/90 text-amber-300 border border-amber-500/60 px-2 py-0.5 rounded-lg flex items-center space-x-1">
+                                    <span>👑</span>
+                                    <span>{user.language === 'ru' ? 'Профиль Администратора: НЕ ЗАКРЫТ' : 'Admin Profile: NOT CLOSED'}</span>
+                                </span>
+                            </div>
                         </div>
 
                         {/* EXPORT DETAILS PREVIEW */}
@@ -5426,6 +5871,37 @@ const getTodayChallenge = () => {
                             >
                                 <span>📋</span>
                                 <span>{user.language === 'ru' ? 'Копировать JSON' : 'Copy JSON'}</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* DOWNLOAD LOCAL PROGRESS BACKUP CARD */}
+                    <div className="bg-duo-card border-2 border-emerald-500/50 rounded-3xl p-6 mb-6 shadow-xl space-y-4">
+                        <div className="flex items-center justify-between flex-wrap gap-3">
+                            <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-xl shadow-md">
+                                    💾
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
+                                        <span>Download Local Progress</span>
+                                        <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-bold uppercase">
+                                            JSON Backup
+                                        </span>
+                                    </h3>
+                                    <p className="text-xs text-gray-400 font-bold">
+                                        {user.language === 'ru' 
+                                            ? 'Резервная копия всего локального состояния user из localStorage в файл JSON' 
+                                            : 'Generates a downloadable JSON file containing the full user state from localStorage for backup purposes'}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={handleDownloadLocalProgress}
+                                className="w-full sm:w-auto py-3 px-6 rounded-2xl font-black text-xs md:text-sm uppercase tracking-wider bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer"
+                            >
+                                <span>📥</span>
+                                <span>Download Local Progress</span>
                             </button>
                         </div>
                     </div>
@@ -5885,7 +6361,7 @@ const getTodayChallenge = () => {
                         {COUNTRIES.map((c) => (
                             <button key={c.code} onClick={() => { playSound('select'); setUser({...user, country: c.name}); }} className={`p-3 rounded-xl font-bold border-b-4 transition-all flex items-center space-x-2 ${user.country === c.name ? 'bg-duo-blue border-duo-blueDark text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'}`}>
                                 <img src={`https://flagcdn.com/w40/${c.code}.png`} className="w-6 h-4 rounded-sm object-cover" alt={c.name}/>
-                                <span className="text-sm">{user.language === 'ru' ? c.local : c.name}</span>
+                                <span className="text-sm">{getLocalizedCountryName(c.code, user.language)}</span>
                             </button>
                         ))}
                     </div>
@@ -5919,6 +6395,106 @@ const getTodayChallenge = () => {
                         </div>
                     </div>
 
+                    {/* DUOLINGO ICONIC: "Я ГОВОРЮ НА..." / "I SPEAK..." & QUICK LANGUAGE SWITCHER */}
+                    <div className="bg-gradient-to-r from-gray-900 via-gray-850 to-gray-900 border-2 border-gray-700/80 rounded-3xl p-4 sm:p-5 mb-6 shadow-xl space-y-3.5">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-gray-800 pb-3">
+                            {/* I SPEAK SELECTOR */}
+                            <div className="flex items-center space-x-3">
+                                <span className="text-3xl">🗣️</span>
+                                <div>
+                                    <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                                        <h3 className="font-black text-sm sm:text-base text-white uppercase tracking-wider">
+                                            {user.language === 'ru' ? 'Я говорю на:' : 'I speak:'}
+                                        </h3>
+                                        <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 uppercase">
+                                            {SPEAKER_LANGUAGES.find(s => s.code === speakerLanguage)?.name || speakerLanguage.toUpperCase()}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-gray-400 font-medium">
+                                        {user.language === 'ru'
+                                            ? 'Курсы, адаптированные для носителей вашего язык'
+                                            : 'Courses tailored for speakers of your native language'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* APP INTERFACE LANGUAGE SWITCHER PILLS */}
+                            <div className="flex items-center space-x-2 shrink-0 flex-wrap gap-y-1 self-start md:self-auto">
+                                <span className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">
+                                    🌐 {user.language === 'ru' ? 'Язык интерфейса:' : 'App language:'}
+                                </span>
+                                <div className="flex items-center space-x-1 bg-black/60 p-1 rounded-xl border border-gray-700 shadow-inner">
+                                    {[
+                                        { code: 'ru', flag: '🇷🇺', label: 'RU' },
+                                        { code: 'en', flag: '🇺🇸', label: 'EN' },
+                                        { code: 'es', flag: '🇪🇸', label: 'ES' },
+                                        { code: 'de', flag: '🇩🇪', label: 'DE' },
+                                        { code: 'fr', flag: '🇫🇷', label: 'FR' },
+                                        { code: 'ja', flag: '🇯🇵', label: 'JA' },
+                                        { code: 'zh', flag: '🇨🇳', label: 'ZH' },
+                                        { code: 'ar', flag: '🇸🇦', label: 'AR' },
+                                    ].map(l => (
+                                        <button
+                                            key={l.code}
+                                            type="button"
+                                            onClick={() => {
+                                                playSound('select');
+                                                setUser({ ...user, language: l.code as any });
+                                            }}
+                                            className={`px-2 py-1 rounded-lg text-[10px] font-black transition-all flex items-center space-x-1 cursor-pointer ${
+                                                user.language === l.code
+                                                    ? 'bg-duo-blue text-white shadow-md'
+                                                    : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                                            }`}
+                                            title={l.label}
+                                        >
+                                            <span>{l.flag}</span>
+                                            <span>{l.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* HORIZONTAL SPEAKER LANGUAGES CHIPS */}
+                        <div className="space-y-1.5">
+                            <div className="text-[11px] font-black uppercase text-amber-400 tracking-wider flex items-center justify-between">
+                                <span>{user.language === 'ru' ? 'Выберите язык, на котором говорите:' : 'Select the language you speak:'}</span>
+                                <span className="text-gray-400 font-medium lowercase">
+                                    {SPEAKER_LANGUAGES.length} {user.language === 'ru' ? 'языков' : 'languages'}
+                                </span>
+                            </div>
+                            <div className="flex items-center space-x-2 overflow-x-auto pb-1 no-scrollbar">
+                                {SPEAKER_LANGUAGES.map(sp => {
+                                    const isSelected = speakerLanguage === sp.code;
+                                    const count = getCoursesForSpeaker(sp.code).length;
+                                    return (
+                                        <button
+                                            key={sp.code}
+                                            type="button"
+                                            onClick={() => {
+                                                playSound('click');
+                                                setSpeakerLanguage(sp.code);
+                                                setCourseRegionTab('speaker');
+                                            }}
+                                            className={`px-3 py-2 rounded-2xl font-black text-xs transition-all flex items-center space-x-2 whitespace-nowrap shrink-0 border-b-2 cursor-pointer ${
+                                                isSelected
+                                                    ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-black border-amber-700 shadow-lg scale-105'
+                                                    : 'bg-gray-800 text-gray-300 border-gray-900 hover:bg-gray-750 hover:text-white'
+                                            }`}
+                                        >
+                                            <img src={`https://flagcdn.com/w40/${sp.flagCode}.png`} className="w-5 h-3.5 rounded-sm object-cover" alt={sp.name} />
+                                            <span>{sp.name}</span>
+                                            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${isSelected ? 'bg-black/20 text-black' : 'bg-gray-700 text-gray-400'}`}>
+                                                {count > 0 ? `${count}` : (sp.code === 'ru' ? '12+' : '6+')}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+
                     {/* REGION NAVIGATION TABS */}
                     {!courseSearch && (
                         <div className="flex items-center space-x-2 overflow-x-auto pb-4 mb-6 no-scrollbar">
@@ -5927,6 +6503,18 @@ const getTodayChallenge = () => {
                                 className={`px-4 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider whitespace-nowrap transition-all border-b-4 ${courseRegionTab === 'all' ? 'bg-duo-blue border-duo-blueDark text-white' : 'bg-gray-800 border-gray-900 text-gray-400 hover:bg-gray-700'}`}
                             >
                                 🌐 {t('allCourses')}
+                            </button>
+                            <button 
+                                onClick={() => { playSound('click'); setCourseRegionTab('speaker'); }}
+                                className={`px-4 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider whitespace-nowrap transition-all border-b-4 ${courseRegionTab === 'speaker' ? 'bg-gradient-to-r from-amber-500 to-yellow-500 border-amber-700 text-black shadow-lg shadow-amber-500/20' : 'bg-gray-800 border-gray-900 text-gray-400 hover:bg-gray-700'}`}
+                            >
+                                🗣️ {user.language === 'ru' ? 'Для знающих мой язык' : 'For My Language'} ({SPEAKER_LANGUAGES.find(s => s.code === speakerLanguage)?.name || speakerLanguage.toUpperCase()})
+                            </button>
+                            <button 
+                                onClick={() => { playSound('click'); setCourseRegionTab('hardest'); }}
+                                className={`px-4 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider whitespace-nowrap transition-all border-b-4 ${courseRegionTab === 'hardest' ? 'bg-gradient-to-r from-red-600 via-orange-600 to-amber-600 border-red-800 text-white shadow-lg shadow-orange-500/20' : 'bg-gray-800 border-gray-900 text-gray-400 hover:bg-gray-700'}`}
+                            >
+                                🔥 {t('hardestLanguages')}
                             </button>
                             <button 
                                 onClick={() => { playSound('click'); setCourseRegionTab('cis'); }}
@@ -5952,6 +6540,12 @@ const getTodayChallenge = () => {
                             >
                                 🇷🇺 {t('rfRegions')}
                             </button>
+                            <button 
+                                onClick={() => { playSound('click'); setCourseRegionTab('catalog'); }}
+                                className={`px-4 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider whitespace-nowrap transition-all border-b-4 ${courseRegionTab === 'catalog' ? 'bg-sky-600 border-sky-800 text-white shadow-lg shadow-sky-500/20' : 'bg-gray-800 border-gray-900 text-gray-400 hover:bg-gray-700'}`}
+                            >
+                                🏆 {user.language === 'ru' ? 'Каталог (100+ языков)' : 'Global Catalog (100+)'}
+                            </button>
                         </div>
                     )}
                     
@@ -5972,7 +6566,7 @@ const getTodayChallenge = () => {
                                         className={`relative p-4 rounded-2xl border-2 border-b-4 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all flex items-center space-x-4 shadow-lg group ${currentCourse.id === c.id ? 'bg-blue-900/30 border-duo-blue ring-2 ring-duo-blue' : 'bg-gray-800 border-gray-700 hover:bg-gray-750'}`}
                                     >
                                         {SPECIAL_IDS.includes(c.id) ? (
-                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl font-black ${c.themeColor} text-white shadow-md`}>
+                                             <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl font-black ${c.themeColor} text-white shadow-md`}>
                                                 {c.id === 'math' ? 'Σ' : c.id === 'music' ? '♫' : c.id === 'chess' ? '♔' : '🚀'}
                                             </div>
                                         ) : (
@@ -5985,10 +6579,211 @@ const getTodayChallenge = () => {
                                         {currentCourse.id === c.id && <div className="bg-duo-green rounded-full p-1"><CheckCircleIcon className="w-5 h-5 text-white"/></div>}
                                     </div>
                                 ))}
+
+                                {searchCatalog(courseSearch).map(item => (
+                                    <div 
+                                        key={item.itemId}
+                                        onClick={() => {
+                                            playSound('select');
+                                            const existing = COURSES.find(c => c.id === item.learningLanguage);
+                                            const selectedCourse = existing || {
+                                                id: item.learningLanguage,
+                                                name: item.learningLanguageName,
+                                                localName: item.title,
+                                                flagCode: item.flagCode,
+                                                themeColor: 'bg-duo-blue',
+                                                themeBorder: 'border-duo-blueDark',
+                                                mascotVariant: 'default'
+                                            };
+                                            setCurrentCourse(selectedCourse);
+                                            setScreen(AppScreen.PATH);
+                                        }}
+                                        className="relative p-4 rounded-2xl border-2 border-sky-500/40 bg-sky-950/30 hover:bg-sky-900/50 cursor-pointer transition-all flex flex-col justify-between hover:scale-[1.02] shadow-md group"
+                                    >
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="flex items-center space-x-3">
+                                                <img src={`https://flagcdn.com/w80/${item.flagCode}.png`} className="w-10 h-7 rounded-md object-cover shadow" alt={item.learningLanguageName} />
+                                                <div className="flex-1 min-w-0">
+                                                    <h4 className="font-bold text-sm text-white truncate">{getLocalizedCatalogTitle(item, user.language)}</h4>
+                                                    <p className="text-[10px] text-sky-300 font-semibold truncate">{getLocalizedLanguageName(item.learningLanguageName, user.language)}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {item.numLearners > 0 && (
+                                            <div className="mt-2 pt-2 border-t border-sky-500/30 flex items-center justify-between text-[10px] font-black text-sky-200">
+                                                <span>👥 {formatLearnerCount(item.numLearners)} {user.language === 'ru' ? 'учащихся' : 'learners'}</span>
+                                                <span className="bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded-full">DuoWindo6601</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     ) : (
                         <div className="space-y-10">
+                            {/* SECTION: COURSES FOR SPEAKERS OF SELECTED LANGUAGE (DUOLINGO ICONIC) */}
+                            {(courseRegionTab === 'all' || courseRegionTab === 'speaker') && (
+                                <div className="rounded-3xl p-5 md:p-6 bg-gradient-to-br from-amber-950/40 via-yellow-950/20 to-gray-900 border-2 border-amber-500/40 shadow-2xl relative overflow-hidden">
+                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6">
+                                        <div className="flex items-center space-x-3">
+                                            <span className="text-3xl">🗣️</span>
+                                            <div>
+                                                <h3 className="text-xl md:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 uppercase tracking-widest flex items-center gap-2">
+                                                    {user.language === 'ru' 
+                                                        ? `Курсы для тех, кто говорит по-${SPEAKER_LANGUAGES.find(s => s.code === speakerLanguage)?.name.toLowerCase() || speakerLanguage}`
+                                                        : `Courses for ${SPEAKER_LANGUAGES.find(s => s.code === speakerLanguage)?.name || speakerLanguage} speakers`}
+                                                    <span className="bg-amber-500 text-black text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                                                        {SPEAKER_LANGUAGES.find(s => s.code === speakerLanguage)?.code.toUpperCase()}
+                                                    </span>
+                                                </h3>
+                                                <p className="text-xs text-amber-200/80 font-bold mt-0.5">
+                                                    {user.language === 'ru' 
+                                                        ? 'Официальная подборка языковых курсов для вашего родного языка'
+                                                        : 'Official courses designed for learning from your spoken language'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            {user.language !== speakerLanguage && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        playSound('select');
+                                                        setUser({ ...user, language: speakerLanguage as any });
+                                                    }}
+                                                    className="px-3 py-1.5 bg-duo-blue/30 hover:bg-duo-blue/50 text-sky-200 border border-sky-400/40 rounded-xl text-xs font-black transition-all flex items-center space-x-1 cursor-pointer"
+                                                >
+                                                    <span>🌐</span>
+                                                    <span>{user.language === 'ru' ? 'Включить этот язык в приложении' : 'Set as app language'}</span>
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* LIST OF COURSES FOR THIS SPEAKER */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                        {/* Core courses if speaker is Russian */}
+                                        {speakerLanguage === 'ru' && COURSES.filter(c => !c.id.startsWith('rf-')).slice(0, 8).map(c => (
+                                            <div 
+                                                key={c.id} 
+                                                onClick={() => { playSound('select'); setCurrentCourse(c); setScreen(AppScreen.PATH); }} 
+                                                className={`relative p-4 rounded-2xl border-2 border-b-4 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all flex items-center space-x-4 shadow-lg group ${currentCourse.id === c.id ? 'bg-amber-950/40 border-amber-500 ring-2 ring-amber-500' : 'bg-gray-800 border-gray-700 hover:bg-gray-750'}`}
+                                            >
+                                                {SPECIAL_IDS.includes(c.id) ? (
+                                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl font-black ${c.themeColor} text-white shadow-md`}>
+                                                        {c.id === 'math' ? 'Σ' : c.id === 'music' ? '♫' : c.id === 'chess' ? '♔' : '🚀'}
+                                                    </div>
+                                                ) : (
+                                                    <img src={`https://flagcdn.com/w80/${c.flagCode}.png`} className="w-12 h-8 rounded-md object-cover shadow-md group-hover:scale-110 transition-transform" alt={c.name} />
+                                                )}
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className="font-bold text-base text-white truncate">{getLocalizedCourseName(c)}</h3>
+                                                    <p className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">{user.language === 'ru' ? 'Для русскоязычных' : 'From Russian'}</p>
+                                                </div>
+                                                {currentCourse.id === c.id && <div className="bg-duo-green rounded-full p-1"><CheckCircleIcon className="w-5 h-5 text-white"/></div>}
+                                            </div>
+                                        ))}
+
+                                        {/* Catalog items matching this fromLanguage */}
+                                        {getCoursesForSpeaker(speakerLanguage).map(item => (
+                                            <div 
+                                                key={item.itemId}
+                                                onClick={() => {
+                                                    playSound('select');
+                                                    const existing = COURSES.find(c => c.id === item.learningLanguage);
+                                                    const selectedCourse = existing || {
+                                                        id: item.learningLanguage,
+                                                        name: item.learningLanguageName,
+                                                        localName: item.title,
+                                                        flagCode: item.flagCode,
+                                                        themeColor: 'bg-duo-blue',
+                                                        themeBorder: 'border-duo-blueDark',
+                                                        mascotVariant: 'default'
+                                                    };
+                                                    setCurrentCourse(selectedCourse);
+                                                    setScreen(AppScreen.PATH);
+                                                }}
+                                                className="relative p-4 rounded-2xl border-2 border-amber-500/40 bg-gray-800/90 hover:bg-amber-950/40 cursor-pointer transition-all flex flex-col justify-between hover:scale-[1.02] active:scale-95 shadow-lg group"
+                                            >
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="flex items-center space-x-3 min-w-0">
+                                                        <img src={`https://flagcdn.com/w80/${item.flagCode}.png`} className="w-10 h-7 rounded-md object-cover shadow group-hover:scale-110 transition-transform" alt={item.learningLanguageName} />
+                                                        <div className="flex-1 min-w-0">
+                                                            <h4 className="font-bold text-sm text-white truncate">{getLocalizedCatalogTitle(item, user.language)}</h4>
+                                                            <p className="text-[10px] text-amber-300 font-bold truncate">{getLocalizedLanguageName(item.learningLanguageName, user.language)}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {item.numLearners > 0 && (
+                                                    <div className="mt-2 pt-2 border-t border-gray-700/60 flex items-center justify-between text-[10px] font-black text-amber-200">
+                                                        <span>👥 {formatLearnerCount(item.numLearners)} {user.language === 'ru' ? 'учащихся' : 'learners'}</span>
+                                                        <span className="bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/30">DuoWindo6601</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* SECTION: HARDEST LANGUAGES IN THE WORLD */}
+                            {(courseRegionTab === 'all' || courseRegionTab === 'hardest') && (
+                                <div className="rounded-3xl p-5 md:p-6 bg-gradient-to-br from-red-950/40 via-orange-950/20 to-gray-900 border-2 border-orange-500/30 shadow-2xl relative overflow-hidden">
+                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6">
+                                        <div className="flex items-center space-x-3">
+                                            <span className="text-3xl animate-pulse">🔥</span>
+                                            <div>
+                                                <h3 className="text-xl md:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-amber-300 to-orange-400 uppercase tracking-widest flex items-center gap-2">
+                                                    {t('hardestSectionTitle')}
+                                                    <span className="bg-red-500 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-red-400/50">TOP</span>
+                                                </h3>
+                                                <p className="text-xs text-orange-200/70 font-bold mt-0.5">
+                                                    {t('hardestSectionDesc')}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <span className="text-[11px] font-black text-amber-300 bg-amber-950/80 px-3 py-1.5 rounded-xl border border-amber-500/40 uppercase tracking-wider self-start md:self-auto">
+                                            ⚡ {t('extremeDifficulty')}
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                        {ALL_HARDEST_COURSES.map(c => {
+                                            const info = HARDEST_LANGUAGE_INFO[c.id];
+                                            const isSelected = currentCourse.id === c.id;
+                                            return (
+                                                <div 
+                                                    key={c.id} 
+                                                    onClick={() => { playSound('select'); setCurrentCourse(c); setScreen(AppScreen.PATH); }} 
+                                                    className={`relative p-4 rounded-2xl border-2 border-b-4 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all flex flex-col justify-between shadow-xl group ${isSelected ? 'bg-orange-950/50 border-orange-500 ring-2 ring-orange-500' : 'bg-gray-800/90 border-gray-700/80 hover:bg-gray-750 hover:border-orange-500/50'}`}
+                                                >
+                                                    <div className="flex items-start justify-between gap-3 mb-2">
+                                                        <div className="flex items-center space-x-3 min-w-0">
+                                                            <img src={`https://flagcdn.com/w80/${c.flagCode}.png`} className="w-12 h-8 rounded-md object-cover shadow-md group-hover:scale-110 transition-transform" alt={c.name} />
+                                                            <div className="flex-1 min-w-0">
+                                                                <h3 className="font-bold text-base text-white truncate">{getLocalizedCourseName(c)}</h3>
+                                                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{c.name}</p>
+                                                            </div>
+                                                        </div>
+                                                        {isSelected && <div className="bg-duo-green rounded-full p-1"><CheckCircleIcon className="w-5 h-5 text-white"/></div>}
+                                                    </div>
+                                                    {info && (
+                                                        <div className="mt-2 pt-2 border-t border-gray-700/60 flex flex-col space-y-1">
+                                                            <div className="flex items-center justify-between text-[10px] font-black">
+                                                                <span className="text-amber-400">{info.badge}</span>
+                                                                <span className="text-gray-400">{info.rank}</span>
+                                                            </div>
+                                                            <p className="text-[10px] text-gray-300 font-medium leading-tight line-clamp-2">
+                                                                {user.language === 'ru' ? info.reasonRu : info.reasonEn}
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* SECTION 1: CIS LANGUAGES */}
                             {(courseRegionTab === 'all' || courseRegionTab === 'cis') && (
                                 <div>
@@ -6105,6 +6900,65 @@ const getTodayChallenge = () => {
                                                     <p className="text-[10px] text-rose-400 font-bold uppercase tracking-wider">{t('regionalCourse')}</p>
                                                 </div>
                                                 {currentCourse.id === c.id && <div className="bg-duo-green rounded-full p-1"><CheckCircleIcon className="w-5 h-5 text-white"/></div>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* SECTION 5: OFFICIAL DUOWINDO6601 GLOBAL CATALOG (100+ COURSES) */}
+                            {(courseRegionTab === 'all' || courseRegionTab === 'catalog') && (
+                                <div className="rounded-3xl p-5 md:p-6 bg-gradient-to-br from-sky-950/50 via-slate-900 to-indigo-950/60 border-2 border-sky-500/40 shadow-2xl relative overflow-hidden">
+                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6">
+                                        <div className="flex items-center space-x-3">
+                                            <span className="text-3xl animate-bounce">🏆</span>
+                                            <div>
+                                                <h3 className="text-xl md:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-sky-300 via-blue-200 to-indigo-300 uppercase tracking-widest flex items-center gap-2">
+                                                    {user.language === 'ru' ? 'Официальный Каталог DuoWindo6601' : 'Official DuoWindo6601 Catalog'}
+                                                    <span className="bg-sky-500 text-black text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-sky-300">100+ COURSES</span>
+                                                </h3>
+                                                <p className="text-xs text-sky-200/80 font-bold mt-0.5">
+                                                    {user.language === 'ru' ? 'Реальная статистика учащихся со всего мира' : 'Real-time learner statistics across all language pairs'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                        {DUOWINDO6601_OFFICIAL_CATALOG.slice(0, courseRegionTab === 'catalog' ? 120 : 16).map(item => (
+                                            <div 
+                                                key={item.itemId}
+                                                onClick={() => {
+                                                    playSound('select');
+                                                    const existing = COURSES.find(c => c.id === item.learningLanguage);
+                                                    const selectedCourse = existing || {
+                                                        id: item.learningLanguage,
+                                                        name: item.learningLanguageName,
+                                                        localName: item.title,
+                                                        flagCode: item.flagCode,
+                                                        themeColor: 'bg-duo-blue',
+                                                        themeBorder: 'border-duo-blueDark',
+                                                        mascotVariant: 'default'
+                                                    };
+                                                    setCurrentCourse(selectedCourse);
+                                                    setScreen(AppScreen.PATH);
+                                                }}
+                                                className="relative p-4 rounded-2xl border-2 border-sky-500/30 bg-gray-800/90 hover:bg-sky-950/60 cursor-pointer transition-all flex flex-col justify-between hover:scale-[1.02] active:scale-95 shadow-lg group"
+                                            >
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="flex items-center space-x-3 min-w-0">
+                                                        <img src={`https://flagcdn.com/w80/${item.flagCode}.png`} className="w-10 h-7 rounded-md object-cover shadow group-hover:scale-110 transition-transform" alt={item.learningLanguageName} />
+                                                        <div className="flex-1 min-w-0">
+                                                            <h4 className="font-bold text-sm text-white truncate">{getLocalizedCatalogTitle(item, user.language)}</h4>
+                                                            <p className="text-[10px] text-sky-300 font-bold truncate">{getLocalizedLanguageName(item.learningLanguageName, user.language)}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {item.numLearners > 0 && (
+                                                    <div className="mt-2 pt-2 border-t border-gray-700/60 flex items-center justify-between text-[10px] font-black text-sky-200">
+                                                        <span>👥 {formatLearnerCount(item.numLearners)} {user.language === 'ru' ? 'учащихся' : 'learners'}</span>
+                                                        <span className="bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded-full border border-sky-500/30">Official</span>
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
@@ -7274,6 +8128,79 @@ const getTodayChallenge = () => {
                   <ActivityChart user={user} language={user.language} />
                 </div>
 
+                {/* LEADERBOARD SECTION TABS: DAILY LEADERBOARD vs ALL-TIME */}
+                <div className="flex items-center justify-center p-1.5 bg-gray-900/90 border border-gray-700/80 rounded-2xl mb-6 max-w-md mx-auto shadow-lg">
+                  <button
+                    onClick={() => { playSound('click'); setLeaderboardTab('daily'); }}
+                    className={`flex-1 py-2.5 px-3 rounded-xl font-black text-xs md:text-sm uppercase tracking-wider transition-all flex items-center justify-center space-x-2 cursor-pointer ${
+                      leaderboardTab === 'daily'
+                        ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 shadow-md scale-[1.02]'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <span>🌟</span>
+                    <span>{user.language === 'ru' ? 'Дневной рейтинг' : 'Daily Leaderboard'}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-black/20 font-mono font-bold">24ч</span>
+                  </button>
+
+                  <button
+                    onClick={() => { playSound('click'); setLeaderboardTab('allTime'); }}
+                    className={`flex-1 py-2.5 px-3 rounded-xl font-black text-xs md:text-sm uppercase tracking-wider transition-all flex items-center justify-center space-x-2 cursor-pointer ${
+                      leaderboardTab === 'allTime'
+                        ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md scale-[1.02]'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <span>🏆</span>
+                    <span>{user.language === 'ru' ? 'Общий рейтинг' : 'All-Time League'}</span>
+                  </button>
+                </div>
+
+                {/* DAILY LEADERBOARD BANNER (WHEN DAILY TAB ACTIVE) */}
+                {leaderboardTab === 'daily' && (
+                  <div className="mb-6 p-4 md:p-5 rounded-3xl bg-gradient-to-r from-amber-950/60 via-slate-900 to-yellow-950/60 border-2 border-amber-500/60 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4 text-left">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center text-2xl shadow-lg shrink-0 text-slate-950">
+                        ⚡
+                      </div>
+                      <div>
+                        <div className="flex items-center space-x-2 flex-wrap">
+                          <h3 className="font-black text-base text-amber-300 uppercase tracking-wide">
+                            {user.language === 'ru' ? 'Дневной рейтинг (Daily Leaderboard)' : 'Daily Leaderboard'}
+                          </h3>
+                          <span className="bg-amber-400 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded-lg uppercase tracking-wider shadow-sm">
+                            Только сегодня
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-300 font-bold mt-0.5">
+                          {user.language === 'ru'
+                            ? 'Фиксирует очки опыта (XP), заработанные только за текущий день. Обнуление каждые 24 часа в полночь.'
+                            : 'Specifically tracks and displays XP gains only for the current calendar day, resetting every 24 hours.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2 shrink-0">
+                      <div className="bg-black/60 border border-amber-500/50 rounded-2xl px-4 py-2 text-center shadow-inner">
+                        <span className="text-[10px] text-gray-400 uppercase font-black tracking-wider block">
+                          {user.language === 'ru' ? 'Сброс через' : 'Resets in'}
+                        </span>
+                        <span className="font-mono font-black text-sm text-amber-400">
+                          ⏱ {dailyResetCountdown}
+                        </span>
+                      </div>
+                      <div className="bg-amber-500/20 border border-amber-500/50 rounded-2xl px-4 py-2 text-center shadow-inner">
+                        <span className="text-[10px] text-amber-300 uppercase font-black tracking-wider block">
+                          {user.language === 'ru' ? 'Ваш XP сегодня' : 'Your Today XP'}
+                        </span>
+                        <span className="font-mono font-black text-sm text-yellow-300">
+                          +{dailyXp} XP
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Rating / Leaderboard Name Translator Bar */}
                 <div className="bg-duo-card border-2 border-purple-500/50 rounded-2xl p-4 mb-6 shadow-xl">
                   <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
@@ -7344,7 +8271,7 @@ const getTodayChallenge = () => {
                 )}
 
                 <div className="bg-duo-card border-2 border-gray-700 rounded-3xl overflow-hidden shadow-2xl">
-                   {leaderboardData.map((entry, index) => {
+                   {(leaderboardTab === 'daily' ? dailyLeaderboardData : leaderboardData).map((entry, index) => {
                       const isUser = entry.id === 'user';
                       const rank = index + 1;
                       let rankColor = "text-gray-400"; if (rank === 1) rankColor = "text-yellow-400"; if (rank === 2) rankColor = "text-gray-300"; if (rank === 3) rankColor = "text-orange-400";
@@ -7376,7 +8303,7 @@ const getTodayChallenge = () => {
                             {isUser && <span className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase"><bdi dir="auto">{t('isYou')}</bdi></span>}
                           </div>
                           <div className="font-bold text-xs sm:text-base text-gray-400 shrink-0 text-right ltr-preserve" dir="ltr">
-                            <bdi dir="ltr">{entry.xp} XP</bdi>
+                            <bdi dir="ltr">{leaderboardTab === 'daily' ? `+${entry.xp} XP` : `${entry.xp} XP`}</bdi>
                           </div>
                         </div> 
                       );
@@ -7730,25 +8657,31 @@ const getTodayChallenge = () => {
                                         </span>
                                      </div>
 
-                                     <div className="p-3 bg-black/40 border border-amber-500/40 rounded-xl space-y-1 text-left">
-                                        <p className="text-[11px] text-amber-300 font-bold leading-normal">
-                                           ⚠️ {user.language === 'ru'
-                                              ? 'После 10 октября 2026 года недоступна Инкогнито и ее нельзя будет восстановить в DuoWindo6601.'
-                                              : 'After October 10, 2026, Incognito will be unavailable and cannot be restored in DuoWindo6601.'}
+                                     <div className="p-3 bg-black/40 border border-amber-500/40 rounded-xl space-y-1.5 text-left">
+                                        <div className="flex items-center space-x-1.5 text-amber-300 font-black uppercase text-[11px]">
+                                           <span>🚫</span>
+                                           <span>{getIncognitoClosureTitle(user.language)}</span>
+                                        </div>
+                                        <p className="text-[11px] text-amber-200 font-bold leading-normal">
+                                           {user.language === 'ru'
+                                              ? '10 октября 2026 года вход в Режим Инкогнито недоступен, и его нельзя будет восстановить в DuoWindo6601.'
+                                              : 'On October 10, 2026, entry into Incognito Mode is unavailable and cannot be restored in DuoWindo6601.'}
                                         </p>
                                         <p className="text-[10px] text-gray-300 font-medium leading-relaxed">
                                            {user.language === 'ru'
-                                              ? 'Если вы хотите сохранить какой-либо контент, мы рекомендуем заранее экспортировать данные Firebase Firestore & Auth через Раздел «Профиль» и Раздел «Настройки» или выполнить Полный Вход.'
-                                              : 'If you want to save any content, we recommend exporting your Firebase Firestore & Auth data in advance via the Profile and Settings sections or performing Full Sign-In.'}
+                                              ? 'Синхронизирован актуальный статус не закрытия: Полный Вход и регистрация работают без ограничений, профиль Администратора доступен.'
+                                              : 'Synchronized actual unclosed status: Full Sign-In & registration operate normally, Admin Profile is active.'}
                                         </p>
                                      </div>
 
                                      <div className="flex flex-wrap gap-1.5 text-[10px] font-bold pt-0.5">
-                                        <span className="bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-md">
-                                           ✅ {user.language === 'ru' ? 'Полный Вход не закрыт' : 'Full Sign-In Active'}
+                                        <span className="bg-emerald-950/90 text-emerald-300 border border-emerald-500/60 px-2 py-0.5 rounded-md flex items-center space-x-1">
+                                           <span>✅</span>
+                                           <span>{user.language === 'ru' ? 'Полный Вход и регистрация: НЕ ЗАКРЫТ (Работает)' : 'Full Sign-In & Registration: NOT CLOSED (Active)'}</span>
                                         </span>
-                                        <span className="bg-amber-950/80 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-md">
-                                           👑 {user.language === 'ru' ? 'Администратор профиль не закрыт' : 'Admin Profile Active'}
+                                        <span className="bg-amber-950/90 text-amber-300 border border-amber-500/60 px-2 py-0.5 rounded-md flex items-center space-x-1">
+                                           <span>👑</span>
+                                           <span>{user.language === 'ru' ? 'Профиль Администратора: НЕ ЗАКРЫТ' : 'Admin Profile: NOT CLOSED'}</span>
                                         </span>
                                      </div>
 
@@ -8113,43 +9046,40 @@ const getTodayChallenge = () => {
       {/* MOBILE NAV */}
       {screen !== AppScreen.LESSON && screen !== AppScreen.VIDEO_CALL && (
         <nav className={isSimulatingMobile
-          ? `fixed bottom-0 left-0 w-full ${isLightMode ? 'bg-white/95 border-slate-200' : 'bg-duo-dark/95 border-gray-800'} backdrop-blur-xl border-t p-3 sm:p-4 flex justify-around z-50 pb-8 sm:pb-6 shadow-2xl safe-bottom`
-          : `lg:hidden fixed bottom-0 left-0 w-full ${isLightMode ? 'bg-white/95 border-slate-200' : 'bg-duo-dark/95 border-gray-800'} backdrop-blur-xl border-t p-3 sm:p-4 flex justify-around z-50 pb-8 sm:pb-6 shadow-2xl safe-bottom`
+          ? `fixed bottom-0 left-0 w-full ${isLightMode ? 'bg-white/95 border-slate-200' : 'bg-duo-dark/95 border-gray-800'} backdrop-blur-xl border-t px-2 py-2 flex items-center justify-around z-50 pb-6 shadow-2xl safe-bottom overflow-x-auto no-scrollbar gap-1`
+          : `lg:hidden fixed bottom-0 left-0 w-full ${isLightMode ? 'bg-white/95 border-slate-200' : 'bg-duo-dark/95 border-gray-800'} backdrop-blur-xl border-t px-2 py-2 flex items-center justify-around z-50 pb-6 shadow-2xl safe-bottom overflow-x-auto no-scrollbar gap-1`
         }>
-          {NAV_ITEMS.map(item => {
+          {NAV_ITEMS.filter(item => MOBILE_NAV_SCREENS.includes(item.screen)).map(item => {
             const todayStr = new Date().toISOString().split('T')[0];
             const isTodayChallengePending = item.screen === AppScreen.PATH && 
               user.dailyChallengeCompletedDate !== todayStr && 
               dailyChallengeDismissedDate !== todayStr;
+            const isActive = screen === item.screen;
             return (
-              <button key={item.screen} onClick={() => handleNavigation(item.screen)} className={`transition-all duration-300 relative cursor-pointer ${screen === item.screen ? 'text-duo-blue scale-125 -translate-y-2' : isLightMode ? 'text-slate-500 hover:text-slate-900' : 'text-gray-500 hover:text-white'}`}>
-                <item.icon className="w-8 h-8" />
-                {isTodayChallengePending && (
-                  <span className={`absolute -top-1 -right-1 w-3 h-3 bg-duo-orange rounded-full border-2 ${isLightMode ? 'border-white' : 'border-duo-dark'} animate-pulse`} />
-                )}
+              <button 
+                key={item.screen} 
+                onClick={() => handleNavigation(item.screen)} 
+                className={`flex flex-col items-center justify-center min-w-[44px] py-1 px-1 rounded-xl transition-all duration-200 relative cursor-pointer flex-shrink-0 ${
+                  isActive 
+                    ? 'text-duo-blue scale-105 font-black bg-duo-blue/10' 
+                    : isLightMode 
+                      ? 'text-slate-500 hover:text-slate-900' 
+                      : 'text-gray-400 hover:text-white'
+                }`}
+                title={item.label}
+              >
+                <div className="relative">
+                  <item.icon className="w-6 h-6 sm:w-7 sm:h-7" />
+                  {isTodayChallengePending && (
+                    <span className={`absolute -top-1 -right-1 w-2.5 h-2.5 bg-duo-orange rounded-full border-2 ${isLightMode ? 'border-white' : 'border-duo-dark'} animate-pulse`} />
+                  )}
+                </div>
+                <span className={`text-[9px] font-black uppercase tracking-tighter mt-0.5 max-w-[48px] truncate text-center leading-none ${isActive ? 'text-duo-blue font-black' : 'text-gray-400 opacity-80'}`}>
+                  {item.label.split(' ')[0]}
+                </span>
               </button>
             );
           })}
-          {isIncognitoUser && (
-            <button
-              onClick={openIncognitoRestrictionsModal}
-              className="flex items-center space-x-3 w-full px-4 py-3 rounded-2xl border border-amber-500/40 bg-amber-950/30 hover:bg-amber-900/50 text-amber-300 transition-all text-left shadow-inner mt-4 group cursor-pointer"
-              title="Режим Ограничения в Инкогнито (8 функций заблокировано)"
-            >
-              <span className="text-xl group-hover:scale-110 transition-transform">🚫</span>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <span className="font-black text-[11px] uppercase tracking-wider block leading-tight text-amber-200">
-                    {user.language === 'ru' ? 'Ограничения' : 'Restrictions'}
-                  </span>
-                  <span className="bg-amber-500 text-black text-[9px] font-black px-1.5 py-0.5 rounded-full">8</span>
-                </div>
-                <span className="text-[10px] text-amber-400/70 font-bold block truncate">
-                  {user.language === 'ru' ? 'Что заблокировано' : 'Blocked features'}
-                </span>
-              </div>
-            </button>
-          )}
         </nav>
       )}
 
@@ -9062,7 +9992,13 @@ const getTodayChallenge = () => {
                       </div>
                  </div>
              ) : (
-                 <div className="flex-1 overflow-y-auto no-scrollbar min-h-0">
+                 <motion.div 
+                   key={currentExercise.id || currentExercise.originalSentence || currentExercise.type}
+                   initial={{ opacity: 0, x: 60 }}
+                   animate={{ opacity: 1, x: 0 }}
+                   transition={{ duration: 0.3 }}
+                   className="flex-1 overflow-y-auto no-scrollbar min-h-0"
+                 >
                    <h2 className="text-2xl md:text-3xl font-bold mb-6 md:mb-10 text-center sm:text-left tracking-tight px-2">{currentExercise.type === 'listening' ? t('whatHeard') : currentExercise.type === 'speech' ? t('speakForDuo') : t('readPractice')}</h2>
                    <div className="flex flex-col md:flex-row items-center space-y-6 md:space-y-0 md:space-x-12 mb-8 md:mb-12">
                      <div className="relative flex flex-col items-center flex-shrink-0">
@@ -9115,7 +10051,7 @@ const getTodayChallenge = () => {
                         </>
                       )}
                     </div>
-                  </div>
+                  </motion.div>
               )}
 
               <div className="mt-auto pt-4 border-t-2 border-gray-800 flex items-center justify-between gap-4 relative z-20 flex-shrink-0">
@@ -9148,7 +10084,12 @@ const getTodayChallenge = () => {
                     </button>
                   </>
                 ) : (
-                  <div className={`w-full flex flex-col md:flex-row items-center justify-between p-4 md:p-6 rounded-2xl md:rounded-3xl ${feedback.status === 'correct' ? 'bg-duo-green/20 border-2 border-duo-green' : 'bg-duo-red/20 border-2 border-duo-red'}`}>
+                  <motion.div 
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.25 }}
+                    className={`w-full flex flex-col md:flex-row items-center justify-between p-4 md:p-6 rounded-2xl md:rounded-3xl ${feedback.status === 'correct' ? 'bg-duo-green/20 border-2 border-duo-green' : 'bg-duo-red/20 border-2 border-duo-red'}`}
+                  >
                     <div className="flex items-center space-x-4 mb-4 md:mb-0">
                       <span className="text-3xl md:text-5xl">{feedback.status === 'correct' ? '🎉' : '❌'}</span>
                       <div>
@@ -9194,7 +10135,7 @@ const getTodayChallenge = () => {
                       )}
                       <button onClick={() => handleContinueAfterLesson()} className={`w-full md:w-auto px-10 md:px-16 py-4 md:py-6 rounded-2xl md:rounded-3xl font-black text-white border-b-4 transition-all hover:scale-105 active:translate-y-1 ${feedback.status === 'correct' ? 'bg-duo-green border-duo-greenDark shadow-xl shadow-duo-green/20' : 'bg-duo-red border-red-800'}`}>{t('next')}</button>
                     </div>
-                  </div>
+                  </motion.div>
                 )}
               </div>
             </div>

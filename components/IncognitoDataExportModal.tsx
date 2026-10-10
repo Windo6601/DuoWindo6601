@@ -6,7 +6,8 @@ import {
   generateIncognitoExportData, 
   isIncognitoLoginClosed, 
   getDaysUntilIncognitoClosure,
-  getFormattedClosureDate 
+  getFormattedClosureDate,
+  getIncognitoClosureTitle
 } from '../services/incognitoService';
 
 export interface IncognitoDataExportModalProps {
@@ -108,35 +109,29 @@ export const IncognitoDataExportModal: React.FC<IncognitoDataExportModalProps> =
             : 'bg-amber-950/40 border-amber-500/60 text-amber-200'
         } space-y-2`}>
           <div className="flex items-center space-x-2">
-            <span className="text-xl shrink-0">{isClosed ? '🛑' : '⚠️'}</span>
+            <span className="text-xl shrink-0">{isClosed ? '🛑' : '🚫'}</span>
             <h4 className="text-xs sm:text-sm font-black uppercase tracking-wide">
-              {isClosed
-                ? (isRu 
-                    ? `Вход в Режим Инкогнито закрыт с ${closureDateStr}` 
-                    : `Incognito Login Closed since ${closureDateStr}`)
-                : (isRu 
-                    ? `Внимание: 10 октября 2026 года вход в Режим Инкогнито будет закрыт` 
-                    : `Notice: Incognito Login will close on October 10, 2026`)}
+              {getIncognitoClosureTitle(language)}
             </h4>
           </div>
           <p className="text-xs text-gray-200 font-bold leading-relaxed">
             {isRu
-              ? 'После 10 октября 2026 года Режим Инкогнито будет недоступен, и его нельзя будет восстановить в DuoWindo6601.'
-              : 'After October 10, 2026, Incognito Mode will be unavailable and cannot be restored in DuoWindo6601.'}
+              ? '10 октября 2026 года вход в Режим Инкогнито недоступен, и его нельзя будет восстановить в DuoWindo6601.'
+              : 'On October 10, 2026, entry into Incognito Mode is unavailable and cannot be restored in DuoWindo6601.'}
           </p>
           <p className="text-xs text-gray-300 font-medium leading-relaxed">
             {isRu 
-              ? 'Если вы хотите сохранить какой-либо контент, мы рекомендуем заранее экспортировать данные Firebase Firestore & Auth через Раздел «Профиль» и Раздел «Настройки» или выполнить Полный Вход в аккаунт.' 
-              : 'If you want to save any content, we recommend exporting your Firebase Firestore & Auth data in advance via the Profile and Settings sections or performing Full Sign-In.'}
+              ? 'Синхронизирован актуальный статус не закрытия: Полный Вход и регистрация работают без ограничений, профиль Администратора доступен.' 
+              : 'Synchronized actual unclosed status: Full Sign-In & registration operate normally, Admin Profile is active.'}
           </p>
           <div className="pt-1 flex flex-wrap gap-2 text-[11px] font-bold">
-            <span className="bg-emerald-950/80 text-emerald-300 border border-emerald-500/50 px-2 py-0.5 rounded-lg flex items-center space-x-1">
+            <span className="bg-emerald-950/90 text-emerald-300 border border-emerald-500/60 px-2.5 py-1 rounded-xl flex items-center space-x-1.5 shadow-sm">
               <span>✅</span>
-              <span>{isRu ? 'Полный Вход: Открыт' : 'Full Sign-In: Active'}</span>
+              <span>{isRu ? 'Полный Вход и регистрация: НЕ ЗАКРЫТ (Работает)' : 'Full Sign-In & Registration: NOT CLOSED (Active)'}</span>
             </span>
-            <span className="bg-amber-950/80 text-amber-300 border border-amber-500/50 px-2 py-0.5 rounded-lg flex items-center space-x-1">
+            <span className="bg-amber-950/90 text-amber-300 border border-amber-500/60 px-2.5 py-1 rounded-xl flex items-center space-x-1.5 shadow-sm">
               <span>👑</span>
-              <span>{isRu ? 'Профиль Администратора: Открыт' : 'Admin Profile: Active'}</span>
+              <span>{isRu ? 'Профиль Администратора: НЕ ЗАКРЫТ' : 'Admin Profile: NOT CLOSED'}</span>
             </span>
           </div>
         </div>

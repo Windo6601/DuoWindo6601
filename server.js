@@ -102,7 +102,7 @@ const server = http.createServer((req, res) => {
       res.end();
       return;
     }
-    const renderMcpKey = process.env.RENDER_MCP_API_KEY || 'rnd_yJ0QbFmEPVzGFlD6OwWG4o8Rg6t8';
+    const renderMcpKey = process.env.RENDER_MCP_API_KEY || '';
     res.statusCode = 200;
     res.setHeader('content-type', 'application/json');
     res.end(JSON.stringify({

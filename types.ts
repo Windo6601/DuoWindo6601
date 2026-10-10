@@ -187,6 +187,7 @@ export interface UserProgress {
   theme?: 'light' | 'dark' | 'system';
   preventAccountDeletion?: boolean;
   placementTests?: Record<string, { moduleIndex: number; score: number; completedAt: string }>;
+  letterMastery?: Record<string, number>;
   chessStats?: {
     games: number;
     wins: number;

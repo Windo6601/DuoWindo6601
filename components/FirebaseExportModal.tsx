@@ -9,6 +9,7 @@ import {
   FirebaseExportPayload,
   FirebaseExportSummary
 } from '../services/firebaseExportService';
+import { getIncognitoClosureTitle } from '../services/incognitoService';
 
 export interface FirebaseExportModalProps {
   isOpen: boolean;
@@ -204,21 +205,31 @@ export const FirebaseExportModal: React.FC<FirebaseExportModalProps> = ({
         </div>
 
         {/* INCOGNITO PERMANENT CLOSURE & EXPORT ADVICE BANNER */}
-        <div className="p-3.5 bg-gradient-to-r from-amber-950/50 via-rose-950/30 to-amber-950/50 border border-amber-500/50 rounded-2xl text-xs space-y-1.5 text-left">
+        <div className="p-3.5 bg-gradient-to-r from-amber-950/50 via-rose-950/30 to-amber-950/50 border border-amber-500/50 rounded-2xl text-xs space-y-2 text-left">
           <div className="flex items-center space-x-2 text-amber-300 font-black uppercase tracking-wider text-[11px]">
-            <span>⚠️</span>
-            <span>{isRu ? 'Предупреждение о сохранении контента' : 'Content Retention Warning'}</span>
+            <span>🚫</span>
+            <span>{getIncognitoClosureTitle(language)}</span>
           </div>
           <p className="text-gray-200 font-bold leading-snug">
             {isRu 
-              ? 'После 10 октября 2026 года Режим Инкогнито будет недоступен, и его нельзя будет восстановить в DuoWindo6601.'
-              : 'After October 10, 2026, Incognito Mode will be unavailable and cannot be restored in DuoWindo6601.'}
+              ? '10 октября 2026 года вход в Режим Инкогнито недоступен, и его нельзя будет восстановить в DuoWindo6601.'
+              : 'On October 10, 2026, entry into Incognito Mode is unavailable and cannot be restored in DuoWindo6601.'}
           </p>
-          <p className="text-[11px] text-gray-400 font-medium leading-relaxed">
+          <p className="text-[11px] text-gray-300 font-medium leading-relaxed">
             {isRu
-              ? 'Если вы хотите сохранить какой-либо контент, мы рекомендуем заранее экспортировать данные Firebase Firestore & Auth через Раздел «Профиль» и Раздел «Настройки» с помощью кнопок ниже или выполнить Полный Вход в систему.'
-              : 'If you want to save any content, we recommend exporting your Firebase Firestore & Auth data in advance via the Profile and Settings sections using the buttons below or performing Full Sign-In.'}
+              ? 'Синхронизирован актуальный статус не закрытия: Полный Вход и регистрация работают без ограничений, профиль Администратора доступен.'
+              : 'Synchronized actual unclosed status: Full Sign-In & registration operate normally, Admin Profile is active.'}
           </p>
+          <div className="flex flex-wrap gap-1.5 text-[10px] font-bold pt-0.5">
+            <span className="bg-emerald-950/90 text-emerald-300 border border-emerald-500/60 px-2.5 py-0.5 rounded-lg flex items-center space-x-1 shadow-sm">
+              <span>✅</span>
+              <span>{isRu ? 'Полный Вход и регистрация: НЕ ЗАКРЫТ (Работает)' : 'Full Sign-In & Registration: NOT CLOSED (Active)'}</span>
+            </span>
+            <span className="bg-amber-950/90 text-amber-300 border border-amber-500/60 px-2.5 py-0.5 rounded-lg flex items-center space-x-1 shadow-sm">
+              <span>👑</span>
+              <span>{isRu ? 'Профиль Администратора: НЕ ЗАКРЫТ' : 'Admin Profile: NOT CLOSED'}</span>
+            </span>
+          </div>
         </div>
 
         {/* TABS */}

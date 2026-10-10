@@ -898,12 +898,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <p className="text-xs text-gray-300 font-bold">
                 Модерация, Мониторинг и Восстановление Ударного Режима
               </p>
-              <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1 text-[10px] font-bold">
-                <span className="bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-md">
-                  👑 Профиль Администратора: НЕ ЗАКРЫТ (Открыт)
+              <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1.5 text-[11px] font-bold">
+                <span className="bg-amber-950/90 text-amber-300 border border-amber-500/60 px-2.5 py-1 rounded-xl shadow-sm">
+                  👑 Профиль Администратора: НЕ ЗАКРЫТ
                 </span>
-                <span className="bg-sky-950/80 text-sky-300 border border-sky-500/40 px-2 py-0.5 rounded-md">
-                  🔑 Полный Вход: НЕ ЗАКРЫТ (Активен)
+                <span className="bg-emerald-950/90 text-emerald-300 border border-emerald-500/60 px-2.5 py-1 rounded-xl shadow-sm">
+                  ✅ Полный Вход и регистрация: НЕ ЗАКРЫТ (Работает)
+                </span>
+                <span className="bg-rose-950/90 text-rose-300 border border-rose-500/60 px-2.5 py-1 rounded-xl shadow-sm">
+                  🚫 Вход в Инкогнито недоступен
                 </span>
               </div>
             </div>
@@ -1130,11 +1133,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <span>👑</span>
                   <span>Панель Владельца — Admin Tool</span>
                 </h1>
-                <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
-                  Доступ только администратора
+                <span className="bg-amber-950/90 text-amber-300 border border-amber-500/60 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">
+                  👑 Профиль Администратора: НЕ ЗАКРЫТ
                 </span>
-                <span className="bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">
-                  👑 Профиль открыт (Не закрыт)
+                <span className="bg-emerald-950/90 text-emerald-300 border border-emerald-500/60 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">
+                  ✅ Полный Вход: НЕ ЗАКРЫТ (Работает)
                 </span>
               </div>
               <p className="text-[11px] text-gray-400 font-bold">

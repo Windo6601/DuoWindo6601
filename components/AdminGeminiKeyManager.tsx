@@ -352,13 +352,13 @@ export const AdminGeminiKeyManager: React.FC<AdminGeminiKeyManagerProps> = ({
   // Reset MCP Key to Default
   const handleResetMcpKey = () => {
     playSound?.('click');
-    const defaultKey = 'rnd_yJ0QbFmEPVzGFlD6OwWG4o8Rg6t8';
+    const defaultKey = '';
     setMcpKeyInput(defaultKey);
     setMcpEnabled(true);
     setJulesDebugEnabled(true);
     saveMcpConfig(true, defaultKey, true);
     setMcpConfig(getMcpConfig());
-    triggerToast({ message: 'Ключ Render MCP сброшен к официальному ключу Jules!', type: 'info', icon: '🔄' });
+    triggerToast({ message: 'Ключ Render MCP сброшен!', type: 'info', icon: '🔄' });
   };
 
   // Run full latency diagnostics

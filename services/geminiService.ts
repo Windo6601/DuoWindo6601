@@ -25,7 +25,7 @@ const sanitizeKey = (k: string): string => {
   return k.replace(/\s+/g, '');
 };
 
-export const DEFAULT_FALLBACK_GEMINI_KEY = 'AQ.Ab8RN6Ky0t2F2VWU9-tlJjneqxCv-RegKUBSTB2DgCXCOe_2Rg';
+export const DEFAULT_FALLBACK_GEMINI_KEY = (typeof process !== 'undefined' && (process.env?.GEMINI_API_KEY || process.env?.API_KEY)) || (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_GEMINI_API_KEY) || '';
 
 export interface ActiveApiKeyInfo {
   source: 'admin' | 'dev' | 'custom' | 'system' | 'none';
@@ -367,7 +367,8 @@ const fallbackSpeak = (text: string, lang: string = 'en', slow: boolean = false,
       'en': 'en-US', 'de': 'de-DE', 'fr': 'fr-FR', 'es': 'es-ES', 'ja': 'ja-JP', 
       'zh': 'zh-CN', 'ko': 'ko-KR', 'it': 'it-IT', 'pt': 'pt-BR', 'ru': 'ru-RU',
       'be': 'ru-RU', 'uk': 'uk-UA', 'et': 'et-EE', 'lv': 'lv-LV', 'lt': 'lt-LT', 'tr': 'tr-TR',
-      'ar': 'ar-SA'
+      'ar': 'ar-SA', 'hu': 'hu-HU', 'fi': 'fi-FI', 'is': 'is-IS', 'pl': 'pl-PL', 'eu': 'eu-ES',
+      'nv': 'en-US', 'tab': 'ru-RU'
     };
     
     // Default lang
@@ -655,6 +656,64 @@ export const getFallbackExercise = (subjectId: string, type: Exercise['type'], s
             id: crypto.randomUUID(), type: 'translation', originalSentence: `Это регион РФ: ${subjectName}?`,
             targetTranslation: "Да", wordBank: ["Да", "Нет", "Возможно", "Не знаю"], isFallback: true
         };
+    }
+
+    const hardestFallbacks: Record<string, { orig: string; trans: string; bank: string[] }[]> = {
+      hu: [
+        { orig: "Szia! Hogy vagy?", trans: "Привет! Как дела?", bank: ["Привет!", "Как", "дела?", "Спасибо", "Пока", "Хорошо"] },
+        { orig: "A macska a házban van", trans: "Кот в доме", bank: ["Кот", "в", "доме", "на", "улице", "собака"] },
+        { orig: "Tanulom a magyar nyelvet", trans: "Я учу венгерский язык", bank: ["Я", "учу", "венгерский", "язык", "он", "знает"] },
+        { orig: "Köszönöm szépen a segítséget", trans: "Большое спасибо за помощь", bank: ["Большое", "спасибо", "за", "помощь", "пожалуйста"] }
+      ],
+      fi: [
+        { orig: "Hei! Mitä kuuluu?", trans: "Привет! Как дела?", bank: ["Привет!", "Как", "дела?", "Отлично", "До", "свидания"] },
+        { orig: "Minä rakastan suomen kieltä", trans: "Я люблю финский язык", bank: ["Я", "люблю", "финский", "язык", "Мы", "учим"] },
+        { orig: "Kissa istuu pöydällä", trans: "Кот сидит на столе", bank: ["Кот", "сидит", "на", "столе", "под", "стулом"] },
+        { orig: "Kiitos paljon avusta", trans: "Большое спасибо за помощь", bank: ["Большое", "спасибо", "за", "помощь", "друг"] }
+      ],
+      is: [
+        { orig: "Halló! Hvað heitir þú?", trans: "Привет! Как тебя зовут?", bank: ["Привет!", "Как", "тебя", "зовут?", "Меня", "друг"] },
+        { orig: "Ég tala smá íslensku", trans: "Я немного говорю по-исландски", bank: ["Я", "немного", "говорю", "по-исландски", "хорошо"] },
+        { orig: "Góðan daginn, vinur", trans: "Добрый день, друг", bank: ["Добрый", "день,", "друг", "ночь", "вечер"] },
+        { orig: "Takk fyrir hjálpina", trans: "Спасибо за помощь", bank: ["Спасибо", "за", "помощь", "Большое", "пожалуйста"] }
+      ],
+      pl: [
+        { orig: "Cześć! Jak się masz?", trans: "Привет! Как дела?", bank: ["Привет!", "Как", "дела?", "Хорошо", "Пока"] },
+        { orig: "Uczę się języka polskiego", trans: "Я изучаю польский язык", bank: ["Я", "изучаю", "польский", "язык", "Мы", "говорим"] },
+        { orig: "Dziękuję bardzo za pomoc", trans: "Большое спасибо за помощь", bank: ["Большое", "спасибо", "за", "помощь", "друг"] },
+        { orig: "W Szczebrzeszynie chrząszcz brzmi w trzcinie", trans: "В Щебжешине жук звучит в тростнике", bank: ["В", "Щебжешине", "жук", "звучит", "в", "тростнике", "поле"] }
+      ],
+      eu: [
+        { orig: "Kaixo! Zer moduz?", trans: "Привет! Как дела?", bank: ["Привет!", "Как", "дела?", "Отлично", "Здравствуйте"] },
+        { orig: "Euskara ikasten ari naiz", trans: "Я изучаю баскский язык", bank: ["Я", "изучаю", "баскский", "язык", "Мы", "знаем"] },
+        { orig: "Gizonak ogia jaten du", trans: "Мужчина ест хлеб", bank: ["Мужчина", "ест", "хлеб", "воду", "пьет"] },
+        { orig: "Eskerrik asko zure laguntzagatik", trans: "Большое спасибо за помощь", bank: ["Большое", "спасибо", "за", "помощь", "пожалуйста"] }
+      ],
+      nv: [
+        { orig: "Yáʼátʼééh! Haash yinilyé?", trans: "Привет! Как тебя зовут?", bank: ["Привет!", "Как", "тебя", "зовут?", "друг"] },
+        { orig: "Diné bizaad bídahwiilʼaah", trans: "Мы изучаем язык навахо", bank: ["Мы", "изучаем", "язык", "навахо", "Я", "говорю"] },
+        { orig: "Shimá dóó shizhéʼé", trans: "Моя мама и мой папа", bank: ["Моя", "мама", "и", "мой", "папа", "брат"] },
+        { orig: "Ahéheeʼ nitsʼą́ą́dóó", trans: "Спасибо тебе за помощь", bank: ["Спасибо", "тебе", "за", "помощь", "Большое"] }
+      ],
+      tab: [
+        { orig: "Салам! Фици вува?", trans: "Привет! Как поживаешь?", bank: ["Привет!", "Как", "поживаешь?", "Хорошо", "дела"] },
+        { orig: "Узу табасаран чIал аьгъю апIураза", trans: "Я изучаю табасаранский язык", bank: ["Я", "изучаю", "табасаранский", "язык", "Мы"] },
+        { orig: "Баб ва дад ккунраза", trans: "Я люблю маму и папу", bank: ["Я", "люблю", "маму", "и", "папу", "семью"] },
+        { orig: "Чугъул сагъул кумек бадали", trans: "Большое спасибо за помощь", bank: ["Большое", "спасибо", "за", "помощь", "пожалуйста"] }
+      ]
+    };
+
+    if (hardestFallbacks[subjectId]) {
+      const list = hardestFallbacks[subjectId];
+      const item = list[Math.floor(Math.random() * list.length)];
+      return {
+        id: crypto.randomUUID(),
+        type: 'translation',
+        originalSentence: item.orig,
+        targetTranslation: item.trans,
+        wordBank: [...item.bank].sort(() => Math.random() - 0.5),
+        isFallback: true
+      };
     }
 
     // Dynamic procedural sentence builder to prevent repetitive sentences!
@@ -1037,25 +1096,29 @@ const CIS_OFFLINE_DICTIONARY: Record<string, Record<string, string>> = {
     'be': 'Прывітанне', 'uk': 'Привіт', 'mo': 'Salut', 'lt': 'Labas', 'lv': 'Sveiki',
     'et': 'Tere', 'ka': 'გამარჯობა (Gamarjoba)', 'hy': 'Բարև (Barev)', 'az': 'Salam',
     'kk': 'Сәлем', 'uz': 'Salom', 'tk': 'Salam', 'ky': 'Салам', 'tg': 'Салом',
-    'en': 'Hello', 'de': 'Hallo', 'fr': 'Bonjour', 'es': 'Hola', 'zh': '你好', 'ja': 'こんにちは', 'ar': 'مرحبا'
+    'en': 'Hello', 'de': 'Hallo', 'fr': 'Bonjour', 'es': 'Hola', 'zh': '你好', 'ja': 'こんにちは', 'ar': 'مرحبا',
+    'hu': 'Szia', 'fi': 'Hei', 'is': 'Halló', 'pl': 'Cześć', 'eu': 'Kaixo', 'nv': 'Yáʼátʼééh', 'tab': 'Салам'
   },
   'спасибо': {
     'be': 'Дзякуй', 'uk': 'Дякую', 'mo': 'Mulțumesc', 'lt': 'Ačiū', 'lv': 'Paldies',
     'et': 'Aitäh', 'ka': 'მადლობა (Madloba)', 'hy': 'Շնորհակալություն (Shnorhakalutyun)', 'az': 'Təşəkkür edirəm',
     'kk': 'Рахмет', 'uz': 'Rahmat', 'tk': 'Sag boluň', 'ky': 'Рахмат', 'tg': 'Раҳмат',
-    'en': 'Thank you', 'de': 'Danke', 'fr': 'Merci', 'es': 'Gracias', 'zh': '谢谢', 'ja': 'ありがとう', 'ar': 'شكرا'
+    'en': 'Thank you', 'de': 'Danke', 'fr': 'Merci', 'es': 'Gracias', 'zh': '谢谢', 'ja': 'ありがとう', 'ar': 'شكرا',
+    'hu': 'Köszönöm', 'fi': 'Kiitos', 'is': 'Takk fyrir', 'pl': 'Dziękuję', 'eu': 'Eskerrik asko', 'nv': 'Ahéheeʼ', 'tab': 'Чугъул сагъул'
   },
   'как дела': {
     'be': 'Як справы?', 'uk': 'Як справи?', 'mo': 'Ce mai faci?', 'lt': 'Kaip sekasi?', 'lv': 'Kā iet?',
     'et': 'Kuidas läheb?', 'ka': 'როგორ ხარ? (Rogor khar?)', 'hy': 'Ինչպե՞ս ես (Inchpes es?)', 'az': 'Necəsən?',
     'kk': 'Қалың қалай?', 'uz': 'Ishlar qalay?', 'tk': 'Ýagdaýlar nähili?', 'ky': 'Кандайсың?', 'tg': 'Аҳвол чӣ хел?',
-    'en': 'How are you?', 'de': 'Wie geht es dir?', 'fr': 'Comment vas-tu?', 'es': '¿Cómo estás?', 'zh': '你好吗？', 'ja': 'お元気ですか？', 'ar': 'كيف حالك؟'
+    'en': 'How are you?', 'de': 'Wie geht es dir?', 'fr': 'Comment vas-tu?', 'es': '¿Cómo estás?', 'zh': '你好吗？', 'ja': 'お元気ですか？', 'ar': 'كيف حالك؟',
+    'hu': 'Hogy vagy?', 'fi': 'Mitä kuuluu?', 'is': 'Hvernig hefurðu það?', 'pl': 'Jak się masz?', 'eu': 'Zer moduz?', 'nv': 'Haash yinilyé?', 'tab': 'Фици вува?'
   },
   'до свидания': {
     'be': 'Да пабачэння', 'uk': 'До побачення', 'mo': 'La revedere', 'lt': 'Viso gero', 'lv': 'Uz redzēšanos',
     'et': 'Head aega', 'ka': 'ნახვამდის (Nakhvamdis)', 'hy': 'Ցտեսություն (Tstesutyun)', 'az': 'Sağ olun',
     'kk': 'Сау болыңыз', 'uz': 'Xayr', 'tk': 'Hoş gal', 'ky': 'Кош болуңуз', 'tg': 'Хайр',
-    'en': 'Goodbye', 'de': 'Auf Wiedersehen', 'fr': 'Au revoir', 'es': 'Adiós', 'zh': '再见', 'ja': 'さようなら', 'ar': 'مع السلامة'
+    'en': 'Goodbye', 'de': 'Auf Wiedersehen', 'fr': 'Au revoir', 'es': 'Adiós', 'zh': '再见', 'ja': 'さようなら', 'ar': 'مع السلامة',
+    'hu': 'Viszlát', 'fi': 'Näkemiin', 'is': 'Bless', 'pl': 'Do widzenia', 'eu': 'Agur', 'nv': 'Hagóóneeʼ', 'tab': 'Сагъвалди'
   }
 };
 
