@@ -8,7 +8,18 @@
     <meta name="description" content="A gamified language learning app featuring an interactive mascot, learning path, AI video calls, regional courses, and multi-language support (EN, DE, FR, ES, JA, ZH, RU, AR)." />
     <meta property="og:title" content="DuoWindo6601" />
     <meta property="og:description" content="A gamified language learning app featuring an interactive mascot, learning path, AI video calls, regional courses, and multi-language support (EN, DE, FR, ES, JA, ZH, RU, AR)." />
-    <link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400;1,700&family=Cairo:wght@400;600;700;800;900&family=Noto+Sans+Arabic:wght@400;600;700;800&family=Noto+Sans+Hebrew:wght@400;600;700;800&family=Nunito:wght@400;600;700;800&family=Rubik:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Progressive Web App (PWA) Meta & Icons -->
+    <meta name="theme-color" content="#131F24" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="DuoWindo" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="alternate icon" type="image/png" href="/favicon.png" />
+    <link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@400;600;700;800;900&family=Almarai:wght@400;700;800&family=Amiri:ital,wght@0,400;0,700;1,400;1,700&family=Cairo:wght@400;600;700;800;900&family=Lexend:wght@400;500;600;700;800;900&family=M+PLUS+Rounded+1c:wght@400;500;700;800;900&family=Ma+Shan+Zheng&family=Montserrat:wght@400;500;600;700;800;900&family=Noto+Sans+Arabic:wght@400;600;700;800;900&family=Noto+Sans+Hebrew:wght@400;600;700;800&family=Noto+Sans+JP:wght@400;500;700;900&family=Noto+Sans+SC:wght@400;500;700;900&family=Noto+Serif+SC:wght@400;700&family=Nunito:wght@400;600;700;800&family=Rubik:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&family=ZCOOL+KuaiLe&family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <!-- International & Script Fonts: Korean, Hindi, Bengali, Thai, Portuguese, Italian, Turkish, Polish, Indonesian -->
+    <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Hind+Siliguri:wght@400;600;700&family=Kanit:wght@400;600;700;800&family=Noto+Sans+Bengali:wght@400;600;700;900&family=Noto+Sans+Devanagari:wght@400;600;700;900&family=Noto+Sans+KR:wght@400;500;700;900&family=Noto+Sans+Thai:wght@400;600;700;900&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
       /* Duolingo DIN Next Rounded Typeface */
       @font-face {
@@ -30,6 +41,16 @@
         font-family: 'Feather';
         src: url('https://db.onlinewebfonts.com/t/0628292f75a0694e22e6b72049e390c2.woff2') format('woff2');
         font-weight: 700;
+        font-style: normal;
+        font-display: swap;
+      }
+      /* Klingon Typeface (fontomania.ru/17807-klingon.html) */
+      @font-face {
+        font-family: 'Klingon';
+        src: url('/fonts/klingon.ttf') format('truetype'),
+             url('https://fontomania.ru/storage/fonts/a09/17807/klingon%20font.ttf') format('truetype'),
+             local('Klingon'), local('klingon');
+        font-weight: normal;
         font-style: normal;
         font-display: swap;
       }
@@ -57,12 +78,79 @@
         font-weight: 700;
       }
 
-      /* Arabic & Hebrew typography helpers */
-      .font-arabic {
-        font-family: 'Cairo', 'Amiri', 'Noto Sans Arabic', sans-serif !important;
+      /* Chinese, Japanese, Arabic & Hebrew typography helpers */
+      .font-chinese, [data-lang="zh"], :lang(zh), .lang-zh, [data-course-script="chinese"] {
+        font-family: 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'ZCOOL KuaiLe', sans-serif !important;
       }
+      .font-japanese, [data-lang="ja"], :lang(ja), .lang-ja, [data-course-script="japanese"] {
+        font-family: 'Zen Maru Gothic', 'M PLUS Rounded 1c', 'Noto Sans JP', 'Hiragino Sans', 'Meiryo', sans-serif !important;
+      }
+      .font-arabic, [data-lang="ar"], :lang(ar), .lang-ar, [data-course-script="arabic"] {
+        font-family: 'DIN Next Rounded', 'Nunito', 'Noto Sans Arabic', 'Cairo', sans-serif !important;
+      }
+      /* Arabic Font Switcher Specific Font Rules */
+      [data-arabic-font="duo"] .font-arabic,
+      [data-arabic-font="duo"] [data-lang="ar"],
+      [data-arabic-font="duo"] :lang(ar),
+      [data-arabic-font="duo"] .lang-ar,
+      [data-arabic-font="duo"] [data-course-script="arabic"],
+      .font-arabic-duo {
+        font-family: 'DIN Next Rounded', 'Nunito', sans-serif !important;
+      }
+      [data-arabic-font="noto"] .font-arabic,
+      [data-arabic-font="noto"] [data-lang="ar"],
+      [data-arabic-font="noto"] :lang(ar),
+      [data-arabic-font="noto"] .lang-ar,
+      [data-arabic-font="noto"] [data-course-script="arabic"],
+      .font-arabic-noto {
+        font-family: 'Noto Sans Arabic', sans-serif !important;
+      }
+      [data-arabic-font="cairo"] .font-arabic,
+      [data-arabic-font="cairo"] [data-lang="ar"],
+      [data-arabic-font="cairo"] :lang(ar),
+      [data-arabic-font="cairo"] .lang-ar,
+      [data-arabic-font="cairo"] [data-course-script="arabic"],
+      .font-arabic-cairo {
+        font-family: 'Cairo', sans-serif !important;
+      }
+      [data-arabic-font="alexandria"] .font-arabic,
+      [data-arabic-font="alexandria"] [data-lang="ar"],
+      [data-arabic-font="alexandria"] :lang(ar),
+      [data-arabic-font="alexandria"] .lang-ar,
+      [data-arabic-font="alexandria"] [data-course-script="arabic"],
+      .font-arabic-alexandria {
+        font-family: 'Alexandria', 'Montserrat', sans-serif !important;
+      }
+      [data-arabic-font="alexandria"] h1, [data-arabic-font="alexandria"] .text-h1 { font-size: 28px !important; font-weight: 400 !important; }
+      [data-arabic-font="alexandria"] h2, [data-arabic-font="alexandria"] .text-h2 { font-size: 22px !important; font-weight: 400 !important; }
+      [data-arabic-font="alexandria"] h3, [data-arabic-font="alexandria"] .text-h3 { font-size: 18px !important; font-weight: 400 !important; }
       .font-hebrew {
         font-family: 'Rubik', 'Noto Sans Hebrew', sans-serif !important;
+      }
+      .font-klingon, [data-lang="tlh"], :lang(tlh), .lang-tlh, [data-course-script="klingon"], [data-course="tlh"] {
+        font-family: 'Klingon', 'DIN Next Rounded', sans-serif !important;
+      }
+      /* Dual Arabic Numerals Styling: European/Western on left, Eastern Arabic on right */
+      .arabic-dual-numeral {
+        direction: ltr !important;
+        unicode-bidi: isolate;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-weight: 800;
+      }
+      .arabic-dual-numeral .western-num {
+        font-family: 'DIN Next Rounded', 'Nunito', sans-serif;
+        color: #38bdf8;
+      }
+      .arabic-dual-numeral .num-separator {
+        color: #94a3b8;
+        font-weight: 600;
+        font-size: 0.85em;
+      }
+      .arabic-dual-numeral .eastern-num {
+        font-family: 'Cairo', 'Amiri', 'Noto Sans Arabic', sans-serif;
+        color: #34d399;
       }
       .rtl-text {
         direction: rtl;

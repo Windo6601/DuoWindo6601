@@ -1276,16 +1276,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <p className="text-[10px] uppercase font-black tracking-wider text-gray-400">Текущий активный источник</p>
                   <div className="flex items-center space-x-2 mt-1.5">
                     <span className="text-xl">
-                      {activeKeyInfo.source === 'ADMIN' ? '👑' : activeKeyInfo.source === 'DEV' ? '💻' : activeKeyInfo.source === 'CUSTOM' ? '👤' : '🌐'}
+                      {activeKeyInfo.source === 'admin' ? '👑' : activeKeyInfo.source === 'dev' ? '💻' : activeKeyInfo.source === 'custom' ? '👤' : '🌐'}
                     </span>
                     <span className={`text-base font-black uppercase tracking-tight ${
-                      activeKeyInfo.source === 'ADMIN' ? 'text-amber-400' :
-                      activeKeyInfo.source === 'DEV' ? 'text-cyan-400' :
-                      activeKeyInfo.source === 'CUSTOM' ? 'text-emerald-400' : 'text-blue-400'
+                      activeKeyInfo.source === 'admin' ? 'text-amber-400' :
+                      activeKeyInfo.source === 'dev' ? 'text-cyan-400' :
+                      activeKeyInfo.source === 'custom' ? 'text-emerald-400' : 'text-blue-400'
                     }`}>
-                      {activeKeyInfo.source === 'ADMIN' ? 'Ключ Администратора' :
-                       activeKeyInfo.source === 'DEV' ? 'Ключ Разработчика' :
-                       activeKeyInfo.source === 'CUSTOM' ? 'Пользовательский' : 'Системный по умолчанию'}
+                      {activeKeyInfo.source === 'admin' ? 'Ключ Администратора' :
+                       activeKeyInfo.source === 'dev' ? 'Ключ Разработчика' :
+                       activeKeyInfo.source === 'custom' ? 'Пользовательский' : 'Системный по умолчанию'}
                     </span>
                   </div>
                   <p className="text-[10px] text-gray-400 mt-1">Приоритет: <span className="text-white font-bold">{keyPriority.toUpperCase()}</span></p>

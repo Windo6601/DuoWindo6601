@@ -93,6 +93,47 @@
         "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp" },
         "updatedBy": { "type": "string", "description": "Email or ID of updating administrator" }
       }
+    },
+    "ChessRoom": {
+      "title": "Chess Room",
+      "description": "Multiplayer chess room state synchronized across users",
+      "type": "object",
+      "properties": {
+        "roomId": { "type": "string", "description": "Unique room ID" },
+        "hostId": { "type": "string", "description": "ID of host player (White)" },
+        "hostName": { "type": "string", "description": "Name of host player" },
+        "hostAvatar": { "type": "string", "description": "Avatar of host player" },
+        "hostElo": { "type": "integer", "description": "ELO rating of host player" },
+        "guestId": { "type": "string", "description": "ID of guest player (Black)" },
+        "guestName": { "type": "string", "description": "Name of guest player" },
+        "guestAvatar": { "type": "string", "description": "Avatar of guest player" },
+        "guestElo": { "type": "integer", "description": "ELO rating of guest player" },
+        "fen": { "type": "string", "description": "Current chess board FEN notation" },
+        "turn": { "type": "string", "enum": ["w", "b"], "description": "Active player turn" },
+        "status": { "type": "string", "enum": ["waiting", "active", "finished", "abandoned"], "description": "Game status" },
+        "winner": { "type": "string", "description": "Winner player ID or draw status" },
+        "lastMove": { "type": "object", "description": "Last move coordinates" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Room creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last move or update timestamp" }
+      },
+      "required": ["hostId", "fen", "turn", "status"]
+    },
+    "SharedSession": {
+      "title": "Shared Session",
+      "description": "Collaborative session room for multi-user shared access",
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string", "description": "Unique session ID" },
+        "creatorId": { "type": "string", "description": "Creator user ID" },
+        "creatorName": { "type": "string", "description": "Creator user display name" },
+        "title": { "type": "string", "description": "Session title or subject" },
+        "participants": { "type": "array", "description": "List of active connected participant IDs" },
+        "activeCount": { "type": "integer", "description": "Number of active participants" },
+        "sharedState": { "type": "object", "description": "Synchronized session state" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Session creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last activity timestamp" }
+      },
+      "required": ["creatorId", "sessionId"]
     }
   },
   "firestore": {
@@ -111,6 +152,14 @@
     "/system_config/{configId}": {
       "schema": "SystemConfig",
       "description": "Global system configurations and API keys restricted to administrators"
+    },
+    "/chess_rooms/{roomId}": {
+      "schema": "ChessRoom",
+      "description": "Real-time multiplayer chess games"
+    },
+    "/shared_sessions/{sessionId}": {
+      "schema": "SharedSession",
+      "description": "Real-time collaborative applet sessions"
     }
   }
 }

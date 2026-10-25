@@ -92,8 +92,72 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Handle Fish Audio TTS Proxy
+  if (pathname.startsWith('/api/tts/fish')) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', '*');
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204;
+      res.end();
+      return;
+    }
+
+    const chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', async () => {
+      try {
+        const bodyBuffer = chunks.length ? Buffer.concat(chunks) : undefined;
+        let parsed = {};
+        if (bodyBuffer) {
+          try { parsed = JSON.parse(bodyBuffer.toString('utf8')); } catch (_) {}
+        }
+        const text = parsed.text || '';
+        if (!text) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: { message: 'Text is required' } }));
+          return;
+        }
+
+        const fishApiKey = process.env.FISH_AUDIO_API_KEY || 'sk-fish-4AQDQGlpw6stJiyg5JTTJabhtkgPpmwBTu_Gveo7DMI';
+        const response = await fetch('https://api.fish.audio/v1/tts', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${fishApiKey}`,
+            'Content-Type': 'application/json',
+            'model': 's2.1-pro-free'
+          },
+          body: JSON.stringify({
+            text,
+            format: parsed.format || 'mp3'
+          })
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          res.statusCode = response.status;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: { message: errText } }));
+          return;
+        }
+
+        res.statusCode = 200;
+        res.setHeader('Content-Type', response.headers.get('content-type') || 'audio/mpeg');
+        const arrayBuffer = await response.arrayBuffer();
+        res.end(Buffer.from(arrayBuffer));
+      } catch (err) {
+        res.statusCode = 502;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: { message: err?.message || 'Fish Audio error' } }));
+      }
+    });
+    return;
+  }
+
   // Handle MCP (Model Context Protocol) & Jules by Google Labs API debug status
   if (pathname.startsWith('/api/mcp/status')) {
+
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', '*');
@@ -125,6 +189,12 @@ const server = http.createServer((req, res) => {
     res.setHeader('Content-Type', 'text/plain');
     res.end('Forbidden');
     return;
+  }
+
+  // Check if file exists in dist, or fallback to public folder
+  const publicPath = path.join(__dirname, 'public', pathname === '/' ? 'index.html' : pathname);
+  if (!fs.existsSync(filePath) && fs.existsSync(publicPath) && fs.statSync(publicPath).isFile()) {
+    filePath = publicPath;
   }
 
   // Check if file exists and is not a directory

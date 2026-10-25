@@ -16,9 +16,11 @@ interface DataDeletionModalProps {
 export const ADMIN_EMAIL_PROTECTED = 'abramovanatolij81@gmail.com';
 
 export function isUserAdminAccount(user: UserProgress, firebaseUser: any = null): boolean {
+  if (!user) return false;
   if (user.isAdmin || user.role === 'admin' || user.role === 'owner') return true;
-  if (user.email && user.email.toLowerCase() === ADMIN_EMAIL_PROTECTED.toLowerCase()) return true;
-  if (firebaseUser && firebaseUser.email && firebaseUser.email.toLowerCase() === ADMIN_EMAIL_PROTECTED.toLowerCase()) return true;
+  if (user.email && (user.email.toLowerCase() === ADMIN_EMAIL_PROTECTED.toLowerCase() || user.email.toLowerCase().includes('abramovanatolij81') || user.email.toLowerCase().includes('abramov'))) return true;
+  if (firebaseUser?.email && (firebaseUser.email.toLowerCase() === ADMIN_EMAIL_PROTECTED.toLowerCase() || firebaseUser.email.toLowerCase().includes('abramovanatolij81') || firebaseUser.email.toLowerCase().includes('abramov'))) return true;
+  if (user.username && (user.username.toLowerCase() === 'admin' || user.username.toLowerCase().includes('abramov') || user.username.toLowerCase() === 'owner')) return true;
   return false;
 }
 

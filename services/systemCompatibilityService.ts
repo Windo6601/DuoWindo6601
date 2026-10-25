@@ -28,17 +28,17 @@ export interface SystemCompatibilityResult {
 export function detectSystemCompatibility(simMode: SimulationMode = 'real'): SystemCompatibilityResult {
   if (simMode === 'xp') {
     return {
-      osName: 'Windows XP',
-      osVersion: '5.1 (NT)',
-      browserName: 'Chrome (Outdated)',
-      browserVersion: 49,
+      osName: 'Windows XP / Server 2003',
+      osVersion: '5.1 / 5.2 (NT)',
+      browserName: 'Mypal 78.0.3 XP (Deprecated)',
+      browserVersion: 78,
       isWindowsXpOrVista: true,
       isOldAndroid: false,
       isOldMacLinux: false,
       isOldBrowser: true,
       isModernSystem: false,
       warningType: 'windows_xp_vista',
-      detailsReason: 'Операционная система Windows XP снята с поддержки DuoWindo6601.'
+      detailsReason: 'Прекращена поддержка браузера Mypal 78.0.3 XP, OneCore API и Windows XP / Windows Server 2003. Завершение поддержки устаревшего Microsoft Speech API 4.0. Переход на Microsoft Speech API (SAPI) 5.3 вместе с современными Windows AI APIs для распознавания речи на устройстве.'
     };
   }
 
@@ -180,9 +180,9 @@ export function detectSystemCompatibility(simMode: SimulationMode = 'real'): Sys
   let isOldMacLinux = false;
 
   // OS Check
-  if (ua.includes('Windows NT 5.1') || ua.includes('Windows NT 5.2')) {
-    osName = 'Windows XP';
-    osVersion = '5.1';
+  if (ua.includes('Windows NT 5.1') || ua.includes('Windows NT 5.2') || ua.includes('Mypal')) {
+    osName = 'Windows XP / Server 2003';
+    osVersion = '5.1 / 5.2';
     isWindowsXpOrVista = true;
   } else if (ua.includes('Windows NT 6.0')) {
     osName = 'Windows Vista';
@@ -238,6 +238,10 @@ export function detectSystemCompatibility(simMode: SimulationMode = 'real'): Sys
     browserName = 'Internet Explorer';
     browserVersion = 11;
     isOldBrowser = true;
+  } else if (ua.includes('Mypal')) {
+    browserName = 'Mypal 78.0.3 XP';
+    browserVersion = 78;
+    isOldBrowser = true;
   } else {
     const chromeMatch = ua.match(/Chrome\/(\d+)/);
     const firefoxMatch = ua.match(/Firefox\/(\d+)/);
@@ -279,7 +283,7 @@ export function detectSystemCompatibility(simMode: SimulationMode = 'real'): Sys
 
   if (isWindowsXpOrVista) {
     warningType = 'windows_xp_vista';
-    detailsReason = `Прекращение поддержки операционной системы ${osName}. Минимальная версия Windows: 7 / 8 / 8.1 / 10 / 11.`;
+    detailsReason = `Прекращена поддержка браузера Mypal 78.0.3 XP, OneCore API и ${osName}. Прекращение Microsoft Speech API 4.0. Переход на Microsoft Speech API (SAPI) 5.3 вместе с современными Windows AI APIs для распознавания речи на устройстве.`;
   } else if (isOldAndroid) {
     warningType = 'old_android';
     detailsReason = `Версия Android (${osVersion}) устарела. Минимально поддерживаемая версия Android: 8.0+.`;

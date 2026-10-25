@@ -134,6 +134,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   if (isPermissionDenied) {
     console.warn('Firestore Permission Denied detected. Staying stable and fallback to offline mode:', errInfo);
   }
+  throw new Error(JSON.stringify(errInfo));
 }
 
 export async function saveUserProgress(uid: string, userProgress: any): Promise<void> {

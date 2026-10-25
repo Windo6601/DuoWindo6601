@@ -3,6 +3,16 @@ import { collection, query, orderBy, getDocs, addDoc, updateDoc, deleteDoc, doc,
 import { db } from '../firebase';
 import { UserProgress, FeedbackItem, FeedbackReply, Course } from '../types';
 import { StarIcon, ThumbsUpIcon, MessageSquareIcon, CloseIcon, TrashIcon } from './Icons';
+import { 
+  isLanguageSwitchLocked, 
+  getLanguageLockedToastMessage,
+  getWorldLockedLanguages,
+  getCisLockedLanguages,
+  getAllLockedLanguages,
+  AVAILABLE_SWITCH_LANGUAGES,
+  LOCKED_WORLD_LANGUAGES,
+  LOCKED_CIS_LANGUAGES
+} from '../services/languageLockService';
 
 interface FeedbackScreenProps {
   user: UserProgress;
@@ -20,7 +30,7 @@ interface FeedbackScreenProps {
   autoTranslateFeedback?: boolean;
 }
 
-// 8 Supported Languages configuration
+// Supported Languages configuration (8 available + 10 world locked + 5 CIS locked)
 export const SUPPORTED_LANGUAGES = [
   { code: 'ru', name: 'Русский', nativeName: 'Русский', flag: '🇷🇺' },
   { code: 'en', name: 'Английский', nativeName: 'English', flag: '🇬🇧' },
@@ -30,6 +40,21 @@ export const SUPPORTED_LANGUAGES = [
   { code: 'ja', name: 'Японский', nativeName: '日本語', flag: '🇯🇵' },
   { code: 'zh', name: 'Китайский', nativeName: '中文', flag: '🇨🇳' },
   { code: 'ar', name: 'Арабский', nativeName: 'العربية', flag: '🇸🇦' },
+  { code: 'pt', name: 'Португальский', nativeName: 'Português', flag: '🇧🇷' },
+  { code: 'it', name: 'Итальянский', nativeName: 'Italiano', flag: '🇮🇹' },
+  { code: 'tr', name: 'Турецкий', nativeName: 'Türkçe', flag: '🇹🇷' },
+  { code: 'ko', name: 'Корейский', nativeName: '한국어', flag: '🇰🇷' },
+  { code: 'hi', name: 'Хинди', nativeName: 'हिन्दी', flag: '🇮🇳' },
+  { code: 'pl', name: 'Польский', nativeName: 'Polski', flag: '🇵🇱' },
+  { code: 'id', name: 'Индонезийский', nativeName: 'Bahasa Indonesia', flag: '🇮🇩' },
+  { code: 'bn', name: 'Бенгальский', nativeName: 'বাংলা', flag: '🇧🇩' },
+  { code: 'th', name: 'Тайский', nativeName: 'ไทย', flag: '🇹🇭' },
+  { code: 'vi', name: 'Вьетнамский', nativeName: 'Tiếng Việt', flag: '🇻🇳' },
+  { code: 'kk', name: 'Казахстан (Қазақша)', nativeName: 'Қазақша', flag: '🇰🇿' },
+  { code: 'uz', name: 'Узбекистан (Oʻzbekcha)', nativeName: 'Oʻzbekcha', flag: '🇺🇿' },
+  { code: 'hy', name: 'Армения (Հայերեն)', nativeName: 'Հայերեն', flag: '🇦🇲' },
+  { code: 'ka', name: 'Грузия (ქართული)', nativeName: 'ქართული', flag: '🇬🇪' },
+  { code: 'az', name: 'Азербайджан (Azərbaycan)', nativeName: 'Azərbaycan', flag: '🇦🇿' },
 ];
 
 export const DEFAULT_FEEDBACK_COURSES = [
@@ -57,12 +82,43 @@ export const DEFAULT_FEEDBACK_COURSES = [
   { id: 'eu', name: 'Баскский язык', localName: 'Euskara', flagEmoji: '🇪🇸' },
   { id: 'nv', name: 'Язык Навахо', localName: 'Diné bizaad', flagEmoji: '🪶' },
   { id: 'tab', name: 'Табасаранский язык', localName: 'Табасаран чIал', flagEmoji: '🏔️' },
-  { id: 'chess', name: 'Шахматы', localName: 'Предметы & Игры', flagEmoji: '♟️' },
+  { id: 'chess', name: 'Шахматы (Предмет / Игра, не язык)', localName: 'Предметы & Игры (Предмет / Игра)', flagEmoji: '♟️' },
   { id: 'math', name: 'Математика', localName: 'Предметы & Игры', flagEmoji: '🔢' },
   { id: 'music', name: 'Музыка', localName: 'Предметы & Игры', flagEmoji: '🎵' },
+  { id: 'pwa', name: 'Приложение DuoWindo6601 PWA', localName: 'ПК & Мобильный (Автономно)', flagEmoji: '📱' },
 ];
 
 const CATEGORIES: Record<string, Record<string, string>> = {
+  'locked_languages': {
+    ru: '🔒 Заблокированные языки (15 языков мира и СНГ)',
+    en: '🔒 Locked Languages (15 World & CIS Languages)',
+    de: '🔒 Gesperrte Sprachen (15 Welt- und GUS-Sprachen)',
+    fr: '🔒 Langues verrouillées (15 langues)',
+    es: '🔒 Idiomas bloqueados (15 idiomas)',
+    ja: '🔒 ロックされた言語（15言語）',
+    zh: '🔒 已锁定语言（15种世界与独联体语言）',
+    ar: '🔒 اللغات المقفلة (15 لغة)'
+  },
+  'available_languages': {
+    ru: '✨ Доступны для переключения (8 языков)',
+    en: '✨ Available for Switching (8 Languages)',
+    de: '✨ Verfügbar zum Wechseln (8 Sprachen)',
+    fr: '✨ Disponibles pour le changement (8 langues)',
+    es: '✨ Disponibles para cambiar (8 idiomas)',
+    ja: '✨ 切り替え可能言語（8言語）',
+    zh: '✨ 可切换语言（8种）',
+    ar: '✨ اللغات المتاحة للتبديل (8 لغات)'
+  },
+  'pwa_app': {
+    ru: '📱 DuoWindo6601 Progressive Web App (PWA)',
+    en: '📱 DuoWindo6601 Progressive Web App (PWA)',
+    de: '📱 DuoWindo6601 Progressive Web App (PWA)',
+    fr: '📱 DuoWindo6601 Progressive Web App (PWA)',
+    es: '📱 DuoWindo6601 Progressive Web App (PWA)',
+    ja: '📱 DuoWindo6601 プログレッシブウェブアプリ (PWA)',
+    zh: '📱 DuoWindo6601 渐进式Web应用 (PWA)',
+    ar: '📱 DuoWindo6601 تطبيق الويب التقدمي (PWA)'
+  },
   'general': {
     ru: '🌟 Общие впечатления',
     en: '🌟 General Impressions',
@@ -379,6 +435,54 @@ interface ReviewTemplate {
 const MULTILINGUAL_REVIEWS_POOL: ReviewTemplate[] = [
   {
     rating: 5,
+    categoryKey: 'locked_languages',
+    comment: {
+      ru: 'В разделе «Заблокированные языки мира» четко указано: 🔒 Казахстан (Қазақша) — Казахстан (казахский — выбран) 🇰🇿, 🔒 Узбекистан (Oʻzbekcha) 🇺🇿, 🔒 Армения (Հայերեն) 🇦🇲, 🔒 Грузия (ქართული) 🇬🇪, 🔒 Азербайджан (Azərbaycan) 🇦🇿! «Раздел Письмо Будут доступ 1 ноября 2026 год». Очень ждем интерактивные прописи и тренажер письма!',
+      en: 'In the Locked Languages section, CIS countries are clearly listed: Kazakhstan 🇰🇿, Uzbekistan 🇺🇿, Armenia 🇦🇲, Georgia 🇬🇪, Azerbaijan 🇦🇿 with "Section Letters will be available November 1, 2026". Looking forward to interactive handwriting practice!',
+      de: 'Im Bereich für gesperrte Sprachen sind die GUS-Länder übersichtlich aufgeführt: Kasachstan 🇰🇿, Usbekistan 🇺🇿, Armenien 🇦🇲, Georgien 🇬🇪, Aserbaidschan 🇦🇿! Der Schreibbereich wird am 1. November 2026 freigeschaltet.',
+      fr: 'Dans la section des langues verrouillées, les pays de la CEI sont bien indiqués avec la date du 1er novembre 2026 pour la section Écriture. Bravo !',
+      es: 'En la sección de idiomas bloqueados, los países de la CEI están claramente listados. La sección de escritura estará disponible el 1 de noviembre de 2026.',
+      ja: 'ロックされた言語セクションでCIS諸国が明確に表示されています。「文字練習セクションは2026年11月1日に公開予定」とのこと、楽しみにしています！',
+      zh: '在锁定语言板块中，独联体国家语言列表清晰明了：“书写板块将于2026年11月1日开放”，非常期待！',
+      ar: 'في قسم اللغات المقفلة، تم توضيح لغات رابطة الدول المستقلة: قسم الكتابة سيكون متاحاً في 1 نوفمبر 2026.'
+    },
+    adminReply: {
+      ru: 'Спасибо за поддержку! Для всех 5 стран СНГ (Казахстан 🇰🇿, Узбекистан 🇺🇿, Армения 🇦🇲, Грузия 🇬🇪, Азербайджан 🇦🇿) раздел Письмо и каллиграфия откроется 1 ноября 2026 года! 🔒✨',
+      en: 'Thank you for your support! For all 5 CIS countries, the Letters section and handwriting practice will unlock on November 1, 2026! 🔒✨',
+      de: 'Vielen Dank für Ihre Unterstützung! Für alle 5 GUS-Länder wird der Schreibbereich am 1. November 2026 freigeschaltet! 🔒✨',
+      fr: 'Merci pour votre soutien ! Pour les 5 pays de la CEI, la section Écriture s\'ouvrira le 1er novembre 2026 ! 🔒✨',
+      es: '¡Gracias por su apoyo! Para los 5 países de la CEI, la sección de escritura se desbloqueará el 1 de noviembre de 2026. 🔒✨',
+      ja: '応援ありがとうございます！CIS5カ国の文字練習セクションは2026年11月1日に公開されます！🔒✨',
+      zh: '感谢您的支持！独联体 5 国的书写与笔画练习板块将于 2026 年 11 月 1 日正式开放！🔒✨',
+      ar: 'شكراً لدعمك! بالنسبة لبلدان رابطة الدول المستقلة الخمسة، سيتم فتح قسم الكتابة في 1 نوفمبر 2026! 🔒✨'
+    }
+  },
+  {
+    rating: 5,
+    categoryKey: 'available_languages',
+    comment: {
+      ru: 'Переключение доступных языков работает идеально! Сейчас доступны для переключения 8 языков: 🇷🇺 Русский, 🇺🇸 English, 🇩🇪 Deutsch, 🇫🇷 Français, 🇪🇸 Español, 🇯🇵 日本語, 🇨🇳 中文, 🇸🇦 العربية. Интерфейс адаптируется за секунду, а автоперевод комментариев помогает общаться со всем миром!',
+      en: 'Switching available languages works seamlessly! 8 languages are currently available: 🇷🇺 Russian, 🇺🇸 English, 🇩🇪 German, 🇫🇷 French, 🇪🇸 Spanish, 🇯🇵 Japanese, 🇨🇳 Chinese, 🇸🇦 Arabic. Instant switching and real-time translation are fantastic!',
+      de: 'Der Sprachwechsel funktioniert reibungslos! 8 Sprachen sind aktuell verfügbar: RU, EN, DE, FR, ES, JA, ZH, AR. Sofortige Anpassung und Übersetzung sind fantastisch!',
+      fr: 'Le changement de langue fonctionne à merveille ! 8 langues sont actuellement disponibles pour basculer : RU, EN, DE, FR, ES, JA, ZH, AR.',
+      es: '¡El cambio entre idiomas disponibles funciona genial! 8 idiomas disponibles actualmente: 🇷🇺 RU, 🇺🇸 EN, 🇩🇪 DE, 🇫🇷 FR, 🇪🇸 ES, 🇯🇵 JA, 🇨🇳 ZH, 🇸🇦 AR.',
+      ja: '利用可能な言語の切り替えが完璧に動作します！現在、8つの言語（ロシア語、英語、ドイツ語、フランス語、スペイン語、日本語、中国語、アラビア語）が即座に切り替え可能です！',
+      zh: '语言切换功能非常顺畅！目前支持即时切换 8 种语言：俄语、英语、德语、法语、西班牙语、日语、中文、阿拉伯语，界面自适应与实时翻译都很出色！',
+      ar: 'تبديل اللغات المتاحة يعمل بسلاسة تامة! حالياً تتوفر 8 لغات للتبديل الفوري بنقرة واحدة.'
+    },
+    adminReply: {
+      ru: 'Благодарим! Все 8 языков поддерживают мгновенный переключатель, аудиосинтез и мультиязычный переводчик DuoWindo6601 🌐✨',
+      en: 'Thank you! All 8 languages support instant UI switching, speech synthesis, and the DuoWindo6601 multilingual translator 🌐✨',
+      de: 'Vielen Dank! Alle 8 Sprachen unterstützen sofortigen Wechsel, Sprachsynthese und Übersetzung 🌐✨',
+      fr: 'Merci ! Les 8 langues prennent en charge le changement instantané et la traduction multilingue 🌐✨',
+      es: '¡Gracias! Los 8 idiomas admiten cambio instantáneo, síntesis de voz y traducción multilingüe 🌐✨',
+      ja: 'ありがとうございます！8言語すべてで即時切り替え、音声合成、多言語翻訳をサポートしています 🌐✨',
+      zh: '感谢您的肯定！所有 8 种语言均支持即时界面切换、语音合成与多语言实时互译 🌐✨',
+      ar: 'شكراً لك! تدعم جميع اللغات الثماني التبديل الفوري والنطق الصوتي والترجمة متعددة اللغات 🌐✨'
+    }
+  },
+  {
+    rating: 5,
     categoryKey: 'new_feature',
     comment: {
       ru: 'Очень удобно, что в раздел проверки браузера и ОС добавили подробные сроки поддержки Windows! Теперь сразу видно: Windows 7, 8.1, 10 и 11 с актуальными датами. DuoWindo6601 работает быстро и стабильно!',
@@ -478,6 +582,169 @@ const MULTILINGUAL_REVIEWS_POOL: ReviewTemplate[] = [
 // Initial seed reviews
 const INITIAL_REVIEWS: FeedbackItem[] = [
   {
+    id: 'seed-locked-cis-1',
+    userId: 'user-azamat-kz',
+    userName: 'Азамат К.',
+    userAvatar: '🇰🇿',
+    userColor: '#0ea5e9',
+    rating: 5,
+    category: '🔒 Заблокированные языки (15 языков мира и СНГ)',
+    courseId: 'kk',
+    courseName: 'Казахский язык',
+    comment: 'Очень ждем открытие! В списке заблокированных языков отмечено: 🔒 Казахстан (Қазақша) — Казахстан (казахский — выбран) 🇰🇿, 🔒 Узбекистан (Oʻzbekcha) — Узбекистан (узбекский) 🇺🇿, 🔒 Армения (Հайерен) 🇦🇲, 🔒 Грузия (ქართული) 🇬🇪, 🔒 Азербайджан (Azərbaycan) — Азербайджан (азербайджанский) 🇦🇿. В приложении чётко указано: «Раздел Письмо Будут доступ 1 ноября 2026 год». Прекрасно, что разработчики заранее объявили точную дату и готовят интерактивный тренажер письменности!',
+    likes: 38,
+    likedBy: [],
+    replies: [
+      {
+        id: 'rep-admin-locked-cis',
+        userId: 'admin-duowindo6601',
+        userName: 'Администратор DuoWindo6601',
+        userAvatar: '👑',
+        userColor: '#f59e0b',
+        isAdmin: true,
+        comment: 'Большое спасибо за отзыв! Подтверждаем: для 5 стран СНГ (Казахстан 🇰🇿, Узбекистан 🇺🇿, Армения 🇦🇲, Грузия 🇬🇪, Азербайджан 🇦🇿) «Раздел Письмо Будут доступ 1 ноября 2026 год». Сейчас в алфавитах уже доступна озвучка букв и слов, а к 1 ноября 2026 г. откроется полноценный тренажер письменности и прописи!',
+        createdAt: new Date(Date.now() - 1800000).toISOString()
+      }
+    ],
+    isPinned: true,
+    createdAt: new Date(Date.now() - 3600000).toISOString()
+  },
+  {
+    id: 'seed-avail-switch-1',
+    userId: 'user-elena-switch',
+    userName: 'Елена С.',
+    userAvatar: '🌐',
+    userColor: '#10b981',
+    rating: 5,
+    category: '✨ Доступны для переключения (8 языков)',
+    courseId: 'general',
+    courseName: 'Общий отзыв о DuoWindo6601',
+    comment: 'Переключение доступных языков выполнено великолепно! Сейчас доступны для переключения 8 языков: 🇷🇺 Русский, 🇺🇸 English, 🇩🇪 Deutsch, 🇫🇷 Français, 🇪🇸 Español, 🇯🇵 日本語, 🇨🇳 中文, 🇸🇦 العربية. Переключение происходит мгновенно в один клик, для арабского включается полноценный режим справа-налево (RTL), а перевод отзывов в реальном времени невероятно удобен!',
+    likes: 31,
+    likedBy: [],
+    replies: [
+      {
+        id: 'rep-admin-avail-switch',
+        userId: 'admin-duowindo6601',
+        userName: 'Администратор DuoWindo6601',
+        userAvatar: '👑',
+        userColor: '#f59e0b',
+        isAdmin: true,
+        comment: 'Благодарим за высокую оценку! Все 8 языков интерфейса поддерживают моментальное переключение, синтез речи и мультиязычный переводчик отзывов. Приятного мультиязычного обучения! 🌐✨',
+        createdAt: new Date(Date.now() - 3600000).toISOString()
+      }
+    ],
+    isPinned: true,
+    createdAt: new Date(Date.now() - 7200000).toISOString()
+  },
+  {
+    id: 'seed-locked-world-1',
+    userId: 'user-minho-ko',
+    userName: 'Min-ho P.',
+    userAvatar: '🇰🇷',
+    userColor: '#8b5cf6',
+    rating: 5,
+    category: '🔒 Заблокированные языки (15 языков мира и СНГ)',
+    courseId: 'ko',
+    courseName: 'Корейский язык',
+    comment: 'В разделе Бета-тестирования проверил список заблокированных мировых языков: Португальский (Português) 🔒, Итальянский (Italiano) 🔒, Турецкий (Türkçe) 🔒, Корейский (한국어) 🔒, Хинди (हिन्दी) 🔒, Польский (Polski) 🔒, Индонезийский (Bahasa Indonesia) 🔒, Бенгальский (বাংলা) 🔒, Тайский (ไทย) 🔒, Вьетнамский (Tiếng Việt) 🔒. Очень удобное уведомление с обратным отсчетом до 1 ноября 2026 года и кнопкой «ПОНЯТНО 🔒». Будем ждать разблокировки!',
+    likes: 25,
+    likedBy: [],
+    replies: [
+      {
+        id: 'rep-admin-locked-world',
+        userId: 'admin-duowindo6601',
+        userName: 'Администратор DuoWindo6601',
+        userAvatar: '👑',
+        userColor: '#f59e0b',
+        isAdmin: true,
+        comment: 'Спасибо за внимание к бета-тестированию! Все 10 заблокированных мировых языков находятся в активной разработке, блокировка переключения будет снята 1 ноября 2026 года! 🔒✨',
+        createdAt: new Date(Date.now() - 10800000).toISOString()
+      }
+    ],
+    isPinned: false,
+    createdAt: new Date(Date.now() - 14400000).toISOString()
+  },
+  {
+    id: 'seed-locked-cis-uz',
+    userId: 'user-timur-uz',
+    userName: 'Тимур А.',
+    userAvatar: '🇺🇿',
+    userColor: '#059669',
+    rating: 5,
+    category: '🔒 Заблокированные языки (15 языков мира и СНГ)',
+    courseId: 'uz',
+    courseName: 'Узбекский язык',
+    comment: 'Проверил статус в разделе «Заблокированные языки мира»: 🔒 Узбекистан (Oʻzbekcha) — Узбекистан (узбекский) 🇺🇿, 🔒 Казахстан (Қазақша) 🇰🇿, 🔒 Армения (Հайерен) 🇦🇲, 🔒 Грузия (ქართული) 🇬🇪, 🔒 Азербайджан (Azərbaycan) 🇦🇿. Уведомление «Раздел Письмо Будут доступ 1 ноября 2026 год» дает точный ориентир. Озвучка алфавита и базовые уроки уже работают отлично!',
+    likes: 21,
+    likedBy: [],
+    replies: [],
+    isPinned: false,
+    createdAt: new Date(Date.now() - 21600000).toISOString()
+  },
+  {
+    id: 'seed-avail-switch-polyglot',
+    userId: 'user-carlos-es',
+    userName: 'Carlos R.',
+    userAvatar: '🇪🇸',
+    userColor: '#ef4444',
+    rating: 5,
+    category: '✨ Доступны для переключения (8 языков)',
+    courseId: 'es',
+    courseName: 'Испанский язык',
+    comment: '¡Genial! El cambio entre los 8 idiomas disponibles (🇷🇺 RU, 🇺🇸 EN, 🇩🇪 DE, 🇫🇷 FR, 🇪🇸 ES, 🇯🇵 JA, 🇨🇳 ZH, 🇸🇦 AR) es instantáneo. La traducción automática de reseñas ayuda a comunicarse con estudiantes de todo el mundo. ¡Esperamos también el Português en noviembre de 2026!',
+    likes: 19,
+    likedBy: [],
+    replies: [],
+    isPinned: false,
+    createdAt: new Date(Date.now() - 28800000).toISOString()
+  },
+  {
+    id: 'seed-pwa-1',
+    userId: 'user-duo-pwa1',
+    userName: 'Владимир Т.',
+    userAvatar: '📱',
+    userColor: '#10b981',
+    rating: 5,
+    category: '📱 DuoWindo6601 Progressive Web App (PWA)',
+    courseId: 'pwa',
+    courseName: 'DuoWindo6601 PWA',
+    comment: 'Установил приложение DuoWindo6601 как Progressive Web App (PWA) на компьютер в браузере и на Android! Запускается моментально в отдельном окне без адресной строки, иконка маскота 100042597.svg на рабочем столе выглядит потрясающе. Полностью работает офлайн: уроки, озвучка и прогресс кэшируются через Service Worker без сбоев. Огромное спасибо!',
+    likes: 27,
+    likedBy: [],
+    replies: [
+      {
+        id: 'rep-admin-pwa',
+        userId: 'admin-duowindo6601',
+        userName: 'Администратор DuoWindo6601',
+        userAvatar: '👑',
+        userColor: '#f59e0b',
+        isAdmin: true,
+        comment: 'Большое спасибо за отзыв о PWA-версии DuoWindo6601! Мы оптимизировали Service Worker, веб-манифест (manifest.json) и автономный кэш, чтобы обучение было быстрым и доступным на ПК, Android и iOS Safari.',
+        createdAt: new Date(Date.now() - 3600000).toISOString()
+      }
+    ],
+    isPinned: true,
+    createdAt: new Date(Date.now() - 7200000).toISOString()
+  },
+  {
+    id: 'seed-pwa-2',
+    userId: 'user-duo-pwa2',
+    userName: 'Александр В.',
+    userAvatar: '💻',
+    userColor: '#6366f1',
+    rating: 5,
+    category: '📱 DuoWindo6601 Progressive Web App (PWA)',
+    courseId: 'pwa',
+    courseName: 'DuoWindo6601 PWA',
+    comment: 'Отличная реализация Progressive Web App (PWA)! На iPhone добавил через меню «Поделиться» → «На экран Домой», а на Windows через Chrome установил в один клик. Работает плавно, как нативное приложение!',
+    likes: 18,
+    likedBy: [],
+    replies: [],
+    isPinned: false,
+    createdAt: new Date(Date.now() - 14400000).toISOString()
+  },
+  {
     id: 'seed-1',
     userId: 'user-duo-1',
     userName: 'Алексей М.',
@@ -554,6 +821,9 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
   const [showForm, setShowForm] = useState(false);
   const [filterRating, setFilterRating] = useState<number | 'all'>('all');
   const [filterSentiment, setFilterSentiment] = useState<'all' | 'good' | 'bad'>('all');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [showLanguageDetails, setShowLanguageDetails] = useState<boolean>(false);
+  const [selectedLanguageTab, setSelectedLanguageTab] = useState<'locked' | 'available'>('locked');
 
   // Selected language for review/comment translator tool
   const currentLang = user.language || 'ru';
@@ -770,6 +1040,12 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
 
   // Quick Language Switcher Handler
   const handleSwitchLanguage = (langCode: string) => {
+    if (isLanguageSwitchLocked(langCode)) {
+      playSound('wrong');
+      setToast(getLanguageLockedToastMessage(langCode, currentLang));
+      setTranslatorTargetLang(langCode);
+      return;
+    }
     playSound('click');
     setTranslatorTargetLang(langCode);
     if (onSetLanguage) {
@@ -1155,7 +1431,29 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
       filterCourseId === 'all' ||
       r.courseId === filterCourseId ||
       (!r.courseId && filterCourseId === 'general');
-    return matchesRating && matchesSentiment && matchesCourse;
+
+    const matchesCategory =
+      filterCategory === 'all' ||
+      (filterCategory === 'locked_languages' && (
+        r.category?.includes('Заблокированные') ||
+        r.category?.includes('Locked Languages') ||
+        r.comment.includes('заблокирован') ||
+        r.comment.includes('1 ноября 2026') ||
+        r.comment.includes('Раздел Письмо') ||
+        r.comment.includes('🔒')
+      )) ||
+      (filterCategory === 'available_languages' && (
+        r.category?.includes('Доступны для переключения') ||
+        r.category?.includes('Available for Switching') ||
+        r.comment.includes('переключени') ||
+        r.comment.includes('переключат') ||
+        r.comment.includes('доступных для переключения') ||
+        r.comment.includes('8 доступных')
+      )) ||
+      (r.category && r.category.includes(filterCategory)) ||
+      (CATEGORIES[filterCategory] && Object.values(CATEGORIES[filterCategory]).some((v) => r.category?.includes(v)));
+
+    return matchesRating && matchesSentiment && matchesCourse && matchesCategory;
   });
 
   return (
@@ -1254,21 +1552,27 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
           </span>
         </div>
 
-        <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
+        <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-9 gap-1.5">
           {SUPPORTED_LANGUAGES.map((lang) => {
             const isSelected = currentLang === lang.code;
+            const isLocked = isLanguageSwitchLocked(lang.code);
             return (
               <button
                 key={lang.code}
                 onClick={() => handleSwitchLanguage(lang.code)}
-                className={`py-2 px-1.5 rounded-xl text-xs font-black transition-all flex flex-col items-center justify-center gap-0.5 border-b-2 ${
+                className={`py-2 px-1.5 rounded-xl text-xs font-black transition-all flex flex-col items-center justify-center gap-0.5 border-b-2 relative ${
                   isSelected
                     ? 'bg-duo-blue text-white border-duo-blueDark shadow-md scale-105 ring-2 ring-blue-400'
-                    : 'bg-gray-800/90 text-gray-300 hover:text-white hover:bg-gray-700 border-gray-900'
+                    : isLocked
+                      ? 'bg-amber-950/40 text-amber-200 hover:bg-amber-900/50 border-amber-900/60'
+                      : 'bg-gray-800/90 text-gray-300 hover:text-white hover:bg-gray-700 border-gray-900'
                 }`}
-                title={`${lang.name} (${lang.nativeName})`}
+                title={isLocked ? `${lang.name}: Доступно до 1 ноября 2026 г. 🔒` : `${lang.name} (${lang.nativeName})`}
               >
-                <span className="text-base">{lang.flag}</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-base">{lang.flag}</span>
+                  {isLocked && <span className="text-[9px]">🔒</span>}
+                </div>
                 <span className="text-[10px] uppercase tracking-wider">{lang.code.toUpperCase()}</span>
               </button>
             );
@@ -1451,21 +1755,33 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
             <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
               Целевой язык для быстрого перевода:
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {SUPPORTED_LANGUAGES.map((lang) => (
-                <button
-                  key={lang.code}
-                  onClick={() => handleSwitchLanguage(lang.code)}
-                  className={`p-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-                    translatorTargetLang === lang.code
-                      ? 'bg-purple-600 text-white border-2 border-purple-400 shadow-md'
-                      : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                  }`}
-                >
-                  <span className="text-lg">{lang.flag}</span>
-                  <span>{lang.name}</span>
-                </button>
-              ))}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+              {SUPPORTED_LANGUAGES.map((lang) => {
+                const isLocked = isLanguageSwitchLocked(lang.code);
+                return (
+                  <button
+                    key={lang.code}
+                    onClick={() => {
+                      playSound('click');
+                      setTranslatorTargetLang(lang.code);
+                      setToast(`Целевой язык перевода: ${lang.flag} ${lang.name}`);
+                    }}
+                    className={`p-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${
+                      translatorTargetLang === lang.code
+                        ? 'bg-purple-600 text-white border-2 border-purple-400 shadow-md'
+                        : isLocked
+                          ? 'bg-amber-950/40 text-amber-200 border border-amber-900/60 hover:bg-amber-900/50'
+                          : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">{lang.flag}</span>
+                      <span className="truncate">{lang.name}</span>
+                    </div>
+                    {isLocked && <span className="text-[10px]" title="Доступно до 1 нояб 2026">🔒</span>}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -2003,14 +2319,19 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
                   {Object.keys(CATEGORIES).map((catKey) => {
                     const catObj = CATEGORIES[catKey];
                     const label = catObj[currentLang] || catObj['ru'];
+                    const isSelected = selectedCategoryKey === catKey;
                     return (
                       <button
                         key={catKey}
                         type="button"
                         onClick={() => { playSound('click'); setSelectedCategoryKey(catKey); }}
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                          selectedCategoryKey === catKey
-                            ? 'bg-duo-blue text-white border-b-2 border-duo-blueDark shadow-md'
+                          isSelected
+                            ? catKey === 'locked_languages'
+                              ? 'bg-amber-500 text-black border-b-2 border-amber-600 shadow-md font-black'
+                              : catKey === 'available_languages'
+                                ? 'bg-emerald-500 text-black border-b-2 border-emerald-600 shadow-md font-black'
+                                : 'bg-duo-blue text-white border-b-2 border-duo-blueDark shadow-md'
                             : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700'
                         }`}
                       >
@@ -2019,6 +2340,104 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
                     );
                   })}
                 </div>
+
+                {/* Sub-selector for Locked Languages */}
+                {selectedCategoryKey === 'locked_languages' && (
+                  <div className="mt-3 p-3 bg-amber-950/40 rounded-2xl border border-amber-500/40 space-y-2">
+                    <div className="text-[11px] font-black uppercase text-amber-300 flex items-center justify-between">
+                      <span>🔒 Быстрый выбор языка для отзыва (15 языков):</span>
+                      <span className="text-[10px] text-amber-400 font-bold lowercase">клик вставляет в текст</span>
+                    </div>
+
+                    {/* CIS 5 Countries */}
+                    <div className="space-y-1">
+                      <div className="text-[10px] font-bold text-amber-400 uppercase">
+                        🏛️ 5 стран СНГ (Раздел Письмо Будут доступ 1 ноября 2026 год):
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { id: 'kk', label: '🔒 Казахстан (Қазақша) 🇰🇿', full: 'Казахстан (Қазақша) — Казахстан (казахский — выбран) 🇰🇿 (Раздел Письмо Будут доступ 1 ноября 2026 год)' },
+                          { id: 'uz', label: '🔒 Узбекистан (Oʻzbekcha) 🇺🇿', full: 'Узбекистан (Oʻzbekcha) — Узбекистан (узбекский) 🇺🇿 (Раздел Письмо Будут доступ 1 ноября 2026 год)' },
+                          { id: 'hy', label: '🔒 Армения (Հայերեն) 🇦🇲', full: 'Армения (Հայերեն) — Армения (армянский) 🇦🇲 (Раздел Письмо Будут доступ 1 ноября 2026 год)' },
+                          { id: 'ka', label: '🔒 Грузия (ქართული) 🇬🇪', full: 'Грузия (ქართული) — Грузия (грузинский) 🇬🇪 (Раздел Письмо Будут доступ 1 ноября 2026 год)' },
+                          { id: 'az', label: '🔒 Азербайджан (Azərbaycan) 🇦🇿', full: 'Азербайджан (Azərbaycan) — Азербайджан (азербайджанский) 🇦🇿 (Раздел Письмо Будут доступ 1 ноября 2026 год)' }
+                        ].map(c => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => {
+                              playSound('click');
+                              setSelectedCourseId(c.id);
+                              setComment(prev => prev ? `${prev}\n\n[Отзыв о: 🔒 ${c.full}]` : `[Отзыв о: 🔒 ${c.full}]: `);
+                            }}
+                            className="px-2.5 py-1 bg-amber-900/60 hover:bg-amber-800 text-amber-200 border border-amber-600/50 rounded-lg text-[11px] font-bold transition-all"
+                          >
+                            {c.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* World 10 Languages */}
+                    <div className="space-y-1 pt-1">
+                      <div className="text-[10px] font-bold text-amber-400 uppercase">
+                        🌍 10 заблокированных языков мира (до 1 ноября 2026 г.):
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {[
+                          { name: 'Португальский (Português)', flag: '🇧🇷' },
+                          { name: 'Итальянский (Italiano)', flag: '🇮🇹' },
+                          { name: 'Турецкий (Türkçe)', flag: '🇹🇷' },
+                          { name: 'Корейский (한국어)', flag: '🇰🇷' },
+                          { name: 'Хинди (Индия / हिन्दी)', flag: '🇮🇳' },
+                          { name: 'Польский (Polski)', flag: '🇵🇱' },
+                          { name: 'Индонезийский (Bahasa Indonesia)', flag: '🇮🇩' },
+                          { name: 'Бенгальский (বাংলা)', flag: '🇧🇩' },
+                          { name: 'Тайский (ไทย)', flag: '🇹🇭' },
+                          { name: 'Вьетнамский (Tiếng Việt)', flag: '🇻🇳' }
+                        ].map((w, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              playSound('click');
+                              setComment(prev => prev ? `${prev}\n\n[Отзыв о: 🔒 ${w.name} ${w.flag} (заблокирован до 1 ноября 2026 г.)]` : `[Отзыв о: 🔒 ${w.name} ${w.flag} (заблокирован до 1 ноября 2026 г.)]: `);
+                            }}
+                            className="px-2 py-0.5 bg-black/50 hover:bg-amber-950 text-gray-300 hover:text-white border border-amber-500/30 rounded-md text-[10px] font-medium transition-all"
+                          >
+                            {w.flag} {w.name} 🔒
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sub-selector for Available Languages */}
+                {selectedCategoryKey === 'available_languages' && (
+                  <div className="mt-3 p-3 bg-emerald-950/40 rounded-2xl border border-emerald-500/40 space-y-2">
+                    <div className="text-[11px] font-black uppercase text-emerald-300 flex items-center justify-between">
+                      <span>✨ Быстрый выбор доступного языка (8 языков):</span>
+                      <span className="text-[10px] text-emerald-400 font-bold lowercase">клик вставляет в текст</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {AVAILABLE_SWITCH_LANGUAGES.map(lang => (
+                        <button
+                          key={lang.code}
+                          type="button"
+                          onClick={() => {
+                            playSound('click');
+                            setSelectedCourseId(lang.code);
+                            setComment(prev => prev ? `${prev}\n\n[Отзыв о переключении: ✨ ${lang.label}]` : `[Отзыв о переключении: ✨ ${lang.label}]: `);
+                          }}
+                          className="px-2.5 py-1 bg-emerald-900/60 hover:bg-emerald-800 text-emerald-200 border border-emerald-600/50 rounded-lg text-[11px] font-bold transition-all"
+                        >
+                          {lang.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Comment TextArea */}
@@ -2058,6 +2477,241 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
               </div>
             </form>
           )}
+
+          {/* INTERACTIVE BANNER: Reviews on Locked Languages & Available Languages */}
+          <div className="bg-gradient-to-br from-gray-900 via-gray-850 to-gray-900 border-2 border-amber-500/60 rounded-3xl p-4 md:p-5 mb-5 shadow-2xl relative overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500/25 to-yellow-500/15 flex items-center justify-center text-2xl border border-amber-500/40 shadow-inner shrink-0">
+                  🔒
+                </div>
+                <div>
+                  <h3 className="font-black text-sm md:text-base text-amber-300 uppercase tracking-wide flex items-center gap-1.5 flex-wrap">
+                    <span>Отзывы: Заблокированные языки и доступны для переключения</span>
+                  </h3>
+                  <p className="text-[11px] text-gray-300 leading-snug">
+                    15 языков заблокированы до 1 ноября 2026 г. • 8 языков доступны для мгновенного переключения
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setShowLanguageDetails(prev => !prev)}
+                  className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1"
+                >
+                  <span>{showLanguageDetails ? '▲ Скрыть список' : '▼ Показать список'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    playSound('click');
+                    setSelectedCategoryKey('locked_languages');
+                    setShowForm(true);
+                  }}
+                  className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-black font-black rounded-xl text-xs uppercase tracking-wider shadow transition-all active:scale-95 flex items-center gap-1"
+                >
+                  <span>✍️ Отзыв</span>
+                  <span>🔒</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Switch Sub-Tabs in Banner */}
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <button
+                type="button"
+                onClick={() => {
+                  playSound('click');
+                  setSelectedLanguageTab('locked');
+                  setFilterCategory('locked_languages');
+                  setToast('Показаны отзывы: 🔒 Заблокированные языки мира');
+                }}
+                className={`py-2 px-3 rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 border ${
+                  selectedLanguageTab === 'locked' && filterCategory === 'locked_languages'
+                    ? 'bg-amber-500 text-black border-amber-300 shadow-lg shadow-amber-500/20'
+                    : 'bg-amber-950/40 text-amber-300 border-amber-500/30 hover:bg-amber-900/50'
+                }`}
+              >
+                <span>🔒 Заблокированные языки (15)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  playSound('click');
+                  setSelectedLanguageTab('available');
+                  setFilterCategory('available_languages');
+                  setToast('Показаны отзывы: ✨ Доступны для переключения');
+                }}
+                className={`py-2 px-3 rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 border ${
+                  selectedLanguageTab === 'available' && filterCategory === 'available_languages'
+                    ? 'bg-emerald-500 text-black border-emerald-300 shadow-lg shadow-emerald-500/20'
+                    : 'bg-emerald-950/40 text-emerald-300 border-emerald-500/30 hover:bg-emerald-900/50'
+                }`}
+              >
+                <span>✨ Доступны для переключения (8)</span>
+              </button>
+            </div>
+
+            {/* Expandable Details Area */}
+            {showLanguageDetails && (
+              <div className="bg-black/40 border border-gray-700/60 rounded-2xl p-3.5 mb-3 space-y-3 animate-in fade-in">
+                {selectedLanguageTab === 'locked' ? (
+                  <div className="space-y-3">
+                    {/* CIS List */}
+                    <div>
+                      <div className="text-[11px] font-black uppercase tracking-wider text-amber-300 flex items-center justify-between mb-1.5 pb-1 border-b border-amber-500/20">
+                        <span className="flex items-center gap-1.5">
+                          <span>🏛️</span>
+                          <span>Заблокированные языки мира (5 стран СНГ):</span>
+                        </span>
+                        <span className="text-[10px] text-amber-400 font-bold bg-amber-500/20 px-2 py-0.5 rounded-md">
+                          Раздел Письмо Будут доступ 1 ноября 2026 год
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
+                        {[
+                          { label: 'Казахстан (Қазақша) — Казахстан (казахский — выбран)', flag: '🇰🇿' },
+                          { label: 'Узбекистан (Oʻzbekcha) — Узбекистан (узбекский)', flag: '🇺🇿' },
+                          { label: 'Армения (Հայերեն) — Армения (армянский)', flag: '🇦🇲' },
+                          { label: 'Грузия (ქართული) — Грузия (грузинский)', flag: '🇬🇪' },
+                          { label: 'Азербайджан (Azərbaycan) — Азербайджан (азербайджанский)', flag: '🇦🇿' },
+                        ].map((item, idx) => (
+                          <div key={idx} className="p-2 rounded-xl bg-gray-900/80 border border-amber-500/30 flex items-center justify-between">
+                            <div className="flex items-center gap-2 truncate">
+                              <span className="text-base">{item.flag}</span>
+                              <span className="font-bold text-amber-100 truncate text-[11px]">
+                                🔒 {item.label}
+                              </span>
+                            </div>
+                            <span className="text-xs">🔒</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* World 10 List */}
+                    <div>
+                      <div className="text-[11px] font-black uppercase tracking-wider text-amber-300 mb-1.5 pb-1 border-b border-amber-500/20 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <span>🌍</span>
+                          <span>10 заблокированных языков мира:</span>
+                        </span>
+                        <span className="text-[10px] text-amber-400 font-bold lowercase">🔒 релиз 1 ноября 2026</span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 text-xs">
+                        {[
+                          { name: 'Португальский', native: 'Português', flag: '🇧🇷' },
+                          { name: 'Итальянский', native: 'Italiano', flag: '🇮🇹' },
+                          { name: 'Турецкий', native: 'Türkçe', flag: '🇹🇷' },
+                          { name: 'Корейский', native: '한국어', flag: '🇰🇷' },
+                          { name: 'Хинди (Индия)', native: 'हिन्दी', flag: '🇮🇳' },
+                          { name: 'Польский', native: 'Polski', flag: '🇵🇱' },
+                          { name: 'Индонезийский', native: 'Bahasa Indonesia', flag: '🇮🇩' },
+                          { name: 'Бенгальский', native: 'বাংলা', flag: '🇧🇩' },
+                          { name: 'Тайский', native: 'ไทย', flag: '🇹🇭' },
+                          { name: 'Вьетнамский', native: 'Tiếng Việt', flag: '🇻🇳' }
+                        ].map((w, idx) => (
+                          <div key={idx} className="p-1.5 rounded-lg bg-gray-900/80 border border-gray-700/60 flex flex-col items-center justify-center text-center">
+                            <span className="text-base">{w.flag}</span>
+                            <span className="font-bold text-[10px] text-white truncate w-full">{w.name}</span>
+                            <span className="text-[9px] text-amber-300 truncate w-full">{w.native}</span>
+                            <span className="text-[9px] text-amber-400 mt-0.5">🔒</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="text-[11px] font-black uppercase tracking-wider text-emerald-300 mb-2 pb-1 border-b border-emerald-500/20">
+                      ✨ Сейчас доступны для переключения интерфейса (8 языков):
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                      {AVAILABLE_SWITCH_LANGUAGES.map((item) => (
+                        <div key={item.code} className="p-2.5 rounded-xl bg-gray-900/90 border border-emerald-500/30 flex items-center justify-between">
+                          <span className="font-bold text-white text-xs">{item.label}</span>
+                          <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-bold">АКТИВЕН</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Category Filter Chips */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none mb-3">
+            <button
+              onClick={() => { playSound('click'); setFilterCategory('all'); }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                filterCategory === 'all'
+                  ? 'bg-duo-blue text-white shadow-md'
+                  : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700'
+              }`}
+            >
+              <span>🌐 Все темы ({reviews.length})</span>
+            </button>
+
+            <button
+              onClick={() => { playSound('click'); setFilterCategory('locked_languages'); }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 border ${
+                filterCategory === 'locked_languages'
+                  ? 'bg-amber-500 text-black border-amber-300 shadow-lg shadow-amber-500/20 font-black'
+                  : 'bg-amber-950/40 text-amber-300 border-amber-800/60 hover:bg-amber-900/50'
+              }`}
+            >
+              <span>🔒 Заблокированные языки ({reviews.filter(r => r.category?.includes('Заблокированные') || r.comment.includes('заблокирован') || r.comment.includes('1 ноября 2026') || r.comment.includes('🔒')).length})</span>
+            </button>
+
+            <button
+              onClick={() => { playSound('click'); setFilterCategory('available_languages'); }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 border ${
+                filterCategory === 'available_languages'
+                  ? 'bg-emerald-600 text-white border-emerald-400 shadow-lg shadow-emerald-600/20 font-black'
+                  : 'bg-emerald-950/40 text-emerald-300 border-emerald-800/60 hover:bg-emerald-900/50'
+              }`}
+            >
+              <span>✨ Доступны для переключения ({reviews.filter(r => r.category?.includes('Доступны для переключения') || r.comment.includes('доступных для переключения')).length})</span>
+            </button>
+
+            <button
+              onClick={() => { playSound('click'); setFilterCategory('cis_languages'); }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                filterCategory === 'cis_languages'
+                  ? 'bg-duo-blue text-white shadow-md'
+                  : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700'
+              }`}
+            >
+              <span>🏛️ Языки СНГ</span>
+            </button>
+
+            <button
+              onClick={() => { playSound('click'); setFilterCategory('world_languages'); }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                filterCategory === 'world_languages'
+                  ? 'bg-duo-blue text-white shadow-md'
+                  : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700'
+              }`}
+            >
+              <span>🌍 Мировые языки</span>
+            </button>
+
+            <button
+              onClick={() => { playSound('click'); setFilterCategory('pwa_app'); }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                filterCategory === 'pwa_app'
+                  ? 'bg-duo-blue text-white shadow-md'
+                  : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700'
+              }`}
+            >
+              <span>📱 DuoWindo6601 PWA</span>
+            </button>
+          </div>
 
           {/* Filter Tabs: Sentiment & Rating Stars */}
           <div className="flex flex-col gap-2 mb-4">
@@ -2192,10 +2846,10 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
                         </div>
                         <div>
                           <div className="font-bold text-white text-sm flex items-center gap-1.5 flex-wrap" dir="auto">
-                            <bdi dir="auto">{(isTranslated || autoTranslate) ? translateTextToTarget(rev.userName, translatorTargetLang) : rev.userName}</bdi>
+                            <bdi dir="auto">{(isTranslated || autoTranslate) ? getTranslatedAuthorName(rev.userName, translatorTargetLang, rev.userId === 'admin-duowindo6601') : rev.userName}</bdi>
                             {rev.userId === 'admin-duowindo6601' && (
                               <span className="text-[10px] font-black bg-amber-500 text-gray-950 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                                👑 {(isTranslated || autoTranslate) ? translateTextToTarget('Админ', translatorTargetLang) : 'Админ'}
+                                👑 {(isTranslated || autoTranslate) ? getTranslatedAuthorName('Администратор DuoWindo6601', translatorTargetLang, true) : 'Админ'}
                               </span>
                             )}
                             {rev.rating >= 4 ? (
@@ -2208,8 +2862,17 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
                               </span>
                             )}
                             {rev.category && (
-                              <span className="text-[10px] font-normal bg-gray-800 text-gray-300 px-2 py-0.5 rounded-full border border-gray-700" dir="auto">
-                                <bdi dir="auto">{(isTranslated || autoTranslate) ? translateTextToTarget(rev.category, translatorTargetLang) : rev.category}</bdi>
+                              <span
+                                className={`text-[10px] px-2 py-0.5 rounded-full border flex items-center gap-1 ${
+                                  rev.category.includes('Заблокированные') || rev.category.includes('Locked Languages')
+                                    ? 'bg-amber-950/60 text-amber-200 border-amber-500/60 font-bold shadow-sm'
+                                    : rev.category.includes('Доступны для переключения') || rev.category.includes('Available for Switching')
+                                      ? 'bg-emerald-950/60 text-emerald-200 border-emerald-500/60 font-bold shadow-sm'
+                                      : 'bg-gray-800 text-gray-300 border-gray-700 font-normal'
+                                }`}
+                                dir="auto"
+                              >
+                                <bdi dir="auto">{(isTranslated || autoTranslate) ? getTranslatedCategory(rev.category, translatorTargetLang) : rev.category}</bdi>
                               </span>
                             )}
                             {rev.courseName && (
@@ -2370,7 +3033,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
                                         {reply.userAvatar || '👤'}
                                       </div>
                                       <span className="font-bold text-white flex items-center gap-1" dir="auto">
-                                        <bdi dir="auto">{(isRepTranslated || autoTranslate) ? translateTextToTarget(reply.userName, translatorTargetLang) : reply.userName}</bdi>
+                                        <bdi dir="auto">{(isRepTranslated || autoTranslate) ? getTranslatedAuthorName(reply.userName, translatorTargetLang, reply.isAdmin) : reply.userName}</bdi>
                                         {reply.isAdmin && (
                                           <span className="bg-amber-500 text-gray-950 font-black text-[9px] px-1.5 py-0.2 rounded uppercase">
                                             {t ? t('official_admin_reply') || 'Официальный ответ' : 'Официальный ответ'}

@@ -21,6 +21,93 @@ export interface ChessOpponent {
   contactDetail?: string;
 }
 
+export const getSampleChessOpponents = (isRu: boolean): ChessOpponent[] => [
+  {
+    id: 'friend-1',
+    name: 'DuoWindo Master',
+    username: '@duo_master',
+    avatar: '🦉',
+    elo: 1650,
+    status: 'online',
+    games: 142,
+    wins: 98
+  },
+  {
+    id: 'friend-2',
+    name: isRu ? 'Анна Шахматистка' : 'Anna ChessPlayer',
+    username: '@anna_chess',
+    avatar: '👩🏼',
+    elo: 1480,
+    status: 'online',
+    games: 86,
+    wins: 54
+  },
+  {
+    id: 'friend-3',
+    name: isRu ? 'Александр К.' : 'Alexander K.',
+    username: '@alex_k',
+    avatar: '👨🏻',
+    elo: 1390,
+    status: 'online',
+    games: 52,
+    wins: 31
+  },
+  {
+    id: 'friend-4',
+    name: isRu ? 'Иван Гроссмейстер' : 'Ivan Grandmaster',
+    username: '@ivan_gm',
+    avatar: '👑',
+    elo: 1720,
+    status: 'online',
+    games: 210,
+    wins: 165
+  },
+  {
+    id: 'friend-5',
+    name: isRu ? 'Мария Соколова' : 'Maria Sokolova',
+    username: '@maria_s',
+    avatar: '👧🏻',
+    elo: 1280,
+    status: 'offline',
+    games: 34,
+    wins: 18
+  }
+];
+
+export const getSearchableChessOpponents = (isRu: boolean): ChessOpponent[] => [
+  ...getSampleChessOpponents(isRu),
+  {
+    id: 'user-search-1',
+    name: isRu ? 'Виктор Таль' : 'Victor Tal',
+    username: '@victor_tal',
+    avatar: '⚡',
+    elo: 1590,
+    status: 'online',
+    games: 94,
+    wins: 62
+  },
+  {
+    id: 'user-search-2',
+    name: isRu ? 'Каспаров Jr' : 'Kasparov Jr',
+    username: '@kasparov_jr',
+    avatar: '🏆',
+    elo: 1850,
+    status: 'online',
+    games: 340,
+    wins: 290
+  },
+  {
+    id: 'user-search-3',
+    name: isRu ? 'Полина Шах' : 'Polina Chess',
+    username: '@polina_shakh',
+    avatar: '🌟',
+    elo: 1410,
+    status: 'online',
+    games: 45,
+    wins: 28
+  }
+];
+
 interface ChessInviteModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -167,58 +254,7 @@ export const ChessInviteModal: React.FC<ChessInviteModalProps> = ({
     ? `${window.location.origin}${window.location.pathname}#chess-party?room=${roomCode}`
     : `https://duowindo6601.applet.run/#chess-party?room=${roomCode}`;
 
-  const friendsList: ChessOpponent[] = [
-    {
-      id: 'friend-1',
-      name: 'DuoWindo Master',
-      username: '@duo_master',
-      avatar: '🦉',
-      elo: 1650,
-      status: 'online',
-      games: 142,
-      wins: 98
-    },
-    {
-      id: 'friend-2',
-      name: isRu ? 'Анна Шахматистка' : 'Anna ChessPlayer',
-      username: '@anna_chess',
-      avatar: '👩🏼',
-      elo: 1480,
-      status: 'online',
-      games: 86,
-      wins: 54
-    },
-    {
-      id: 'friend-3',
-      name: isRu ? 'Александр К.' : 'Alexander K.',
-      username: '@alex_k',
-      avatar: '👨🏻',
-      elo: 1390,
-      status: 'online',
-      games: 52,
-      wins: 31
-    },
-    {
-      id: 'friend-4',
-      name: isRu ? 'Иван Гроссмейстер' : 'Ivan Grandmaster',
-      username: '@ivan_gm',
-      avatar: '👑',
-      elo: 1720,
-      status: 'online',
-      games: 210,
-      wins: 165
-    },
-    {
-      id: 'friend-5',
-      name: isRu ? 'Мария Соколова' : 'Maria Sokolova',
-      username: '@maria_s',
-      avatar: '👧🏻',
-      elo: 1280,
-      status: 'offline',
-      games: 34,
-      wins: 18
-    }
-  ];
+  const friendsList: ChessOpponent[] = getSampleChessOpponents(isRu);
 
   const contactsList: ChessOpponent[] = [
     {
@@ -273,39 +309,7 @@ export const ChessInviteModal: React.FC<ChessInviteModalProps> = ({
     }
   ];
 
-  const searchResults: ChessOpponent[] = [
-    ...friendsList,
-    {
-      id: 'user-search-1',
-      name: isRu ? 'Виктор Таль' : 'Victor Tal',
-      username: '@victor_tal',
-      avatar: '⚡',
-      elo: 1590,
-      status: 'online' as const,
-      games: 94,
-      wins: 62
-    },
-    {
-      id: 'user-search-2',
-      name: isRu ? 'Каспаров Jr' : 'Kasparov Jr',
-      username: '@kasparov_jr',
-      avatar: '🏆',
-      elo: 1850,
-      status: 'online' as const,
-      games: 340,
-      wins: 290
-    },
-    {
-      id: 'user-search-3',
-      name: isRu ? 'Полина Шах' : 'Polina Chess',
-      username: '@polina_shakh',
-      avatar: '🌟',
-      elo: 1410,
-      status: 'online' as const,
-      games: 45,
-      wins: 28
-    }
-  ].filter(u => {
+  const searchResults: ChessOpponent[] = getSearchableChessOpponents(isRu).filter(u => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return u.name.toLowerCase().includes(q) || (u.username && u.username.toLowerCase().includes(q));
@@ -346,70 +350,71 @@ export const ChessInviteModal: React.FC<ChessInviteModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 md:p-6 animate-in fade-in duration-200 font-din overflow-y-auto">
-      <div className="bg-gray-900 border-2 border-gray-700 w-full max-w-xl rounded-[2.5rem] p-6 md:p-8 shadow-2xl relative flex flex-col max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 md:p-6 animate-in fade-in duration-200 font-din overflow-y-auto">
+      <div className="bg-gray-900 border-2 border-gray-700 w-full max-w-xl rounded-3xl p-4 sm:p-6 md:p-7 shadow-2xl relative flex flex-col max-h-[92dvh] overflow-hidden">
         
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-gray-800 flex-shrink-0">
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 rounded-2xl bg-duo-green flex items-center justify-center text-2xl shadow-lg border-b-4 border-duo-greenDark">
+        <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-gray-800 flex-shrink-0">
+          <div className="flex items-center space-x-2.5 sm:space-x-3">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-duo-green flex items-center justify-center text-xl sm:text-2xl shadow-lg border-b-4 border-duo-greenDark shrink-0">
               ♟️
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h2 className="text-xl md:text-2xl font-black text-white uppercase tracking-tight">
-                  {isRu ? 'Пригласите сыграть партию' : 'Invite to Play a Match'}
+                <h2 className="text-base sm:text-xl md:text-2xl font-black text-white uppercase tracking-tight">
+                  {isRu ? 'Пригласить сыграть партию' : 'Invite to Play a Match'}
                 </h2>
               </div>
-              <span className="inline-block bg-duo-green/20 text-duo-green text-[11px] font-black px-2.5 py-0.5 rounded-full border border-duo-green/40 uppercase tracking-widest mt-0.5">
+              <span className="inline-block bg-duo-green/20 text-duo-green text-[10px] sm:text-[11px] font-black px-2 sm:px-2.5 py-0.5 rounded-full border border-duo-green/40 uppercase tracking-widest mt-0.5">
                 +30 {isRu ? 'очков опыта' : 'XP'}
               </span>
             </div>
           </div>
           <button 
             onClick={() => { playSound('click'); onClose(); }}
-            className="w-10 h-10 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white flex items-center justify-center transition-colors"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+            aria-label="Close"
           >
-            <CloseIcon className="w-6 h-6" />
+            <CloseIcon className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
 
         {/* 3 Main Action Tabs */}
-        <div className="grid grid-cols-3 gap-2 my-4 bg-gray-800/80 p-1.5 rounded-2xl border border-gray-700/60 flex-shrink-0">
+        <div className="grid grid-cols-3 gap-1 sm:gap-2 my-3 sm:my-4 bg-gray-800/80 p-1 sm:p-1.5 rounded-2xl border border-gray-700/60 flex-shrink-0">
           <button
             onClick={() => { playSound('select'); setActiveTab('link'); }}
-            className={`py-3 px-2 rounded-xl font-bold text-xs md:text-sm uppercase tracking-wider transition-all flex items-center justify-center space-x-1.5 ${
+            className={`py-2 sm:py-3 px-1 sm:px-2 rounded-xl font-bold text-[11px] sm:text-xs md:text-sm uppercase tracking-wider transition-all flex items-center justify-center space-x-1 sm:space-x-1.5 cursor-pointer ${
               activeTab === 'link'
                 ? 'bg-duo-blue text-white shadow-lg border-b-2 border-duo-blueDark font-black'
                 : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
             }`}
           >
             <span>🔗</span>
-            <span className="truncate">{isRu ? 'Отправить ссылку' : 'Invite Link'}</span>
+            <span className="truncate">{isRu ? 'Ссылка' : 'Link'}</span>
           </button>
 
           <button
             onClick={() => { playSound('select'); setActiveTab('search'); }}
-            className={`py-3 px-2 rounded-xl font-bold text-xs md:text-sm uppercase tracking-wider transition-all flex items-center justify-center space-x-1.5 ${
+            className={`py-2 sm:py-3 px-1 sm:px-2 rounded-xl font-bold text-[11px] sm:text-xs md:text-sm uppercase tracking-wider transition-all flex items-center justify-center space-x-1 sm:space-x-1.5 cursor-pointer ${
               activeTab === 'search'
                 ? 'bg-duo-green text-white shadow-lg border-b-2 border-duo-greenDark font-black'
                 : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
             }`}
           >
             <span>🔍</span>
-            <span className="truncate">{isRu ? 'Поиск по имени' : 'Search Name'}</span>
+            <span className="truncate">{isRu ? 'Поиск' : 'Search'}</span>
           </button>
 
           <button
             onClick={() => { playSound('select'); setActiveTab('contacts'); }}
-            className={`py-3 px-2 rounded-xl font-bold text-xs md:text-sm uppercase tracking-wider transition-all flex items-center justify-center space-x-1.5 ${
+            className={`py-2 sm:py-3 px-1 sm:px-2 rounded-xl font-bold text-[11px] sm:text-xs md:text-sm uppercase tracking-wider transition-all flex items-center justify-center space-x-1 sm:space-x-1.5 cursor-pointer ${
               activeTab === 'contacts'
                 ? 'bg-purple-600 text-white shadow-lg border-b-2 border-purple-800 font-black'
                 : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
             }`}
           >
             <span>📱</span>
-            <span className="truncate">{isRu ? 'Из контактов' : 'Contacts'}</span>
+            <span className="truncate">{isRu ? 'Контакты' : 'Contacts'}</span>
           </button>
         </div>
 

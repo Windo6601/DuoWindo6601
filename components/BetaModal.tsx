@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { UserProgress, Course } from '../types';
 import { 
   CloseIcon, 
@@ -11,6 +11,14 @@ import {
   VolumeIcon
 } from './Icons';
 import { speakText } from '../services/geminiService';
+import { 
+  getWorldLockedLanguages, 
+  getCisLockedLanguages, 
+  AVAILABLE_SWITCH_LANGUAGES,
+  isLanguageSwitchLocked,
+  getBetaWritingRestrictedCoursesList
+} from '../services/languageLockService';
+import { SPEAKER_LANGUAGES, getCoursesForSpeaker, getLocalizedCatalogTitle } from '../services/duowindo6601Catalog';
 
 interface BetaModalProps {
   user: UserProgress;
@@ -19,11 +27,25 @@ interface BetaModalProps {
   onOpenAdmin: () => void;
   onOpenSystemInfo: () => void;
   onOpenFeedback: () => void;
+  onOpenPoems?: () => void;
   onSelectCourse?: (course: Course) => void;
   onDismissBanner?: () => void;
   playSound: (type: 'click' | 'correct' | 'wrong' | 'fanfare' | 'streak' | string) => void;
   courses?: Course[];
+  onAttemptSwitchLanguage?: (langCode: string) => boolean;
+  onOpenLanguageLockModal?: (langCode?: string) => void;
 }
+
+const DEFAULT_BETA_COURSES: Course[] = [
+  { id: 'eo', name: 'Esperanto', localName: 'Эсперанто (Esperanto)', flagCode: 'eu', themeColor: 'bg-emerald-600', themeBorder: 'border-emerald-800', mascotVariant: 'default', isBeta: true, betaTag: 'Международный', betaVersion: 'v0.9.4 Beta', betaFeedbackCount: 142, writingRestrictionNotice: 'Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год' },
+  { id: 'la', name: 'Latin', localName: 'Латынь (Lingua Latina)', flagCode: 'it', themeColor: 'bg-amber-600', themeBorder: 'border-amber-800', mascotVariant: 'default', isBeta: true, betaTag: 'Классический', betaVersion: 'v0.8.2 Beta', betaFeedbackCount: 98, writingRestrictionNotice: 'Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год' },
+  { id: 'sv', name: 'Swedish', localName: 'Шведский (Svenska)', flagCode: 'se', themeColor: 'bg-blue-600', themeBorder: 'border-blue-800', mascotVariant: 'default', isBeta: true, betaTag: 'Скандинавский', betaVersion: 'v0.9.1 Beta', betaFeedbackCount: 115, writingRestrictionNotice: 'Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год' },
+  { id: 'no', name: 'Norwegian', localName: 'Норвежский (Norsk)', flagCode: 'no', themeColor: 'bg-red-600', themeBorder: 'border-red-800', mascotVariant: 'default', isBeta: true, betaTag: 'Скандинавский', betaVersion: 'v0.9.0 Beta', betaFeedbackCount: 84, writingRestrictionNotice: 'Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год' },
+  { id: 'tt', name: 'Tatar', localName: 'Татарский (Татар теле)', flagCode: 'ru', themeColor: 'bg-teal-600', themeBorder: 'border-teal-800', mascotVariant: 'default', isBeta: true, betaTag: 'Тюркский', betaVersion: 'v0.9.5 Beta', betaFeedbackCount: 230, writingRestrictionNotice: 'Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год' },
+  { id: 'hv', name: 'High Valyrian', localName: 'Высокий валирийский (Valyrio)', flagCode: 'gb', themeColor: 'bg-purple-700', themeBorder: 'border-purple-900', mascotVariant: 'default', isBeta: true, betaTag: 'Вымышленный', betaVersion: 'v0.8.0 Beta', betaFeedbackCount: 76, writingRestrictionNotice: 'Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год' },
+  { id: 'tlh', name: 'Klingon', localName: 'Клингонский (tlhIngan Hol)', flagCode: 'us', themeColor: 'bg-stone-700', themeBorder: 'border-stone-900', mascotVariant: 'default', isBeta: true, betaTag: 'Вымышленный', betaVersion: 'v0.7.3 Beta', betaFeedbackCount: 63, writingRestrictionNotice: 'Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год' },
+  { id: 'yi', name: 'Yiddish', localName: 'Идиш (ייִדיш)', flagCode: 'il', themeColor: 'bg-indigo-600', themeBorder: 'border-indigo-800', mascotVariant: 'default', isBeta: true, betaTag: 'Германский / Еврейский', betaVersion: 'v0.9.2 Beta', betaFeedbackCount: 91, writingRestrictionNotice: 'Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год' }
+];
 
 export const BetaModal: React.FC<BetaModalProps> = ({
   user,
@@ -32,17 +54,21 @@ export const BetaModal: React.FC<BetaModalProps> = ({
   onOpenAdmin,
   onOpenSystemInfo,
   onOpenFeedback,
+  onOpenPoems,
   onSelectCourse,
   onDismissBanner,
   playSound,
-  courses = []
+  courses = [],
+  onAttemptSwitchLanguage,
+  onOpenLanguageLockModal
 }) => {
   const handleEnableVip = () => {
     playSound('correct');
     setUser(prev => ({
       ...prev,
       subscription: 'max',
-      hearts: 'unlimited',
+      hearts: 5,
+      infiniteHearts: true,
       gems: prev.gems + 99999,
       streak: Math.max(prev.streak, 100)
     }));
@@ -62,6 +88,49 @@ export const BetaModal: React.FC<BetaModalProps> = ({
       await speakText('Добро пожаловать в Бета-Центр DuoWindo6601!', user.language || 'ru');
     } catch {
       playSound('correct');
+    }
+  };
+
+  const [selectedSpeakerLang, setSelectedSpeakerLang] = useState<string>(user.language || 'ru');
+
+  const betaCoursesToRender = React.useMemo(() => {
+    const listFromProps = courses.filter(c => c.isBeta);
+    if (listFromProps.length >= DEFAULT_BETA_COURSES.length) {
+      return listFromProps;
+    }
+    const merged = [...listFromProps];
+    for (const defCourse of DEFAULT_BETA_COURSES) {
+      if (!merged.some(m => m.id === defCourse.id)) {
+        merged.push(defCourse);
+      }
+    }
+    return merged;
+  }, [courses]);
+
+  const speakerFilteredCatalog = React.useMemo(() => {
+    return getCoursesForSpeaker(selectedSpeakerLang);
+  }, [selectedSpeakerLang]);
+
+  const handleEnrollBetaCourse = (course: Course) => {
+    playSound('correct');
+    const alreadyTested = user.betaTestedCourses?.includes(course.id);
+    const bonusXp = alreadyTested ? 0 : 50;
+    const bonusGems = alreadyTested ? 0 : 20;
+
+    setUser(prev => {
+      const currentTested = prev.betaTestedCourses || [];
+      const updatedTested = currentTested.includes(course.id) ? currentTested : [...currentTested, course.id];
+      return {
+        ...prev,
+        isBetaTester: true,
+        betaTestedCourses: updatedTested,
+        xp: prev.xp + bonusXp,
+        gems: prev.gems + bonusGems
+      };
+    });
+
+    if (onSelectCourse) {
+      onSelectCourse(course);
     }
   };
 
@@ -91,7 +160,7 @@ export const BetaModal: React.FC<BetaModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-xl transition-colors"
+            className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-xl transition-colors cursor-pointer"
           >
             <CloseIcon className="w-6 h-6" />
           </button>
@@ -109,9 +178,204 @@ export const BetaModal: React.FC<BetaModalProps> = ({
             </span>
           </div>
           <div className="flex items-center space-x-2">
+            {user.isBetaTester && (
+              <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-black text-[10px] uppercase">
+                ✅ Бета-тестер ({user.betaTestedCourses?.length || 1} курсов)
+              </span>
+            )}
             <span className="font-bold text-gray-300">
               Язык: <strong className="text-emerald-400 uppercase">{user.language}</strong>
             </span>
+          </div>
+        </div>
+
+        {/* SECTION: BETA TESTING LANGUAGE COURSES (TEST BENCH) */}
+        <div className="bg-gradient-to-br from-purple-950/70 via-indigo-950/50 to-gray-900 border-2 border-purple-500/40 rounded-3xl p-5 space-y-4 shadow-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-purple-500/30 pb-3">
+            <div className="flex items-center space-x-2.5">
+              <span className="text-2xl animate-pulse">🧪</span>
+              <div>
+                <h4 className="font-din font-black text-sm sm:text-base text-white uppercase tracking-wider flex items-center gap-2">
+                  <span>Бета-тестирование языковых курсов</span>
+                  <span className="bg-purple-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase">
+                    8 курсов
+                  </span>
+                </h4>
+                <p className="text-[11px] text-purple-200/80 font-medium">
+                  Выберите курс для проверки уроков, словаря и генерации упражнений (+50 XP тестеру)
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onOpenFeedback}
+              className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center space-x-1 shrink-0 self-start sm:self-auto cursor-pointer"
+            >
+              <span>⭐ Отзыв по курсу</span>
+            </button>
+          </div>
+
+          {/* SPEAKER LANGUAGE SELECTOR: "Курсы для тех, кто говорит по..." */}
+          <div className="bg-slate-900/90 border border-purple-500/30 rounded-2xl p-3.5 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-black text-purple-300 uppercase tracking-wider flex items-center gap-2">
+                <span>🗣️</span>
+                <span>{user.language === 'ru' ? 'Курсы для тех, кто говорит по:' : 'Courses for those who speak:'}</span>
+              </label>
+              <span className="text-[10px] text-gray-400 font-mono">
+                {speakerFilteredCatalog.length} направлений
+              </span>
+            </div>
+            <select
+              value={selectedSpeakerLang}
+              onChange={(e) => {
+                const code = e.target.value;
+                if (isLanguageSwitchLocked(code)) {
+                  playSound('wrong');
+                  if (onOpenLanguageLockModal) {
+                    onOpenLanguageLockModal(code);
+                  }
+                  return;
+                }
+                playSound('click');
+                setSelectedSpeakerLang(code);
+                const mappedLang = code === 'zs' ? 'zh' : (['ru', 'en', 'de', 'fr', 'es', 'ja', 'zh', 'ar'].includes(code) ? code : 'en');
+                setUser(prev => ({
+                  ...prev,
+                  language: mappedLang as any
+                }));
+              }}
+              className="w-full bg-slate-950 border border-purple-500/50 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all cursor-pointer"
+            >
+              <optgroup label="✨ Сейчас доступны для переключения:">
+                <option value="ru">🇷🇺 Русский</option>
+                <option value="en">🇺🇸 English</option>
+                <option value="de">🇩🇪 Deutsch</option>
+                <option value="fr">🇫🇷 Français</option>
+                <option value="es">🇪🇸 Español</option>
+                <option value="ja">🇯🇵 日本語</option>
+                <option value="zs">🇨🇳 中文</option>
+                <option value="ar">🇸🇦 العربية</option>
+              </optgroup>
+              <optgroup label="🔒 Заблокированные языки мира (10) — до 1 ноября 2026:">
+                <option value="pt">🔒 Português (Португальский)</option>
+                <option value="it">🔒 Italiano (Итальянский)</option>
+                <option value="tr">🔒 Türkçe (Турецкий)</option>
+                <option value="ko">🔒 한국어 (Корейский)</option>
+                <option value="hi">🔒 हिन्दी (Хинди)</option>
+                <option value="pl">🔒 Polski (Польский)</option>
+                <option value="id">🔒 Bahasa Indonesia</option>
+                <option value="bn">🔒 বাংলা (Бенгальский)</option>
+                <option value="th">🔒 ไทย (Тайский)</option>
+                <option value="vi">🔒 Tiếng Việt (Вьетнамский)</option>
+              </optgroup>
+              <optgroup label="🔒 Раздел Письмо Будут доступ 1 ноября 2026 год:">
+                <option value="kk">🔒 Казахстан (Қазақша) — Казахстан (казахский) 🇰🇿</option>
+                <option value="uz">🔒 Узбекистан (Oʻzbekcha) — Узбекистан (узбекский) 🇺🇿</option>
+                <option value="hy">🔒 Армения (Հայերեն) — Армения (армянский) 🇦🇲</option>
+                <option value="ka">🔒 Грузия (ქართული) — Грузия (грузинский) 🇬🇪</option>
+                <option value="az">🔒 Азербайджан (Azərbaycan) — Азербайджан (азербайджанский) 🇦🇿</option>
+              </optgroup>
+              <optgroup label="🔒 Бета Курс Язык — Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год:">
+                <option value="eo">🔒 Эсперанто (Esperanto) — v0.9.4 Beta</option>
+                <option value="la">🔒 Латынь (Lingua Latina) — v0.8.2 Beta</option>
+                <option value="sv">🔒 Шведский (Svenska) — v0.9.1 Beta</option>
+                <option value="no">🔒 Норвежский (Norsk) — v0.9.0 Beta</option>
+                <option value="tt">🔒 Татарский (Татар теле) — v0.9.5 Beta</option>
+                <option value="hv">🔒 Высокий валирийский (Valyrio) — v0.8.0 Beta</option>
+                <option value="tlh">🔒 Клингонский (tlhIngan Hol) — v0.7.3 Beta (Шрифт Klingon Font)</option>
+                <option value="yi">🔒 Идиш (ייִдиш) — v0.9.2 Beta</option>
+              </optgroup>
+            </select>
+
+            {speakerFilteredCatalog.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1 max-h-24 overflow-y-auto no-scrollbar">
+                {speakerFilteredCatalog.slice(0, 8).map(item => (
+                  <span key={item.itemId} className="text-[10px] bg-purple-900/50 text-purple-200 border border-purple-500/40 px-2 py-0.5 rounded-lg font-bold">
+                    {getLocalizedCatalogTitle(item, user.language)}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-64 overflow-y-auto no-scrollbar pr-1">
+            {betaCoursesToRender.map(course => {
+              const isTested = user.betaTestedCourses?.includes(course.id);
+              return (
+                <div
+                  key={course.id}
+                  className="p-3 bg-gray-850/90 hover:bg-gray-800 border border-purple-500/30 hover:border-purple-400/60 rounded-2xl flex flex-col justify-between transition-all group shadow-md"
+                >
+                  <div className="flex items-center space-x-3 mb-2">
+                    <img
+                      src={`https://flagcdn.com/w80/${course.flagCode}.png`}
+                      className="w-10 h-7 rounded-md object-cover shadow group-hover:scale-105 transition-transform shrink-0"
+                      alt={course.name}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-black text-sm text-white truncate">
+                          {course.localName || course.name}
+                        </span>
+                        {isTested && (
+                          <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-black border border-emerald-500/40 shrink-0">
+                            ✓ Тестирован
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center space-x-2 text-[10px] text-gray-400 font-bold">
+                        <span className="text-purple-300 font-mono">{course.betaVersion || 'Beta'}</span>
+                        <span>•</span>
+                        <span className="text-amber-300">{course.betaTag}</span>
+                      </div>
+                      <div className="mt-1 px-2 py-0.5 rounded-lg bg-amber-500/20 border border-amber-500/40 text-[9px] text-amber-300 font-bold flex items-center gap-1">
+                        <span>🔒</span>
+                        <span className="truncate">Ограничение раздел письма будут доступ до 1 ноября 2026 год</span>
+                      </div>
+                      {course.id === 'tlh' && (
+                        <div className="mt-1 space-y-1">
+                          <div className="px-2 py-0.5 rounded-lg bg-purple-900/40 border border-purple-500/40 text-[9px] text-purple-200 font-bold flex items-center justify-between">
+                            <span className="font-klingon text-xs">tlhIngan Hol</span>
+                            <span className="text-[8px] text-purple-300">Шрифт Klingon Font</span>
+                          </div>
+                          <a
+                            href="https://hol.kag.org/page/sentenceplayer"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="px-2 py-0.5 rounded-lg bg-sky-950/60 border border-sky-500/40 text-[9px] text-sky-300 hover:text-white font-bold flex items-center justify-between hover:bg-sky-900/60 transition-colors"
+                          >
+                            <span>🔊 Speech hol.kag.org Sentence Player</span>
+                            <span className="text-[8px]">↗</span>
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1 border-t border-gray-750">
+                    <button
+                      type="button"
+                      onClick={() => handleEnrollBetaCourse(course)}
+                      className="flex-1 py-1.5 px-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow cursor-pointer text-center active:scale-95"
+                    >
+                      {isTested ? 'Учить курс →' : 'Тестировать (+50 XP)'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playSound('click');
+                        onOpenFeedback();
+                      }}
+                      className="p-1.5 bg-gray-800 hover:bg-gray-700 text-amber-300 rounded-xl border border-gray-700 text-xs font-bold cursor-pointer transition-colors"
+                      title="Баг-репорт курса"
+                    >
+                      🐞
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -260,42 +524,254 @@ export const BetaModal: React.FC<BetaModalProps> = ({
               </div>
             </button>
 
+            {/* Poetry by Heart Trainer */}
+            {onOpenPoems && (
+              <button
+                onClick={onOpenPoems}
+                className="p-4 bg-gradient-to-r from-purple-900/60 via-indigo-900/60 to-slate-900/60 hover:from-purple-850 hover:to-indigo-850 border border-purple-500/50 rounded-2xl text-left transition-all group hover:scale-[1.02] shadow-md flex items-start space-x-3 cursor-pointer sm:col-span-2"
+              >
+                <div className="text-2xl p-2 bg-purple-950 rounded-xl border border-purple-400/40">
+                  📜
+                </div>
+                <div>
+                  <span className="font-black text-sm block text-purple-200 group-hover:text-white flex items-center gap-1.5">
+                    <span>Выучить стихотворение наизусть</span>
+                    <span className="text-[10px] bg-purple-500 text-white px-2 py-0.5 rounded-full uppercase font-black">NEW</span>
+                  </span>
+                  <span className="text-[11px] text-gray-300 font-medium block mt-0.5">
+                    Поэтический тренажёр: исчезающие слова, ритм, озвучка и проверка рецитации (+35 XP)
+                  </span>
+                </div>
+              </button>
+            )}
+
           </div>
         </div>
 
-        {/* Quick Language Switcher */}
-        <div className="space-y-2 pt-2 border-t border-gray-800">
-          <h4 className="font-black text-xs uppercase tracking-wider text-gray-400">
-            Быстрое переключение языка интерфейса
-          </h4>
-          <div className="flex flex-wrap gap-1.5">
-            {[
-              { code: 'ru', label: '🇷🇺 RU' },
-              { code: 'en', label: '🇬🇧 EN' },
-              { code: 'de', label: '🇩🇪 DE' },
-              { code: 'fr', label: '🇫🇷 FR' },
-              { code: 'es', label: '🇪🇸 ES' },
-              { code: 'ja', label: '🇯🇵 JA' },
-              { code: 'zh', label: '🇨🇳 ZH' },
-              { code: 'ar', label: '🇸🇦 AR' },
-            ].map(lang => (
+        {/* Beta Testing: Language Courses & Country Language Switcher */}
+        <div className="space-y-4 pt-4 border-t border-gray-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <h4 className="font-black text-xs uppercase tracking-wider text-purple-300 flex items-center space-x-2">
+              <span>🌐</span>
+              <span>Бета тестирование: Курс Язык & Переключить язык стран</span>
+            </h4>
+            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+              🔒 15 заблокировано до 1 ноября 2026 г.
+            </span>
+          </div>
+
+          {/* Available Languages */}
+          <div className="p-3 bg-sky-950/20 border border-sky-500/30 rounded-2xl">
+            <span className="text-[11px] font-black uppercase tracking-wider text-sky-400 block mb-2">
+              ✨ Сейчас доступны для переключения:
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {AVAILABLE_SWITCH_LANGUAGES.map(lang => (
+                <button
+                  key={lang.code}
+                  onClick={() => {
+                    playSound('click');
+                    if (onAttemptSwitchLanguage) {
+                      onAttemptSwitchLanguage(lang.code);
+                    } else {
+                      setUser(prev => ({ ...prev, language: lang.code as any }));
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border cursor-pointer ${
+                    user.language === lang.code
+                      ? 'bg-sky-500 text-black border-sky-300 shadow-md ring-2 ring-sky-400/50'
+                      : 'bg-gray-800/90 hover:bg-gray-700 text-gray-200 border-gray-700'
+                  }`}
+                >
+                  {lang.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Locked World Languages (10) */}
+          <div className="p-3 bg-amber-950/20 border border-amber-500/30 rounded-2xl">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-black uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                <span>🌍</span>
+                <span>Заблокированные языки мира (10):</span>
+              </span>
+              <span className="text-[10px] font-bold text-amber-400">🔒 до 1 ноября 2026</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {getWorldLockedLanguages().map(item => (
+                <button
+                  key={item.code}
+                  type="button"
+                  onClick={() => {
+                    playSound('wrong');
+                    if (onOpenLanguageLockModal) {
+                      onOpenLanguageLockModal(item.code);
+                    } else if (onAttemptSwitchLanguage) {
+                      onAttemptSwitchLanguage(item.code);
+                    }
+                  }}
+                  className="p-2.5 rounded-xl border border-amber-500/30 bg-black/40 hover:bg-amber-950/40 text-gray-200 hover:text-amber-200 transition-all text-xs flex items-center justify-between cursor-pointer group text-left"
+                >
+                  <div className="flex items-center space-x-2 truncate">
+                    <span className="text-base select-none shrink-0">{item.flagEmoji}</span>
+                    <div className="truncate">
+                      <div className="font-bold text-[11px] text-white group-hover:text-amber-200 truncate">
+                        {item.nameRu}
+                      </div>
+                      <div className="text-[9px] text-amber-300/80 font-medium truncate">
+                        {item.nativeName}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-xs text-amber-400 shrink-0 ml-1">🔒</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Locked CIS Countries List & Letters Section (5) */}
+          <div className="p-3 bg-gradient-to-r from-amber-950/30 to-purple-950/30 border border-amber-500/40 rounded-2xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2 pb-1.5 border-b border-amber-500/20">
+              <span className="text-[11px] font-black uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                <span>🌍</span>
+                <span>Заблокированные языки мира</span>
+              </span>
+              <span className="text-[10px] font-black text-amber-300 bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 rounded-md self-start sm:self-auto">
+                Раздел Письмо Будут доступ 1 ноября 2026 год
+              </span>
+            </div>
+
+            <div className="space-y-1.5">
+              {getCisLockedLanguages().map(item => (
+                <button
+                  key={item.code}
+                  type="button"
+                  onClick={() => {
+                    playSound('wrong');
+                    if (onOpenLanguageLockModal) {
+                      onOpenLanguageLockModal(item.code);
+                    } else if (onAttemptSwitchLanguage) {
+                      onAttemptSwitchLanguage(item.code);
+                    }
+                  }}
+                  className="w-full p-2.5 rounded-xl border border-amber-500/30 bg-black/50 hover:bg-amber-950/50 text-gray-200 hover:text-amber-200 transition-all text-xs flex items-center justify-between cursor-pointer group text-left"
+                >
+                  <div className="flex items-center space-x-2.5 truncate">
+                    <span className="text-base select-none shrink-0">{item.flagEmoji}</span>
+                    <div className="truncate">
+                      <div className="font-bold text-[11px] text-amber-100 group-hover:text-white truncate">
+                        🔒 {item.fullLabelRu || `${item.nameRu} — (${item.nativeName})`}
+                      </div>
+                      <div className="text-[9px] text-gray-400 font-medium">
+                        Раздел Письмо Будут доступ 1 ноября 2026 год
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-xs text-amber-400 shrink-0 ml-1">🔒</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-3 pt-2 border-t border-amber-500/20 flex items-center justify-between flex-wrap gap-2">
               <button
-                key={lang.code}
+                type="button"
                 onClick={() => {
                   playSound('click');
-                  setUser(prev => ({ ...prev, language: lang.code as any }));
+                  onClose();
+                  onOpenFeedback();
                 }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
-                  user.language === lang.code
-                    ? 'bg-purple-600 text-white border-purple-400 shadow-md ring-2 ring-purple-400/50'
-                    : 'bg-gray-800 hover:bg-gray-700 text-gray-300 border-gray-700'
-                }`}
+                className="px-3.5 py-2 bg-gray-800 hover:bg-gray-700 text-amber-300 font-bold text-[11px] uppercase tracking-wider rounded-xl border border-amber-500/30 shadow cursor-pointer flex items-center gap-1.5 transition-all"
               >
-                {lang.label}
+                <span>💬</span>
+                <span>Отзывы: Заблокированные и доступные языки</span>
               </button>
-            ))}
+
+              <button
+                type="button"
+                onClick={() => {
+                  playSound('click');
+                  if (onOpenLanguageLockModal) {
+                    onOpenLanguageLockModal();
+                  }
+                }}
+                className="px-4 py-2 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-black font-black text-[11px] uppercase tracking-wider rounded-xl shadow cursor-pointer flex items-center gap-1.5 transition-all"
+              >
+                <span>ПОНЯТНО</span>
+                <span>🔒</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Dedicated Section: Бета Курс Язык — Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год */}
+          <div className="p-4 bg-gradient-to-br from-purple-950/40 via-stone-950/60 to-black/80 border-2 border-purple-500/50 rounded-2xl space-y-3 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-2 border-b border-purple-500/30">
+              <div className="flex items-center space-x-2">
+                <span className="text-xl">🧪</span>
+                <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-purple-200">
+                  Бета Курс Язык: Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год
+                </span>
+              </div>
+              <span className="text-[10px] font-black text-amber-300 bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 rounded-full shrink-0">
+                🔒 До 1 ноября 2026 г.
+              </span>
+            </div>
+
+            <p className="text-[11px] text-gray-300 font-medium">
+              Для бета-курсов доступно изучение слов, грамматики и озвучка, а интерактивный раздел написания букв и прописей находится на стадии калибровки до 1 ноября 2026 года.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {getBetaWritingRestrictedCoursesList().map((item) => (
+                <div
+                  key={item.id}
+                  className="p-2.5 rounded-xl border border-purple-500/30 bg-purple-950/20 hover:bg-purple-900/30 text-gray-200 transition-all flex flex-col justify-between"
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <div className="flex items-center space-x-2 min-w-0">
+                      <img
+                        src={`https://flagcdn.com/w80/${item.flagCode}.png`}
+                        className="w-7 h-5 rounded object-cover shadow shrink-0"
+                        alt={item.name}
+                      />
+                      <span className="font-black text-xs text-white truncate">
+                        {item.localName}
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-mono text-purple-300 font-bold bg-purple-900/60 border border-purple-500/40 px-1.5 py-0.2 rounded shrink-0">
+                      {item.version}
+                    </span>
+                  </div>
+
+                  <div className="mt-1.5 text-[9px] text-amber-300 font-bold bg-amber-500/10 border border-amber-500/30 px-2 py-1 rounded-lg flex items-center gap-1">
+                    <span>🔒</span>
+                    <span className="truncate">{item.restrictionNotice}</span>
+                  </div>
+
+                  {item.id === 'tlh' && (
+                    <div className="mt-1 space-y-1">
+                      <div className="text-[9px] text-emerald-300 font-bold bg-emerald-950/40 border border-emerald-500/40 px-2 py-1 rounded-lg flex items-center justify-between">
+                        <span className="font-klingon text-sm">tlhIngan Hol</span>
+                        <span className="text-[8px] text-emerald-400">Шрифт Klingon Font активирован</span>
+                      </div>
+                      <a
+                        href="https://hol.kag.org/page/sentenceplayer"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-[9px] text-sky-300 hover:text-white font-bold bg-sky-950/60 border border-sky-500/40 px-2 py-1 rounded-lg flex items-center justify-between hover:bg-sky-900/60 transition-colors"
+                      >
+                        <span>🔊 API-Speech hol.kag.org Sentence Player</span>
+                        <span className="text-[8px]">↗</span>
+                      </a>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
+
 
         {/* Footer Buttons */}
         <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-800">

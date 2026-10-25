@@ -9,7 +9,8 @@ import {
   HandwritingCategory,
   getStoredHandwritingHabit,
   saveHandwritingHabit,
-  DailyHandwritingHabit
+  DailyHandwritingHabit,
+  pointsToSvgPath
 } from '../services/handwritingData';
 import { playSound, triggerHapticFeedback } from '../services/audioService';
 import { speakText } from '../services/geminiService';
@@ -19,6 +20,7 @@ import {
 } from './Icons';
 import { Mascot } from './Mascot';
 import { Course, UserProgress } from '../types';
+import { isBetaWritingRestricted, getBetaWritingRestrictedInfo } from '../services/languageLockService';
 
 interface Point {
   x: number;
@@ -440,7 +442,7 @@ export const HandwritingScreen: React.FC<HandwritingScreenProps> = ({
     if (activeTab === 'connections') return LETTER_CONNECTIONS;
     if (activeTab === 'words') {
       if (wordCategoryFilter === 'all') return HANDWRITING_WORDS;
-      return HANDWRITING_WORDS.filter(w => w.category === wordCategoryFilter);
+      return HANDWRITING_WORDS.filter(w => (w.category as any) === wordCategoryFilter || (w.theme as any) === wordCategoryFilter);
     }
     return [];
   };
@@ -500,6 +502,19 @@ export const HandwritingScreen: React.FC<HandwritingScreenProps> = ({
           </button>
         </div>
       </header>
+
+      {/* Beta Course Writing Restriction Notice Banner */}
+      {isBetaWritingRestricted(currentCourse.id) && (
+        <div className="bg-gradient-to-r from-amber-950/90 via-purple-950/90 to-amber-950/90 border-b-2 border-amber-500/60 px-4 py-2.5 text-center flex flex-col sm:flex-row items-center justify-center gap-2 shadow-xl animate-in fade-in">
+          <span className="text-amber-300 font-black text-xs uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-sm">🔒</span>
+            <span>Бета Курс: {currentCourse.localName || currentCourse.name} ({getBetaWritingRestrictedInfo(currentCourse.id)?.version || 'Beta'})</span>
+          </span>
+          <span className="text-amber-200 font-bold text-xs bg-amber-500/20 border border-amber-500/40 px-2.5 py-0.5 rounded-full">
+            Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год
+          </span>
+        </div>
+      )}
 
       {/* TOP NAVIGATION TABS */}
       <div className="bg-[#111827] border-b border-gray-800 px-4 py-2">
@@ -759,7 +774,7 @@ export const HandwritingScreen: React.FC<HandwritingScreenProps> = ({
                   return (
                     <path
                       key={stroke.id}
-                      d={stroke.path}
+                      d={stroke.svgPath || (Array.isArray(stroke.path) ? pointsToSvgPath(stroke.path) : '')}
                       fill="none"
                       stroke={isCompleted ? '#10b981' : isCurrent ? '#38bdf8' : '#cbd5e1'}
                       strokeWidth={isCurrent ? 6 : 4}
@@ -889,6 +904,22 @@ export const HandwritingScreen: React.FC<HandwritingScreenProps> = ({
               </button>
 
               <div className="w-px h-6 bg-gray-700 mx-1"></div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  playSound('click');
+                  const list = getFilteredItems();
+                  const curIdx = list.findIndex(i => i.id === selectedItem.id);
+                  const nextItem = list[(curIdx + 1) % list.length];
+                  handleSelectItem(nextItem);
+                }}
+                className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white border border-gray-700 font-black text-xs uppercase tracking-wider flex items-center space-x-1 shadow-md active:scale-95 transition-all"
+                title="Пропустить этот символ"
+              >
+                <span>⏭️</span>
+                <span>Пропустить</span>
+              </button>
 
               <button
                 type="button"

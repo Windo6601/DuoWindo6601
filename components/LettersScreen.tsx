@@ -13,6 +13,12 @@ import {
 import { Course, UserProgress } from '../types';
 import { CIS_ALPHABET_DATA, AlphabetItem, AlphabetCategory } from '../services/alphabetData';
 import { playSound, triggerHapticFeedback } from '../services/audioService';
+import { ArabicNumeralsConverter } from './ArabicNumeralsConverter';
+import { 
+  isBetaWritingRestricted, 
+  getBetaWritingRestrictedInfo, 
+  getDaysRemainingUntilUnlock 
+} from '../services/languageLockService';
 
 interface LettersScreenProps {
   currentCourse: Course;
@@ -62,7 +68,12 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
   const [feedbackStatus, setFeedbackStatus] = useState<'idle' | 'correct' | 'wrong'>('idle');
   const [hasTraced, setHasTraced] = useState<boolean>(false);
   const [showCoursePickerModal, setShowCoursePickerModal] = useState<boolean>(false);
-  const [courseCategoryTab, setCourseCategoryTab] = useState<'cis' | 'russia' | 'world' | 'hardest'>('cis');
+  const [showBetaLockModal, setShowBetaLockModal] = useState<boolean>(false);
+  const [courseCategoryTab, setCourseCategoryTab] = useState<'cis' | 'russia' | 'world' | 'hardest' | 'beta'>('cis');
+
+  const isBetaRestricted = isBetaWritingRestricted(currentCourse.id);
+  const betaLockInfo = getBetaWritingRestrictedInfo(currentCourse.id);
+  const daysUntilUnlock = getDaysRemainingUntilUnlock();
   
   // Matching Pairs State
   const [matchedPairIds, setMatchedPairIds] = useState<string[]>([]);
@@ -194,6 +205,13 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
 
   // Build Interactive Letters Lesson Exercises
   const startLetterLesson = (specificChar?: string) => {
+    if (isBetaRestricted) {
+      playSound('wrong');
+      triggerHapticFeedback('warning');
+      setShowBetaLockModal(true);
+      return;
+    }
+
     playSound('select');
     triggerHapticFeedback('medium');
 
@@ -207,11 +225,68 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
 
     const exercises: LetterExercise[] = [];
 
-    // 1. Trace the Character (Screenshot 2)
+    const currentLang = user.language || 'ru';
+
+    const locTrace: Record<string, string> = {
+      ru: 'Обведите символ',
+      en: 'Trace the character',
+      de: 'Zeichne das Zeichen nach',
+      fr: 'Tracez le caractère',
+      es: 'Traza el carácter',
+      ja: '文字をなぞってください',
+      zh: '描摹该字符',
+      ar: 'تتبع الحرف'
+    };
+
+    const locSelectSound: Record<string, string> = {
+      ru: 'Выберите правильный символ для',
+      en: 'Select the correct character for',
+      de: 'Wähle das richtige Zeichen für',
+      fr: 'Sélectionnez le bon caractère pour',
+      es: 'Selecciona el carácter correcto para',
+      ja: '正解の文字を選択してください：',
+      zh: '为以下发音选择正确的字符：',
+      ar: 'اختر الحرف الصحيح لـ'
+    };
+
+    const locWhatHear: Record<string, string> = {
+      ru: 'Что вы слышите?',
+      en: 'What do you hear?',
+      de: 'Was hörst du?',
+      fr: 'Qu’entendez-vous ?',
+      es: '¿Qué escuchas?',
+      ja: '何が聞こえますか？',
+      zh: '你听到了什么？',
+      ar: 'ماذا تسمع؟'
+    };
+
+    const locMatchPairs: Record<string, string> = {
+      ru: 'Нажмите соответствующие пары',
+      en: 'Tap the matching pairs',
+      de: 'Tippe auf die passenden Paare',
+      fr: 'Associez les paires',
+      es: 'Toca las parejas correspondientes',
+      ja: 'ペアをタップしてください',
+      zh: '点击匹配配对',
+      ar: 'اضغط على الأزواج المتطابقة'
+    };
+
+    const locHardWords: Record<string, string> = {
+      ru: 'Выберите правильные буквы для',
+      en: 'Select the correct characters for',
+      de: 'Wähle die richtigen Zeichen für',
+      fr: 'Sélectionnez les bons caractères pour',
+      es: 'Selecciona los caracteres correctos para',
+      ja: '正解の文字を選んでください：',
+      zh: '选择正确的字符：',
+      ar: 'اختر الأحرف الصحيحة لـ'
+    };
+
+    // 1. Trace the Character
     exercises.push({
       id: 'ex_trace_1',
       type: 'trace',
-      title: user.language === 'ru' ? 'Обведите символ' : 'Trace the character',
+      title: locTrace[currentLang] || locTrace['ru'],
       subtitle: targetCharItem.sound || targetCharItem.translit || targetCharItem.name,
       targetChar: targetCharItem.char,
       targetSound: targetCharItem.sound || targetCharItem.translit || targetCharItem.name,
@@ -219,7 +294,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
       targetTranslation: targetCharItem.translation
     });
 
-    // 2. Select the correct character for sound (Screenshot 3)
+    // 2. Select the correct character for sound
     const soundItem = shuffled[1 % shuffled.length] || targetCharItem;
     const soundDistractors = currentLetters.filter(l => l.char !== soundItem.char).slice(0, 3);
     const soundOptions = [
@@ -230,13 +305,13 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
     exercises.push({
       id: 'ex_sound_2',
       type: 'select_sound',
-      title: `${user.language === 'ru' ? 'Выберите правильный символ для' : 'Select the correct character for'} "${soundItem.translit || soundItem.sound || soundItem.name || soundItem.char}"`,
+      title: `${locSelectSound[currentLang] || locSelectSound['ru']} "${soundItem.translit || soundItem.sound || soundItem.name || soundItem.char}"`,
       targetChar: soundItem.char,
       targetSound: soundItem.sound || soundItem.translit || soundItem.name,
       options: soundOptions
     });
 
-    // 3. What do you hear? (Screenshot 4)
+    // 3. What do you hear?
     const listenItem = shuffled[2 % shuffled.length] || targetCharItem;
     const listenDistractors = currentLetters.filter(l => l.char !== listenItem.char).slice(0, 3);
     const listenOptions = [
@@ -247,19 +322,19 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
     exercises.push({
       id: 'ex_listen_3',
       type: 'listen_choice',
-      title: user.language === 'ru' ? 'Что вы слышите?' : 'What do you hear?',
+      title: locWhatHear[currentLang] || locWhatHear['ru'],
       targetChar: listenItem.char,
       targetSound: listenItem.sound || listenItem.translit || listenItem.name,
       options: listenOptions
     });
 
-    // 4. Tap the matching pairs (Screenshot 5)
+    // 4. Tap the matching pairs
     const pairItems = shuffled.slice(0, 4);
     if (pairItems.length >= 2) {
       exercises.push({
         id: 'ex_pairs_4',
         type: 'match_pairs',
-        title: user.language === 'ru' ? 'Нажмите соответствующие пары' : 'Tap the matching pairs',
+        title: locMatchPairs[currentLang] || locMatchPairs['ru'],
         pairs: pairItems.map(p => ({
           id: p.char,
           target: p.char,
@@ -268,7 +343,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
       });
     }
 
-    // 5. HARD EXERCISE (Screenshot 6)
+    // 5. HARD EXERCISE
     const hardItem = shuffled[3 % shuffled.length] || targetCharItem;
     const testWord = hardItem.word ? hardItem.word.split(' ')[0] : (hardItem.char + (currentLetters[1]?.char || ''));
     const testTranslit = hardItem.translit 
@@ -298,7 +373,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
       id: 'ex_hard_5',
       type: 'hard_word',
       isHard: true,
-      title: `${user.language === 'ru' ? 'Выберите правильные буквы для' : 'Select the correct characters for'} "${testTranslit}"`,
+      title: `${locHardWords[currentLang] || locHardWords['ru']} "${testTranslit}"`,
       targetChar: testWord,
       targetSound: testTranslit,
       options: hardOptions
@@ -502,12 +577,28 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
     }
   };
 
+  // Skip Exercise
+  const handleSkipExercise = () => {
+    playSound('click');
+    triggerHapticFeedback('light');
+    handleContinueExercise();
+  };
+
   // Format Dual Case for card (e.g. "А а", "Б б", or standard for non-cased scripts)
   const formatLetterDisplay = (char: string) => {
     if (char.length === 1 && char.toUpperCase() !== char.toLowerCase()) {
       return `${char.toUpperCase()} ${char.toLowerCase()}`;
     }
     return char;
+  };
+
+  // Dedicated font typography classes for Chinese, Japanese, Arabic, and Klingon
+  const getScriptFontClass = (courseId: string) => {
+    if (courseId === 'zh') return 'font-chinese';
+    if (courseId === 'ja') return 'font-japanese';
+    if (courseId === 'ar') return 'font-arabic';
+    if (courseId === 'tlh') return 'font-klingon';
+    return '';
   };
 
   // Categorized course lists
@@ -546,6 +637,184 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
     return allCourses.filter(c => hardIds.includes(c.id));
   }, [allCourses]);
 
+  const betaCoursesList = useMemo(() => {
+    return allCourses.filter(c => c.isBeta || ['eo', 'la', 'sv', 'no', 'tt', 'hv', 'tlh', 'yi'].includes(c.id));
+  }, [allCourses]);
+
+  const isNonLanguage = currentCourse.id === 'chess' || currentCourse.id === 'math' || currentCourse.id === 'music' || currentCourse.flagCode === 'chess' || currentCourse.flagCode === 'math' || currentCourse.flagCode === 'music';
+
+  if (isNonLanguage) {
+    return (
+      <div className={`min-h-screen w-full ${isLightMode ? 'bg-[#F7F9FA] text-slate-900' : 'bg-[#131F24] text-white'} flex flex-col items-center justify-center p-4 sm:p-6 font-din relative`}>
+        <div className={`max-w-md w-full rounded-3xl p-6 sm:p-8 border-2 shadow-2xl text-center space-y-5 ${isLightMode ? 'bg-white border-slate-300' : 'bg-[#182329] border-gray-700'}`}>
+          <div className="w-20 h-20 mx-auto rounded-3xl bg-amber-500/20 border-2 border-amber-500/40 flex items-center justify-center text-4xl shadow-inner">
+            🔒
+          </div>
+          
+          <div>
+            <span className="text-[11px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+              {user.language === 'ru' ? 'Раздел недоступен' : 'Section unavailable'}
+            </span>
+            <h2 className="text-2xl font-black mt-3">
+              {user.language === 'ru' ? 'Раздел «Письма» доступен только для языковых курсов' : 'Letters section is only available for language courses'}
+            </h2>
+            <p className="text-xs sm:text-sm text-gray-400 font-medium mt-2 leading-relaxed">
+              {user.language === 'ru'
+                ? `Курс «${currentCourse.localName || currentCourse.name}» относится к разделу «Предметы & Игры» (не языковой курс). В данном предмете нет алфавита или букв.`
+                : `The course "${currentCourse.name}" is a special subject/game (non-language). Letters and alphabets are only available for language courses.`}
+            </p>
+          </div>
+
+          <div className="flex flex-col space-y-2.5 pt-2">
+            <button
+              onClick={() => {
+                playSound('click');
+                setShowCoursePickerModal(true);
+              }}
+              className="w-full py-3.5 px-4 bg-duo-green hover:bg-duo-greenDark text-white font-black text-xs uppercase tracking-wider rounded-2xl border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all shadow-lg cursor-pointer"
+            >
+              🌍 {user.language === 'ru' ? 'Выбрать языковой курс' : 'Choose a language course'}
+            </button>
+            {onBackToPath && (
+              <button
+                onClick={() => {
+                  playSound('click');
+                  onBackToPath();
+                }}
+                className="w-full py-3 px-4 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold text-xs uppercase tracking-wider rounded-2xl border border-gray-700 transition-all cursor-pointer"
+              >
+                ← {user.language === 'ru' ? 'Вернуться к урокам курса' : 'Back to course lessons'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Modal Course Picker */}
+        {showCoursePickerModal && (
+          <div className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-[#182329] border-2 border-gray-700 rounded-3xl p-6 max-w-lg w-full shadow-2xl max-h-[85vh] flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2">
+                  <AlphabetIcon className="w-6 h-6 text-duo-blue" />
+                  <h3 className="text-xl font-black text-white">
+                    {user.language === 'ru' ? 'Выберите язык курса' : 'Choose Course Language'}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setShowCoursePickerModal(false)}
+                  className="p-2 text-gray-400 hover:text-white rounded-full hover:bg-gray-800 cursor-pointer"
+                >
+                  <CloseIcon className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Tabs: CIS vs Russia Regions vs World vs Hardest vs Beta */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 rounded-2xl bg-gray-800/80 p-1 mb-4">
+                <button
+                  onClick={() => {
+                    playSound('click');
+                    setCourseCategoryTab('cis');
+                  }}
+                  className={`py-2 px-1 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all cursor-pointer text-center ${
+                    courseCategoryTab === 'cis' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  🏛️ {user.language === 'ru' ? 'СНГ' : 'CIS'}
+                </button>
+                <button
+                  onClick={() => {
+                    playSound('click');
+                    setCourseCategoryTab('russia');
+                  }}
+                  className={`py-2 px-1 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all cursor-pointer text-center ${
+                    courseCategoryTab === 'russia' ? 'bg-rose-600 text-white shadow-md' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  🇷🇺 {user.language === 'ru' ? 'РФ' : 'Russia'}
+                </button>
+                <button
+                  onClick={() => {
+                    playSound('click');
+                    setCourseCategoryTab('world');
+                  }}
+                  className={`py-2 px-1 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all cursor-pointer text-center ${
+                    courseCategoryTab === 'world' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  🌍 {user.language === 'ru' ? 'Мир' : 'World'}
+                </button>
+                <button
+                  onClick={() => {
+                    playSound('click');
+                    setCourseCategoryTab('hardest');
+                  }}
+                  className={`py-2 px-1 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all cursor-pointer text-center ${
+                    courseCategoryTab === 'hardest' ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-md' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  🔥 {user.language === 'ru' ? 'Сложные' : 'Hard'}
+                </button>
+                <button
+                  onClick={() => {
+                    playSound('click');
+                    setCourseCategoryTab('beta');
+                  }}
+                  className={`py-2 px-1 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all cursor-pointer text-center ${
+                    courseCategoryTab === 'beta' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md ring-1 ring-purple-400/50' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  🧪 {user.language === 'ru' ? 'Бета' : 'Beta'}
+                </button>
+              </div>
+
+              {/* Course Grid */}
+              <div className="overflow-y-auto space-y-2 pr-1 flex-1">
+                {(
+                  courseCategoryTab === 'cis' 
+                    ? cisCoursesList 
+                    : courseCategoryTab === 'russia'
+                    ? russiaCoursesList
+                    : courseCategoryTab === 'world'
+                    ? worldCoursesList
+                    : courseCategoryTab === 'hardest'
+                    ? hardestCoursesList
+                    : betaCoursesList
+                ).map(c => {
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => {
+                        playSound('select');
+                        if (onSwitchCourse) onSwitchCourse(c);
+                        setShowCoursePickerModal(false);
+                      }}
+                      className="w-full p-3.5 rounded-2xl flex items-center justify-between border-2 transition-all cursor-pointer bg-gray-800/60 border-gray-700/60 hover:bg-gray-750 hover:border-gray-600 text-gray-300"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <span className="text-2xl">{c.flagCode || '🌐'}</span>
+                        <div className="text-left">
+                          <span className="font-black text-sm block text-white">
+                            {getCourseDisplayName(c)}
+                          </span>
+                          <span className="text-xs text-gray-400 font-bold">
+                            {c.name}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-duo-green/20 text-duo-green font-black px-2.5 py-1 rounded-lg">
+                        {user.language === 'ru' ? 'Выбрать' : 'Select'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className={`min-h-screen w-full ${isLightMode ? 'bg-[#F7F9FA] text-slate-900' : 'bg-[#131F24] text-white'} selection:bg-duo-blue/30 pb-28 md:pb-12 transition-colors`}>
       
@@ -555,17 +824,29 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
       {activeLesson && currentExercise ? (
         <div className="max-w-2xl mx-auto min-h-screen flex flex-col justify-between p-4 sm:p-6 animate-in fade-in zoom-in-95 duration-200">
           
-          {/* Top Bar: Close, Progress, Energy, Hearts */}
+          {/* Top Bar: Close, Skip, Progress, Energy, Hearts */}
           <div className="flex items-center justify-between gap-4 mb-4">
-            <button
-              onClick={() => {
-                playSound('click');
-                setActiveLesson(false);
-              }}
-              className="p-2 text-gray-400 hover:text-white rounded-full hover:bg-white/10 transition-colors cursor-pointer"
-            >
-              <CloseIcon className="w-6 h-6" />
-            </button>
+            <div className="flex items-center space-x-1.5 shrink-0">
+              <button
+                onClick={() => {
+                  playSound('click');
+                  setActiveLesson(false);
+                }}
+                className="p-2 text-gray-400 hover:text-white rounded-full hover:bg-white/10 transition-colors cursor-pointer"
+                title={user.language === 'ru' ? 'Выйти' : 'Quit'}
+              >
+                <CloseIcon className="w-6 h-6" />
+              </button>
+              <button
+                type="button"
+                onClick={handleSkipExercise}
+                className="px-2.5 py-1 bg-gray-800/90 hover:bg-gray-700 text-gray-300 hover:text-white border border-gray-700 rounded-xl font-black text-xs uppercase tracking-wider flex items-center space-x-1 cursor-pointer transition-all active:scale-95 shadow-sm"
+                title={user.language === 'ru' ? 'Пропустить упражнение' : 'Skip exercise'}
+              >
+                <span>⏭️</span>
+                <span className="hidden sm:inline">{user.language === 'ru' ? 'Пропустить' : 'Skip'}</span>
+              </button>
+            </div>
 
             {/* Green Animated Progress Bar */}
             <div className="flex-1 bg-gray-800 h-3.5 rounded-full overflow-hidden border border-gray-700">
@@ -694,7 +975,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                         setSelectedOptionId(opt.id);
                         speakText(opt.text, currentCourse.id, false, user.preferredVoice, user.voiceProvider);
                       }}
-                      className={`h-36 sm:h-44 rounded-3xl flex items-center justify-center font-black text-4xl sm:text-5xl transition-all border-b-4 active:border-b-2 active:translate-y-0.5 cursor-pointer ${
+                      className={`h-36 sm:h-44 rounded-3xl flex items-center justify-center font-black text-4xl sm:text-5xl transition-all border-b-4 active:border-b-2 active:translate-y-0.5 cursor-pointer ${getScriptFontClass(currentCourse.id)} ${
                         isSelected
                           ? 'bg-[#182329] border-duo-blue ring-4 ring-duo-blue/30 text-duo-blue'
                           : 'bg-[#182329] border-gray-800 hover:border-gray-700 text-white hover:bg-[#1E2B33]'
@@ -771,7 +1052,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                         key={`left_${p.id}`}
                         disabled={isMatched}
                         onClick={() => handleSelectLeftPair(p.id)}
-                        className={`h-20 rounded-2xl flex items-center justify-center font-black text-xl transition-all border-b-4 active:border-b-2 cursor-pointer ${
+                        className={`h-20 rounded-2xl flex items-center justify-center font-black text-xl transition-all border-b-4 active:border-b-2 cursor-pointer ${getScriptFontClass(currentCourse.id)} ${
                           isMatched
                             ? 'opacity-30 bg-gray-900 border-transparent text-gray-600 cursor-not-allowed'
                             : isSelected
@@ -830,7 +1111,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                         triggerHapticFeedback('light');
                         setSelectedOptionId(opt.id);
                       }}
-                      className={`h-36 sm:h-44 rounded-3xl flex items-center justify-center font-black text-3xl sm:text-4xl transition-all border-b-4 active:border-b-2 active:translate-y-0.5 cursor-pointer ${
+                      className={`h-36 sm:h-44 rounded-3xl flex items-center justify-center font-black text-3xl sm:text-4xl transition-all border-b-4 active:border-b-2 active:translate-y-0.5 cursor-pointer ${getScriptFontClass(currentCourse.id)} ${
                         isSelected
                           ? 'bg-[#182329] border-duo-blue ring-4 ring-duo-blue/30 text-duo-blue'
                           : 'bg-[#182329] border-gray-800 hover:border-gray-700 text-white hover:bg-[#1E2B33]'
@@ -848,23 +1129,34 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
           {/* Bottom Action / Check / Continue Bar */}
           <div className="pt-4 border-t border-gray-800/80">
             {feedbackStatus === 'idle' ? (
-              <button
-                disabled={
-                  currentExercise.type === 'trace' 
-                    ? !hasTraced 
-                    : currentExercise.type === 'match_pairs'
-                    ? matchedPairIds.length !== (currentExercise.pairs?.length || 0)
-                    : !selectedOptionId
-                }
-                onClick={handleCheckAnswer}
-                className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all border-b-4 active:border-b-0 active:translate-y-1 shadow-xl cursor-pointer ${
-                  (currentExercise.type === 'trace' ? hasTraced : currentExercise.type === 'match_pairs' ? matchedPairIds.length === (currentExercise.pairs?.length || 0) : selectedOptionId)
-                    ? 'bg-[#58CC02] hover:bg-[#46A302] text-white border-[#46A302]'
-                    : 'bg-gray-800 text-gray-500 border-gray-900 cursor-not-allowed'
-                }`}
-              >
-                {user.language === 'ru' ? 'ПРОВЕРИТЬ' : 'CHECK'}
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleSkipExercise}
+                  className="px-5 py-4 rounded-2xl font-black text-xs md:text-sm uppercase tracking-wider border-2 border-gray-700 bg-gray-800/90 hover:bg-gray-700 hover:border-gray-500 text-gray-300 hover:text-white transition-all active:translate-y-1 shadow-md cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
+                  title={user.language === 'ru' ? 'Пропустить упражнение' : 'Skip exercise'}
+                >
+                  <span>⏭️</span>
+                  <span>{user.language === 'ru' ? 'ПРОПУСТИТЬ' : 'SKIP'}</span>
+                </button>
+                <button
+                  disabled={
+                    currentExercise.type === 'trace' 
+                      ? !hasTraced 
+                      : currentExercise.type === 'match_pairs'
+                      ? matchedPairIds.length !== (currentExercise.pairs?.length || 0)
+                      : !selectedOptionId
+                  }
+                  onClick={handleCheckAnswer}
+                  className={`flex-1 py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all border-b-4 active:border-b-0 active:translate-y-1 shadow-xl cursor-pointer ${
+                    (currentExercise.type === 'trace' ? hasTraced : currentExercise.type === 'match_pairs' ? matchedPairIds.length === (currentExercise.pairs?.length || 0) : selectedOptionId)
+                      ? 'bg-[#58CC02] hover:bg-[#46A302] text-white border-[#46A302]'
+                      : 'bg-gray-800 text-gray-500 border-gray-900 cursor-not-allowed'
+                  }`}
+                >
+                  {user.language === 'ru' ? 'ПРОВЕРИТЬ' : 'CHECK'}
+                </button>
+              </div>
             ) : (
               <div className={`p-4 rounded-2xl flex items-center justify-between animate-in slide-in-from-bottom-3 duration-200 ${
                 feedbackStatus === 'correct' ? 'bg-[#58CC02]/20 border-2 border-[#58CC02]' : 'bg-red-500/20 border-2 border-red-500'
@@ -938,16 +1230,100 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                 : `Get to know the ${getCourseDisplayName(currentCourse)} writing system`}
             </p>
 
+            {/* Beta Course Writing Restriction Notice Banner */}
+            {isBetaRestricted && betaLockInfo && (
+              <div className="w-full max-w-md mt-4 p-4 rounded-3xl bg-amber-950/40 border-2 border-amber-500/50 shadow-xl text-center space-y-2 animate-in fade-in">
+                <div className="flex items-center justify-center space-x-2 text-amber-300 font-black text-xs sm:text-sm uppercase tracking-wider">
+                  <span>🔒</span>
+                  <span>Ограничение раздел письма будут доступ до 1 ноября 2026 год</span>
+                </div>
+                <div className="flex items-center justify-center flex-wrap gap-2 text-xs font-bold text-gray-300">
+                  <span className="text-white font-black">{currentCourse.localName || currentCourse.name}</span>
+                  <span className="font-mono text-purple-300 bg-purple-900/60 border border-purple-500/40 px-2 py-0.5 rounded-full font-bold">
+                    {betaLockInfo.version}
+                  </span>
+                  <span className="text-amber-400 font-mono">Доступно через {daysUntilUnlock} дн.</span>
+                </div>
+                {currentCourse.id === 'tlh' && (
+                  <div className="pt-2 flex items-center justify-center gap-2 text-xs text-emerald-300 font-bold border-t border-amber-500/20">
+                    <span className="font-klingon text-lg">tlhIngan Hol</span>
+                    <span className="text-[11px] text-gray-300">• Шрифт Klingon Font подключен (fontomania.ru/17807-klingon.html)</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Prominent "LEARN THE LETTERS" Button (Screenshot 1) */}
             <div className="w-full max-w-md mt-6">
               <button
                 onClick={() => startLetterLesson()}
-                className="w-full py-4 px-8 bg-duo-blue hover:bg-[#1899D6] active:border-b-0 active:translate-y-1 text-white font-black text-sm uppercase tracking-widest rounded-2xl border-b-4 border-[#1899D6] shadow-xl flex items-center justify-center space-x-3 transition-all cursor-pointer group"
+                className={`w-full py-4 px-8 active:border-b-0 active:translate-y-1 text-white font-black text-sm uppercase tracking-widest rounded-2xl border-b-4 shadow-xl flex items-center justify-center space-x-3 transition-all cursor-pointer group ${
+                  isBetaRestricted
+                    ? 'bg-amber-600 hover:bg-amber-500 border-amber-800'
+                    : 'bg-duo-blue hover:bg-[#1899D6] border-[#1899D6]'
+                }`}
               >
-                <SparklesIcon className="w-5 h-5 group-hover:rotate-12 transition-transform" />
-                <span>{user.language === 'ru' ? 'УЧИТЬ БУКВЫ' : 'LEARN THE LETTERS'}</span>
+                {isBetaRestricted ? (
+                  <>
+                    <span>🔒</span>
+                    <span>{user.language === 'ru' ? 'ОГРАНИЧЕНИЕ ПИСЬМА (ДО 1 НОЯ 2026)' : 'WRITING RESTRICTED (UNTIL NOV 1 2026)'}</span>
+                  </>
+                ) : (
+                  <>
+                    <SparklesIcon className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                    <span>{user.language === 'ru' ? 'УЧИТЬ БУКВЫ' : 'LEARN THE LETTERS'}</span>
+                  </>
+                )}
               </button>
             </div>
+
+            {/* Quick Arabic Font Switcher Pill Bar (Only shown for Arabic course) */}
+            {currentCourse.id === 'ar' && (
+              <div className="w-full max-w-md mt-4 p-3 bg-[#182329] border border-emerald-500/40 rounded-2xl flex flex-col items-center gap-2 shadow-lg">
+                <div className="flex items-center justify-between w-full px-1 text-xs font-bold text-emerald-300">
+                  <span className="flex items-center gap-1.5">
+                    <span>🇦🇪</span>
+                    <span>{user.language === 'ru' ? 'Шрифт курса Арабского:' : 'Arabic Font:'}</span>
+                  </span>
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-mono px-2 py-0.5 rounded-full border border-emerald-500/30">
+                    {user.arabicFontFamily === 'cairo' ? 'Cairo' : user.arabicFontFamily === 'noto' ? 'Noto Sans' : 'Duo Rounded'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5 w-full">
+                  {[
+                    { id: 'duo' as const, label: 'Duo Rounded' },
+                    { id: 'noto' as const, label: 'Noto Sans' },
+                    { id: 'cairo' as const, label: 'Cairo' },
+                  ].map((fontOpt) => {
+                    const isSelected = (user.arabicFontFamily || 'duo') === fontOpt.id;
+                    return (
+                      <button
+                        key={fontOpt.id}
+                        type="button"
+                        onClick={() => {
+                          playSound('select');
+                          const updatedUser = { ...user, arabicFontFamily: fontOpt.id };
+                          setUser(updatedUser);
+                          if (onSaveProgress) onSaveProgress(updatedUser);
+                          try {
+                            localStorage.setItem('duowindo6601_user_progress_v1', JSON.stringify(updatedUser));
+                          } catch {}
+                          document.documentElement.setAttribute('data-arabic-font', fontOpt.id);
+                          document.body.setAttribute('data-arabic-font', fontOpt.id);
+                        }}
+                        className={`py-1.5 px-2 rounded-xl text-xs font-black transition-all cursor-pointer border ${
+                          isSelected
+                            ? 'bg-emerald-600 text-white border-emerald-400 shadow-md ring-1 ring-emerald-400'
+                            : 'bg-gray-800 text-gray-400 border-gray-700 hover:text-white hover:bg-gray-700'
+                        }`}
+                      >
+                        {fontOpt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Category Tabs (if language has multiple scripts or alphabet sections) */}
@@ -993,7 +1369,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                 >
                   {/* Letter Character Display */}
                   <div className="my-1 flex flex-col items-center">
-                    <span className={`text-xl sm:text-2xl font-black transition-colors ${
+                    <span className={`text-xl sm:text-2xl font-black transition-colors ${getScriptFontClass(currentCourse.id)} ${
                       isSelected ? 'text-[#FFC800]' : 'text-white group-hover:text-duo-blue'
                     }`}>
                       {formatLetterDisplay(item.char)}
@@ -1019,16 +1395,25 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
             })}
           </div>
 
+          {/* DUAL ARABIC NUMERALS CONVERTER (0-99) & HANDBOOK FOR ARABIC COURSE */}
+          {currentCourse.id === 'ar' && (
+            <ArabicNumeralsConverter 
+              speakText={speakText} 
+              preferredVoice={user.preferredVoice} 
+              voiceProvider={user.voiceProvider} 
+            />
+          )}
+
           {/* Letter Detail Bottom Sheet / Modal */}
           {selectedLetter && (
             <div className="fixed inset-x-0 bottom-0 z-50 p-4 sm:p-6 bg-duo-dark/95 backdrop-blur-xl border-t-2 border-gray-800 rounded-t-[2.5rem] shadow-2xl max-w-xl mx-auto animate-in slide-in-from-bottom-6 duration-200">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center space-x-4">
-                  <div className="w-16 h-16 rounded-2xl bg-duo-blue/20 border-2 border-duo-blue flex items-center justify-center text-3xl font-black text-white">
+                  <div className={`w-16 h-16 rounded-2xl bg-duo-blue/20 border-2 border-duo-blue flex items-center justify-center text-3xl font-black text-white ${getScriptFontClass(currentCourse.id)}`}>
                     {selectedLetter.char}
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-white">
+                    <h3 className={`text-xl font-black text-white ${getScriptFontClass(currentCourse.id)}`}>
                       {formatLetterDisplay(selectedLetter.char)}
                     </h3>
                     <p className="text-xs font-bold text-gray-400">
@@ -1109,8 +1494,8 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                   </button>
                 </div>
 
-                {/* Tabs: CIS vs Russia Regions vs World vs Hardest */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 rounded-2xl bg-gray-800/80 p-1 mb-4">
+                {/* Tabs: CIS vs Russia Regions vs World vs Hardest vs Beta */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 rounded-2xl bg-gray-800/80 p-1 mb-4">
                   <button
                     onClick={() => {
                       playSound('click');
@@ -1155,6 +1540,17 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                   >
                     🔥 {user.language === 'ru' ? 'Сложнейшие' : 'Hardest'}
                   </button>
+                  <button
+                    onClick={() => {
+                      playSound('click');
+                      setCourseCategoryTab('beta');
+                    }}
+                    className={`py-2 px-1 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all cursor-pointer text-center ${
+                      courseCategoryTab === 'beta' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md ring-1 ring-purple-400/50' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    🧪 {user.language === 'ru' ? 'Бета' : 'Beta'}
+                  </button>
                 </div>
 
                 {/* Course Grid */}
@@ -1166,9 +1562,12 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                       ? russiaCoursesList
                       : courseCategoryTab === 'world'
                       ? worldCoursesList
-                      : hardestCoursesList
+                      : courseCategoryTab === 'hardest'
+                      ? hardestCoursesList
+                      : betaCoursesList
                   ).map(c => {
                     const isCurrent = currentCourse.id === c.id;
+                    const isBeta = c.isBeta || isBetaWritingRestricted(c.id);
                     return (
                       <button
                         key={c.id}
@@ -1177,31 +1576,100 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                           if (onSwitchCourse) onSwitchCourse(c);
                           setShowCoursePickerModal(false);
                         }}
-                        className={`w-full p-3.5 rounded-2xl flex items-center justify-between border-2 transition-all cursor-pointer ${
+                        className={`w-full p-3.5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-2 transition-all cursor-pointer ${
                           isCurrent
                             ? 'bg-duo-blue/20 border-duo-blue text-white'
                             : 'bg-gray-800/60 border-gray-700/60 hover:bg-gray-750 hover:border-gray-600 text-gray-300'
                         }`}
                       >
-                        <div className="flex items-center space-x-3">
+                        <div className="flex items-center space-x-3 min-w-0">
                           <span className="text-2xl">{c.flagCode || '🌐'}</span>
-                          <div className="text-left">
-                            <span className="font-black text-sm block text-white">
-                              {getCourseDisplayName(c)}
-                            </span>
-                            <span className="text-xs text-gray-400 font-bold">
+                          <div className="text-left min-w-0">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-black text-sm block text-white truncate">
+                                {getCourseDisplayName(c)}
+                              </span>
+                              {c.betaVersion && (
+                                <span className="font-mono text-[10px] text-purple-300 bg-purple-950/80 border border-purple-500/40 px-1.5 py-0.2 rounded shrink-0">
+                                  {c.betaVersion}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-xs text-gray-400 font-bold block truncate">
                               {c.name}
                             </span>
+                            {isBeta && (
+                              <div className="mt-1 text-[9px] text-amber-300 font-bold bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                <span>🔒</span>
+                                <span className="truncate">Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год</span>
+                              </div>
+                            )}
+                            {c.id === 'tlh' && (
+                              <div className="mt-1 text-[9px] text-emerald-300 font-bold flex items-center gap-1">
+                                <span className="font-klingon text-xs">tlhIngan Hol</span>
+                                <span>• Шрифт Klingon Font</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                         {isCurrent && (
-                          <span className="w-3 h-3 rounded-full bg-duo-blue shadow-lg animate-pulse" />
+                          <span className="w-3 h-3 rounded-full bg-duo-blue shadow-lg animate-pulse shrink-0 self-end sm:self-center" />
                         )}
                       </button>
                     );
                   })}
                 </div>
 
+              </div>
+            </div>
+          )}
+
+          {/* Beta Writing Lock Modal Dialog */}
+          {showBetaLockModal && betaLockInfo && (
+            <div className="fixed inset-0 z-[120] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+              <div className="bg-[#182329] border-2 border-amber-500/60 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-4">
+                <div className="w-16 h-16 mx-auto rounded-2xl bg-amber-500/20 border-2 border-amber-500/40 flex items-center justify-center text-3xl shadow-inner">
+                  🔒
+                </div>
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                    Бета Курс Язык
+                  </span>
+                  <h3 className="text-xl sm:text-2xl font-black text-white mt-3 leading-snug">
+                    Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год
+                  </h3>
+                  <p className="text-xs text-gray-300 font-medium mt-2 leading-relaxed">
+                    Курс <strong>{currentCourse.localName || currentCourse.name}</strong> (<span className="font-mono text-purple-300">{betaLockInfo.version}</span>). Интерактивный тренажёр прописей и написания букв для данного бета-курса будет открыт 1 ноября 2026 года (осталось {daysUntilUnlock} дн.).
+                  </p>
+                  <p className="text-xs text-amber-300 font-bold mt-1">
+                    Вы можете нажимать на буквы в таблице ниже, чтобы прослушивать их правильное произношение и примеры слов!
+                  </p>
+                </div>
+
+                {currentCourse.id === 'tlh' && (
+                  <div className="p-3 rounded-2xl bg-purple-950/40 border border-purple-500/40 text-left space-y-1">
+                    <div className="flex items-center justify-between text-xs font-bold text-purple-200">
+                      <span>Шрифт языка:</span>
+                      <span className="font-klingon text-base text-emerald-400">tlhIngan Hol</span>
+                    </div>
+                    <div className="text-[10px] text-gray-400">
+                      Шрифт Klingon Font активирован (fontomania.ru/17807-klingon.html)
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playSound('click');
+                      setShowBetaLockModal(false);
+                    }}
+                    className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-black font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg transition-all cursor-pointer"
+                  >
+                    ПОНЯТНО (ПРОСМОТР БУКВ И ОЗВУЧКА)
+                  </button>
+                </div>
               </div>
             </div>
           )}

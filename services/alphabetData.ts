@@ -1084,6 +1084,25 @@ export const CIS_ALPHABET_DATA: Record<string, AlphabetCategory[]> = {
       description: 'Арабские харакаты (гласные значки)',
       script: 'arabic',
       items: ['َ', 'ُ', 'ِ', 'ً', 'ٌ', 'ٍ', 'ْ', 'ّ', 'آ', 'إ', 'أ', 'ء']
+    },
+    {
+      title: 'Арабские цифры: Две формы (Dual Numerals)',
+      description: 'Современная арабская с двумя формами: западные/европейские цифры слева и восточно-арабские цифры справа (0 / ٠, 1 / ١)',
+      script: 'arabic',
+      items: [
+        { char: '0 / ٠', name: 'Сифр (Sifr)', sound: '[sˤifr]', word: '٠ صفر (0 Sifr)', translation: 'Ноль • 0 (западная) / ٠ (восточная)' },
+        { char: '1 / ١', name: 'Вахид (Wahid)', sound: '[waːħid]', word: '١ واحد (1 Wahid)', translation: 'Один • 1 (западная) / ١ (восточная)' },
+        { char: '2 / ٢', name: 'Исна́н (Ithnan)', sound: '[iθnaːn]', word: '٢ اثنان (2 Ithnan)', translation: 'Два • 2 (западная) / ٢ (восточная)' },
+        { char: '3 / ٣', name: 'Саля́са (Thalatha)', sound: '[θalaːθa]', word: '٣ ثلاثة (3 Thalatha)', translation: 'Три • 3 (западная) / ٣ (восточная)' },
+        { char: '4 / ٤', name: 'А́рбаа (Arba\'a)', sound: '[ʔarbaʕa]', word: '٤ أربعة (4 Arba\'a)', translation: 'Четыре • 4 (западная) / ٤ (восточная)' },
+        { char: '5 / ٥', name: 'Ха́мса (Khamsa)', sound: '[xamsa]', word: '٥ خمسة (5 Khamsa)', translation: 'Пять • 5 (западная) / ٥ (восточная)' },
+        { char: '6 / ٦', name: 'Си́тта (Sitta)', sound: '[sitta]', word: '٦ ستة (6 Sitta)', translation: 'Шесть • 6 (западная) / ٦ (восточная)' },
+        { char: '7 / ٧', name: 'Са́бъа (Sab\'a)', sound: '[sabʕa]', word: '٧ سبعة (7 Sab\'a)', translation: 'Семь • 7 (западная) / ٧ (восточная)' },
+        { char: '8 / ٨', name: 'Сама́ния (Thamaniya)', sound: '[θamaːnija]', word: '٨ ثمانية (8 Thamaniya)', translation: 'Восемь • 8 (западная) / ٨ (восточная)' },
+        { char: '9 / ٩', name: 'Ти́съа (Tis\'a)', sound: '[tisʕa]', word: '٩ تسعة (9 Tis\'a)', translation: 'Девять • 9 (западная) / ٩ (восточная)' },
+        { char: '10 / ١٠', name: 'А́шара (\'Ashara)', sound: '[ʕaʃara]', word: '١٠ عشرة (10 \'Ashara)', translation: 'Десять • 10 (западная) / ١٠ (восточная)' },
+        { char: '100 / ١٠٠', name: 'Ми\'а (Mi\'ah)', sound: '[miʔa]', word: '١٠٠ مئة (100 Mi\'ah)', translation: 'Сто • 100 (западная) / ١٠٠ (восточная)' }
+      ]
     }
   ],
   'he': [
@@ -1393,6 +1412,337 @@ export const CIS_ALPHABET_DATA: Record<string, AlphabetCategory[]> = {
         { char: 'ЧI', name: 'чI гортанный', sound: '[tʃʼ]', word: 'ЧIвур', translation: 'Лицо' },
         { char: 'Ш', name: 'ша', sound: '[ʃ]', word: 'Шубуб', translation: 'Три' },
         { char: 'Ъ', name: 'твёрдый знак', sound: '[ʔ]', word: 'Аьгъю', translation: 'Знание' }
+      ]
+    }
+  ],
+
+  // 17. Chuvash / Чувашский (Чӑвашла)
+  'cv': [
+    {
+      title: 'Уникальные буквы (4)',
+      description: 'Специфические буквы чувашского языка огурской ветви',
+      items: [
+        { char: 'Ӑ', name: 'ӑ', sound: '[ɒ̆] (краткий о/а)', word: 'Ӑс', translation: 'Ум, разум', tips: 'Гласный заднего ряда краткий' },
+        { char: 'Ӗ', name: 'ӗ', sound: '[ɘ̆] (краткий э/е)', word: 'Ӗҫ', translation: 'Работа, дело', tips: 'Гласный переднего ряда краткий' },
+        { char: 'Ҫ', name: 'ҫе', sound: '[ɕ] (мягкий глухой сь)', word: 'Ҫӑкӑр', translation: 'Хлеб', tips: 'Седиль под буквой С' },
+        { char: 'Ӳ', name: 'ӳ', sound: '[y] (огузский лабиализованный)', word: 'Ӳкер', translation: 'Рисовать', tips: 'Двойной акут над У' }
+      ]
+    },
+    {
+      title: 'Чӑваш алфавичӗ (37)',
+      description: 'Полный чувашский алфавит на основе кириллицы',
+      items: [
+        { char: 'А', name: 'а', sound: '[a]', word: 'Ака', translation: 'Пахота' },
+        { char: 'Ӑ', name: 'ӑ', sound: '[ɒ̆]', word: 'Ӑс', translation: 'Разум' },
+        { char: 'Б', name: 'бэ', sound: '[b]', word: 'Базар', translation: 'Базар' },
+        { char: 'В', name: 'вэ', sound: '[ʋ]', word: 'Вӑрман', translation: 'Лес' },
+        { char: 'Г', name: 'гэ', sound: '[ɡ]', word: 'Герб', translation: 'Герб' },
+        { char: 'Д', name: 'дэ', sound: '[d]', word: 'Дуб', translation: 'Дуб' },
+        { char: 'Е', name: 'е', sound: '[jɛ]/[ɛ]', word: 'Ел', translation: 'Село' },
+        { char: 'Ӗ', name: 'ӗ', sound: '[ɘ̆]', word: 'Ӗҫ', translation: 'Дело' },
+        { char: 'Ё', name: 'ё', sound: '[jo]', word: 'Ёлка', translation: 'Ёлка' },
+        { char: 'Ж', name: 'жэ', sound: '[ʐ]', word: 'Журнал', translation: 'Журнал' },
+        { char: 'З', name: 'зэ', sound: '[z]', word: 'Завод', translation: 'Завод' },
+        { char: 'И', name: 'и', sound: '[i]', word: 'Ил', translation: 'Бери' },
+        { char: 'Й', name: 'йот', sound: '[j]', word: 'Йывӑҫ', translation: 'Дерево' },
+        { char: 'К', name: 'ка', sound: '[k]', word: 'Кӗнеке', translation: 'Книга' },
+        { char: 'Л', name: 'эль', sound: '[l]', word: 'Лӑпкӑ', translation: 'Тихий' },
+        { char: 'М', name: 'эм', sound: '[m]', word: 'Малалла', translation: 'Вперёд' },
+        { char: 'Н', name: 'эн', sound: '[n]', word: 'Намӑс', translation: 'Стыд' },
+        { char: 'О', name: 'о', sound: '[o]', word: 'Опера', translation: 'Опера' },
+        { char: 'П', name: 'пэ', sound: '[p]', word: 'Пахча', translation: 'Сад' },
+        { char: 'Р', name: 'эр', sound: '[r]', word: 'Радио', translation: 'Радио' },
+        { char: 'С', name: 'эс', sound: '[s]', word: 'Салам', translation: 'Привет' },
+        { char: 'Ҫ', name: 'ҫе', sound: '[ɕ]', word: 'Ҫутӑ', translation: 'Свет' },
+        { char: 'Т', name: 'тэ', sound: '[t]', word: 'Тавах', translation: 'Спасибо' },
+        { char: 'У', name: 'у', sound: '[u]', word: 'Урам', translation: 'Улица' },
+        { char: 'Ӳ', name: 'ӳ', sound: '[y]', word: 'Ӳсентӑран', translation: 'Растение' },
+        { char: 'Ф', name: 'эф', sound: '[f]', word: 'Фабрика', translation: 'Фабрика' },
+        { char: 'Х', name: 'ха', sound: '[x]', word: 'Хӗвел', translation: 'Солнце' },
+        { char: 'Ц', name: 'цэ', sound: '[ts]', word: 'Цирк', translation: 'Цирк' },
+        { char: 'Ч', name: 'че', sound: '[tɕ]', word: 'Чӗре', translation: 'Сердце' },
+        { char: 'Ш', name: 'ша', sound: '[ʂ]', word: 'Шкул', translation: 'Школа' },
+        { char: 'Щ', name: 'ща', sound: '[ɕː]', word: 'Щётка', translation: 'Щётка' },
+        { char: 'Ъ', name: 'твёрдый знак', sound: '[-]', word: 'Подъезд', translation: 'Подъезд' },
+        { char: 'Ы', name: 'ы', sound: '[ɯ]', word: 'Ылтӑн', translation: 'Золото' },
+        { char: 'Ь', name: 'мягкий знак', sound: '[-]', word: 'Альбом', translation: 'Альбом' },
+        { char: 'Э', name: 'э', sound: '[e]', word: 'Эпир', translation: 'Мы' },
+        { char: 'Ю', name: 'ю', sound: '[ju]', word: 'Юлташ', translation: 'Друг' },
+        { char: 'Я', name: 'я', sound: '[ja]', word: 'Ял', translation: 'Деревня' }
+      ]
+    }
+  ],
+
+  // ---------------------------------------------------------------------------
+  // BETA LANGUAGE COURSES
+  // Restriction: «Ограничение раздел письма будут доступ до 1 ноября 2026 год»
+  // ---------------------------------------------------------------------------
+  'eo': [
+    {
+      title: "Эсперанто (Esperanto) — v0.9.4 Beta",
+      description: "Алфавит эсперанто с особыми буквами (ĉ, ĝ, ĥ, ĵ, ŝ, ŭ)",
+      script: "latin",
+      items: [
+        { char: 'A', name: 'a', sound: '[a]', word: 'Amiko', translation: 'Друг' },
+        { char: 'B', name: 'bo', sound: '[b]', word: 'Bona', translation: 'Хороший' },
+        { char: 'C', name: 'co', sound: '[ts]', word: 'Celo', translation: 'Цель' },
+        { char: 'Ĉ', name: 'ĉo', sound: '[tʃ]', word: 'Ĉielo', translation: 'Небо' },
+        { char: 'D', name: 'do', sound: '[d]', word: 'Domo', translation: 'Дом' },
+        { char: 'E', name: 'e', sound: '[e]', word: 'Eble', translation: 'Возможно' },
+        { char: 'F', name: 'fo', sound: '[f]', word: 'Feliĉa', translation: 'Счастливый' },
+        { char: 'G', name: 'go', sound: '[ɡ]', word: 'Granda', translation: 'Большой' },
+        { char: 'Ĝ', name: 'ĝo', sound: '[dʒ]', word: 'Ĝojo', translation: 'Радость' },
+        { char: 'H', name: 'ho', sound: '[h]', word: 'Hodiaŭ', translation: 'Сегодня' },
+        { char: 'Ĥ', name: 'ĥo', sound: '[x]', word: 'Ĥaoso', translation: 'Хаос' },
+        { char: 'I', name: 'i', sound: '[i]', word: 'Ili', translation: 'Они' },
+        { char: 'J', name: 'jo', sound: '[j]', word: 'Jes', translation: 'Да' },
+        { char: 'Ĵ', name: 'ĵo', sound: '[ʒ]', word: 'Ĵurnalo', translation: 'Газета' },
+        { char: 'K', name: 'ko', sound: '[k]', word: 'Kato', translation: 'Кот' },
+        { char: 'L', name: 'lo', sound: '[l]', word: 'Luno', translation: 'Луна' },
+        { char: 'M', name: 'mo', sound: '[m]', word: 'Mondo', translation: 'Мир' },
+        { char: 'N', name: 'no', sound: '[n]', word: 'Nokto', translation: 'Ночь' },
+        { char: 'O', name: 'o', sound: '[o]', word: 'Ovo', translation: 'Яйцо' },
+        { char: 'P', name: 'po', sound: '[p]', word: 'Paco', translation: 'Мир (покой)' },
+        { char: 'R', name: 'ro', sound: '[r]', word: 'Rivero', translation: 'Река' },
+        { char: 'S', name: 'so', sound: '[s]', word: 'Suno', translation: 'Солнце' },
+        { char: 'Ŝ', name: 'ŝo', sound: '[ʃ]', word: 'Ŝipo', translation: 'Корабль' },
+        { char: 'T', name: 'to', sound: '[t]', word: 'Tago', translation: 'День' },
+        { char: 'U', name: 'u', sound: '[u]', word: 'Unu', translation: 'Один' },
+        { char: 'Ŭ', name: 'ŭo', sound: '[w]', word: 'Aŭto', translation: 'Авто' },
+        { char: 'V', name: 'vo', sound: '[v]', word: 'Vento', translation: 'Ветер' },
+        { char: 'Z', name: 'zo', sound: '[z]', word: 'Zono', translation: 'Пояс' }
+      ]
+    }
+  ],
+  'la': [
+    {
+      title: "Латынь (Lingua Latina) — v0.8.2 Beta",
+      description: "Классический римский алфавит латинского языка",
+      script: "latin",
+      items: [
+        { char: 'A', name: 'a', sound: '[aː]', word: 'Amor', translation: 'Любовь' },
+        { char: 'B', name: 'be', sound: '[b]', word: 'Bellum', translation: 'Война' },
+        { char: 'C', name: 'ce', sound: '[k]', word: 'Caesar', translation: 'Цезарь' },
+        { char: 'D', name: 'de', sound: '[d]', word: 'Deus', translation: 'Бог' },
+        { char: 'E', name: 'e', sound: '[eː]', word: 'Equus', translation: 'Конь' },
+        { char: 'F', name: 'ef', sound: '[f]', word: 'Fortuna', translation: 'Удача' },
+        { char: 'G', name: 'ge', sound: '[ɡ]', word: 'Gloria', translation: 'Слава' },
+        { char: 'H', name: 'ha', sound: '[h]', word: 'Homo', translation: 'Человек' },
+        { char: 'I', name: 'i', sound: '[iː]', word: 'Ignis', translation: 'Огонь' },
+        { char: 'K', name: 'ka', sound: '[k]', word: 'Kalendae', translation: 'Календы' },
+        { char: 'L', name: 'el', sound: '[l]', word: 'Lux', translation: 'Свет' },
+        { char: 'M', name: 'em', sound: '[m]', word: 'Mare', translation: 'Море' },
+        { char: 'N', name: 'en', sound: '[n]', word: 'Nox', translation: 'Ночь' },
+        { char: 'O', name: 'o', sound: '[oː]', word: 'Oculus', translation: 'Глаз' },
+        { char: 'P', name: 'pe', sound: '[p]', word: 'Pax', translation: 'Мир' },
+        { char: 'Q', name: 'qu', sound: '[kʷ]', word: 'Quis', translation: 'Кто' },
+        { char: 'R', name: 'er', sound: '[r]', word: 'Roma', translation: 'Рим' },
+        { char: 'S', name: 'es', sound: '[s]', word: 'Sol', translation: 'Солнце' },
+        { char: 'T', name: 'te', sound: '[t]', word: 'Terra', translation: 'Земля' },
+        { char: 'V', name: 'u', sound: '[uː]/[w]', word: 'Vita', translation: 'Жизнь' },
+        { char: 'X', name: 'ix', sound: '[ks]', word: 'Rex', translation: 'Царь' },
+        { char: 'Y', name: 'ypsilon', sound: '[y]', word: 'Sylva', translation: 'Лес' },
+        { char: 'Z', name: 'zeta', sound: '[dz]', word: 'Zephyrus', translation: 'Зефир' }
+      ]
+    }
+  ],
+  'sv': [
+    {
+      title: "Шведский (Svenska) — v0.9.1 Beta",
+      description: "Шведский алфавит со скандинавскими буквами (Å, Ä, Ö)",
+      script: "latin",
+      items: [
+        { char: 'A', name: 'a', sound: '[ɑː]', word: 'Alltid', translation: 'Всегда' },
+        { char: 'B', name: 'be', sound: '[beː]', word: 'Bok', translation: 'Книга' },
+        { char: 'C', name: 'se', sound: '[seː]', word: 'Citron', translation: 'Лимон' },
+        { char: 'D', name: 'de', sound: '[deː]', word: 'Dag', translation: 'День' },
+        { char: 'E', name: 'e', sound: '[eː]', word: 'Ett', translation: 'Один' },
+        { char: 'F', name: 'eff', sound: '[ɛf]', word: 'Fika', translation: 'Перерыв на кофе' },
+        { char: 'G', name: 'ge', sound: '[jeː]/[ɡ]', word: 'Glad', translation: 'Радостный' },
+        { char: 'H', name: 'hå', sound: '[hoː]', word: 'Hej', translation: 'Привет' },
+        { char: 'I', name: 'i', sound: '[iː]', word: 'Idag', translation: 'Сегодня' },
+        { char: 'J', name: 'ji', sound: '[jiː]', word: 'Ja', translation: 'Да' },
+        { char: 'K', name: 'kå', sound: '[koː]/[ɕ]', word: 'Katt', translation: 'Кот' },
+        { char: 'L', name: 'ell', sound: '[ɛl]', word: 'Ljus', translation: 'Свет' },
+        { char: 'M', name: 'emm', sound: '[ɛm]', word: 'Morgon', translation: 'Утро' },
+        { char: 'N', name: 'enn', sound: '[ɛn]', word: 'Nej', translation: 'Нет' },
+        { char: 'O', name: 'o', sound: '[uː]/[oː]', word: 'Ost', translation: 'Сыр' },
+        { char: 'P', name: 'pe', sound: '[peː]', word: 'Prata', translation: 'Говорить' },
+        { char: 'R', name: 'ärr', sound: '[ærː]', word: 'Röd', translation: 'Красный' },
+        { char: 'S', name: 'ess', sound: '[ɛs]', word: 'Sol', translation: 'Солнце' },
+        { char: 'T', name: 'te', sound: '[teː]', word: 'Tack', translation: 'Спасибо' },
+        { char: 'U', name: 'u', sound: '[ʉː]', word: 'Underbar', translation: 'Прекрасный' },
+        { char: 'V', name: 've', sound: '[veː]', word: 'Vatten', translation: 'Вода' },
+        { char: 'Å', name: 'å', sound: '[oː]', word: 'År', translation: 'Год' },
+        { char: 'Ä', name: 'ä', sound: '[ɛː]', word: 'Äpple', translation: 'Яблоко' },
+        { char: 'Ö', name: 'ö', sound: '[øː]', word: 'Öga', translation: 'Глаз' }
+      ]
+    }
+  ],
+  'no': [
+    {
+      title: "Норвежский (Norsk) — v0.9.0 Beta",
+      description: "Норвежский алфавит с буквами (Æ, Ø, Å)",
+      script: "latin",
+      items: [
+        { char: 'A', name: 'a', sound: '[ɑː]', word: 'Alltid', translation: 'Всегда' },
+        { char: 'B', name: 'be', sound: '[beː]', word: 'Bok', translation: 'Книга' },
+        { char: 'C', name: 'se', sound: '[seː]', word: 'Camping', translation: 'Кемпинг' },
+        { char: 'D', name: 'de', sound: '[deː]', word: 'Dag', translation: 'День' },
+        { char: 'E', name: 'e', sound: '[eː]', word: 'Elv', translation: 'Река' },
+        { char: 'F', name: 'eff', sound: '[ɛf]', word: 'Fjord', translation: 'Фьорд' },
+        { char: 'G', name: 'ge', sound: '[ɡeː]', word: 'God', translation: 'Хороший' },
+        { char: 'H', name: 'hå', sound: '[hoː]', word: 'Hei', translation: 'Привет' },
+        { char: 'I', name: 'i', sound: '[iː]', word: 'Is', translation: 'Лёд' },
+        { char: 'J', name: 'jodd', sound: '[jɔd]', word: 'Ja', translation: 'Да' },
+        { char: 'K', name: 'kå', sound: '[koː]', word: 'Katt', translation: 'Кот' },
+        { char: 'L', name: 'ell', sound: '[ɛl]', word: 'Lys', translation: 'Свет' },
+        { char: 'M', name: 'emm', sound: '[ɛm]', word: 'Måne', translation: 'Луна' },
+        { char: 'N', name: 'enn', sound: '[ɛn]', word: 'Nei', translation: 'Нет' },
+        { char: 'O', name: 'o', sound: '[uː]', word: 'Ost', translation: 'Сыр' },
+        { char: 'P', name: 'pe', sound: '[peː]', word: 'Penger', translation: 'Деньги' },
+        { char: 'R', name: 'err', sound: '[ær]', word: 'Reise', translation: 'Путешествие' },
+        { char: 'S', name: 'ess', sound: '[ɛs]', word: 'Sol', translation: 'Солнце' },
+        { char: 'T', name: 'te', sound: '[teː]', word: 'Takk', translation: 'Спасибо' },
+        { char: 'U', name: 'u', sound: '[ʉː]', word: 'Ute', translation: 'Снаружи' },
+        { char: 'V', name: 've', sound: '[veː]', word: 'Vann', translation: 'Вода' },
+        { char: 'Æ', name: 'æ', sound: '[æː]', word: 'Ære', translation: 'Честь' },
+        { char: 'Ø', name: 'ø', sound: '[øː]', word: 'Øy', translation: 'Остров' },
+        { char: 'Å', name: 'å', sound: '[oː]', word: 'År', translation: 'Год' }
+      ]
+    }
+  ],
+  'tt': [
+    {
+      title: "Татарский (Татар теле) — v0.9.5 Beta",
+      description: "Татарский алфавит с дополнительными буквами (Ә, Ө, Ү, Җ, Ң, Һ)",
+      script: "cyrillic",
+      items: [
+        { char: 'А', name: 'а', sound: '[a]', word: 'Алма', translation: 'Яблоко' },
+        { char: 'Ә', name: 'ә', sound: '[æ]', word: 'Әни', translation: 'Мама' },
+        { char: 'Б', name: 'бэ', sound: '[b]', word: 'Бала', translation: 'Ребёнок' },
+        { char: 'В', name: 'вэ', sound: '[w]/[v]', word: 'Вакыт', translation: 'Время' },
+        { char: 'Г', name: 'гэ', sound: '[ɡ]', word: 'Гөл', translation: 'Цветок' },
+        { char: 'Д', name: 'дэ', sound: '[d]', word: 'Дус', translation: 'Друг' },
+        { char: 'Е', name: 'е', sound: '[je]', word: 'Егет', translation: 'Парень' },
+        { char: 'Ж', name: 'жэ', sound: '[ʒ]', word: 'Җил', translation: 'Ветер' },
+        { char: 'Җ', name: 'җе', sound: '[ʑ]', word: 'Җыр', translation: 'Песня' },
+        { char: 'З', name: 'зэ', sound: '[z]', word: 'Заман', translation: 'Эпоха' },
+        { char: 'И', name: 'и', sound: '[i]', word: 'Ил', translation: 'Страна' },
+        { char: 'К', name: 'ка', sound: '[k]', word: 'Китап', translation: 'Книга' },
+        { char: 'Л', name: 'эль', sound: '[l]', word: 'Ләззәт', translation: 'Удовольствие' },
+        { char: 'М', name: 'эм', sound: '[m]', word: 'Мәктәп', translation: 'Школа' },
+        { char: 'Н', name: 'эн', sound: '[n]', word: 'Нур', translation: 'Луч' },
+        { char: 'Ң', name: 'эң', sound: '[ŋ]', word: 'Яңа', translation: 'Новый' },
+        { char: 'О', name: 'о', sound: '[o]', word: 'Олы', translation: 'Старший' },
+        { char: 'Ө', name: 'ө', sound: '[ø]', word: 'Өй', translation: 'Дом' },
+        { char: 'П', name: 'пэ', sound: '[p]', word: 'Пар', translation: 'Пара' },
+        { char: 'Р', name: 'эр', sound: '[r]', word: 'Рәхмәт', translation: 'Спасибо' },
+        { char: 'С', name: 'эс', sound: '[s]', word: 'Сәлам', translation: 'Привет' },
+        { char: 'Т', name: 'тэ', sound: '[t]', word: 'Тау', translation: 'Гора' },
+        { char: 'У', name: 'у', sound: '[u]', word: 'Урам', translation: 'Улица' },
+        { char: 'Ү', name: 'ү', sound: '[y]', word: 'Үлән', translation: 'Трава' },
+        { char: 'Һ', name: 'һэ', sound: '[h]', word: 'Һава', translation: 'Воздух' },
+        { char: 'Ч', name: 'че', sound: '[ɕ]', word: 'Чәй', translation: 'Чай' },
+        { char: 'Ш', name: 'ша', sound: '[ʂ]', word: 'Шәһәр', translation: 'Город' }
+      ]
+    }
+  ],
+  'hv': [
+    {
+      title: "Высокий валирийский (Valyrio) — v0.8.0 Beta",
+      description: "Валирийская письменность (High Valyrian)",
+      script: "latin",
+      items: [
+        { char: 'A', name: 'a', sound: '[a]', word: 'Aderi', translation: 'Быстро' },
+        { char: 'B', name: 'be', sound: '[b]', word: 'Bantis', translation: 'Ночь' },
+        { char: 'D', name: 'de', sound: '[d]', word: 'Dohaeris', translation: 'Служит' },
+        { char: 'E', name: 'e', sound: '[e]', word: 'Eleks', translation: 'Голос' },
+        { char: 'G', name: 'ge', sound: '[ɡ]', word: 'Geros', translation: 'Терпение' },
+        { char: 'H', name: 'he', sound: '[h]', word: 'Hāros', translation: 'Три' },
+        { char: 'I', name: 'i', sound: '[i]', word: 'Iemnys', translation: 'Стена' },
+        { char: 'J', name: 'je', sound: '[dʒ]', word: 'Jelmey', translation: 'Шторм' },
+        { char: 'K', name: 'ka', sound: '[k]', word: 'Kelmey', translation: 'Волна' },
+        { char: 'L', name: 'el', sound: '[l]', word: 'Lanta', translation: 'Два' },
+        { char: 'M', name: 'em', sound: '[m]', word: 'Morghulis', translation: 'Умереть' },
+        { char: 'N', name: 'en', sound: '[n]', word: 'Nēdys', translation: 'Храбрый' },
+        { char: 'O', name: 'o', sound: '[o]', word: 'Ondos', translation: 'Рука' },
+        { char: 'P', name: 'pe', sound: '[p]', word: 'Perzys', translation: 'Огонь' },
+        { char: 'Q', name: 'qa', sound: '[q]', word: 'Qūbē', translation: 'Победа' },
+        { char: 'R', name: 'er', sound: '[r]', word: 'Rhaenys', translation: 'Имя' },
+        { char: 'S', name: 'es', sound: '[s]', word: 'Syrio', translation: 'Учитель' },
+        { char: 'T', name: 'te', sound: '[t]', word: 'Taoba', translation: 'Мальчик' },
+        { char: 'U', name: 'u', sound: '[u]', word: 'Udrir', translation: 'Язык' },
+        { char: 'V', name: 've', sound: '[v]', word: 'Valar', translation: 'Люди' },
+        { char: 'Y', name: 'ypsilon', sound: '[y]', word: 'Yn', translation: 'Но' },
+        { char: 'Z', name: 'zeta', sound: '[z]', word: 'Zaldrīzes', translation: 'Дракон' }
+      ]
+    }
+  ],
+  'tlh': [
+    {
+      title: "Клингонский (tlhIngan Hol) — v0.7.3 Beta",
+      description: "Письменность pIqaD со шрифтом Klingon Font (fontomania.ru/17807-klingon.html)",
+      script: "special",
+      items: [
+        { char: 'a', name: 'a', sound: '[ɑ]', word: 'ach', translation: 'но', translit: 'a' },
+        { char: 'b', name: 'ba', sound: '[b]', word: 'batlh', translation: 'честь', translit: 'b' },
+        { char: 'ch', name: 'cha', sound: '[t͡ʃ]', word: 'chu’', translation: 'новый', translit: 'ch' },
+        { char: 'D', name: 'Da', sound: '[ɖ]', word: 'Duj', translation: 'корабль', translit: 'D' },
+        { char: 'e', name: 'e', sound: '[ɛ]', word: 'en', translation: 'здесь', translit: 'e' },
+        { char: 'gh', name: 'gha', sound: '[ɣ]', word: 'ghom', translation: 'группа', translit: 'gh' },
+        { char: 'H', name: 'Ha', sound: '[x]', word: 'HoD', translation: 'капитан', translit: 'H' },
+        { char: 'I', name: 'I', sound: '[ɪ]', word: 'In', translation: 'предупреждение', translit: 'I' },
+        { char: 'j', name: 'ja', sound: '[d͡ʒ]', word: 'jaj', translation: 'день', translit: 'j' },
+        { char: 'l', name: 'la', sound: '[l]', word: 'logh', translation: 'космос', translit: 'l' },
+        { char: 'm', name: 'ma', sound: '[m]', word: 'maH', translation: 'мы', translit: 'm' },
+        { char: 'n', name: 'na', sound: '[n]', word: 'nom', translation: 'быстро', translit: 'n' },
+        { char: 'ng', name: 'nga', sound: '[ŋ]', word: 'nga’chuq', translation: 'секс', translit: 'ng' },
+        { char: 'o', name: 'o', sound: '[o]', word: 'or', translation: 'гравитация', translit: 'o' },
+        { char: 'p', name: 'pa', sound: '[pʰ]', word: 'pa’', translation: 'комната', translit: 'p' },
+        { char: 'q', name: 'qa', sound: '[qʰ]', word: 'qaH', translation: 'сэр', translit: 'q' },
+        { char: 'Q', name: 'Qa', sound: '[q͡χ]', word: 'Qapla’', translation: 'успех!', translit: 'Q' },
+        { char: 'r', name: 'ra', sound: '[r]', word: 'rey', translation: 'время', translit: 'r' },
+        { char: 'S', name: 'Sa', sound: '[ʂ]', word: 'SoH', translation: 'ты', translit: 'S' },
+        { char: 't', name: 'ta', sound: '[tʰ]', word: 'tlhIngan', translation: 'клингон', translit: 't' },
+        { char: 'tlh', name: 'tlha', sound: '[t͡ɬʰ]', word: 'tlhIngan', translation: 'клингонский', translit: 'tlh' },
+        { char: 'u', name: 'u', sound: '[u]', word: 'uj', translation: 'длина', translit: 'u' },
+        { char: 'v', name: 'va', sound: '[v]', word: 'veS', translation: 'война', translit: 'v' },
+        { char: 'w', name: 'wa', sound: '[w]', word: 'wa’', translation: 'один', translit: 'w' },
+        { char: 'y', name: 'ya', sound: '[j]', word: 'yaj', translation: 'понимать', translit: 'y' },
+        { char: '’', name: '’a’', sound: '[ʔ]', word: '’ach', translation: 'но/однако', translit: '’' }
+      ]
+    }
+  ],
+  'yi': [
+    {
+      title: "Идиш (ייִדיש) — v0.9.2 Beta",
+      description: "Еврейский алфавит языка Идиш (Алеф-Бейс)",
+      script: "special",
+      items: [
+        { char: 'א', name: 'shtumer alef', sound: '[-]', word: 'אַלץ', translation: 'всё' },
+        { char: 'ב', name: 'beys', sound: '[b]', word: 'בוך', translation: 'книга' },
+        { char: 'בֿ', name: 'veys', sound: '[v]', word: 'בֿאָס', translation: 'что' },
+        { char: 'ג', name: 'giml', sound: '[ɡ]', word: 'גוט', translation: 'хорошо' },
+        { char: 'ד', name: 'daled', sound: '[d]', word: 'דאָס', translation: 'это' },
+        { char: 'ה', name: 'hey', sound: '[h]', word: 'הײַנט', translation: 'сегодня' },
+        { char: 'ו', name: 'vov', sound: '[u]', word: 'וואַסער', translation: 'вода' },
+        { char: 'ז', name: 'zayen', sound: '[z]', word: 'זון', translation: 'солнце' },
+        { char: 'ח', name: 'khes', sound: '[x]', word: 'חבֿר', translation: 'друг' },
+        { char: 'ט', name: 'tes', sound: '[t]', word: 'טאָג', translation: 'день' },
+        { char: 'י', name: 'yud', sound: '[i]/[j]', word: 'יאָ', translation: 'да' },
+        { char: 'כ', name: 'khof', sound: '[x]', word: 'כּל', translation: 'весь' },
+        { char: 'ל', name: 'lamed', sound: '[l]', word: 'ליבע', translation: 'любовь' },
+        { char: 'מ', name: 'mem', sound: '[m]', word: 'מאַמע', translation: 'мама' },
+        { char: 'נ', name: 'nun', sound: '[n]', word: 'נאַכט', translation: 'ночь' },
+        { char: 'ס', name: 'samekh', sound: '[s]', word: 'ספֿר', translation: 'книга' },
+        { char: 'ע', name: 'ayin', sound: '[e]', word: 'עפּל', translation: 'яблоко' },
+        { char: 'פ', name: 'pey', sound: '[p]', word: 'פּאַפּיר', translation: 'бумага' },
+        { char: 'פֿ', name: 'fey', sound: '[f]', word: 'פֿרײַנד', translation: 'друг' },
+        { char: 'צ', name: 'tsadek', sound: '[ts]', word: 'צײַט', translation: 'время' },
+        { char: 'ק', name: 'kuf', sound: '[k]', word: 'קאַץ', translation: 'кот' },
+        { char: 'ר', name: 'resh', sound: '[r]', word: 'רויט', translation: 'красный' },
+        { char: 'ש', name: 'shin', sound: '[ʃ]', word: 'שלום', translation: 'мир' }
       ]
     }
   ]

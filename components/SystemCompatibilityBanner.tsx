@@ -44,7 +44,7 @@ export const SystemCompatibilityBanner: React.FC<SystemCompatibilityBannerProps>
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="font-black text-sm sm:text-base tracking-wide uppercase flex items-center gap-1.5">
                 {isXpOrVista ? (
-                  lang === 'ru' ? 'DuoWindo6601: Прекращена поддержка Windows XP / Vista' : 'DuoWindo6601: Windows XP / Vista Support Ended'
+                  lang === 'ru' ? 'DuoWindo6601: Прекращение поддержки Win XP / 2003, Mypal 78.0.3 XP & SAPI 4.0' : 'DuoWindo6601: Windows XP / 2003, Mypal & SAPI 4.0 Support Ended'
                 ) : isAndroid ? (
                   lang === 'ru' ? 'DuoWindo6601: Старая версия Android (4.x - 7.x)' : 'DuoWindo6601: Legacy Android Version (4.x - 7.x)'
                 ) : isMacLinux ? (

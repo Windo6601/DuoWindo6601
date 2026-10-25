@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { Readable } from 'stream';
 
@@ -74,6 +75,61 @@ app.use('/api/gemini-proxy', express.raw({ type: '*/*', limit: '50mb' }), async 
   }
 });
 
+// Fish Audio TTS API Proxy
+app.post('/api/tts/fish', express.json(), async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+
+  const { text, format = 'mp3', reference_id, lang } = req.body || {};
+  if (!text || typeof text !== 'string') {
+    res.status(400).json({ error: { message: 'Text is required' } });
+    return;
+  }
+
+  const fishApiKey = process.env.FISH_AUDIO_API_KEY || 'sk-fish-4AQDQGlpw6stJiyg5JTTJabhtkgPpmwBTu_Gveo7DMI';
+
+  try {
+    const fishRes = await fetch('https://api.fish.audio/v1/tts', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${fishApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text,
+        format: format || 'mp3',
+        model: 's2.1-pro-free',
+        normalize: true,
+        latency: 'normal',
+        top_p: 0.5,
+        temperature: 0.1,
+        repetition_penalty: 1.2,
+        ...(reference_id ? { reference_id } : {})
+      })
+    });
+
+    if (!fishRes.ok) {
+      const errText = await fishRes.text();
+      console.error('[Fish Audio Proxy Error]:', fishRes.status, errText);
+      res.status(fishRes.status).json({ error: { message: errText || 'Fish Audio API error' } });
+      return;
+    }
+
+    res.setHeader('Content-Type', fishRes.headers.get('content-type') || 'audio/mpeg');
+    const arrayBuffer = await fishRes.arrayBuffer();
+    res.send(Buffer.from(arrayBuffer));
+  } catch (err: any) {
+    console.error('[Fish Audio Proxy Exception]:', err);
+    res.status(502).json({ error: { message: err?.message || 'Fish Audio proxy failed' } });
+  }
+});
+
 // MCP (Model Context Protocol) & Jules debugging status endpoint
 app.get('/api/mcp/status', (_req, res) => {
   const renderMcpKey = process.env.RENDER_MCP_API_KEY || '';
@@ -87,6 +143,7 @@ app.get('/api/mcp/status', (_req, res) => {
   });
 });
 
+
 async function startServer() {
   const isProduction = process.env.NODE_ENV === 'production';
 
@@ -98,7 +155,9 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.resolve(__dirname, 'dist');
+    const distPath = fs.existsSync(path.resolve(__dirname, 'dist'))
+      ? path.resolve(__dirname, 'dist')
+      : path.resolve(__dirname, 'build');
     app.use(express.static(distPath));
     app.use((req, res, next) => {
       if (req.method === 'GET') {

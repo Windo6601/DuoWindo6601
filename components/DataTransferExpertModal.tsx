@@ -232,6 +232,7 @@ export const DataTransferExpertModal: React.FC<DataTransferExpertModalProps> = (
       }
 
       setUser(updatedUser);
+      localStorage.setItem('duowindo6601_user_progress_v1', JSON.stringify(updatedUser));
       localStorage.setItem('duowindo_user_progress', JSON.stringify(updatedUser));
 
       if (firebaseUser) {

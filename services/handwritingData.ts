@@ -2,6 +2,7 @@
 export interface StrokePoint {
   x: number;
   y: number;
+  angle?: number;
 }
 
 export interface StrokeGuide {
@@ -14,6 +15,8 @@ export interface StrokeGuide {
   end?: StrokePoint;
   checkpoints?: StrokePoint[];
   arrow?: { from: StrokePoint; to: StrokePoint };
+  arrowPos?: StrokePoint;
+  directionHintRu?: string;
   hint: string;
   hintRu: string;
   svgPath: string;
@@ -31,6 +34,10 @@ export interface HandwritingItem {
   soundText?: string;
   translit?: string;
   translation?: string;
+  translationRu?: string;
+  tipsRu?: string;
+  connectionRuleRu?: string;
+  type?: string;
   script: 'cyrillic' | 'latin' | 'arabic' | 'japanese' | 'hebrew' | 'other';
   category: 'alphabet' | 'forms' | 'words';
   theme?: 'travel' | 'faith' | 'family' | 'art' | 'basic' | 'ligature';
@@ -1164,7 +1171,12 @@ export interface DailyHandwritingHabit {
   completedDates: string[];
   currentStreak: number;
   lastTrainedItem?: string;
+  lastPracticedTitle?: string;
   totalLettersDrawn: number;
+  completedCount?: number;
+  targetCount?: number;
+  streakDays?: number;
+  isCompleted?: boolean;
 }
 
 export const getStoredHandwritingHabit = (): DailyHandwritingHabit => {

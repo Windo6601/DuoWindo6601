@@ -10,7 +10,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, googleProvider, handleFirestoreError, OperationType } from '../firebase';
-import { UserProgress } from '../types';
+import { UserProgress, Course } from '../types';
 import { 
   isIncognitoLoginClosed, 
   getDaysUntilIncognitoClosure, 
@@ -21,6 +21,12 @@ import {
   getIncognitoClosureTitle,
   getSynchronizedActiveStatuses
 } from '../services/incognitoService';
+import { 
+  isLanguageSwitchLocked, 
+  getLanguageLockedToastMessage, 
+  getLanguageLockInfo, 
+  AVAILABLE_SWITCH_LANGUAGES 
+} from '../services/languageLockService';
 
 export interface AuthModalProps {
   isOpen: boolean;
@@ -36,10 +42,74 @@ export interface AuthModalProps {
   onOpenIncognitoRestrictions?: () => void;
   onOpenIncognitoExport?: () => void;
   onOpenFirebaseExport?: () => void;
+  onSwitchCourse?: (course: Course) => void;
+  allCourses?: Course[];
+  onOpenLanguageLockModal?: (langCode: string) => void;
 }
 
 // Local accounts storage key for fallback / offline lookup by @username or email
 const REGISTERED_ACCOUNTS_KEY = 'duo_registered_accounts_6601';
+
+export interface AuthCountryLanguageItem {
+  id: string;
+  name: string;
+  flag: string;
+  country: string;
+  category: 'available' | 'world_locked' | 'cis_locked';
+}
+
+const COUNTRY_LANGUAGES: AuthCountryLanguageItem[] = [
+  // ✨ AVAILABLE SWITCH LANGUAGES (8)
+  { id: 'ru', name: 'Россия (Русский)', flag: '🇷🇺', country: 'RU', category: 'available' },
+  { id: 'en', name: 'USA / UK (English)', flag: '🇺🇸', country: 'US', category: 'available' },
+  { id: 'de', name: 'Deutschland (Deutsch)', flag: '🇩🇪', country: 'DE', category: 'available' },
+  { id: 'fr', name: 'France (Français)', flag: '🇫🇷', country: 'FR', category: 'available' },
+  { id: 'es', name: 'España (Español)', flag: '🇪🇸', country: 'ES', category: 'available' },
+  { id: 'zh', name: '中国 (中文)', flag: '🇨🇳', country: 'CN', category: 'available' },
+  { id: 'ja', name: '日本 (日本語)', flag: '🇯🇵', country: 'JP', category: 'available' },
+  { id: 'ar', name: 'المملكة العربية السعودية (العربية)', flag: '🇸🇦', country: 'SA', category: 'available' },
+
+  // 🔒 WORLD LOCKED LANGUAGES (10) — Available Nov 1, 2026
+  { id: 'pt', name: '🔒 Brasil (Português)', flag: '🇧🇷', country: 'BR', category: 'world_locked' },
+  { id: 'it', name: '🔒 Italia (Italiano)', flag: '🇮🇹', country: 'IT', category: 'world_locked' },
+  { id: 'tr', name: '🔒 Türkiye (Türkçe)', flag: '🇹🇷', country: 'TR', category: 'world_locked' },
+  { id: 'ko', name: '🔒 대한민국 (한국어)', flag: '🇰🇷', country: 'KR', category: 'world_locked' },
+  { id: 'hi', name: '🔒 Индия (हिन्दी)', flag: '🇮🇳', country: 'IN', category: 'world_locked' },
+  { id: 'pl', name: '🔒 Polska (Polski)', flag: '🇵🇱', country: 'PL', category: 'world_locked' },
+  { id: 'id', name: '🔒 Indonesia (Bahasa Indonesia)', flag: '🇮🇩', country: 'ID', category: 'world_locked' },
+  { id: 'bn', name: '🔒 Bangladesh (বাংলা)', flag: '🇧🇩', country: 'BD', category: 'world_locked' },
+  { id: 'th', name: '🔒 Thailand (ไทย)', flag: '🇹🇭', country: 'TH', category: 'world_locked' },
+  { id: 'vi', name: '🔒 Việt Nam (Tiếng Việt)', flag: '🇻🇳', country: 'VN', category: 'world_locked' },
+
+  // 🔒 CIS COUNTRIES (5) — Раздел Письмо Будут доступ 1 ноября 2026 год
+  { id: 'kk', name: '🔒 Казахстан (Қазақша) — Казахстан (казахский — выбран)', flag: '🇰🇿', country: 'KZ', category: 'cis_locked' },
+  { id: 'uz', name: '🔒 Узбекистан (Oʻzbekcha) — Узбекистан (узбекский)', flag: '🇺🇿', country: 'UZ', category: 'cis_locked' },
+  { id: 'hy', name: '🔒 Армения (Հայերեն) — Армения (армянский)', flag: '🇦🇲', country: 'AM', category: 'cis_locked' },
+  { id: 'ka', name: '🔒 Грузия (ქართული) — Грузия (грузинский)', flag: '🇬🇪', country: 'GE', category: 'cis_locked' },
+  { id: 'az', name: '🔒 Азербайджан (Azərbaycan) — Азербайджан (азербайджанский)', flag: '🇦🇿', country: 'AZ', category: 'cis_locked' }
+];
+
+const TARGET_COURSES_LIST = [
+  { id: 'en', name: 'Английский язык (English)', flag: '🇺🇸' },
+  { id: 'de', name: 'Немецкий язык (Deutsch)', flag: '🇩🇪' },
+  { id: 'fr', name: 'Французский язык (Français)', flag: '🇫🇷' },
+  { id: 'es', name: 'Испанский язык (Español)', flag: '🇪🇸' },
+  { id: 'zh', name: 'Китайский язык (中文)', flag: '🇨🇳' },
+  { id: 'ja', name: 'Японский язык (日本語)', flag: '🇯🇵' },
+  { id: 'ar', name: 'Арабский язык (العربية)', flag: '🇸🇦' },
+  { id: 'ru', name: 'Русский язык (Russian)', flag: '🇷🇺' },
+  { id: 'it', name: '🔒 Итальянский язык (Italiano)', flag: '🇮🇹' },
+  { id: 'ko', name: '🔒 Корейский язык (한국어)', flag: '🇰🇷' },
+  { id: 'pl', name: '🔒 Польский язык (Polski)', flag: '🇵🇱' },
+  { id: 'pt', name: '🔒 Португальский (Português)', flag: '🇧🇷' },
+  { id: 'tr', name: '🔒 Турецкий язык (Türkçe)', flag: '🇹🇷' },
+  { id: 'hi', name: '🔒 Хинди (हिन्दी)', flag: '🇮🇳' },
+  { id: 'kk', name: '🔒 Казахстан (Қазақша)', flag: '🇰🇿' },
+  { id: 'uz', name: '🔒 Узбекистан (Oʻzbekcha)', flag: '🇺🇿' },
+  { id: 'hy', name: '🔒 Армения (Հայերեն)', flag: '🇦🇲' },
+  { id: 'ka', name: '🔒 Грузия (ქართული)', flag: '🇬🇪' },
+  { id: 'az', name: '🔒 Азербайджан (Azərbaycan)', flag: '🇦🇿' }
+];
 
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,
@@ -55,6 +125,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onOpenIncognitoRestrictions,
   onOpenIncognitoExport,
   onOpenFirebaseExport,
+  onSwitchCourse,
+  allCourses = [],
+  onOpenLanguageLockModal
 }) => {
   const [activeTab, setActiveTab] = useState<'login' | 'register' | 'google' | 'incognito'>('login');
 
@@ -72,6 +145,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [avatarColor, setAvatarColor] = useState('bg-duo-blue');
   const [avatarIcon, setAvatarIcon] = useState('🦉');
 
+  // Country & Language Selector State
+  const [selectedNativeLang, setSelectedNativeLang] = useState<string>(
+    (user.language as string) || 'ru'
+  );
+  const [selectedCountryCode, setSelectedCountryCode] = useState<string>(user.country || 'RU');
+  const [selectedTargetCourseId, setSelectedTargetCourseId] = useState<string>(() => {
+    return localStorage.getItem('duo_course_id_6601') || 'en';
+  });
+
   // UI state
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -88,6 +170,170 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const incognitoClosed = isIncognitoLoginClosed();
   const daysUntilClosure = getDaysUntilIncognitoClosure();
   const closureDateLabel = getFormattedClosureDate(user.language);
+
+  // Helper to apply selected country & target course preferences to user progress
+  const applyCountryAndCoursePreferences = (baseUser: UserProgress): UserProgress => {
+    const isLocked = isLanguageSwitchLocked(selectedNativeLang);
+    const matchedCountry = COUNTRY_LANGUAGES.find(c => c.id === selectedNativeLang)?.country || selectedCountryCode || 'RU';
+
+    // If locked, fallback interface language to 'ru' or existing supported language, while persisting country choice
+    const activeInterfaceLang = isLocked 
+      ? (AVAILABLE_SWITCH_LANGUAGES.some(a => a.code === baseUser.language) ? baseUser.language : 'ru') 
+      : selectedNativeLang;
+
+    const finalUser: UserProgress = {
+      ...baseUser,
+      language: activeInterfaceLang as any,
+      country: matchedCountry,
+    };
+
+    if (selectedTargetCourseId) {
+      localStorage.setItem('duo_course_id_6601', selectedTargetCourseId);
+      if (allCourses.length > 0 && onSwitchCourse) {
+        const courseToSwitch = allCourses.find(c => c.id === selectedTargetCourseId);
+        if (courseToSwitch) {
+          onSwitchCourse(courseToSwitch);
+        }
+      }
+    }
+
+    if (isLocked) {
+      if (onOpenLanguageLockModal) {
+        setTimeout(() => onOpenLanguageLockModal(selectedNativeLang), 250);
+      } else {
+        setToast(getLanguageLockedToastMessage(selectedNativeLang, isRu ? 'ru' : 'en'));
+      }
+    }
+
+    return finalUser;
+  };
+
+  // Reusable Selector Component
+  const renderCountryAndLanguageSelectors = () => {
+    const isSelectedLocked = isLanguageSwitchLocked(selectedNativeLang);
+    const lockInfo = getLanguageLockInfo(selectedNativeLang);
+
+    return (
+      <div className="bg-gray-950/80 border border-gray-800 p-3 rounded-2xl space-y-2">
+        <div className="flex items-center justify-between text-[11px] font-bold text-gray-300 uppercase tracking-wider">
+          <span className="flex items-center gap-1.5">
+            <span>🌍</span>
+            <span>{isRu ? 'Язык страны и Выбор курса' : 'Country Language & Course'}</span>
+          </span>
+          <span className="text-[10px] text-emerald-400 font-extrabold">{isRu ? 'Страны' : 'Country'}</span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {/* Native Interface Language & Country */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+              <span>{isRu ? 'Родной язык / Страна' : 'Native Language & Country'}</span>
+              {isSelectedLocked && (
+                <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-black border border-amber-500/40">
+                  🔒 01.11.2026
+                </span>
+              )}
+            </label>
+            <select
+              value={selectedNativeLang}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedNativeLang(val);
+                const found = COUNTRY_LANGUAGES.find(c => c.id === val);
+                if (found) setSelectedCountryCode(found.country);
+                if (isLanguageSwitchLocked(val)) {
+                  playSound('wrong');
+                } else {
+                  playSound('click');
+                }
+              }}
+              className={`w-full bg-gray-900 border ${
+                isSelectedLocked ? 'border-amber-500/80 text-amber-200' : 'border-gray-700 text-white'
+              } focus:border-emerald-500 rounded-xl px-2.5 py-2 text-xs font-bold focus:outline-none cursor-pointer transition-colors`}
+            >
+              <optgroup label={isRu ? '✨ Доступные языки стран (8)' : '✨ Available Languages (8)'}>
+                {COUNTRY_LANGUAGES.filter(c => c.category === 'available').map(item => (
+                  <option key={item.id} value={item.id} className="bg-gray-900 text-white font-bold">
+                    {item.flag} {item.name}
+                  </option>
+                ))}
+              </optgroup>
+
+              <optgroup label={isRu ? '🔒 Заблокированные языки мира (10) — 01.11.2026' : '🔒 World Locked Languages (10) — Nov 1, 2026'}>
+                {COUNTRY_LANGUAGES.filter(c => c.category === 'world_locked').map(item => (
+                  <option key={item.id} value={item.id} className="bg-gray-900 text-amber-300 font-bold">
+                    {item.flag} {item.name}
+                  </option>
+                ))}
+              </optgroup>
+
+              <optgroup label={isRu ? '🔒 Страны СНГ — Раздел Письмо (01.11.2026)' : '🔒 CIS Countries — Section Letters (Nov 1, 2026)'}>
+                {COUNTRY_LANGUAGES.filter(c => c.category === 'cis_locked').map(item => (
+                  <option key={item.id} value={item.id} className="bg-gray-900 text-amber-300 font-bold">
+                    {item.flag} {item.name}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+          </div>
+
+          {/* Target Course / Language */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              {isRu ? 'Изучаемый курс страны' : 'Target Country Course'}
+            </label>
+            <select
+              value={selectedTargetCourseId}
+              onChange={(e) => {
+                setSelectedTargetCourseId(e.target.value);
+                playSound('click');
+              }}
+              className="w-full bg-gray-900 border border-gray-700 focus:border-emerald-500 rounded-xl px-2.5 py-2 text-xs text-white font-bold focus:outline-none cursor-pointer"
+            >
+              {TARGET_COURSES_LIST.map(item => (
+                <option key={item.id} value={item.id} className="bg-gray-900 text-white font-bold">
+                  {item.flag} {item.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* LOCKED LANGUAGE WARNING BANNER */}
+        {isSelectedLocked && (
+          <div className="p-2.5 bg-amber-950/80 border border-amber-500/80 rounded-xl text-[11px] text-amber-200 font-bold space-y-1 animate-in fade-in">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1 text-amber-400 font-black">
+                <span>🔒</span>
+                <span>{isRu ? 'Заблокированный язык стран' : 'Locked Country Language'}</span>
+              </span>
+              {onOpenLanguageLockModal && (
+                <button
+                  type="button"
+                  onClick={() => onOpenLanguageLockModal(selectedNativeLang)}
+                  className="px-2 py-0.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[10px] rounded-lg uppercase tracking-wider transition-colors cursor-pointer"
+                >
+                  {isRu ? 'ℹ️ Посмотреть дату' : 'ℹ️ Details'}
+                </button>
+              )}
+            </div>
+            <p className="leading-snug">
+              {getLanguageLockedToastMessage(selectedNativeLang, isRu ? 'ru' : 'en')}
+            </p>
+            <p className="text-[10px] text-amber-300/80 italic">
+              {lockInfo?.category === 'cis' 
+                ? (isRu 
+                    ? '🔒 Раздел Письмо Будут доступ 1 ноября 2026 год. Выбор страны сохранится в вашем профиле.' 
+                    : '🔒 Section Letters will be available November 1, 2026. Your country choice is saved in profile.')
+                : (isRu 
+                    ? '🔒 Заблокированные языки будут доступ 1 ноября 2026 год. Интерфейс пока переключен на доступный язык.' 
+                    : '🔒 Locked languages will be available November 1, 2026. UI temporarily set to available language.')}
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -220,7 +466,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const cleanDisplayName = displayName.trim() || cleanUsername || (isRu ? 'Ученик' : 'Learner');
       const cleanPass = password || '123456';
 
-      const newUserProgress: UserProgress = {
+      const newUserProgress: UserProgress = applyCountryAndCoursePreferences({
         ...user,
         name: cleanDisplayName,
         username: cleanUsername,
@@ -228,7 +474,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         authProvider: 'email',
         avatarColor: avatarColor,
         avatarIcon: avatarIcon,
-      };
+      });
 
       setUser(newUserProgress);
       localStorage.setItem('duowindo_user_progress_v3', JSON.stringify(newUserProgress));
@@ -260,13 +506,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         ? user.username 
         : 'google_learner';
 
-      const updatedUser: UserProgress = {
+      const updatedUser: UserProgress = applyCountryAndCoursePreferences({
         ...user,
         name: googleName,
         email: googleEmail,
         username: cleanUsername,
         authProvider: 'google',
-      };
+      });
 
       setUser(updatedUser);
       localStorage.setItem('duowindo_user_progress_v3', JSON.stringify(updatedUser));
@@ -294,7 +540,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     const localAcc = findLocalAccount(cleanIdent);
     if (localAcc && localAcc.userProgress) {
-      const restored = { ...localAcc.userProgress, authProvider: 'email' as const };
+      const restored = applyCountryAndCoursePreferences({ ...localAcc.userProgress, authProvider: 'email' as const });
       setUser(restored);
       localStorage.setItem('duowindo_user_progress_v3', JSON.stringify(restored));
       playSound('success');
@@ -309,13 +555,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     const fallbackDisplayName = user.name && user.name !== 'Ученик 6601' ? user.name : fallbackUsername;
     const fallbackEmail = cleanIdent.includes('@') ? cleanIdent.toLowerCase() : `${fallbackUsername}@duowindo.local`;
 
-    const newLocalUser: UserProgress = {
+    const newLocalUser: UserProgress = applyCountryAndCoursePreferences({
       ...user,
       name: fallbackDisplayName,
       username: fallbackUsername,
       email: fallbackEmail,
       authProvider: 'email',
-    };
+    });
 
     setUser(newLocalUser);
     localStorage.setItem('duowindo_user_progress_v3', JSON.stringify(newLocalUser));
@@ -587,7 +833,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
 
       // 2. Prepare updated user progress
-      const newUserProgress: UserProgress = {
+      const newUserProgress: UserProgress = applyCountryAndCoursePreferences({
         ...user,
         name: cleanDisplayName,
         username: cleanUsername,
@@ -595,7 +841,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         authProvider: 'email',
         avatarColor: avatarColor,
         avatarIcon: avatarIcon,
-      };
+      });
 
       setUser(newUserProgress);
       localStorage.setItem('duowindo_user_progress_v3', JSON.stringify(newUserProgress));
@@ -665,20 +911,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       let updatedUser: UserProgress;
       if (docSnap.exists()) {
         const cloudData = docSnap.data() as UserProgress;
-        updatedUser = {
+        updatedUser = applyCountryAndCoursePreferences({
           ...user,
           ...cloudData,
           email: googleEmail || cloudData.email,
           authProvider: 'google',
-        };
+        });
       } else {
-        updatedUser = {
+        updatedUser = applyCountryAndCoursePreferences({
           ...user,
           name: googleName,
           email: googleEmail,
           username: user.username && !user.username.startsWith('incognito_') ? user.username : fallbackUsername,
           authProvider: 'google',
-        };
+        });
         await setDoc(userRef, {
           ...updatedUser,
           createdAt: serverTimestamp(),
@@ -1134,6 +1380,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <span className="text-[11px] text-emerald-400 font-bold">🔒 DuoWindo 6601 Cloud</span>
                 </div>
 
+                {/* COUNTRY & LANGUAGE SELECTOR */}
+                {renderCountryAndLanguageSelectors()}
+
                 {/* SUBMIT BUTTON */}
                 <button
                   type="submit"
@@ -1346,6 +1595,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
             </div>
 
+            {/* COUNTRY & LANGUAGE SELECTOR */}
+            {renderCountryAndLanguageSelectors()}
+
             {/* SUBMIT REGISTRATION BUTTON */}
             <button
               type="submit"
@@ -1410,6 +1662,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </button>
               </div>
             )}
+
+            {/* COUNTRY & LANGUAGE SELECTOR */}
+            {renderCountryAndLanguageSelectors()}
 
             <button
               type="button"

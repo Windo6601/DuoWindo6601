@@ -1,11 +1,15 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "DIN Next Rounded", Cairo, Rubik, Nunito, sans-serif;
+  --font-sans: "DIN Next Rounded", Montserrat, Alexandria, Cairo, Rubik, sans-serif;
+  --font-montserrat: Montserrat, sans-serif;
+  --font-alexandria: Alexandria, sans-serif;
   --font-din: "DIN Next Rounded", Nunito, sans-serif;
   --font-feather: Feather, sans-serif;
-  --font-arabic: Cairo, Amiri, "Noto Sans Arabic", sans-serif;
+  --font-arabic: Alexandria, Cairo, "Noto Sans Arabic", Tajawal, Almarai, Amiri, sans-serif;
   --font-hebrew: Rubik, "Noto Sans Hebrew", sans-serif;
+  --font-chinese: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "ZCOOL KuaiLe", "Ma Shan Zheng", sans-serif;
+  --font-japanese: "Zen Maru Gothic", "M PLUS Rounded 1c", "Noto Sans JP", "Hiragino Sans", Meiryo, sans-serif;
 
   --color-duo-dark: #131F24;
   --color-duo-card: #202F36;
@@ -322,5 +326,167 @@ html.light body,
 /* Plaintext bidirectional rendering for mixed-script strings */
 .bdi-isolate, [dir="auto"], bdi {
   unicode-bidi: plaintext;
+}
+
+/* Chinese, Japanese, and Arabic typography utilities & auto-font application */
+.font-chinese, [data-lang="zh"], :lang(zh), .lang-zh, [data-course-script="chinese"] {
+  font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "ZCOOL KuaiLe", "Ma Shan Zheng", sans-serif !important;
+}
+
+.font-japanese, [data-lang="ja"], :lang(ja), .lang-ja, [data-course-script="japanese"] {
+  font-family: "Zen Maru Gothic", "M PLUS Rounded 1c", "Noto Sans JP", "Hiragino Sans", Meiryo, sans-serif !important;
+}
+
+.font-arabic, [data-lang="ar"], :lang(ar), .lang-ar, [data-course-script="arabic"], [dir="rtl"] {
+  font-family: Alexandria, Cairo, "Noto Sans Arabic", Tajawal, Almarai, Amiri, sans-serif !important;
+}
+
+/* Klingon font (fontomania.ru/17807-klingon.html) */
+@font-face {
+  font-family: 'Klingon';
+  src: url('/fonts/klingon.ttf') format('truetype'),
+       url('https://fontomania.ru/storage/fonts/a09/17807/klingon%20font.ttf') format('truetype'),
+       local('Klingon'), local('klingon');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+.font-klingon, [data-lang="tlh"], :lang(tlh), .lang-tlh, [data-course-script="klingon"], [data-course="tlh"] {
+  font-family: 'Klingon', 'DIN Next Rounded', sans-serif !important;
+}
+
+/* ==========================================================================
+   TEXT SIZE SCALING (Размер текста)
+   ========================================================================== */
+html[data-text-size="small"] {
+  font-size: 14.5px;
+}
+html[data-text-size="normal"] {
+  font-size: 16px;
+}
+html[data-text-size="large"] {
+  font-size: 18px;
+}
+html[data-text-size="huge"] {
+  font-size: 20px;
+}
+
+/* ==========================================================================
+   APP FONT FAMILY SELECTION (Шрифт интерфейса)
+   ========================================================================== */
+html[data-font="din"], body[data-font="din"], .font-pref-din {
+  font-family: "DIN Next Rounded", Nunito, sans-serif !important;
+}
+
+html[data-font="sans"], body[data-font="sans"], .font-pref-sans {
+  font-family: Rubik, Alexandria, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
+html[data-font="serif"], body[data-font="serif"], .font-pref-serif {
+  font-family: "Noto Serif SC", Amiri, Georgia, Cambria, "Times New Roman", serif !important;
+}
+
+html[data-font="dyslexic"], body[data-font="dyslexic"], .font-pref-dyslexic {
+  font-family: "Lexend", Nunito, sans-serif !important;
+  letter-spacing: 0.025em;
+}
+
+html[data-font="mono"], body[data-font="mono"], .font-pref-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+}
+
+html[data-font="playful"], body[data-font="playful"], .font-pref-playful {
+  font-family: "ZCOOL KuaiLe", "M PLUS Rounded 1c", cursive, sans-serif !important;
+}
+
+/* ==========================================================================
+   ARABIC TYPOGRAPHY & DUAL NUMERALS (Шрифт арабского и обе формы цифр)
+   ========================================================================== */
+.font-arabic,
+html.lang-ar,
+body.lang-ar,
+[data-course-script="arabic"] {
+  font-family: Alexandria, Cairo, "Noto Sans Arabic", Tajawal, Almarai, Amiri, sans-serif !important;
+}
+
+.arabic-numerals-eastern {
+  font-family: Alexandria, Cairo, "Noto Sans Arabic", sans-serif;
+  font-variant-numeric: normal;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.arabic-numerals-western {
+  font-family: "DIN Next Rounded", Nunito, -apple-system, sans-serif;
+  font-variant-numeric: tabular-nums;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* ==========================================================================
+   THEME PALETTES (Midnight AMOLED & Emerald Forest)
+   ========================================================================== */
+/* Midnight AMOLED (Ultra Dark Pure Black) */
+html[data-theme="midnight"],
+body.theme-midnight,
+html.midnight {
+  --color-duo-dark: #000000;
+  --color-duo-card: #080b0f;
+  background-color: #000000 !important;
+  color: #f1f5f9 !important;
+}
+
+html[data-theme="midnight"] body,
+body.theme-midnight {
+  background-color: #000000 !important;
+}
+
+html[data-theme="midnight"] .bg-duo-dark,
+html[data-theme="midnight"] [class*="bg-duo-dark"] {
+  background-color: #000000 !important;
+}
+
+html[data-theme="midnight"] .bg-duo-card,
+html[data-theme="midnight"] [class*="bg-duo-card"] {
+  background-color: #080b0f !important;
+  border-color: #1e293b !important;
+}
+
+/* Emerald Forest (Фирменный изумрудный DuoWindo) */
+html[data-theme="emerald"],
+body.theme-emerald,
+html.emerald {
+  --color-duo-dark: #051e16;
+  --color-duo-card: #0a2d21;
+  background-color: #051e16 !important;
+  color: #ecfdf5 !important;
+}
+
+html[data-theme="emerald"] body,
+body.theme-emerald {
+  background-color: #051e16 !important;
+}
+
+html[data-theme="emerald"] .bg-duo-dark,
+html[data-theme="emerald"] [class*="bg-duo-dark"] {
+  background-color: #051e16 !important;
+}
+
+html[data-theme="emerald"] .bg-duo-card,
+html[data-theme="emerald"] [class*="bg-duo-card"] {
+  background-color: #0a2d21 !important;
+  border-color: #0d4a36 !important;
+}
+
+/* Montserrat & Alexandria Geometric Sans Companions */
+.font-montserrat {
+  font-family: 'Montserrat', sans-serif;
+}
+.font-alexandria {
+  font-family: 'Alexandria', sans-serif;
+}
+.font-geometric-duo {
+  font-family: 'Montserrat', 'Alexandria', sans-serif;
 }
 

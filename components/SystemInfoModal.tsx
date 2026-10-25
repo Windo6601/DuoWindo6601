@@ -117,8 +117,8 @@ export const SystemInfoModal: React.FC<SystemInfoModalProps> = ({
             <div className="bg-gray-800/80 border border-gray-700 p-3 rounded-xl space-y-1">
               <span className="font-black text-gray-200 block">🪟 Windows OS</span>
               <p className="text-[11px] text-gray-400">
-                <span className="text-red-400 font-bold">🛑 XP / Vista:</span> Не поддерживаются<br/>
-                <span className="text-emerald-400 font-bold">✅ Win 7 / 8 / 8.1 / 10 / 11:</span> Поддерживаются
+                <span className="text-red-400 font-bold">🛑 XP / 2003 / Vista:</span> Прекращено<br/>
+                <span className="text-emerald-400 font-bold">✅ Win 7 / 8 / 10 / 11:</span> Поддерживаются
               </p>
             </div>
 
@@ -149,6 +149,19 @@ export const SystemInfoModal: React.FC<SystemInfoModalProps> = ({
               </p>
             </div>
           </div>
+        </div>
+
+        {/* Speech API & Browser Architecture Notice */}
+        <div className="bg-gradient-to-r from-blue-950/60 to-purple-950/60 border border-blue-500/30 p-4 rounded-2xl space-y-2 text-xs">
+          <h4 className="font-black uppercase tracking-wider text-blue-300 flex items-center gap-1.5">
+            <span>🗣️</span>
+            <span>{lang === 'ru' ? 'Архитектура речевых движков и браузеров' : 'Speech Engine & Browser Architecture'}</span>
+          </h4>
+          <p className="text-gray-300 text-[11px] leading-relaxed">
+            {lang === 'ru'
+              ? 'Прекращена поддержка устаревшего Microsoft Speech API 4.0, а также браузера Mypal 78.0.3 XP, OneCore API и Windows XP / Windows Server 2003. Осуществлен переход на Microsoft Speech API (SAPI) 5.3 в сочетании с современными Windows AI APIs для распознавания речи на устройстве.'
+              : 'Support ended for legacy Microsoft Speech API 4.0, Mypal 78.0.3 XP browser, OneCore API, and Windows XP / Windows Server 2003. Upgraded to Microsoft Speech API (SAPI) 5.3 alongside modern on-device Windows AI speech recognition APIs.'}
+          </p>
         </div>
 
         {/* Simulation / Testing Controls */}

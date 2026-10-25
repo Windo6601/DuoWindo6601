@@ -3,6 +3,7 @@ import { Chess, Square } from 'chess.js';
 import { ChessPieceIcon, ChessColor } from './ChessPieceIcon';
 import { playSound } from '../services/audioService';
 import { analyzeChessPosition, analyzeFullChessGameWithAI, ChessAiMoveAnalysis, getChessMove } from '../services/geminiService';
+import { ChessAutoTranslatorModal } from './ChessAutoTranslatorModal';
 
 export interface ChessAnalysisScreenProps {
   initialMoves?: string[];
@@ -214,6 +215,7 @@ export const ChessAnalysisScreen: React.FC<ChessAnalysisScreenProps> = ({
   } | null>(null);
   const [isAiAnalyzingGame, setIsAiAnalyzingGame] = useState<boolean>(false);
   const [showFullReportModal, setShowFullReportModal] = useState<boolean>(false);
+  const [showAutoTranslatorModal, setShowAutoTranslatorModal] = useState<boolean>(false);
 
   // "What if" trial moves from current position
   const [trialMoveFens, setTrialMoveFens] = useState<string[]>([]);
@@ -522,8 +524,17 @@ export const ChessAnalysisScreen: React.FC<ChessAnalysisScreenProps> = ({
       if (botSan) {
         const isCapture = botSan.includes('x');
         const isCheck = botSan.includes('+') || botSan.includes('#');
-        if (isCapture) playSound('capture');
-        else playSound('click');
+        const areChessSoundsEnabled = () => {
+          try {
+            const raw = localStorage.getItem('duowindo6601_user_progress_v1');
+            if (raw) return JSON.parse(raw).chessSoundEffects ?? true;
+          } catch {}
+          return true;
+        };
+        if (areChessSoundsEnabled()) {
+          if (isCapture) playSound('capture');
+          else playSound('click');
+        }
 
         const updatedMoves = [...currentMoves, botSan];
         setMovesList(updatedMoves);
@@ -562,8 +573,17 @@ export const ChessAnalysisScreen: React.FC<ChessAnalysisScreenProps> = ({
         });
         if (move) {
           const isCapture = !!(move.captured || (move.flags && (move.flags.includes('c') || move.flags.includes('e'))));
-          if (isCapture) playSound('capture');
-          else playSound('click');
+          const areChessSoundsEnabled = () => {
+            try {
+              const raw = localStorage.getItem('duowindo6601_user_progress_v1');
+              if (raw) return JSON.parse(raw).chessSoundEffects ?? true;
+            } catch {}
+            return true;
+          };
+          if (areChessSoundsEnabled()) {
+            if (isCapture) playSound('capture');
+            else playSound('click');
+          }
 
           if (boardMode === 'append') {
             // Append player move to current game ply!
@@ -804,6 +824,14 @@ export const ChessAnalysisScreen: React.FC<ChessAnalysisScreenProps> = ({
             className="px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-xl text-xs md:text-sm font-extrabold shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-1.5"
           >
             <span>✨ Отчет ИИ</span>
+          </button>
+
+          <button
+            onClick={() => setShowAutoTranslatorModal(true)}
+            className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:brightness-110 text-slate-950 rounded-xl text-xs md:text-sm font-black shadow-lg shadow-amber-500/20 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer border border-amber-300"
+            title="Авто-Переводчик для шахматных комментариев и нотации (Шахматы - не язык)"
+          >
+            <span>⚡ Авто-Переводчик</span>
           </button>
 
           {/* Big Header Play With Bot button */}
@@ -1642,6 +1670,17 @@ export const ChessAnalysisScreen: React.FC<ChessAnalysisScreenProps> = ({
           </div>
         </div>
       )}
+
+      {/* Chess Auto-Translator Modal */}
+      <ChessAutoTranslatorModal
+        isOpen={showAutoTranslatorModal}
+        onClose={() => setShowAutoTranslatorModal(false)}
+        userLanguage="ru"
+        initialTextToTranslate={
+          activeAiData?.explanation || 
+          (currentMove ? `Ход: ${currentMove.san}. ${getClassificationMeta(currentMove.classification).label}` : duoSpeech || '')
+        }
+      />
     </div>
   );
 };

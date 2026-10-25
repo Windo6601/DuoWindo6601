@@ -2,9 +2,10 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db, googleProvider, handleFirestoreError, OperationType } from './firebase';
+import { MultiUserShareModal } from './components/MultiUserShareModal';
 import { AppScreen, Exercise, UserProgress, Course, WordToken, LeaderboardEntry, SubscriptionTier, RoleplayMessage } from './types';
 import { Chess, Square } from 'chess.js';
 import { generateExercise, checkAnswerWithAI, pingGeminiApi, speakText, startRoleplay, replyToRoleplay, generateIllusion, generateDrawing, checkDrawing, getFallbackExercise, getChessMove, getChessChatReply, translateText, getMistakeExplanation, generateLocalMistakeExplanation, generateIshihara, generateInterviewQuestion, getInterviewHint, generateReading, generateVideoCallRoleplayResponse } from './services/geminiService';
@@ -15,7 +16,7 @@ import { SystemInfoModal } from "./components/SystemInfoModal";
 import { BetaModal } from "./components/BetaModal";
 import { playSound } from './services/audioService';
 import { 
-  HomeIcon, DumbbellIcon, ShieldIcon, ChestIcon, UserIcon,
+  HomeIcon, DumbbellIcon, ShieldIcon, ChestIcon, UserIcon, SearchIcon,
   FireIcon, GemStoneIcon, VolumeIcon, CloseIcon, BookIcon, 
   InfiniteHeartIcon, InfiniteEnergyIcon, LightningIcon, BatteryIcon, CameraIcon,
   ActivityIcon, StarIcon, CheckCircleIcon, GridIcon, MicIcon, NewWordIcon,
@@ -29,12 +30,17 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { SupportChatScreen } from './components/SupportChatScreen';
 import { ActivityChart } from './components/ActivityChart';
 import { VocabularyBank } from './components/VocabularyBank';
+import { DuoWindo6601PracticeHub } from './components/DuoWindo6601PracticeHub';
 import { IncognitoRestrictionsModal } from './components/IncognitoRestrictionsModal';
 import { IncognitoDataExportModal } from './components/IncognitoDataExportModal';
 import { FirebaseExportModal } from './components/FirebaseExportModal';
 import { DataDeletionModal, isUserAdminAccount } from './components/DataDeletionModal';
 import { DataTransferExpertModal } from './components/DataTransferExpertModal';
 import { PlacementTestModal } from './components/PlacementTestModal';
+import { PWAInstallButton, PWAInstructionModal } from './components/PWAInstallButton';
+import { OfflineIndicator } from './components/OfflineIndicator';
+import { DuoWindo6601PoemModal } from './components/DuoWindo6601PoemModal';
+import { MusicStudioModal } from './components/MusicStudioModal';
 import { 
   downloadFirebaseExportFile, 
   copyFirebaseExportToClipboard 
@@ -65,11 +71,27 @@ import { AiLimitSection } from './components/AiLimitSection';
 import { GeminiRefillSection } from './components/GeminiRefillSection';
 import { getTodayAiUsage, AiUsageStatus, isCustomApiKeySkipped } from './services/aiLimitManager';
 import { AuthModal } from './components/AuthModal';
-import { ChessInviteModal, ChessOpponent } from './components/ChessInviteModal';
+import { ChessInviteModal, ChessOpponent, getSampleChessOpponents, getSearchableChessOpponents } from './components/ChessInviteModal';
+import { ChessSettingsModal } from './components/ChessSettingsModal';
+import { ChessPieceTheme } from './components/ChessPieceIcon';
 import { ChessAnalysisScreen } from './components/ChessAnalysisScreen';
+import { ChessAutoTranslatorModal } from './components/ChessAutoTranslatorModal';
 import { triggerHapticFeedback } from './services/audioService';
 import { LettersScreen } from './components/LettersScreen';
 import { CIS_ALPHABET_DATA, AlphabetItem, AlphabetCategory as CISAlphabetCategory } from './services/alphabetData';
+import { LanguageLockModal } from './components/LanguageLockModal';
+import { SettingsAppearanceSection } from './components/SettingsAppearanceSection';
+import { ShopSuperTrialSection } from './components/ShopSuperTrialSection';
+import { HARDEST_LANGUAGE_DETAILS } from './services/languageDetailsData';
+import { HardestLanguageDetailModal } from './components/HardestLanguageDetailModal';
+import { 
+  isLanguageSwitchLocked, 
+  getLanguageLockedToastMessage, 
+  LOCKED_SWITCH_LANGUAGES,
+  UNLOCK_DEADLINE_ISO,
+  isBetaWritingRestricted,
+  getBetaWritingRestrictedInfo
+} from './services/languageLockService';
 import {
   initFirestoreCacheMaintenance,
   recordFirestoreUserActivity,
@@ -148,12 +170,37 @@ const CHESS_UNICODE: Record<string, { w: string; b: string }> = {
   k: { w: '♔', b: '♚' },
 };
 
-const ChessPieceIcon: React.FC<{ type: string; color: ChessColor; className?: string }> = ({ type, color, className }) => {
+const ChessPieceIcon: React.FC<{ type: string; color: ChessColor; className?: string; theme?: ChessPieceTheme }> = ({ type, color, className, theme }) => {
     const isWhite = color === 'w';
+    const t = type.toLowerCase();
+
+    const activeTheme: ChessPieceTheme = theme || (typeof window !== 'undefined' ? (() => {
+      try {
+        const raw = localStorage.getItem('duowindo6601_user_progress_v1');
+        if (raw) return JSON.parse(raw).chessPieceTheme || 'graphical';
+      } catch {}
+      return 'graphical';
+    })() : 'graphical');
+
+    if (activeTheme === 'unicode') {
+      const char = CHESS_UNICODE[t]?.[color] || '?';
+      return (
+        <span
+          className={`inline-flex items-center justify-center select-none font-serif leading-none ${className || ''} ${
+            isWhite
+              ? 'text-white [text-shadow:_0_0_2px_#000000,_0_2px_4px_rgba(0,0,0,0.9)]'
+              : 'text-slate-950 [text-shadow:_0_0_2px_#ffffff,_0_1px_3px_rgba(255,255,255,0.7)]'
+          }`}
+          style={{ fontSize: '1.9em' }}
+        >
+          {char}
+        </span>
+      );
+    }
+
     const fill = isWhite ? "#FFFFFF" : "#1E293B";
     const stroke = isWhite ? "#0F172A" : "#FFFFFF";
-    const strokeWidth = 1.5;
-    const t = type.toLowerCase(); 
+    const strokeWidth = 1.5; 
 
     if (t === 'p') {
         return (
@@ -312,26 +359,32 @@ const CIS_COURSES: Course[] = [
 
 const HARDEST_COURSES: Course[] = [
   { id: 'tab', name: 'Tabasaran', localName: 'Табасаранский (Табасаран)', flagCode: 'ru', themeColor: 'bg-purple-600', themeBorder: 'border-purple-800', mascotVariant: 'default' },
+  { id: 'cv', name: 'Chuvash', localName: 'Чувашский (Чӑвашла)', flagCode: 'ru', themeColor: 'bg-amber-600', themeBorder: 'border-amber-800', mascotVariant: 'default' },
   { id: 'hu', name: 'Hungarian', localName: 'Венгерский (Magyar)', flagCode: 'hu', themeColor: 'bg-red-500', themeBorder: 'border-red-700', mascotVariant: 'default' },
   { id: 'eu', name: 'Basque', localName: 'Баскский (Euskara)', flagCode: 'es', themeColor: 'bg-emerald-600', themeBorder: 'border-emerald-800', mascotVariant: 'default' },
   { id: 'fi', name: 'Finnish', localName: 'Финский (Suomi)', flagCode: 'fi', themeColor: 'bg-blue-600', themeBorder: 'border-blue-800', mascotVariant: 'default' },
   { id: 'nv', name: 'Navajo', localName: 'Навахо (Diné bizaad)', flagCode: 'us', themeColor: 'bg-amber-600', themeBorder: 'border-amber-800', mascotVariant: 'default' },
   { id: 'is', name: 'Icelandic', localName: 'Исландский (Íslenska)', flagCode: 'is', themeColor: 'bg-indigo-600', themeBorder: 'border-indigo-800', mascotVariant: 'default' },
   { id: 'pl', name: 'Polish', localName: 'Польский (Polski)', flagCode: 'pl', themeColor: 'bg-rose-500', themeBorder: 'border-rose-700', mascotVariant: 'default' },
+  { id: 'ja', name: 'Japanese', localName: 'Японский (日本語)', flagCode: 'jp', themeColor: 'bg-rose-500', themeBorder: 'border-rose-700', mascotVariant: 'default' },
+  { id: 'zh', name: 'Chinese', localName: 'Китайский (中文)', flagCode: 'cn', themeColor: 'bg-red-600', themeBorder: 'border-red-800', mascotVariant: 'default' },
+  { id: 'ar', name: 'Arabic', localName: 'Арабский (العربية)', flagCode: 'sa', themeColor: 'bg-emerald-600', themeBorder: 'border-emerald-800', mascotVariant: 'default' },
+  { id: 'ko', name: 'Korean', localName: 'Корейский (한국어)', flagCode: 'kr', themeColor: 'bg-sky-400', themeBorder: 'border-sky-600', mascotVariant: 'default' },
 ];
 
 const HARDEST_LANGUAGE_INFO: Record<string, { badge: string; reasonRu: string; reasonEn: string; rank: string }> = {
   tab: { badge: '🏆 Рекорд Гиннесса', reasonRu: '48–53 падежа существительных, сложнейшая эргативная грамматика', reasonEn: 'Guinness Record: 48–53 noun cases, intricate ergative grammar', rank: '#1' },
-  hu: { badge: '⚡ Уральский гигант', reasonRu: '18–35 падежей, сингармонизм гласных, агглютинация суффиксов', reasonEn: '18–35 noun cases, vowel harmony, agglutinative affixes', rank: '#2' },
-  eu: { badge: '🗿 Древний изолят', reasonRu: 'Язык-изолят Европы, полиперсональное спряжение глаголов', reasonEn: 'European language isolate, polypersonal verb conjugation', rank: '#3' },
-  fi: { badge: '❄️ 15 падежей', reasonRu: '15 падежей, чередование ступеней согласных, отсутствие предлогов', reasonEn: '15 noun cases, consonant gradation, no prepositions', rank: '#4' },
-  nv: { badge: '🪶 Язык шифровальщиков', reasonRu: 'Полисинтетический строй, 4 тона, префиксы формы и одушевленности', reasonEn: 'Code Talkers language, polysynthetic verb structure, 4 tones', rank: '#5' },
-  is: { badge: '⚔️ Язык викингов', reasonRu: 'Древнескандинавская морфология, 4 падежа, пуризм словаря', reasonEn: 'Old Norse archaic grammar, 4 cases, strict linguistic purism', rank: '#6' },
-  pl: { badge: '🌪️ Фонетический шторм', reasonRu: '7 падежей, ряды шипящих согласных, сложнейшие исключения', reasonEn: '7 cases, dense consonant clusters (szcz, rz), complex aspects', rank: '#7' },
-  ja: { badge: '🏯 3 системы письма', reasonRu: 'Кандзи + Хирагана + Катакана, система почтительности кейго', reasonEn: '3 writing scripts (Kanji/Kana), complex keigo honorifics', rank: '#8' },
-  zh: { badge: '🏮 Тоновая иероглифика', reasonRu: '4 тона + нейтральный, тысячи логограмм, счётные слова', reasonEn: '4 tones, logographic characters, extensive homophones', rank: '#9' },
-  ar: { badge: '📜 Трёхсогласный корень', reasonRu: 'Корневая морфология, письмо справа налево, двойственное число', reasonEn: 'Triconsonantal root system, right-to-left abjad script, dual form', rank: '#10' },
-  ko: { badge: '🎎 Иерархия вежливости', reasonRu: '7 уровней уважительности, частицы-послелоги, агглютинация', reasonEn: '7 speech politeness levels, postpositions, SOV word order', rank: '#11' },
+  cv: { badge: '👑 Уникальная ветвь булгар', reasonRu: 'Единственный живой огурский тюркский язык, буквы Ӑ, Ӗ, Ҫ, Ӳ, сингармонизм и сложнейшая агглютинация', reasonEn: 'Sole surviving Oghur/Bulgar Turkic branch, unique letters Ӑ, Ӗ, Ҫ, Ӳ, vowel harmony, multi-layered agglutination', rank: '#2' },
+  hu: { badge: '⚡ Уральский гигант', reasonRu: '18–35 падежей, сингармонизм гласных, агглютинация суффиксов', reasonEn: '18–35 noun cases, vowel harmony, agglutinative affixes', rank: '#3' },
+  eu: { badge: '🗿 Древний изолят', reasonRu: 'Язык-изолят Европы, полиперсональное спряжение глаголов', reasonEn: 'European language isolate, polypersonal verb conjugation', rank: '#4' },
+  fi: { badge: '❄️ 15 падежей', reasonRu: '15 падежей, чередование ступеней согласных, отсутствие предлогов', reasonEn: '15 noun cases, consonant gradation, no prepositions', rank: '#5' },
+  nv: { badge: '🪶 Язык шифровальщиков', reasonRu: 'Полисинтетический строй, 4 тона, префиксы формы и одушевленности', reasonEn: 'Code Talkers language, polysynthetic verb structure, 4 tones', rank: '#6' },
+  is: { badge: '⚔️ Язык викингов', reasonRu: 'Древнескандинавская морфология, 4 падежа, пуризм словаря', reasonEn: 'Old Norse archaic grammar, 4 cases, strict linguistic purism', rank: '#7' },
+  pl: { badge: '🌪️ Фонетический шторм', reasonRu: '7 падежей, ряды шипящих согласных, сложнейшие исключения', reasonEn: '7 cases, dense consonant clusters (szcz, rz), complex aspects', rank: '#8' },
+  ja: { badge: '🏯 3 системы письма', reasonRu: 'Кандзи + Хирагана + Катакана, система почтительности кейго', reasonEn: '3 writing scripts (Kanji/Kana), complex keigo honorifics', rank: '#9' },
+  zh: { badge: '🏮 Тоновая иероглифика', reasonRu: '4 тона + нейтральный, тысячи логограмм, счётные слова', reasonEn: '4 tones, logographic characters, extensive homophones', rank: '#10' },
+  ar: { badge: '📜 Трёхсогласный корень', reasonRu: 'Корневая морфология, письмо справа налево, двойственное число', reasonEn: 'Triconsonantal root system, right-to-left abjad script, dual form', rank: '#11' },
+  ko: { badge: '🎎 Иерархия вежливости', reasonRu: '7 уровней уважительности, частицы-послелоги, агглютинация', reasonEn: '7 speech politeness levels, postpositions, SOV word order', rank: '#12' },
 };
 
 const WORLD_COURSES: Course[] = [
@@ -348,19 +401,69 @@ const WORLD_COURSES: Course[] = [
   { id: 'he', name: 'Hebrew', localName: 'Иврит', flagCode: 'il', themeColor: 'bg-blue-600', themeBorder: 'border-blue-800', mascotVariant: 'default' },
 ];
 
-const ALL_HARDEST_COURSES: Course[] = [
-  ...HARDEST_COURSES,
-  ...WORLD_COURSES.filter(c => ['ja', 'zh', 'ar', 'ko'].includes(c.id))
-];
+export type CourseSortMode = 'default' | 'hardest' | 'easiest' | 'alphabetical';
+
+export const getCourseDifficultyRankNumber = (courseId: string): number => {
+  const info = HARDEST_LANGUAGE_INFO[courseId];
+  if (!info) return 999;
+  const match = info.rank.match(/\d+/);
+  return match ? parseInt(match[0], 10) : 999;
+};
+
+export const sortCoursesByDifficulty = (
+  courses: Course[],
+  sortMode: CourseSortMode
+): Course[] => {
+  if (sortMode === 'default') return courses;
+  const list = [...courses];
+  if (sortMode === 'hardest') {
+    // Sort from hardest to easiest: rank #1 (tab) -> #2 (hu) -> ... -> #11 (ko), then unranked courses
+    return list.sort((a, b) => {
+      const rankA = getCourseDifficultyRankNumber(a.id);
+      const rankB = getCourseDifficultyRankNumber(b.id);
+      if (rankA !== rankB) return rankA - rankB;
+      return a.name.localeCompare(b.name);
+    });
+  }
+  if (sortMode === 'easiest') {
+    // Sort from easiest to hardest: unranked/easier first, then reverse rank #11 down to #1
+    return list.sort((a, b) => {
+      const rankA = getCourseDifficultyRankNumber(a.id);
+      const rankB = getCourseDifficultyRankNumber(b.id);
+      if (rankA !== rankB) {
+        return rankB - rankA;
+      }
+      return a.name.localeCompare(b.name);
+    });
+  }
+  if (sortMode === 'alphabetical') {
+    return list.sort((a, b) => a.name.localeCompare(b.name));
+  }
+  return list;
+};
+
+const ALL_HARDEST_COURSES: Course[] = HARDEST_COURSES;
 
 const SPECIAL_COURSES: Course[] = [
   { id: 'math', name: 'Mathematics', localName: 'Математика', flagCode: 'math', themeColor: 'bg-duo-blue', themeBorder: 'border-duo-blueDark', mascotVariant: 'math' },
   { id: 'music', name: 'Music', localName: 'Музыка', flagCode: 'music', themeColor: 'bg-pink-500', themeBorder: 'border-pink-700', mascotVariant: 'music' },
-  { id: 'chess', name: 'Chess', localName: 'Шахматы', flagCode: 'chess', themeColor: 'bg-slate-600', themeBorder: 'border-slate-800', mascotVariant: 'chess' },
+  { id: 'chess', name: 'Chess', localName: 'Шахматы (Курс не является языком • Навык/Игра)', flagCode: 'chess', themeColor: 'bg-slate-600', themeBorder: 'border-slate-800', mascotVariant: 'chess' },
+];
+
+export const BETA_COURSES: Course[] = [
+  { id: 'eo', name: 'Esperanto', localName: 'Эсперанто (Esperanto)', flagCode: 'eu', themeColor: 'bg-emerald-600', themeBorder: 'border-emerald-800', mascotVariant: 'default', isBeta: true, betaTag: 'Международный', betaVersion: 'v0.9.4 Beta', betaFeedbackCount: 142, writingRestrictionNotice: 'Ограничение раздел письма будут доступ до 1 ноября 2026 год' },
+  { id: 'la', name: 'Latin', localName: 'Латынь (Lingua Latina)', flagCode: 'it', themeColor: 'bg-amber-600', themeBorder: 'border-amber-800', mascotVariant: 'default', isBeta: true, betaTag: 'Классический', betaVersion: 'v0.8.2 Beta', betaFeedbackCount: 98, writingRestrictionNotice: 'Ограничение раздел письма будут доступ до 1 ноября 2026 год' },
+  { id: 'sv', name: 'Swedish', localName: 'Шведский (Svenska)', flagCode: 'se', themeColor: 'bg-blue-600', themeBorder: 'border-blue-800', mascotVariant: 'default', isBeta: true, betaTag: 'Скандинавский', betaVersion: 'v0.9.1 Beta', betaFeedbackCount: 115, writingRestrictionNotice: 'Ограничение раздел письма будут доступ до 1 ноября 2026 год' },
+  { id: 'no', name: 'Norwegian', localName: 'Норвежский (Norsk)', flagCode: 'no', themeColor: 'bg-red-600', themeBorder: 'border-red-800', mascotVariant: 'default', isBeta: true, betaTag: 'Скандинавский', betaVersion: 'v0.9.0 Beta', betaFeedbackCount: 84, writingRestrictionNotice: 'Ограничение раздел письма будут доступ до 1 ноября 2026 год' },
+  { id: 'tt', name: 'Tatar', localName: 'Татарский (Татар теле)', flagCode: 'ru', themeColor: 'bg-teal-600', themeBorder: 'border-teal-800', mascotVariant: 'default', isBeta: true, betaTag: 'Тюркский', betaVersion: 'v0.9.5 Beta', betaFeedbackCount: 230, writingRestrictionNotice: 'Ограничение раздел письма будут доступ до 1 ноября 2026 год' },
+  { id: 'hv', name: 'High Valyrian', localName: 'Высокий валирийский (Valyrio)', flagCode: 'gb', themeColor: 'bg-purple-700', themeBorder: 'border-purple-900', mascotVariant: 'default', isBeta: true, betaTag: 'Вымышленный', betaVersion: 'v0.8.0 Beta', betaFeedbackCount: 76, writingRestrictionNotice: 'Ограничение раздел письма будут доступ до 1 ноября 2026 год' },
+  { id: 'tlh', name: 'Klingon', localName: 'Клингонский (tlhIngan Hol)', flagCode: 'us', themeColor: 'bg-stone-700', themeBorder: 'border-stone-900', mascotVariant: 'default', isBeta: true, betaTag: 'Вымышленный', betaVersion: 'v0.7.3 Beta', betaFeedbackCount: 63, writingRestrictionNotice: 'Ограничение раздел письма будут доступ до 1 ноября 2026 год' },
+  { id: 'yi', name: 'Yiddish', localName: 'Идиш (ייִдиш)', flagCode: 'il', themeColor: 'bg-indigo-600', themeBorder: 'border-indigo-800', mascotVariant: 'default', isBeta: true, betaTag: 'Германский / Еврейский', betaVersion: 'v0.9.2 Beta', betaFeedbackCount: 91, writingRestrictionNotice: 'Ограничение раздел письма будут доступ до 1 ноября 2026 год' }
 ];
 
 const SPECIAL_IDS = ['math', 'music', 'chess', 'hv', 'tlh'];
 const CONLANG_IDS = ['yi', 'hv', 'tlh'];
+const BETA_IDS = BETA_COURSES.map(c => c.id);
 const CIS_IDS = CIS_COURSES.map(c => c.id);
 
 const COURSES: Course[] = [
@@ -368,6 +471,7 @@ const COURSES: Course[] = [
   ...WORLD_COURSES,
   ...CIS_COURSES,
   ...SPECIAL_COURSES,
+  ...BETA_COURSES.filter(bc => !SPECIAL_COURSES.some(s => s.id === bc.id)),
   ...generateCourses(RF_REPUBLICS, 'rep'),
   ...generateCourses(RF_KRAIS, 'krai'),
   ...generateCourses(RF_OBLASTS, 'obl')
@@ -706,6 +810,25 @@ const ALPHABET_SETS: Record<string, AlphabetCategory[]> = {
       description: 'Арабские харакаты (гласные значки)',
       script: 'arabic',
       items: ['َ', 'ُ', 'ِ', 'ً', 'ٌ', 'ٍ', 'ْ', 'ّ', 'آ', 'إ', 'أ', 'ء']
+    },
+    {
+      title: 'Арабские цифры: Две формы (Dual Numerals)',
+      description: 'Современная арабская с двумя формами: западные/европейские цифры слева и восточно-арабские цифры справа (0 / ٠, 1 / ١)',
+      script: 'arabic',
+      items: [
+        { char: '0 / ٠', name: 'Сифр (Sifr)', sound: '[sˤifr]', word: '٠ صفر (0 Sifr)', translation: 'Ноль • 0 (западная) / ٠ (восточная)' },
+        { char: '1 / ١', name: 'Вахид (Wahid)', sound: '[waːħid]', word: '١ واحد (1 Wahid)', translation: 'Один • 1 (западная) / ١ (восточная)' },
+        { char: '2 / ٢', name: 'Исна́н (Ithnan)', sound: '[iθnaːn]', word: '٢ اثنان (2 Ithnan)', translation: 'Два • 2 (западная) / ٢ (восточная)' },
+        { char: '3 / ٣', name: 'Саля́са (Thalatha)', sound: '[θalaːθa]', word: '٣ ثلاثة (3 Thalatha)', translation: 'Три • 3 (западная) / ٣ (восточная)' },
+        { char: '4 / ٤', name: 'А́рбаа (Arba\'a)', sound: '[ʔarbaʕa]', word: '٤ أربعة (4 Arba\'a)', translation: 'Четыре • 4 (западная) / ٤ (восточная)' },
+        { char: '5 / ٥', name: 'Ха́мса (Khamsa)', sound: '[xamsa]', word: '٥ خمسة (5 Khamsa)', translation: 'Пять • 5 (западная) / ٥ (восточная)' },
+        { char: '6 / ٦', name: 'Си́тта (Sitta)', sound: '[sitta]', word: '٦ ستة (6 Sitta)', translation: 'Шесть • 6 (западная) / ٦ (восточная)' },
+        { char: '7 / ٧', name: 'Са́бъа (Sab\'a)', sound: '[sabʕa]', word: '٧ سبعة (7 Sab\'a)', translation: 'Семь • 7 (западная) / ٧ (восточная)' },
+        { char: '8 / ٨', name: 'Сама́ния (Thamaniya)', sound: '[θamaːnija]', word: '٨ ثمانية (8 Thamaniya)', translation: 'Восемь • 8 (западная) / ٨ (восточная)' },
+        { char: '9 / ٩', name: 'Ти́съа (Tis\'a)', sound: '[tisʕa]', word: '٩ تسعة (9 Tis\'a)', translation: 'Девять • 9 (западная) / ٩ (восточная)' },
+        { char: '10 / ١٠', name: 'А́шара (\'Ashara)', sound: '[ʕaʃara]', word: '١٠ عشرة (10 \'Ashara)', translation: 'Десять • 10 (западная) / ١٠ (восточная)' },
+        { char: '100 / ١٠٠', name: 'Ми\'а (Mi\'ah)', sound: '[miʔa]', word: '١٠٠ مئة (100 Mi\'ah)', translation: 'Сто • 100 (западная) / ١٠٠ (восточная)' }
+      ]
     }
   ],
   'he': [
@@ -1052,7 +1175,7 @@ const ALPHABETS: Record<string, string[]> = {
   'zh': ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '人', '口', '日', '月', '水', '火', '木', '金', '土', '女', '子', '大', '小', '中', '国', '山', '田', '天', '地', '心', '手', '目', '石', '竹', '米', '糸', '耳', '言', '走', '足', '雨', '风', '龙', '车', '门', '马', '鸟', '鱼'],
   'ja': ['あ', 'い', 'う', 'え', 'お', 'か', 'き', 'く', 'け', 'こ', 'さ', 'し', 'す', 'せ', 'そ', 'た', 'ち', 'つ', 'て', 'と', 'な', 'に', 'ぬ', 'ね', 'の', 'は', 'ひ', 'ふ', 'へ', 'ほ', 'ま', 'み', 'む', 'め', 'も', 'や', 'ゆ', 'よ', 'ら', 'り', 'る', 'れ', 'ろ', 'わ', 'を', 'ん'],
   'ko': ['ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅅ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ', 'ㅏ', 'ㅑ', 'ㅓ', 'ㅕ', 'ㅗ', 'ㅛ', 'ㅜ', 'ㅠ', 'ㅡ', 'ㅣ'],
-  'ar': ['ا', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي'],
+  'ar': ['ا', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي', '0/٠', '1/١', '2/٢', '3/٣', '4/٤', '5/٥', '6/٦', '7/٧', '8/٨', '9/٩', '10/١٠'],
   'he': ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 'י', 'כ', 'ל', 'מ', 'נ', 'ס', 'ע', 'פ', 'צ', 'ק', 'ר', 'ש', 'ת', 'ך', 'ם', 'ן', 'ף', 'ץ']
 };
 
@@ -1785,7 +1908,7 @@ const TRANSLATIONS: Record<string, any> = {
     trafficMax: "Трафик DuoWindo6601 Max Платное Gemini API Key",
     allInSuper: "Всё, что в Super", aiExplain: "Объяснение ответов (AI)", currentPlan: "ТЕКУЩИЙ ПЛАН", streakDays: "Ударные дни",
     totalXP: "Общий опыт", playChess: "СЫГРАЕМ В ШАХМАТЫ", chessDesc: "Партии с DuoWindo6601", games: "ПАРТИИ", wins: "ПОБЕДЫ", elo: "ЭЛО",
-    startChess: "НАЧАТЬ: +30 XP", startSpeak: "Начни говорить →", whatHeard: "Что вы услышали?", speakForDuo: "Говори за Duo",
+    startChess: "НАЧАТЬ: +30 XP", startSpeak: "Начни говорить →", whatHeard: "Что вы услышали?", speakForDuo: "Говори за DuoWindo6601",
     chessSubtitle: "20-минутные партии с DuoWindo6601", startChessMatch: "НАЧАТЬ ПАРТИЮ: +30 ОЧКОВ ОПЫТА",
     pvp: "Игрок против Игрока", pve: "Игрок против DuoWindo6601",
     readPractice: "Практика чтения", aiTrans: "AI Переводчик", realOrNot: "Что реально, а что нет?", writePractice: "Практика письма",
@@ -1964,7 +2087,7 @@ const TRANSLATIONS: Record<string, any> = {
     trafficMax: "DuoWindo6601 Max Traffic (Paid Gemini API Key)",
     allInSuper: "Everything in Super", aiExplain: "Answer Explanation (AI)", currentPlan: "CURRENT PLAN", streakDays: "Streak Days",
     totalXP: "Total XP", playChess: "LET'S PLAY CHESS", chessDesc: "Games with DuoWindo6601", games: "GAMES", wins: "WINS", elo: "ELO",
-    startChess: "START: +30 XP", startSpeak: "Start speaking →", whatHeard: "What did you hear?", speakForDuo: "Speak for Duo",
+    startChess: "START: +30 XP", startSpeak: "Start speaking →", whatHeard: "What did you hear?", speakForDuo: "Speak for DuoWindo6601",
     chessSubtitle: "20-minute games with DuoWindo6601", startChessMatch: "START MATCH: +30 XP",
     pvp: "Player vs Player", pve: "Player vs DuoWindo6601",
     readPractice: "Reading Practice", aiTrans: "AI Translator", realOrNot: "Real or not?", writePractice: "Writing Practice",
@@ -2139,7 +2262,7 @@ const TRANSLATIONS: Record<string, any> = {
     trafficMax: "DuoWindo6601 Max-Traffic (Kostenpflichtiger Gemini API Key)",
     allInSuper: "Alles in Super", aiExplain: "Antworterklärung (AI)", currentPlan: "AKTUELLER PLAN", streakDays: "Streak-Tage",
     totalXP: "Gesamt-XP", playChess: "SCHACH SPIELEN", chessDesc: "Partien mit DuoWindo6601", games: "SPIELE", wins: "SIEGE", elo: "ELO",
-    startChess: "START: +30 XP", startSpeak: "Sprechen beginnen →", whatHeard: "Was haben Sie gehört?", speakForDuo: "Für Duo sprechen",
+    startChess: "START: +30 XP", startSpeak: "Sprechen beginnen →", whatHeard: "Was haben Sie gehört?", speakForDuo: "Für DuoWindo6601 sprechen",
     chessSubtitle: "20-Minuten-Partien mit DuoWindo6601", startChessMatch: "PARTIE STARTEN: +30 XP",
     pvp: "Spieler gegen Spieler", pve: "Spieler gegen DuoWindo6601",
     readPractice: "Lesepraxis", aiTrans: "KI-Übersetzer", realOrNot: "Echt oder nicht?", writePractice: "Schreibpraxis",
@@ -2313,7 +2436,7 @@ const TRANSLATIONS: Record<string, any> = {
     trafficMax: "Trafic DuoWindo6601 Max (Gemini API Key Payant)",
     allInSuper: "Tout dans Super", aiExplain: "Explication des réponses (IA)", currentPlan: "PLAN ACTUEL", streakDays: "Jours de série",
     totalXP: "XP Total", playChess: "JOUER AUX ÉCHECS", chessDesc: "Parties avec DuoWindo6601", games: "PARTIES", wins: "VICTOIRES", elo: "ELO",
-    startChess: "DÉMARRER : +30 XP", startSpeak: "Commencer à parler →", whatHeard: "Qu’avez-vous entendu ?", speakForDuo: "Parler pour Duo",
+    startChess: "DÉMARRER : +30 XP", startSpeak: "Commencer à parler →", whatHeard: "Qu’avez-vous entendu ?", speakForDuo: "Parler pour DuoWindo6601",
     chessSubtitle: "Parties de 20 min avec DuoWindo6601", startChessMatch: "LANCER LE MATCH : +30 XP",
     pvp: "Joueur contre Joueur", pve: "Joueur contre DuoWindo6601",
     readPractice: "Pratique de lecture", aiTrans: "Traducteur IA", realOrNot: "Réel ou non ?", writePractice: "Pratique d'écriture",
@@ -2487,7 +2610,7 @@ const TRANSLATIONS: Record<string, any> = {
     trafficMax: "Tráfico DuoWindo6601 Max (Gemini API Key De Pago)",
     allInSuper: "Todo en Super", aiExplain: "Explicación de respuestas (IA)", currentPlan: "PLAN ACTUAL", streakDays: "Días de racha",
     totalXP: "XP Total", playChess: "JUGAR AL AJEDREZ", chessDesc: "Partidas con DuoWindo6601", games: "PARTIDAS", wins: "VICTORIAS", elo: "ELO",
-    startChess: "INICIAR: +30 XP", startSpeak: "Empezar a hablar →", whatHeard: "¿Qué escuchaste?", speakForDuo: "Hablar por Duo",
+    startChess: "INICIAR: +30 XP", startSpeak: "Empezar a hablar →", whatHeard: "¿Qué escuchaste?", speakForDuo: "Hablar por DuoWindo6601",
     chessSubtitle: "Partidas de 20 min con DuoWindo6601", startChessMatch: "INICIAR PARTIDA: +30 XP",
     pvp: "Jugador vs Jugador", pve: "Jugador vs DuoWindo6601",
     readPractice: "Práctica de lectura", aiTrans: "Traductor IA", realOrNot: "¿Real o no?", writePractice: "Práctica de escritura",
@@ -2661,7 +2784,7 @@ const TRANSLATIONS: Record<string, any> = {
     trafficMax: "DuoWindo6601 Max トラフィック (有料 Gemini API Key)",
     allInSuper: "Superの全機能", aiExplain: "AIによる回答解説", currentPlan: "現在のプラン", streakDays: "連続日数",
     totalXP: "合計XP", playChess: "チェスで遊ぶ", chessDesc: "DuoWindo6601との対局", games: "対局数", wins: "勝利", elo: "イロ",
-    startChess: "開始：+30 XP", startSpeak: "話し始める →", whatHeard: "何が聞こえましたか？", speakForDuo: "Duoの代わりに話す",
+    startChess: "開始：+30 XP", startSpeak: "話し始める →", whatHeard: "何が聞こえましたか？", speakForDuo: "DuoWindo6601の代わりに話す",
     chessSubtitle: "DuoWindo6601との20分間の対局", startChessMatch: "マッチ開始：+30 XP",
     pvp: "プレイヤー対プレイヤー", pve: "プレイヤー対DuoWindo6601",
     readPractice: "リーディング練習", aiTrans: "AI翻訳", realOrNot: "本物？偽物？", writePractice: "ライティング練習",
@@ -2835,7 +2958,7 @@ const TRANSLATIONS: Record<string, any> = {
     trafficMax: "DuoWindo6601 Max 流量 (付费 Gemini API Key)",
     allInSuper: "Super 的所有功能", aiExplain: "AI 解答纠错", currentPlan: "当前方案", streakDays: "连续天数",
     totalXP: "总经验值", playChess: "下国际象棋", chessDesc: "与 DuoWindo6601 对弈", games: "对局", wins: "胜利", elo: "积分",
-    startChess: "开始：+30 XP", startSpeak: "开始说话 →", whatHeard: "你听到了什么？", speakForDuo: "替 Duo 发言",
+    startChess: "开始：+30 XP", startSpeak: "开始说话 →", whatHeard: "你听到了什么？", speakForDuo: "替 DuoWindo6601 发言",
     chessSubtitle: "与 DuoWindo6601 进行 20 分钟对弈", startChessMatch: "开始对局：+30 经验值",
     pvp: "玩家对战玩家", pve: "玩家对战 DuoWindo6601",
     readPractice: "阅读练习", aiTrans: "AI 翻译官", realOrNot: "是真是假？", writePractice: "写作练习",
@@ -3009,7 +3132,7 @@ const TRANSLATIONS: Record<string, any> = {
     trafficMax: "حركة مرور DuoWindo6601 Max (Gemini API Key مدفوع)",
     allInSuper: "جميع ميزات Super", aiExplain: "توضيح الذكاء الاصطناعي", currentPlan: "الخطة الحالية", streakDays: "أيام متتالية",
     totalXP: "إجمالي النقاط", playChess: "لعب الشطرنج", chessDesc: "اللعب مع DuoWindo6601", games: "مباريات", wins: "انتصارات", elo: "التصنيف",
-    startChess: "ابدأ: +30 XP", startSpeak: "ابدأ التحدث ←", whatHeard: "ماذا سمعت؟", speakForDuo: "التحدث عن Duo",
+    startChess: "ابدأ: +30 XP", startSpeak: "ابدأ التحدث ←", whatHeard: "ماذا سمعت؟", speakForDuo: "التحدث عن DuoWindo6601",
     chessSubtitle: "لعبة شطرنج مدتها 20 دقيقة مع DuoWindo6601", startChessMatch: "بدء المباراة: +30 XP",
     pvp: "لاعب ضد لاعب", pve: "لاعب ضد DuoWindo6601",
     readPractice: "تمرين القراءة", aiTrans: "مترجم الذكاء الاصطناعي", realOrNot: "حقيقي أم لا؟", writePractice: "تمرين الكتابة",
@@ -3157,7 +3280,12 @@ function App() {
   }, [simSystemMode]);
 
   const [screen, setScreen] = useState<AppScreen>(AppScreen.PATH);
-  const [offlineMode, setOfflineMode] = useState(false);
+  const [offlineMode, setOfflineMode] = useState<boolean>(() => {
+    if (typeof navigator !== 'undefined') {
+      return !navigator.onLine;
+    }
+    return false;
+  });
   
   // Mobile test simulator states
   const [simulatorMode, setSimulatorMode] = useState<'none' | 'android' | 'ios'>('none');
@@ -3179,9 +3307,199 @@ function App() {
   const [simTriggerDismissed, setSimTriggerDismissed] = useState<boolean>(() => localStorage.getItem('duo_sim_trigger_dismissed') === 'true');
   const [dailyChallengeDismissedDate, setDailyChallengeDismissedDate] = useState<string>(() => localStorage.getItem('duo_daily_challenge_dismissed') || '');
   const [showBetaModal, setShowBetaModal] = useState<boolean>(false);
+  const [showPoemModal, setShowPoemModal] = useState<boolean>(false);
+  const [showMusicStudioModal, setShowMusicStudioModal] = useState<boolean>(false);
+  const [musicStudioTab, setMusicStudioTab] = useState<'notes' | 'learn' | 'tempo' | 'repeat'>('notes');
   const [showExplanationModal, setShowExplanationModal] = useState<boolean>(false);
+  const [showChessAutoTranslatorModal, setShowChessAutoTranslatorModal] = useState<boolean>(false);
   const [explanation, setExplanation] = useState<string>('');
   const [explanationLoading, setExplanationLoading] = useState<boolean>(false);
+
+  // --- SECTIONS & DAILY REPETITION STATES ---
+  // Music: Раздел 1-4 (Основы нот, Ритмика, Аккорды, Мастер композиции)
+  const [musicSection, setMusicSection] = useState<number>(() => {
+    return Number(localStorage.getItem('duo_music_section_6601') || '1');
+  });
+  // Math: Класс 2-8 (2, 3, 4, 5, 6, 7, 8) & Темы (Арифметика / Алгебра)
+  const [mathGrade, setMathGrade] = useState<number>(() => {
+    return Number(localStorage.getItem('duo_math_grade_6601') || '2');
+  });
+  const [mathTopic, setMathTopic] = useState<'arithmetic' | 'algebra'>(() => {
+    return (localStorage.getItem('duo_math_topic_6601') as any) || 'arithmetic';
+  });
+  // Languages: Раздел 1-8 (A1-B2)
+  const [langSection, setLangSection] = useState<number>(() => {
+    return Number(localStorage.getItem('duo_lang_section_6601') || '1');
+  });
+  // Chess: Разделы 1-7 (включая разделы 6-7: эндшпили и партии гроссмейстеров)
+  const [chessSection, setChessSection] = useState<number>(() => {
+    return Number(localStorage.getItem('duo_chess_section_6601') || '6');
+  });
+
+  const generateMathExercise = (grade: number, topic: 'arithmetic' | 'algebra'): Exercise => {
+    let question = "";
+    let answer = "";
+    let distractors: string[] = [];
+
+    if (topic === 'arithmetic') {
+      if (grade === 2) {
+        const mode = Math.random();
+        if (mode < 0.4) {
+          const a = Math.floor(Math.random() * 40) + 12;
+          const b = Math.floor(Math.random() * 40) + 10;
+          question = `${a} + ${b} = ?`;
+          answer = (a + b).toString();
+        } else if (mode < 0.7) {
+          const a = Math.floor(Math.random() * 50) + 30;
+          const b = Math.floor(Math.random() * 25) + 5;
+          question = `${a} - ${b} = ?`;
+          answer = (a - b).toString();
+        } else {
+          const a = Math.floor(Math.random() * 8) + 2;
+          const b = Math.random() > 0.5 ? 2 : 3;
+          question = `${a} × ${b} = ?`;
+          answer = (a * b).toString();
+        }
+      } else if (grade === 3) {
+        const isDiv = Math.random() > 0.5;
+        const a = Math.floor(Math.random() * 8) + 2;
+        const b = Math.floor(Math.random() * 8) + 2;
+        if (isDiv) {
+          question = `${a * b} ÷ ${a} = ?`;
+          answer = b.toString();
+        } else {
+          question = `${a} × ${b} = ?`;
+          answer = (a * b).toString();
+        }
+      } else if (grade === 4) {
+        const type = Math.random();
+        if (type < 0.5) {
+          const a = Math.floor(Math.random() * 70) + 25;
+          const b = Math.floor(Math.random() * 8) + 3;
+          question = `${a} × ${b} = ?`;
+          answer = (a * b).toString();
+        } else {
+          const den = 8;
+          const n1 = Math.floor(Math.random() * 3) + 1;
+          const n2 = Math.floor(Math.random() * 3) + 1;
+          question = `${n1}/${den} + ${n2}/${den} = ?`;
+          answer = `${n1 + n2}/${den}`;
+          distractors = [`${n1 + n2 + 1}/${den}`, `${n1 + n2}/${den * 2}`, `${Math.max(1, n1 + n2 - 1)}/${den}`];
+        }
+      } else if (grade === 5) {
+        const type = Math.random();
+        if (type < 0.5) {
+          const a = (Math.floor(Math.random() * 50) + 10) / 10;
+          const b = (Math.floor(Math.random() * 50) + 10) / 10;
+          question = `${a} + ${b} = ?`;
+          answer = (parseFloat((a + b).toFixed(1))).toString();
+        } else {
+          const pct = [10, 20, 25, 50][Math.floor(Math.random() * 4)];
+          const total = [100, 200, 400, 600][Math.floor(Math.random() * 4)];
+          question = `${pct}% от ${total} = ?`;
+          answer = ((pct / 100) * total).toString();
+        }
+      } else if (grade === 6) {
+        const type = Math.random();
+        if (type < 0.5) {
+          const a = -(Math.floor(Math.random() * 20) + 5);
+          const b = Math.floor(Math.random() * 30) + 10;
+          question = `${a} + ${b} = ?`;
+          answer = (a + b).toString();
+        } else {
+          const a = -(Math.floor(Math.random() * 6) + 2);
+          const b = -(Math.floor(Math.random() * 6) + 2);
+          question = `(${a}) × (${b}) = ?`;
+          answer = (a * b).toString();
+        }
+      } else if (grade === 7) {
+        const base = [2, 3, 5, 10][Math.floor(Math.random() * 4)];
+        const exp = base === 10 ? 3 : [2, 3, 4][Math.floor(Math.random() * 3)];
+        question = `${base}^${exp} = ?`;
+        answer = Math.pow(base, exp).toString();
+      } else {
+        const num = [16, 25, 36, 49, 64, 81, 100, 121, 144][Math.floor(Math.random() * 9)];
+        const plus = Math.floor(Math.random() * 15) + 5;
+        question = `√${num} + ${plus} = ?`;
+        answer = (Math.sqrt(num) + plus).toString();
+      }
+    } else {
+      if (grade === 2) {
+        const a = Math.floor(Math.random() * 10) + 3;
+        const x = Math.floor(Math.random() * 15) + 2;
+        question = `x + ${a} = ${x + a}, x = ?`;
+        answer = x.toString();
+      } else if (grade === 3) {
+        const a = Math.floor(Math.random() * 7) + 2;
+        const x = Math.floor(Math.random() * 8) + 2;
+        question = `${a} × x = ${a * x}, x = ?`;
+        answer = x.toString();
+      } else if (grade === 4) {
+        const a = Math.floor(Math.random() * 6) + 2;
+        const b = Math.floor(Math.random() * 4) + 2;
+        const x = Math.floor(Math.random() * 8) + 2;
+        question = `(x + ${a}) × ${b} = ${(x + a) * b}, x = ?`;
+        answer = x.toString();
+      } else if (grade === 5) {
+        const a = Math.floor(Math.random() * 3) + 2;
+        const b = Math.floor(Math.random() * 4) + 1;
+        const x = Math.floor(Math.random() * 7) + 2;
+        question = `${a}x + ${b}x = ${(a + b) * x}, x = ?`;
+        answer = x.toString();
+      } else if (grade === 6) {
+        const x = Math.floor(Math.random() * 6) + 2;
+        const c = 2 * x;
+        question = `4x - 8 = 2x + ${c - 8}, x = ?`;
+        answer = x.toString();
+      } else if (grade === 7) {
+        const a = [2, 3, 4, 5][Math.floor(Math.random() * 4)];
+        question = `(x + ${a})² = x² + ?x + ${a * a}`;
+        answer = (2 * a).toString();
+      } else {
+        const x1 = Math.floor(Math.random() * 4) + 1;
+        const x2 = Math.floor(Math.random() * 5) + 2;
+        const sum = x1 + x2;
+        const prod = x1 * x2;
+        question = `x² - ${sum}x + ${prod} = 0, x₁ + x₂ = ?`;
+        answer = sum.toString();
+      }
+    }
+
+    const numAns = parseInt(answer);
+    if (!isNaN(numAns) && distractors.length === 0) {
+      distractors = [
+        (numAns + 1).toString(),
+        (numAns - 1).toString(),
+        (numAns + (numAns > 10 ? 10 : 2)).toString(),
+        (Math.max(0, numAns - 2)).toString()
+      ].filter(d => d !== answer).slice(0, 3);
+    }
+
+    const wordBank = [answer, ...distractors].sort(() => Math.random() - 0.5);
+
+    return {
+      id: crypto.randomUUID(),
+      type: 'translation',
+      originalSentence: question,
+      targetTranslation: answer,
+      wordBank,
+      isFallback: true
+    };
+  };
+
+  const startMathTraining = (grade: number = mathGrade, topic: 'arithmetic' | 'algebra' = mathTopic) => {
+    playSound('click');
+    const ex = generateMathExercise(grade, topic);
+    setCurrentExercise(ex);
+    setAvailableTokens((ex.wordBank || []).map(w => ({ id: crypto.randomUUID(), text: w })));
+    setSelectedWordIds([]);
+    setFeedback({ status: 'idle', message: '' });
+    setExplanation('');
+    setShowExplanationModal(false);
+    setScreen(AppScreen.LESSON);
+    setLessonLoading(false);
+    setLoading(false);
+  };
 const DAILY_CHALLENGES: Array<{
   type: Exercise['type'];
   titleRu: string;
@@ -3212,7 +3530,26 @@ const getTodayChallenge = () => {
   const [user, setUser] = useState<UserProgress>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     const todayStr = new Date().toISOString().split('T')[0];
-    return saved ? JSON.parse(saved) : { 
+    const defaultChessSettings = {
+      chessTimeControl: 20,
+      chessSoundEffects: true,
+      chessPieceTheme: 'graphical' as const,
+    };
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const safeLang = (parsed.language && isLanguageSwitchLocked(parsed.language)) ? 'ru' : (parsed.language || 'ru');
+        return {
+          ...defaultChessSettings,
+          ...parsed,
+          language: safeLang,
+          chessStats: parsed.chessStats || { games: 265, wins: 134, elo: 590 },
+        };
+      } catch (e) {
+        console.error("Error reading saved progress", e);
+      }
+    }
+    return { 
       name: "Ученик 6601", avatarColor: "bg-duo-blue", 
       energy: 25, 
       hearts: 0, 
@@ -3224,6 +3561,7 @@ const getTodayChallenge = () => {
       preferredVoice: 'Kore',
       voiceProvider: 'gemini',
       chessStats: { games: 265, wins: 134, elo: 590 },
+      ...defaultChessSettings,
       streakFreezeCount: 1,
       lastActiveDate: todayStr
     };
@@ -3246,7 +3584,16 @@ const getTodayChallenge = () => {
     if (TRANSLATIONS[lang]?.[directKey]) {
       return TRANSLATIONS[lang][directKey];
     }
-    if (c.id === 'chess') return t('playChess');
+    if (c.id === 'chess') {
+      if (lang === 'ru') return 'Шахматы (Курс не является языком • Навык/Игра)';
+      if (lang === 'de') return 'Schach (Keine Sprache • Logik & Spiel)';
+      if (lang === 'fr') return 'Échecs (Pas une langue • Jeu de logique)';
+      if (lang === 'es') return 'Ajedrez (No es un idioma • Juego de lógica)';
+      if (lang === 'ja') return 'チェス（言語ではありません • 論理＆スキル）';
+      if (lang === 'zh') return '国际象棋（非语言课程 • 逻辑与技能）';
+      if (lang === 'ar') return 'الشطرنج (ليست لغة • مهارة ولعبة منطق)';
+      return 'Chess (Not a Language • Skill & Logic)';
+    }
     if (c.id === 'math') {
       if (lang === 'ru') return 'Математика';
       if (lang === 'de') return 'Mathematik';
@@ -3273,6 +3620,7 @@ const getTodayChallenge = () => {
       'rf-sakha': { ru: 'Якутский (Саха)', en: 'Yakut (Sakha)', de: 'Jakutisch', fr: 'Iakoute', es: 'Yakuto', ja: 'ヤクート語', zh: '雅库特语', ar: 'الياقوتية' },
       'rf-buryat': { ru: 'Бурятский', en: 'Buryat', de: 'Burjatisch', fr: 'Bouriate', es: 'Buriato', ja: 'ブリヤート語', zh: '布里亚特语', ar: 'البورياتية' },
       'rf-chuvash': { ru: 'Чувашский', en: 'Chuvash', de: 'Tschuwaschisch', fr: 'Tchouvache', es: 'Chuvasio', ja: 'チュヴァシ語', zh: '楚瓦什语', ar: 'التشوفاشية' },
+      'cv': { ru: 'Чувашский', en: 'Chuvash', de: 'Tschuwaschisch', fr: 'Tchouvache', es: 'Chuvasio', ja: 'チュヴァシ語', zh: '楚瓦什语', ar: 'التشوفاشية' },
       'rf-tuvan': { ru: 'Тувинский', en: 'Tuvan', de: 'Tuwinisch', fr: 'Touvain', es: 'Tuvano', ja: 'トゥバ語', zh: '图瓦语', ar: 'التوفية' },
       'rf-ossetian': { ru: 'Осетинский', en: 'Ossetian', de: 'Ossetisch', fr: 'Ossète', es: 'Osetio', ja: 'オセチア語', zh: '奥塞梯语', ar: 'الأوسيتية' },
       'rf-chechen': { ru: 'Чеченский', en: 'Chechen', de: 'Tschetschenisch', fr: 'Tchétchène', es: 'Checheno', ja: 'チェチェン語', zh: '车臣语', ar: 'الشيشانية' },
@@ -3374,6 +3722,44 @@ const getTodayChallenge = () => {
     });
   }, []);
 
+  // Listen for online and offline network events to seamlessly sync offlineMode
+  useEffect(() => {
+    const handleOnline = () => {
+      setOfflineMode(false);
+      setToast(
+        user.language === 'ru'
+          ? '🌐 Подключение к интернету восстановлено! Офлайн-режим отключен.'
+          : '🌐 Internet connection restored! Offline mode deactivated.'
+      );
+    };
+
+    const handleOffline = () => {
+      setOfflineMode(true);
+      setToast(
+        user.language === 'ru'
+          ? '⚠️ Нет подключения к интернету. Активирован автономный офлайн-режим PWA.'
+          : '⚠️ No internet connection. PWA Offline mode activated.'
+      );
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Initial check
+    if (typeof navigator !== 'undefined') {
+      if (!navigator.onLine) {
+        setOfflineMode(true);
+      } else {
+        setOfflineMode(false);
+      }
+    }
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [user.language]);
+
   const handleManualPurgeFirestoreCache = async () => {
     playSound('click');
     triggerHapticFeedback('medium');
@@ -3411,6 +3797,40 @@ const getTodayChallenge = () => {
     setFirestoreCacheStatus(updatedStatus);
     setToast(user.language === 'ru' ? '🔄 Таймер активности сброшен на текущее время' : '🔄 Activity timer reset to now');
   };
+
+  // Super trial expiration auto-check (3 days validity, available once until Nov 1, 2026)
+  useEffect(() => {
+    if (user.superTrialExpiresAt && !user.superTrialExpired) {
+      const expiresTime = new Date(user.superTrialExpiresAt).getTime();
+      if (Date.now() >= expiresTime) {
+        setUser(prev => {
+          const updated: UserProgress = {
+            ...prev,
+            subscription: prev.subscription === 'super' ? 'free' : prev.subscription,
+            superTrialExpired: true,
+            infiniteEnergy: prev.subscription === 'max' ? true : false,
+            infiniteHearts: prev.subscription === 'max' ? true : false
+          };
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+        setToast(
+          user.language === 'ru'
+            ? '⌛ Срок бесплатного DuoWindo6601 Super (3 дня) закончился! Предложение доступно 1 раз (до 1 ноября 2026 г.). Оформите подписку Super или Max.'
+            : '⌛ Free 3-Day DuoWindo6601 Super trial has ended! Available once (until Nov 1, 2026). Subscribe to Super or Max.'
+        );
+      }
+    }
+  }, [user.superTrialExpiresAt, user.superTrialExpired, user.language]);
+
+  // Synchronize Arabic font setting to document data attribute
+  useEffect(() => {
+    const arFont = user.arabicFontFamily || 'duo';
+    document.documentElement.setAttribute('data-arabic-font', arFont);
+    document.body.setAttribute('data-arabic-font', arFont);
+  }, [user.arabicFontFamily]);
 
   const handleForceSync = async () => {
     playSound('streak_update');
@@ -3579,6 +3999,7 @@ const getTodayChallenge = () => {
   const [betaDismissed, setBetaDismissed] = useState(() => localStorage.getItem('duo_beta_dismissed') === 'true');
   const [androidDismissed, setAndroidDismissed] = useState(() => localStorage.getItem('duo_android_dismissed') === 'true');
   const [serverJsDismissed, setServerJsDismissed] = useState(() => localStorage.getItem('duo_serverjs_dismissed') === 'true');
+  const [poemMilestoneDismissed, setPoemMilestoneDismissed] = useState(() => localStorage.getItem('duo_poem_milestone_dismissed') === 'true');
 
   useEffect(() => {
     try {
@@ -3603,11 +4024,37 @@ const getTodayChallenge = () => {
     try {
       const isRtl = user.language === 'ar';
       document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
-      document.documentElement.lang = user.language || 'ru';
+      const effectiveLang = user.language || 'ru';
+      document.documentElement.lang = effectiveLang;
+      document.documentElement.setAttribute('data-lang', effectiveLang);
+
+      // Clean typography classes
+      const fontClasses = ['font-chinese', 'font-japanese', 'font-arabic', 'lang-zh', 'lang-ja', 'lang-ar'];
+      fontClasses.forEach(c => {
+        document.documentElement.classList.remove(c);
+        document.body.classList.remove(c);
+      });
+
+      const activeCourseId = currentCourse?.id;
+      if (effectiveLang === 'zh' || activeCourseId === 'zh') {
+        document.documentElement.classList.add('font-chinese', 'lang-zh');
+        document.body.classList.add('font-chinese', 'lang-zh');
+        document.documentElement.setAttribute('data-course-script', 'chinese');
+      } else if (effectiveLang === 'ja' || activeCourseId === 'ja') {
+        document.documentElement.classList.add('font-japanese', 'lang-ja');
+        document.body.classList.add('font-japanese', 'lang-ja');
+        document.documentElement.setAttribute('data-course-script', 'japanese');
+      } else if (effectiveLang === 'ar' || activeCourseId === 'ar') {
+        document.documentElement.classList.add('font-arabic', 'lang-ar');
+        document.body.classList.add('font-arabic', 'lang-ar');
+        document.documentElement.setAttribute('data-course-script', 'arabic');
+      } else {
+        document.documentElement.removeAttribute('data-course-script');
+      }
     } catch (e) {
-      console.warn("Language direction update error:", e);
+      console.warn("Language direction/typography update error:", e);
     }
-  }, [user.language]);
+  }, [user.language, currentCourse?.id]);
 
   // Daily Streak Freeze check on launch
   useEffect(() => {
@@ -3729,11 +4176,29 @@ const getTodayChallenge = () => {
   const [showPlacementTestModal, setShowPlacementTestModal] = useState<boolean>(false);
   const [placementCourse, setPlacementCourse] = useState<Course | null>(null);
 
+  // Language lock modal state (switching locked for pt, it, tr, ko, hi, pl, id, bn, th until Nov 1, 2026)
+  const [showLanguageLockModal, setShowLanguageLockModal] = useState<boolean>(false);
+  const [lockedModalLang, setLockedModalLang] = useState<string | null>(null);
+
+  const handleAttemptSwitchLanguage = (langCode: string, onSuccess?: () => void): boolean => {
+    if (isLanguageSwitchLocked(langCode)) {
+      playSound('wrong');
+      setToast(getLanguageLockedToastMessage(langCode, user.language));
+      setLockedModalLang(langCode);
+      setShowLanguageLockModal(true);
+      return false;
+    }
+    if (onSuccess) {
+      onSuccess();
+    }
+    return true;
+  };
+
   // Synchronized theme detection (light vs dark mode)
   const isLightMode = useMemo(() => {
     const theme = user.theme;
     if (theme === 'light') return true;
-    if (theme === 'dark') return false;
+    if (theme === 'dark' || theme === 'midnight' || theme === 'emerald') return false;
     if (user.nightMode === false) return true;
     if (user.nightMode === true) return false;
     if (theme === 'system' && typeof window !== 'undefined' && window.matchMedia) {
@@ -3742,20 +4207,38 @@ const getTodayChallenge = () => {
     return false;
   }, [user.theme, user.nightMode]);
 
-  // Global Theme Effect (Syncs light/dark/system theme to HTML & body classes)
+  // Global Theme, Text Size, and Font Effect (Syncs settings to HTML & body classes/attributes)
   useEffect(() => {
-    if (isLightMode) {
+    const activeTheme = user.theme || (isLightMode ? 'light' : 'dark');
+    document.documentElement.classList.remove('light', 'dark', 'midnight', 'emerald', 'theme-light', 'theme-midnight', 'theme-emerald');
+    document.body.classList.remove('theme-light', 'theme-midnight', 'theme-emerald');
+
+    if (activeTheme === 'light' || (activeTheme === 'system' && isLightMode)) {
       document.documentElement.classList.add('light', 'theme-light');
-      document.documentElement.classList.remove('dark');
       document.body.classList.add('theme-light');
       document.documentElement.setAttribute('data-theme', 'light');
+    } else if (activeTheme === 'midnight') {
+      document.documentElement.classList.add('dark', 'midnight', 'theme-midnight');
+      document.body.classList.add('theme-midnight');
+      document.documentElement.setAttribute('data-theme', 'midnight');
+    } else if (activeTheme === 'emerald') {
+      document.documentElement.classList.add('dark', 'emerald', 'theme-emerald');
+      document.body.classList.add('theme-emerald');
+      document.documentElement.setAttribute('data-theme', 'emerald');
     } else {
       document.documentElement.classList.add('dark');
-      document.documentElement.classList.remove('light', 'theme-light');
-      document.body.classList.remove('theme-light');
       document.documentElement.setAttribute('data-theme', 'dark');
     }
-  }, [isLightMode]);
+
+    // Synchronize Text Size (small | normal | large | huge)
+    const textSize = user.textSize || 'normal';
+    document.documentElement.setAttribute('data-text-size', textSize);
+
+    // Synchronize App Font Family (din | sans | serif | dyslexic | mono | playful)
+    const font = user.fontFamily || 'din';
+    document.documentElement.setAttribute('data-font', font);
+    document.body.setAttribute('data-font', font);
+  }, [user.theme, isLightMode, user.textSize, user.fontFamily]);
 
   // Instant one-click toggle between Light and Dark mode with sound & toast
   const toggleTheme = () => {
@@ -4134,6 +4617,12 @@ const getTodayChallenge = () => {
   
   // CHESS STATE
   const [isChessInviteModalOpen, setIsChessInviteModalOpen] = useState(false);
+  const [isChessSettingsModalOpen, setIsChessSettingsModalOpen] = useState(false);
+  const [chessHubRoomCode, setChessHubRoomCode] = useState(() => 'DW-' + Math.floor(100000 + Math.random() * 900000));
+  const [chessHubLinkCopied, setChessHubLinkCopied] = useState(false);
+  const [chessHubSearchQuery, setChessHubSearchQuery] = useState('');
+  const [chessLobbyTab, setChessLobbyTab] = useState<'bot' | 'pvp' | 'analysis' | 'all'>('all');
+  const [chessPvpSubTab, setChessPvpSubTab] = useState<'link' | 'invite' | 'search'>('link');
   const [chessOpponent, setChessOpponent] = useState<{ name: string; elo: number; avatar: string; isBot?: boolean }>({
     name: "DuoWindo6601",
     elo: 1500,
@@ -4153,7 +4642,7 @@ const getTodayChallenge = () => {
   const [chessChat, setChessChat] = useState<RoleplayMessage[]>([]);
   const [chessTab, setChessTab] = useState<'history' | 'chat'>('history');
   const [chessInput, setChessInput] = useState("");
-  const [chessTimerSeconds, setChessTimerSeconds] = useState<number>(20 * 60);
+  const [chessTimerSeconds, setChessTimerSeconds] = useState<number>(() => ((user?.chessTimeControl || 20) * 60));
   const chessMoveHistoryEndRef = useRef<HTMLDivElement>(null);
 
   const [ishiharaInput, setIshiharaInput] = useState("");
@@ -4164,9 +4653,11 @@ const getTodayChallenge = () => {
   const [translatorOutput, setTranslatorOutput] = useState("");
   const [transTarget, setTransTarget] = useState<Course>(currentCourse);
 
-  const [courseRegionTab, setCourseRegionTab] = useState<'all' | 'speaker' | 'hardest' | 'cis' | 'world' | 'special' | 'rf' | 'catalog'>('all');
+  const [courseRegionTab, setCourseRegionTab] = useState<'all' | 'speaker' | 'hardest' | 'cis' | 'world' | 'special' | 'rf' | 'catalog' | 'beta'>('all');
   const [speakerLanguage, setSpeakerLanguage] = useState<string>(() => user.language || 'ru');
   const [courseSearch, setCourseSearch] = useState("");
+  const [courseSortMode, setCourseSortMode] = useState<CourseSortMode>('default');
+  const [selectedHardestLanguageId, setSelectedHardestLanguageId] = useState<string | null>(null);
 
   // VIDEO CALL STATE
   const [videoCameraOn, setVideoCameraOn] = useState(true);
@@ -4211,6 +4702,23 @@ const getTodayChallenge = () => {
   const isHebrewText = useCallback((text: string) => {
     return /[\u0590-\u05FF]/.test(text || '');
   }, []);
+
+  const isChineseText = useCallback((text: string) => {
+    return /[\u4E00-\u9FFF\u3400-\u4DBF]/.test(text || '');
+  }, []);
+
+  const isJapaneseText = useCallback((text: string) => {
+    return /[\u3040-\u309F\u30A0-\u30FF]/.test(text || '');
+  }, []);
+
+  const getTextFontClass = useCallback((text: string) => {
+    if (!text) return '';
+    if (isArabicText(text)) return 'font-arabic text-right';
+    if (isJapaneseText(text)) return 'font-japanese';
+    if (isChineseText(text)) return 'font-chinese';
+    if (isHebrewText(text)) return 'font-hebrew text-right';
+    return '';
+  }, [isArabicText, isJapaneseText, isChineseText, isHebrewText]);
 
   const formatRTLOverride = useCallback((text: string) => {
     if (!text) return "";
@@ -4500,6 +5008,16 @@ const getTodayChallenge = () => {
 
   // ... (Video, Speech, Draw handlers same as before) ...
   const startVideoCall = async (topic: string = "Заказ в кафе") => {
+      if (user.subscription !== 'max') {
+          playSound('wrong');
+          setToast(
+              user.language === 'ru'
+                  ? '💎 Видеозвонок (AI) доступен только по платной подписке DuoWindo6601 Max!'
+                  : '💎 AI Video Call requires DuoWindo6601 Max paid subscription!'
+          );
+          setScreen(AppScreen.SUBSCRIPTION);
+          return;
+      }
       playSound('click');
       setLoading(true);
       setVideoTopic(topic);
@@ -4678,6 +5196,40 @@ const getTodayChallenge = () => {
       });
   };
 
+  const handleUpdateChessTimeControl = (minutes: number) => {
+    setUser(prev => {
+      const updated = { ...prev, chessTimeControl: minutes };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
+    setChessTimerSeconds(minutes * 60);
+    setToast(user.language === 'ru' ? `⏱️ Контроль времени: ${minutes} мин` : `⏱️ Time control: ${minutes} min`);
+  };
+
+  const handleToggleChessSoundEffects = (enabled: boolean) => {
+    setUser(prev => {
+      const updated = { ...prev, chessSoundEffects: enabled };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
+    setToast(enabled
+      ? (user.language === 'ru' ? '🔊 Звуки ходов и взятий включены' : '🔊 Chess move & capture sounds enabled')
+      : (user.language === 'ru' ? '🔇 Звуки ходов и взятий выключены' : '🔇 Chess move & capture sounds disabled')
+    );
+  };
+
+  const handleUpdateChessPieceTheme = (theme: ChessPieceTheme) => {
+    setUser(prev => {
+      const updated = { ...prev, chessPieceTheme: theme };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
+    setToast(theme === 'unicode'
+      ? (user.language === 'ru' ? '♔ Тема фигур: Классический Юникод' : '♔ Piece theme: Classic Unicode')
+      : (user.language === 'ru' ? '🎨 Тема фигур: Графические иконки (Staunton)' : '🎨 Piece theme: Graphical Icons (Staunton)')
+    );
+  };
+
   const initChessGame = (customOpponent?: { name: string; elo: number; avatar: string; isBot?: boolean }) => {
     const opp = customOpponent || chessOpponent;
     setChessFen(INITIAL_BOARD_FEN);
@@ -4688,7 +5240,7 @@ const getTodayChallenge = () => {
     setChessValidMoves([]);
     setChessStatus('active');
     setChessLastMove(null);
-    setChessTimerSeconds(20 * 60);
+    setChessTimerSeconds((user.chessTimeControl || 20) * 60);
     setChessChat([{
       role: 'model',
       text: opp.isBot
@@ -4723,6 +5275,43 @@ const getTodayChallenge = () => {
       }
     });
     setScreen(AppScreen.LESSON);
+  };
+
+  const handleChessHubCopyLink = () => {
+    const url = typeof window !== 'undefined'
+      ? `${window.location.origin}${window.location.pathname}#chess-party?room=${chessHubRoomCode}`
+      : `https://duowindo6601.applet.run/#chess-party?room=${chessHubRoomCode}`;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        navigator.clipboard.writeText(url);
+      }
+    } catch (e) {
+      console.warn("Clipboard copy failed", e);
+    }
+    setChessHubLinkCopied(true);
+    playSound('success');
+    setToast(user.language === 'ru' ? '✅ Ссылка на шахматную партию скопирована!' : '✅ Chess match link copied!');
+    setTimeout(() => setChessHubLinkCopied(false), 3000);
+  };
+
+  const handleChessHubShareLink = async () => {
+    const url = typeof window !== 'undefined'
+      ? `${window.location.origin}${window.location.pathname}#chess-party?room=${chessHubRoomCode}`
+      : `https://duowindo6601.applet.run/#chess-party?room=${chessHubRoomCode}`;
+    playSound('click');
+    if (navigator?.share) {
+      try {
+        await navigator.share({
+          title: user.language === 'ru' ? 'Шахматы DuoWindo6601' : 'DuoWindo6601 Chess',
+          text: user.language === 'ru' ? 'Сыграем партию в шахматы? Заходи по ссылке и получи +30 XP!' : 'Let\'s play a chess match! Join via link and get +30 XP!',
+          url
+        });
+        return;
+      } catch (err) {
+        // Fallback to copy
+      }
+    }
+    handleChessHubCopyLink();
   };
   const handleChessChatSend = async () => { if (!chessInput.trim()) return; const userText = chessInput; setChessInput(""); const newHistory = [...chessChat, { role: 'user', text: userText } as RoleplayMessage]; setChessChat(newHistory); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); const reply = await getChessChatReply(chessFen, chessHistory, newHistory, userText); setChessChat([...newHistory, { role: 'model', text: reply }]); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); }
   const getPieceTutorial = (piece: ChessPiece, lang: string) => {
@@ -4775,10 +5364,12 @@ const getTodayChallenge = () => {
       }
       
       const isCapture = !!(moveObj && (moveObj.captured || (moveObj.flags && (moveObj.flags.includes('c') || moveObj.flags.includes('e')))));
-      if (isCapture) {
-          playSound('capture');
-      } else {
-          playSound('click');
+      if (user.chessSoundEffects ?? true) {
+          if (isCapture) {
+              playSound('capture');
+          } else {
+              playSound('click');
+          }
       }
 
       const newFen = chess.fen();
@@ -4851,10 +5442,12 @@ const getTodayChallenge = () => {
       const lastMove = aiMoves[aiMoves.length - 1];
 
       const isCapture = !!(lastMove && (lastMove.captured || (lastMove.flags && (lastMove.flags.includes('c') || lastMove.flags.includes('e')))));
-      if (isCapture) {
-          playSound('capture');
-      } else {
-          playSound('select');
+      if (user.chessSoundEffects ?? true) {
+          if (isCapture) {
+              playSound('capture');
+          } else {
+              playSound('select');
+          }
       }
       
       const newFen = chess.fen();
@@ -4987,7 +5580,10 @@ const getTodayChallenge = () => {
     const userLang = user.language === 'en' ? 'English' : 'Russian';
 
     try {
-      const explanationText = await getMistakeExplanation(original, userAnswer, correctAnswer, userLang, isCorrect, currentExercise.type, isOffline);
+      let explanationText = "";
+      if (user.subscription === 'max') {
+        explanationText = await getMistakeExplanation(original, userAnswer, correctAnswer, userLang, isCorrect, currentExercise.type, isOffline);
+      }
       setExplanation(explanationText || generateLocalMistakeExplanation(original, userAnswer, correctAnswer, userLang, isCorrect, currentExercise.type));
     } catch (e) {
       setExplanation(generateLocalMistakeExplanation(original, userAnswer, correctAnswer, userLang, isCorrect, currentExercise.type));
@@ -5017,6 +5613,17 @@ const getTodayChallenge = () => {
       return;
     }
 
+    if (currentCourse.id === 'math') {
+      startMathTraining(mathGrade, mathTopic);
+      return;
+    }
+
+    if (currentCourse.id === 'music') {
+      setMusicStudioTab('notes');
+      setShowMusicStudioModal(true);
+      return;
+    }
+
     // Authentic Duolingo lesson loading screen transition
     setCurrentExercise(null);
     setLessonLoading(true);
@@ -5030,7 +5637,8 @@ const getTodayChallenge = () => {
     setIshiharaInput("");
     setReadingInput("");
 
-    if (offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') {
+    const isPhysicalOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+    if (isPhysicalOffline || (offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max')) {
       const ex = getFallbackExercise(currentCourse.id, type, currentCourse.localName);
       setCurrentExercise(ex);
       setAvailableTokens((ex.wordBank || []).map(w => ({ id: crypto.randomUUID(), text: w })));
@@ -5041,6 +5649,16 @@ const getTodayChallenge = () => {
 
     try {
       if (type === 'roleplay') {
+        if (user.subscription !== 'max') {
+          playSound('wrong');
+          setToast(
+              user.language === 'ru'
+                  ? '💎 Roleplay Max (AI) доступен только по платной подписке DuoWindo6601 Max!'
+                  : '💎 Roleplay Max (AI) requires DuoWindo6601 Max paid subscription!'
+          );
+          setScreen(AppScreen.SUBSCRIPTION);
+          return;
+        }
         setRoleplayInput("");
         const ex = await startRoleplay(currentCourse.localName, currentCourse.id);
         setCurrentExercise(ex);
@@ -5150,15 +5768,45 @@ const getTodayChallenge = () => {
     }
   };
 
-  const handleNavigation = (s: AppScreen) => { playSound('screen_transition'); setScreen(s); };
+  const isSpecialNonLanguage = (courseId: string) => {
+    return courseId === 'math' || courseId === 'music' || courseId === 'chess';
+  };
+
+  const handleNavigation = (s: AppScreen) => { 
+    if (s === AppScreen.ALPHABET && isSpecialNonLanguage(currentCourse.id)) {
+      playSound('wrong');
+      setToast(user.language === 'ru' 
+        ? `🔒 Раздел «Письма» доступен только для языковых курсов. В курсе «${currentCourse.localName}» (Предметы & Игры) нет алфавита.`
+        : `🔒 The Letters section is only accessible for language courses. Non-language courses do not have letters.`
+      );
+      setScreen(AppScreen.ALPHABET);
+      return;
+    }
+    if (s === AppScreen.ALPHABET && isBetaWritingRestricted(currentCourse.id)) {
+      const bInfo = getBetaWritingRestrictedInfo(currentCourse.id);
+      setToast(`🔒 ${currentCourse.localName || currentCourse.name} (${bInfo?.version || 'Beta'}): Ограничение раздел письма будут доступ до 1 ноября 2026 год`);
+    }
+    playSound('screen_transition'); 
+    setScreen(s); 
+  };
 
   const ChessNavIcon: React.FC<{ className?: string }> = ({ className }) => (
     <ChessPieceIcon type="n" color={isLightMode ? 'w' : 'b'} className={className} />
   );
 
+  const isNonLangCourse = isSpecialNonLanguage(currentCourse.id);
+
   const NAV_ITEMS = [
     { screen: AppScreen.PATH, icon: HomeIcon, label: t('home') },
-    { screen: AppScreen.ALPHABET, icon: AlphabetIcon, label: user.language === 'ru' ? 'Письма' : t('alphabet') },
+    { 
+      screen: AppScreen.ALPHABET, 
+      icon: AlphabetIcon, 
+      label: isNonLangCourse 
+        ? (user.language === 'ru' ? 'Письма (Только языки 🔒)' : 'Letters (Languages only 🔒)')
+        : isBetaWritingRestricted(currentCourse.id)
+        ? (user.language === 'ru' ? 'Письма (Ограничение 🔒)' : 'Letters (Restricted 🔒)')
+        : (user.language === 'ru' ? 'Письма' : t('alphabet')) 
+    },
     { screen: AppScreen.TRANSLATOR, icon: BookIcon, label: user.language === 'ru' ? 'Переводчик DuoWindo6601' : 'Translator DuoWindo6601' },
     { screen: AppScreen.FEEDBACK, icon: StarIcon, label: user.language === 'ru' ? 'Отзывы о DuoWindo6601' : 'Reviews DuoWindo6601' },
     { screen: AppScreen.SUPPORT_CHAT, icon: ChatBubbleIcon, label: user.language === 'ru' ? 'Чат техподдержки DuoWindo6601' : 'Support Chat DuoWindo6601' },
@@ -5227,18 +5875,36 @@ const getTodayChallenge = () => {
                 className={`flex items-center space-x-4 w-full px-4 py-3.5 rounded-2xl border-2 transition-all relative cursor-pointer ${
                   screen === item.screen 
                     ? 'bg-duo-blue/10 border-duo-blue/40 text-duo-blue font-black' 
-                    : isLightMode 
-                      ? 'border-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900' 
-                      : 'border-transparent text-gray-400 hover:bg-white/5 hover:text-white'
+                    : item.screen === AppScreen.ALPHABET && isNonLangCourse
+                      ? 'border-transparent text-gray-500 opacity-60 hover:opacity-100'
+                      : isLightMode 
+                        ? 'border-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900' 
+                        : 'border-transparent text-gray-400 hover:bg-white/5 hover:text-white'
                 }`}
+                title={item.screen === AppScreen.ALPHABET && isNonLangCourse ? (user.language === 'ru' ? 'Раздел «Письма» доступен только для языковых курсов' : 'Only available for language courses') : item.label}
               >
                 <div className="relative">
-                  <item.icon className="w-6 h-6" />
+                  <item.icon className={`w-6 h-6 ${item.screen === AppScreen.ALPHABET && isNonLangCourse ? 'opacity-40' : ''}`} />
+                  {item.screen === AppScreen.ALPHABET && (isNonLangCourse || isBetaWritingRestricted(currentCourse.id)) && (
+                    <span className="absolute -top-1.5 -right-1.5 text-xs">🔒</span>
+                  )}
                   {isTodayChallengePending && (
                     <span className={`absolute -top-1 -right-1 w-2.5 h-2.5 bg-duo-orange rounded-full border-2 ${isLightMode ? 'border-white' : 'border-duo-dark'} animate-pulse`} />
                   )}
                 </div>
-                <span className="font-bold text-xs uppercase tracking-widest">{item.label}</span>
+                <div className="flex flex-col text-left">
+                  <span className="font-bold text-xs uppercase tracking-widest">{item.label}</span>
+                  {item.screen === AppScreen.ALPHABET && isNonLangCourse && (
+                    <span className="text-[9px] text-amber-400 font-bold normal-case leading-tight">
+                      {user.language === 'ru' ? 'Только для языков' : 'Languages only'}
+                    </span>
+                  )}
+                  {item.screen === AppScreen.ALPHABET && !isNonLangCourse && isBetaWritingRestricted(currentCourse.id) && (
+                    <span className="text-[9px] text-amber-400 font-bold normal-case leading-tight">
+                      {user.language === 'ru' ? 'Ограничение до 1 ноя 2026' : 'Restricted until Nov 1 2026'}
+                    </span>
+                  )}
+                </div>
               </button>
             );
           })}
@@ -5289,7 +5955,7 @@ const getTodayChallenge = () => {
       <main className={isSimulatingMobile ? "flex-1 relative pb-44 min-h-screen w-full" : "flex-1 lg:ml-64 relative pb-44 lg:pb-0 min-h-screen"}>
         {/* HEADER */}
         {screen !== AppScreen.LESSON && screen !== AppScreen.VIDEO_CALL && (
-          <header className={`sticky top-0 z-40 ${isLightMode ? 'bg-white/95 border-slate-200' : 'bg-duo-dark/95 border-gray-800'} backdrop-blur-md p-2.5 sm:p-4 border-b flex flex-col space-y-2 sm:space-y-4 shadow-sm transition-colors`}>
+          <header className={`sticky top-0 z-40 ${isLightMode ? 'bg-white/95' : 'bg-duo-dark/95'} backdrop-blur-md p-2.5 sm:p-4 flex flex-col space-y-2 sm:space-y-4 shadow-sm transition-colors`}>
              <div className="flex justify-between items-center max-w-5xl mx-auto w-full">
                 <div className="flex items-center space-x-3 sm:space-x-5">
                   <div className="flex items-center text-duo-red font-bold text-sm sm:text-lg"><FireIcon className="w-5 h-5 sm:w-6 sm:h-6 mr-1" /> {user.streak}</div>
@@ -5383,6 +6049,9 @@ const getTodayChallenge = () => {
                         : (isLightMode ? 'Light' : 'Dark')}
                     </span>
                   </button>
+
+                  {/* PWA INSTALL BUTTON (Desktop PC & Mobile Standalone) */}
+                  <PWAInstallButton isRu={user.language === 'ru'} onOpenReviews={() => setScreen(AppScreen.FEEDBACK)} />
 
                   {/* QUICK LANGUAGE SWITCHER */}
                     <div className="relative group">
@@ -6086,15 +6755,150 @@ const getTodayChallenge = () => {
                         </div>
                     </div>
                     <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl">
-                    <h3 className="text-xl font-bold mb-4 text-white uppercase tracking-widest">{t('language')}</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-                        {['ru','en','de','fr','es','ja','zh','ar'].map(lang => (
-                            <button key={lang} onClick={() => { playSound('select'); setUser({...user, language: lang as any}); }} className={`p-3 rounded-xl font-bold border-b-4 transition-all text-xs flex flex-col items-center justify-center space-y-1 ${user.language === lang ? 'bg-duo-blue border-duo-blueDark text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'}`}>
-                                <span className="font-black text-sm tracking-wider">{lang.toUpperCase()}</span>
-                                <span className="text-[10px] opacity-80">{t('lang_' + lang)}</span>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-xl font-bold text-white uppercase tracking-widest">{t('language')}</h3>
+                        <span className="text-xs font-black px-2.5 py-1 rounded-full bg-duo-blue/20 text-sky-300 border border-duo-blue/40 uppercase">
+                          {user.language.toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">
+                        {user.language === 'ru' ? 'Доступные языки интерфейса:' : 'Available Interface Languages:'}
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                          {[
+                            { code: 'ru', name: 'Русский', fontClass: '' },
+                            { code: 'en', name: 'English', fontClass: '' },
+                            { code: 'de', name: 'Deutsch', fontClass: '' },
+                            { code: 'fr', name: 'Français', fontClass: '' },
+                            { code: 'es', name: 'Español', fontClass: '' },
+                            { code: 'ja', name: '日本語', fontClass: 'font-japanese' },
+                            { code: 'zh', name: '中文', fontClass: 'font-chinese' },
+                            { code: 'ar', name: 'العربية', fontClass: 'font-arabic' }
+                          ].map(item => (
+                              <button 
+                                key={item.code} 
+                                onClick={() => { playSound('select'); setUser({...user, language: item.code as any}); }} 
+                                className={`p-3 rounded-xl font-bold border-b-4 transition-all text-xs flex flex-col items-center justify-center space-y-1 cursor-pointer ${
+                                  user.language === item.code 
+                                    ? 'bg-duo-blue border-duo-blueDark text-white ring-2 ring-duo-blue/40' 
+                                    : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700 hover:text-white'
+                                }`}
+                              >
+                                  <span className={`font-black text-sm tracking-wider ${item.fontClass}`}>{item.code.toUpperCase()}</span>
+                                  <span className={`text-[10px] opacity-80 ${item.fontClass}`}>{item.name}</span>
+                              </button>
+                          ))}
+                      </div>
+
+                      {/* Locked languages in development (Until Nov 1, 2026) */}
+                      <div className="p-4 rounded-2xl bg-amber-950/20 border-2 border-amber-500/40 mb-5">
+                        <div className="flex items-center justify-between mb-2.5">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-lg">🔒</span>
+                            <div>
+                              <h4 className="text-xs sm:text-sm font-black text-amber-300 uppercase tracking-wider">
+                                {user.language === 'ru' ? 'В разработке • Доступно 1 ноября 2026 г.' : 'In Development • Available Nov 1, 2026'}
+                              </h4>
+                              <p className="text-[11px] text-amber-200/80 font-medium">
+                                {user.language === 'ru' 
+                                  ? 'Переключение на эти языки и раздел «Письмо» откроются 1 ноября 2026 года' 
+                                  : 'Switching to these languages and "Letters" section will unlock on Nov 1, 2026'}
+                              </p>
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-amber-500 text-black shrink-0 uppercase">
+                            15 {user.language === 'ru' ? 'языков' : 'langs'}
+                          </span>
+                        </div>
+
+                        {/* World Languages (10) */}
+                        <div className="text-[11px] font-black uppercase tracking-wider text-amber-300 mb-2 flex items-center justify-between">
+                          <span>🌍 {user.language === 'ru' ? 'Языки мира (10):' : 'World Languages (10):'}</span>
+                          <span className="text-[10px] font-bold text-amber-400">🔒 1 нояб. 2026</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 mb-3.5">
+                          {[
+                            { code: 'pt', nameRu: 'Португальский', nameEn: 'Portuguese', native: 'Português', flag: '🇧🇷' },
+                            { code: 'it', nameRu: 'Итальянский', nameEn: 'Italian', native: 'Italiano', flag: '🇮🇹' },
+                            { code: 'tr', nameRu: 'Турецкий', nameEn: 'Turkish', native: 'Türkçe', flag: '🇹🇷' },
+                            { code: 'ko', nameRu: 'Корейский', nameEn: 'Korean', native: '한국어', flag: '🇰🇷' },
+                            { code: 'hi', nameRu: 'Хинди (Индия)', nameEn: 'Hindi (India)', native: 'हिन्दी', flag: '🇮🇳' },
+                            { code: 'pl', nameRu: 'Польский', nameEn: 'Polish', native: 'Polski', flag: '🇵🇱' },
+                            { code: 'id', nameRu: 'Индонезийский (Bahasa Indonesia)', nameEn: 'Indonesian (Bahasa Indonesia)', native: 'Bahasa Indonesia', flag: '🇮🇩' },
+                            { code: 'bn', nameRu: 'Бенгальский (বাংলা)', nameEn: 'Bengali (বাংলা)', native: 'বাংলা', flag: '🇧🇩' },
+                            { code: 'th', nameRu: 'Тайский (ไทย)', nameEn: 'Thai (ไทย)', native: 'ไทย', flag: '🇹🇭' },
+                            { code: 'vi', nameRu: 'Вьетнамский (Tiếng Việt)', nameEn: 'Vietnamese', native: 'Tiếng Việt', flag: '🇻🇳' },
+                          ].map(item => (
+                            <button
+                              key={item.code}
+                              type="button"
+                              onClick={() => handleAttemptSwitchLanguage(item.code)}
+                              className="p-2.5 rounded-xl border border-amber-500/30 bg-black/40 hover:bg-amber-950/40 text-gray-300 hover:text-amber-200 transition-all text-xs flex items-center justify-between cursor-pointer group"
+                              title={user.language === 'ru' ? `${item.nameRu}: доступно 1 ноября 2026 г.` : `${item.nameEn}: available by Nov 1, 2026`}
+                            >
+                              <div className="flex items-center space-x-2 truncate">
+                                <span className="text-base select-none">{item.flag}</span>
+                                <div className="text-left truncate">
+                                  <div className="font-bold text-[11px] truncate text-white group-hover:text-amber-200">
+                                    {user.language === 'ru' ? item.nameRu : item.nameEn}
+                                  </div>
+                                  <div className="text-[9px] text-gray-400 truncate">
+                                    {item.native}
+                                  </div>
+                                </div>
+                              </div>
+                              <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0 ml-1">
+                                🔒 1 нояб.
+                              </span>
                             </button>
-                        ))}
-                    </div>
+                          ))}
+                        </div>
+
+                        {/* CIS Countries List (5) */}
+                        <div className="p-3 bg-black/40 border border-amber-500/30 rounded-xl space-y-2">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-1.5 border-b border-amber-500/20">
+                            <span className="text-[11px] font-black uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                              <span>🌍</span>
+                              <span>{user.language === 'ru' ? 'Заблокированные языки мира' : 'Locked World Languages'}</span>
+                            </span>
+                            <span className="text-[10px] font-black text-amber-300 bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 rounded-md self-start sm:self-auto">
+                              Раздел Письмо Будут доступ 1 ноября 2026 год
+                            </span>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            {[
+                              { code: 'kk', label: 'Казахстан (Қазақша) — Казахстан (казахский — выбран) 🇰🇿', flag: '🇰🇿' },
+                              { code: 'uz', label: 'Узбекистан (Oʻzbekcha) — Узбекистан (узбекский) 🇺🇿', flag: '🇺🇿' },
+                              { code: 'hy', label: 'Армения (Հայերեն) — Армения (армянский) 🇦🇲', flag: '🇦🇲' },
+                              { code: 'ka', label: 'Грузия (ქართული) — Грузия (грузинский) 🇬🇪', flag: '🇬🇪' },
+                              { code: 'az', label: 'Азербайджан (Azərbaycan) — Азербайджан (азербайджанский) 🇦🇿', flag: '🇦🇿' },
+                            ].map(item => (
+                              <button
+                                key={item.code}
+                                type="button"
+                                onClick={() => handleAttemptSwitchLanguage(item.code)}
+                                className="w-full p-2.5 rounded-xl border border-amber-500/30 bg-black/50 hover:bg-amber-950/50 text-gray-300 hover:text-amber-200 transition-all text-xs flex items-center justify-between cursor-pointer group text-left"
+                              >
+                                <div className="flex items-center space-x-2.5 truncate">
+                                  <span className="text-base select-none shrink-0">{item.flag}</span>
+                                  <div className="truncate">
+                                    <div className="font-bold text-[11px] text-amber-100 group-hover:text-white truncate">
+                                      🔒 {item.label}
+                                    </div>
+                                    <div className="text-[9px] text-gray-400 font-medium">
+                                      Раздел Письмо Будут доступ 1 ноября 2026 год
+                                    </div>
+                                  </div>
+                                </div>
+                                <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0 ml-1">
+                                  🔒 1 нояб.
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
 
                     {/* Auto-Translator toggle in Settings -> Language */}
                     <div className="bg-gray-800/80 border-2 border-indigo-500/40 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-inner">
@@ -6144,101 +6948,189 @@ const getTodayChallenge = () => {
                       </button>
                     </div>
 
-                    {/* GLOBAL THEME SWITCHER */}
-                    <div className="bg-gray-800/80 border-2 border-indigo-500/40 rounded-2xl p-4 flex flex-col space-y-3 shadow-inner mt-3 text-left">
+                    {/* APPEARANCE, TEXT SIZE, THEME & FONT SECTIONS */}
+                    <div className="mt-4 mb-4">
+                      <SettingsAppearanceSection
+                        user={user}
+                        setUser={setUser}
+                        setToast={setToast}
+                        playSound={playSound}
+                        isLightMode={isLightMode}
+                        STORAGE_KEY={STORAGE_KEY}
+                      />
+                    </div>
+
+                    {/* DEDICATED CHESS MATCH SETTINGS & TOGGLES */}
+                    <div className="bg-gray-800/80 border-2 border-emerald-500/50 rounded-2xl p-5 flex flex-col space-y-4 shadow-inner mt-4 text-left">
                       <div className="flex items-start justify-between flex-wrap gap-2">
                         <div className="flex items-start space-x-3">
-                          <span className="text-2xl p-2 bg-indigo-950/60 rounded-xl border border-indigo-500/40">
-                            {user.theme === 'light' ? '☀️' : user.theme === 'system' ? '💻' : '🌙'}
+                          <span className="text-2xl p-2.5 bg-emerald-950/70 rounded-2xl border border-emerald-500/40">
+                            ♟️
                           </span>
                           <div>
                             <div className="flex items-center space-x-2">
                               <h4 className="font-extrabold text-sm text-white uppercase tracking-wider">
-                                {user.language === 'ru' ? 'Тема оформления (Светлая / Темная)' : 'Theme Mode (Light / Dark)'}
+                                {user.language === 'ru' ? 'Настройки шахмат (Chess Settings)' : 'Chess Match Settings'}
                               </h4>
-                              <span className="bg-indigo-500/30 text-indigo-300 text-[10px] font-black px-2 py-0.5 rounded-md border border-indigo-500/50 uppercase">
-                                UI Theme
+                              <span className="bg-emerald-500/30 text-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-md border border-emerald-500/50 uppercase">
+                                DuoWindo6601
                               </span>
                             </div>
                             <p className="text-xs text-gray-300 font-medium mt-1">
                               {user.language === 'ru'
-                                ? 'Глобальный переключатель между светлым, темным и системным режимами интерфейса'
-                                : 'Global switch between light, dark, and system interface modes'}
+                                ? 'Контроль времени (таймер 5/10/20 мин), звуки ходов и взятий, переключатель темы фигур (Юникод / Графика)'
+                                : 'Game time control (5/10/20 min), move & capture sound effects toggle, piece theme switcher (Unicode / SVG)'}
                             </p>
                           </div>
                         </div>
+
+                        <button
+                          type="button"
+                          onClick={() => { playSound('click'); setIsChessSettingsModalOpen(true); }}
+                          className="px-3.5 py-1.5 bg-[#00cd9c] hover:bg-[#00cd9c]/90 text-gray-950 font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition-all active:scale-95 cursor-pointer flex items-center space-x-1"
+                        >
+                          <GearIcon className="w-3.5 h-3.5 text-gray-950" />
+                          <span>{user.language === 'ru' ? 'Открыть меню' : 'Open Menu'}</span>
+                        </button>
                       </div>
 
-                      {/* 3 THEME PILLS */}
-                      <div className="grid grid-cols-3 gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            playSound('click');
-                            setUser(prev => {
-                              const updated = { ...prev, theme: 'light' as const, nightMode: false };
-                              localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-                              return updated;
-                            });
-                            setToast(user.language === 'ru' ? '☀️ Светлая тема включена' : '☀️ Light Mode enabled');
-                          }}
-                          className={`py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-1.5 border-2 transition-all cursor-pointer ${
-                            user.theme === 'light'
-                              ? 'bg-amber-500 text-white border-amber-400 shadow-md ring-2 ring-amber-300'
-                              : isLightMode 
-                                ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm' 
-                                : 'bg-gray-900 border-gray-700 text-gray-300 hover:bg-gray-800'
-                          }`}
-                        >
-                          <span>☀️</span>
-                          <span>{user.language === 'ru' ? 'Светлая' : 'Light'}</span>
-                        </button>
+                      {/* 1. TIME CONTROL SETTING */}
+                      <div className="bg-black/40 p-3.5 rounded-xl border border-gray-700/80 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black text-white flex items-center gap-1.5 uppercase tracking-wide">
+                            <span>⏱️</span>
+                            <span>{user.language === 'ru' ? 'Контроль времени партии' : 'Game Time Control'}</span>
+                          </span>
+                          <span className="text-[11px] font-mono font-bold text-amber-300 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/30">
+                            {user.chessTimeControl || 20} {user.language === 'ru' ? 'минут' : 'minutes'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-400 font-medium">
+                          {user.language === 'ru'
+                            ? 'Начальное время на часах вместо стандартных 20 минут:'
+                            : 'Countdown timer duration on the clock instead of fixed 20 minutes:'}
+                        </p>
+                        <div className="grid grid-cols-3 gap-2 pt-1">
+                          {[
+                            { m: 5, label: user.language === 'ru' ? '5 мин' : '5 min', badge: 'Blitz ⚡' },
+                            { m: 10, label: user.language === 'ru' ? '10 мин' : '10 min', badge: 'Rapid ⏱️' },
+                            { m: 20, label: user.language === 'ru' ? '20 мин' : '20 min', badge: 'Classic 🏆' }
+                          ].map(opt => {
+                            const isAct = (user.chessTimeControl || 20) === opt.m;
+                            return (
+                              <button
+                                key={opt.m}
+                                type="button"
+                                onClick={() => {
+                                  playSound('select');
+                                  handleUpdateChessTimeControl(opt.m);
+                                }}
+                                className={`py-2 px-2 rounded-xl font-black text-xs uppercase tracking-wider border-2 transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
+                                  isAct
+                                    ? 'bg-emerald-600 text-white border-emerald-400 ring-2 ring-emerald-300 shadow-md'
+                                    : 'bg-gray-900 border-gray-700 text-gray-300 hover:bg-gray-800'
+                                }`}
+                              >
+                                <span className="text-sm font-black">{opt.label}</span>
+                                <span className={`text-[9px] uppercase font-bold opacity-80 ${isAct ? 'text-emerald-100' : 'text-gray-400'}`}>
+                                  {opt.badge}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
 
+                      {/* 2. DEDICATED TOGGLE FOR SOUND EFFECTS (MOVES & CAPTURES) */}
+                      <div className="bg-black/40 p-3.5 rounded-xl border border-gray-700/80 flex items-center justify-between gap-3">
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-black text-white flex items-center gap-1.5 uppercase tracking-wide">
+                            <span>🔊</span>
+                            <span>{user.language === 'ru' ? 'Звуки ходов и взятий фигур' : 'Move & Capture Sound Effects'}</span>
+                          </span>
+                          <span className="text-[11px] text-gray-400 block font-medium">
+                            {user.language === 'ru'
+                              ? 'Включение или отключение звуков щелчка хода и стука взятия в шахматах'
+                              : 'Enable or disable sound effects specifically for chess moves and captures'}
+                          </span>
+                        </div>
                         <button
                           type="button"
                           onClick={() => {
                             playSound('click');
-                            setUser(prev => {
-                              const updated = { ...prev, theme: 'dark' as const, nightMode: true };
-                              localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-                              return updated;
-                            });
-                            setToast(user.language === 'ru' ? '🌙 Тёмная тема включена' : '🌙 Dark Mode enabled');
+                            handleToggleChessSoundEffects(!(user.chessSoundEffects ?? true));
                           }}
-                          className={`py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-1.5 border-2 transition-all cursor-pointer ${
-                            user.theme === 'dark' || (!user.theme && (user.nightMode ?? true))
-                              ? 'bg-indigo-600 text-white border-indigo-400 shadow-md ring-2 ring-indigo-400'
-                              : isLightMode 
-                                ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm' 
-                                : 'bg-gray-900 border-gray-700 text-gray-300 hover:bg-gray-800'
+                          className={`py-2.5 px-4 rounded-xl font-black text-xs uppercase tracking-wider border-b-4 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center space-x-1.5 shadow-md shrink-0 cursor-pointer ${
+                            (user.chessSoundEffects ?? true)
+                              ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-800'
+                              : 'bg-gray-800 hover:bg-gray-700 text-gray-400 border-gray-950'
                           }`}
+                          title="Переключить звуки ходов и взятий"
                         >
-                          <span>🌙</span>
-                          <span>{user.language === 'ru' ? 'Тёмная' : 'Dark'}</span>
+                          <span>{(user.chessSoundEffects ?? true) ? '🔊' : '🔇'}</span>
+                          <span>
+                            {(user.chessSoundEffects ?? true)
+                              ? (user.language === 'ru' ? 'ВКЛЮЧЕНО' : 'ENABLED')
+                              : (user.language === 'ru' ? 'ВЫКЛЮЧЕНО' : 'DISABLED')}
+                          </span>
                         </button>
+                      </div>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            playSound('click');
-                            setUser(prev => {
-                              const updated = { ...prev, theme: 'system' as const };
-                              localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-                              return updated;
-                            });
-                            setToast(user.language === 'ru' ? '💻 Системная тема' : '💻 System Theme');
-                          }}
-                          className={`py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-1.5 border-2 transition-all cursor-pointer ${
-                            user.theme === 'system'
-                              ? 'bg-sky-600 text-white border-sky-400 shadow-md ring-2 ring-sky-400'
-                              : isLightMode 
-                                ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm' 
+                      {/* 3. THEME SWITCHER FOR CHESS PIECES */}
+                      <div className="bg-black/40 p-3.5 rounded-xl border border-gray-700/80 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black text-white flex items-center gap-1.5 uppercase tracking-wide">
+                            <span>🎨</span>
+                            <span>{user.language === 'ru' ? 'Тема оформления шахматных фигур' : 'Chess Piece Theme'}</span>
+                          </span>
+                          <span className="text-[10px] font-bold text-sky-300 bg-sky-950/60 px-2 py-0.5 rounded border border-sky-500/40 uppercase">
+                            {user.chessPieceTheme === 'unicode' ? 'Unicode' : 'Staunton SVG'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-400 font-medium">
+                          {user.language === 'ru'
+                            ? 'Выбор между классическими символами Юникод и графическими иконками Staunton:'
+                            : 'Choose between classic Unicode typography characters and graphical Staunton icons:'}
+                        </p>
+                        <div className="grid grid-cols-2 gap-2 pt-0.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              playSound('click');
+                              handleUpdateChessPieceTheme('graphical');
+                            }}
+                            className={`py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider border-2 transition-all cursor-pointer flex flex-col items-center justify-center gap-1.5 ${
+                              user.chessPieceTheme !== 'unicode'
+                                ? 'bg-indigo-600 text-white border-indigo-400 ring-2 ring-indigo-400 shadow-md'
                                 : 'bg-gray-900 border-gray-700 text-gray-300 hover:bg-gray-800'
-                          }`}
-                        >
-                          <span>💻</span>
-                          <span>{user.language === 'ru' ? 'Система' : 'System'}</span>
-                        </button>
+                            }`}
+                          >
+                            <div className="flex items-center space-x-1.5">
+                              <ChessPieceIcon type="n" color="w" theme="graphical" className="w-5 h-5 drop-shadow" />
+                              <ChessPieceIcon type="k" color="b" theme="graphical" className="w-5 h-5 drop-shadow" />
+                            </div>
+                            <span>{user.language === 'ru' ? 'Графика (Иконки)' : 'Graphical (Icons)'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              playSound('click');
+                              handleUpdateChessPieceTheme('unicode');
+                            }}
+                            className={`py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider border-2 transition-all cursor-pointer flex flex-col items-center justify-center gap-1.5 ${
+                              user.chessPieceTheme === 'unicode'
+                                ? 'bg-indigo-600 text-white border-indigo-400 ring-2 ring-indigo-400 shadow-md'
+                                : 'bg-gray-900 border-gray-700 text-gray-300 hover:bg-gray-800'
+                            }`}
+                          >
+                            <div className="flex items-center space-x-1 text-base">
+                              <ChessPieceIcon type="n" color="w" theme="unicode" className="w-5 h-5" />
+                              <ChessPieceIcon type="k" color="b" theme="unicode" className="w-5 h-5" />
+                            </div>
+                            <span>{user.language === 'ru' ? 'Классический Юникод' : 'Classic Unicode'}</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
 
@@ -6366,7 +7258,7 @@ const getTodayChallenge = () => {
                         ))}
                     </div>
                     </div>
-                    <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl"><h3 className="text-xl font-bold mb-4 text-white uppercase tracking-widest">{t('voiceProvider')}</h3><div className="grid grid-cols-2 md:grid-cols-4 gap-2"><button onClick={() => setUser({...user, voiceProvider: 'gemini'})} className={`p-3 rounded-xl font-bold border-b-4 ${user.voiceProvider === 'gemini' ? 'bg-purple-600 border-purple-800 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>Gemini AI</button><button onClick={() => setUser({...user, voiceProvider: 'google'})} className={`p-3 rounded-xl font-bold border-b-4 ${user.voiceProvider === 'google' ? 'bg-blue-600 border-blue-800 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>Google</button><button onClick={() => setUser({...user, voiceProvider: 'yandex'})} className={`p-3 rounded-xl font-bold border-b-4 ${user.voiceProvider === 'yandex' ? 'bg-red-600 border-red-800 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>Yandex</button><button onClick={() => setUser({...user, voiceProvider: 'system'})} className={`p-3 rounded-xl font-bold border-b-4 ${user.voiceProvider === 'system' ? 'bg-green-600 border-green-800 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>System</button></div></div>
+                    <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl"><h3 className="text-xl font-bold mb-4 text-white uppercase tracking-widest">{t('voiceProvider')}</h3><div className="grid grid-cols-2 md:grid-cols-6 gap-2"><button onClick={() => { playSound('select'); setUser({...user, voiceProvider: 'fish'}); }} className={`p-3 rounded-xl font-bold border-b-4 ${user.voiceProvider === 'fish' ? 'bg-cyan-600 border-cyan-800 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>Fish Audio 🐟</button><button onClick={() => { playSound('select'); setUser({...user, voiceProvider: 'gemini'}); }} className={`p-3 rounded-xl font-bold border-b-4 ${user.voiceProvider === 'gemini' || !user.voiceProvider ? 'bg-purple-600 border-purple-800 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>Gemini AI 🤖</button><button onClick={() => { playSound('select'); setUser({...user, voiceProvider: 'google'}); }} className={`p-3 rounded-xl font-bold border-b-4 ${user.voiceProvider === 'google' ? 'bg-blue-600 border-blue-800 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>Google</button><button onClick={() => { playSound('select'); setUser({...user, voiceProvider: 'yandex'}); }} className={`p-3 rounded-xl font-bold border-b-4 ${user.voiceProvider === 'yandex' ? 'bg-red-600 border-red-800 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>Yandex</button><button onClick={() => { playSound('select'); setUser({...user, voiceProvider: 'system'}); }} className={`p-3 rounded-xl font-bold border-b-4 ${user.voiceProvider === 'system' ? 'bg-green-600 border-green-800 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>System</button><button onClick={() => { playSound('select'); setUser({...user, voiceProvider: 'sapi53'}); }} className={`p-3 rounded-xl font-bold border-b-4 ${user.voiceProvider === 'sapi53' ? 'bg-blue-700 border-blue-900 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>Microsoft SAPI 5.3 🪟</button></div></div>
                 </div>
             </div>
         )}
@@ -6425,19 +7317,20 @@ const getTodayChallenge = () => {
                                 </span>
                                 <div className="flex items-center space-x-1 bg-black/60 p-1 rounded-xl border border-gray-700 shadow-inner">
                                     {[
-                                        { code: 'ru', flag: '🇷🇺', label: 'RU' },
-                                        { code: 'en', flag: '🇺🇸', label: 'EN' },
-                                        { code: 'es', flag: '🇪🇸', label: 'ES' },
-                                        { code: 'de', flag: '🇩🇪', label: 'DE' },
-                                        { code: 'fr', flag: '🇫🇷', label: 'FR' },
-                                        { code: 'ja', flag: '🇯🇵', label: 'JA' },
-                                        { code: 'zh', flag: '🇨🇳', label: 'ZH' },
-                                        { code: 'ar', flag: '🇸🇦', label: 'AR' },
+                                        { code: 'ru', flag: '🇷🇺', label: 'RU', fontClass: '' },
+                                        { code: 'en', flag: '🇺🇸', label: 'EN', fontClass: '' },
+                                        { code: 'es', flag: '🇪🇸', label: 'ES', fontClass: '' },
+                                        { code: 'de', flag: '🇩🇪', label: 'DE', fontClass: '' },
+                                        { code: 'fr', flag: '🇫🇷', label: 'FR', fontClass: '' },
+                                        { code: 'ja', flag: '🇯🇵', label: 'JA', fontClass: 'font-japanese' },
+                                        { code: 'zh', flag: '🇨🇳', label: 'ZH', fontClass: 'font-chinese' },
+                                        { code: 'ar', flag: '🇸🇦', label: 'AR', fontClass: 'font-arabic' },
                                     ].map(l => (
                                         <button
                                             key={l.code}
                                             type="button"
                                             onClick={() => {
+                                                if (!handleAttemptSwitchLanguage(l.code)) return;
                                                 playSound('select');
                                                 setUser({ ...user, language: l.code as any });
                                             }}
@@ -6449,7 +7342,7 @@ const getTodayChallenge = () => {
                                             title={l.label}
                                         >
                                             <span>{l.flag}</span>
-                                            <span>{l.label}</span>
+                                            <span className={l.fontClass}>{l.label}</span>
                                         </button>
                                     ))}
                                 </div>
@@ -6468,11 +7361,18 @@ const getTodayChallenge = () => {
                                 {SPEAKER_LANGUAGES.map(sp => {
                                     const isSelected = speakerLanguage === sp.code;
                                     const count = getCoursesForSpeaker(sp.code).length;
+                                    const isLocked = isLanguageSwitchLocked(sp.code);
+                                    const fontClass = sp.code === 'zs' ? 'font-chinese' : sp.code === 'ja' ? 'font-japanese' : sp.code === 'ar' ? 'font-arabic' : '';
+
                                     return (
                                         <button
                                             key={sp.code}
                                             type="button"
                                             onClick={() => {
+                                                if (isLocked) {
+                                                    handleAttemptSwitchLanguage(sp.code);
+                                                    return;
+                                                }
                                                 playSound('click');
                                                 setSpeakerLanguage(sp.code);
                                                 setCourseRegionTab('speaker');
@@ -6480,20 +7380,168 @@ const getTodayChallenge = () => {
                                             className={`px-3 py-2 rounded-2xl font-black text-xs transition-all flex items-center space-x-2 whitespace-nowrap shrink-0 border-b-2 cursor-pointer ${
                                                 isSelected
                                                     ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-black border-amber-700 shadow-lg scale-105'
+                                                    : isLocked
+                                                    ? 'bg-gray-900/90 text-gray-400 border-amber-500/30 hover:border-amber-400/60 hover:text-amber-300'
                                                     : 'bg-gray-800 text-gray-300 border-gray-900 hover:bg-gray-750 hover:text-white'
                                             }`}
+                                            title={isLocked ? (user.language === 'ru' ? `${sp.name}: доступно до 1 ноября 2026 г.` : `${sp.name}: available by Nov 1, 2026`) : sp.name}
                                         >
                                             <img src={`https://flagcdn.com/w40/${sp.flagCode}.png`} className="w-5 h-3.5 rounded-sm object-cover" alt={sp.name} />
-                                            <span>{sp.name}</span>
-                                            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${isSelected ? 'bg-black/20 text-black' : 'bg-gray-700 text-gray-400'}`}>
-                                                {count > 0 ? `${count}` : (sp.code === 'ru' ? '12+' : '6+')}
-                                            </span>
+                                            <span className={fontClass}>{sp.name}</span>
+                                            {isLocked ? (
+                                                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center space-x-0.5">
+                                                    <span>🔒</span>
+                                                    <span>1 нояб.</span>
+                                                </span>
+                                            ) : (
+                                                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${isSelected ? 'bg-black/20 text-black' : 'bg-gray-700 text-gray-400'}`}>
+                                                    {count > 0 ? `${count}` : (sp.code === 'ru' ? '12+' : '6+')}
+                                                </span>
+                                            )}
                                         </button>
                                     );
                                 })}
                             </div>
                         </div>
                     </div>
+
+                    {/* COURSE DIFFICULTY & ALPHABETICAL SORT CONTROLS */}
+                    <div className="bg-gradient-to-r from-gray-900 via-gray-850 to-gray-900 border-2 border-gray-700/80 rounded-3xl p-3.5 sm:p-4 mb-4 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div className="flex items-center space-x-3">
+                            <span className="text-2xl">⚖️</span>
+                            <div>
+                                <div className="flex items-center space-x-2 flex-wrap">
+                                    <h4 className="text-xs sm:text-sm font-black uppercase text-white tracking-wider">
+                                        {user.language === 'ru' ? 'Сортировка курсов:' : 'Course Sorting:'}
+                                    </h4>
+                                    {courseSortMode !== 'default' && (
+                                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/40 uppercase">
+                                            {courseSortMode === 'hardest' ? '🔥 TOP #1 → #11' : courseSortMode === 'easiest' ? '⚡ #11 → #1' : '🔤 A-Z'}
+                                        </span>
+                                    )}
+                                </div>
+                                <p className="text-[11px] text-gray-400 font-medium">
+                                    {user.language === 'ru' 
+                                        ? 'Сортировка по лингвистической сложности (карта HARDEST_LANGUAGE_INFO) или алфавиту' 
+                                        : 'Sort courses by linguistic difficulty based on the HARDEST_LANGUAGE_INFO map'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                                type="button"
+                                onClick={() => { playSound('click'); setCourseSortMode('default'); }}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center space-x-1 border cursor-pointer ${
+                                    courseSortMode === 'default'
+                                        ? 'bg-gray-700 text-white border-gray-500 shadow-md'
+                                        : 'bg-gray-800/80 text-gray-400 border-gray-700 hover:text-white hover:bg-gray-750'
+                                }`}
+                            >
+                                <span>🔄</span>
+                                <span>{user.language === 'ru' ? 'По умолчанию' : 'Default'}</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => { playSound('click'); setCourseSortMode('hardest'); }}
+                                className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 border cursor-pointer ${
+                                    courseSortMode === 'hardest'
+                                        ? 'bg-gradient-to-r from-red-600 via-orange-600 to-amber-600 text-white border-orange-400 shadow-lg shadow-orange-950/60 ring-2 ring-orange-500/50 scale-[1.02]'
+                                        : 'bg-gray-800/80 text-orange-400 border-orange-900/60 hover:bg-orange-950/40 hover:border-orange-500/40'
+                                }`}
+                                title={user.language === 'ru' ? 'Сложнейшие в начале (#1 Табасаранский -> #11 Корейский)' : 'Hardest first (#1 Tabasaran -> #11 Korean)'}
+                            >
+                                <span>🔥</span>
+                                <span>{user.language === 'ru' ? 'По сложности: от сложных к простым' : 'By Difficulty (Hardest to easiest)'}</span>
+                                <span className="text-[10px] bg-black/40 px-1.5 py-0.2 rounded font-black">#1→#11</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => { playSound('click'); setCourseSortMode('easiest'); }}
+                                className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 border cursor-pointer ${
+                                    courseSortMode === 'easiest'
+                                        ? 'bg-gradient-to-r from-amber-600 to-yellow-600 text-black border-amber-300 shadow-lg shadow-amber-950/60 ring-2 ring-amber-400/50 scale-[1.02]'
+                                        : 'bg-gray-800/80 text-amber-300 border-amber-900/60 hover:bg-amber-950/40 hover:border-amber-500/40'
+                                }`}
+                                title={user.language === 'ru' ? 'От простых к сложным (#11 Корейский -> #1 Табасаранский)' : 'Easiest first (#11 Korean -> #1 Tabasaran)'}
+                            >
+                                <span>⚡</span>
+                                <span>{user.language === 'ru' ? 'От простых к сложным' : 'Easiest to hardest'}</span>
+                                <span className="text-[10px] bg-black/30 px-1.5 py-0.2 rounded font-black">#11→#1</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => { playSound('click'); setCourseSortMode('alphabetical'); }}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center space-x-1 border cursor-pointer ${
+                                    courseSortMode === 'alphabetical'
+                                        ? 'bg-duo-blue text-white border-blue-400 shadow-md'
+                                        : 'bg-gray-800/80 text-gray-400 border-gray-700 hover:text-white hover:bg-gray-750'
+                                }`}
+                            >
+                                <span>🔤</span>
+                                <span>{user.language === 'ru' ? 'По алфавиту (A-Z)' : 'By Name (A-Z)'}</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* SORT EXPLANATION BANNER */}
+                    {courseSortMode === 'hardest' && (
+                        <div className="bg-gradient-to-r from-red-950/80 via-orange-950/60 to-gray-900 border-2 border-orange-500/60 rounded-2xl p-3.5 mb-4 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in">
+                            <div className="flex items-center space-x-3">
+                                <span className="text-2xl animate-pulse">🔥</span>
+                                <div>
+                                    <div className="text-sm font-black text-white flex items-center gap-2 flex-wrap">
+                                        <span>{user.language === 'ru' ? 'Активна сортировка по сложности: От сложных к простым' : 'Active: Difficulty Sort (Hardest to Easiest)'}</span>
+                                        <span className="bg-gradient-to-r from-red-500 to-orange-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider border border-orange-300/60">
+                                            HARDEST_LANGUAGE_INFO
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-orange-200/80 font-semibold mt-0.5">
+                                        {user.language === 'ru'
+                                            ? 'Рейтинг сложности: #1 Табасаранский → #2 Чувашский → #3 Венгерский → #4 Баскский → #5 Финский → #6 Навахо → #7 Исландский → #8 Польский → #9 Японский → #10 Китайский → #11 Арабский → #12 Корейский'
+                                            : 'Rank order: #1 Tabasaran → #2 Chuvash → #3 Hungarian → #4 Basque → #5 Finnish → #6 Navajo → #7 Icelandic → #8 Polish → #9 Japanese → #10 Chinese → #11 Arabic → #12 Korean'}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => { playSound('click'); setCourseSortMode('default'); }}
+                                className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-xl text-xs font-black transition-all border border-gray-600 shrink-0 cursor-pointer"
+                            >
+                                {user.language === 'ru' ? '✕ Сбросить' : '✕ Reset'}
+                            </button>
+                        </div>
+                    )}
+                    {courseSortMode === 'easiest' && (
+                        <div className="bg-gradient-to-r from-amber-950/80 via-yellow-950/60 to-gray-900 border-2 border-amber-500/60 rounded-2xl p-3.5 mb-4 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in">
+                            <div className="flex items-center space-x-3">
+                                <span className="text-2xl">⚡</span>
+                                <div>
+                                    <div className="text-sm font-black text-white flex items-center gap-2 flex-wrap">
+                                        <span>{user.language === 'ru' ? 'Активна сортировка по сложности: От простых к сложным' : 'Active: Difficulty Sort (Easiest to Hardest)'}</span>
+                                        <span className="bg-gradient-to-r from-amber-500 to-yellow-500 text-black text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider border border-amber-300/60">
+                                            #11 → #1
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-amber-200/80 font-semibold mt-0.5">
+                                        {user.language === 'ru'
+                                            ? 'Обратный порядок: #11 Корейский → #10 Арабский → #9 Китайский → #8 Японский → #7 Польский → #6 Исландский → #5 Навахо → #4 Финский → #3 Баскский → #2 Венгерский → #1 Табасаранский'
+                                            : 'Reverse order: #11 Korean → #10 Arabic → #9 Chinese → #8 Japanese → #7 Polish → #6 Icelandic → #5 Navajo → #4 Finnish → #3 Basque → #2 Hungarian → #1 Tabasaran'}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => { playSound('click'); setCourseSortMode('default'); }}
+                                className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-xl text-xs font-black transition-all border border-gray-600 shrink-0 cursor-pointer"
+                            >
+                                {user.language === 'ru' ? '✕ Сбросить' : '✕ Reset'}
+                            </button>
+                        </div>
+                    )}
 
                     {/* REGION NAVIGATION TABS */}
                     {!courseSearch && (
@@ -6546,6 +7594,12 @@ const getTodayChallenge = () => {
                             >
                                 🏆 {user.language === 'ru' ? 'Каталог (100+ языков)' : 'Global Catalog (100+)'}
                             </button>
+                            <button 
+                                onClick={() => { playSound('click'); setCourseRegionTab('beta'); }}
+                                className={`px-4 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider whitespace-nowrap transition-all border-b-4 ${courseRegionTab === 'beta' ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-fuchsia-600 border-purple-900 text-white shadow-lg shadow-purple-500/25 ring-2 ring-purple-400/40' : 'bg-gray-800 border-gray-900 text-gray-400 hover:bg-gray-700'}`}
+                            >
+                                🧪 {user.language === 'ru' ? 'Бета-курсы (8)' : 'Beta Courses (8)'}
+                            </button>
                         </div>
                     )}
                     
@@ -6556,29 +7610,44 @@ const getTodayChallenge = () => {
                                 {t('searchResults')}
                             </h3>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                {COURSES.filter(c => 
-                                    c.name.toLowerCase().includes(courseSearch.toLowerCase()) || 
-                                    c.localName.toLowerCase().includes(courseSearch.toLowerCase())
-                                ).map(c => (
-                                    <div 
-                                        key={c.id} 
-                                        onClick={() => { playSound('select'); setCurrentCourse(c); setScreen(AppScreen.PATH); }} 
-                                        className={`relative p-4 rounded-2xl border-2 border-b-4 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all flex items-center space-x-4 shadow-lg group ${currentCourse.id === c.id ? 'bg-blue-900/30 border-duo-blue ring-2 ring-duo-blue' : 'bg-gray-800 border-gray-700 hover:bg-gray-750'}`}
-                                    >
-                                        {SPECIAL_IDS.includes(c.id) ? (
-                                             <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl font-black ${c.themeColor} text-white shadow-md`}>
-                                                {c.id === 'math' ? 'Σ' : c.id === 'music' ? '♫' : c.id === 'chess' ? '♔' : '🚀'}
+                                {sortCoursesByDifficulty(
+                                    COURSES.filter(c => 
+                                        c.name.toLowerCase().includes(courseSearch.toLowerCase()) || 
+                                        c.localName.toLowerCase().includes(courseSearch.toLowerCase())
+                                    ),
+                                    courseSortMode
+                                ).map(c => {
+                                    const info = HARDEST_LANGUAGE_INFO[c.id];
+                                    const isSelected = currentCourse.id === c.id;
+                                    return (
+                                        <div 
+                                            key={c.id} 
+                                            onClick={() => { playSound('select'); setCurrentCourse(c); setScreen(AppScreen.PATH); }} 
+                                            className={`relative p-4 rounded-2xl border-2 border-b-4 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all flex flex-col justify-between shadow-lg group ${isSelected ? 'bg-blue-900/30 border-duo-blue ring-2 ring-duo-blue' : 'bg-gray-800 border-gray-700 hover:bg-gray-750'}`}
+                                        >
+                                            <div className="flex items-center space-x-4">
+                                                {SPECIAL_IDS.includes(c.id) ? (
+                                                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl font-black ${c.themeColor} text-white shadow-md`}>
+                                                        {c.id === 'math' ? 'Σ' : c.id === 'music' ? '♫' : c.id === 'chess' ? '♔' : '🚀'}
+                                                    </div>
+                                                ) : (
+                                                    <img src={`https://flagcdn.com/w80/${c.flagCode}.png`} className="w-12 h-8 rounded-md object-cover shadow-md group-hover:scale-110 transition-transform" alt={c.name} />
+                                                )}
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className="font-bold text-base text-white truncate">{getLocalizedCourseName(c)}</h3>
+                                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{c.name}</p>
+                                                </div>
+                                                {isSelected && <div className="bg-duo-green rounded-full p-1"><CheckCircleIcon className="w-5 h-5 text-white"/></div>}
                                             </div>
-                                        ) : (
-                                            <img src={`https://flagcdn.com/w80/${c.flagCode}.png`} className="w-12 h-8 rounded-md object-cover shadow-md group-hover:scale-110 transition-transform" alt={c.name} />
-                                        )}
-                                        <div className="flex-1 min-w-0">
-                                            <h3 className="font-bold text-base text-white truncate">{getLocalizedCourseName(c)}</h3>
-                                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{c.name}</p>
+                                            {info && (
+                                                <div className="mt-2 pt-2 border-t border-gray-700/60 flex items-center justify-between text-[10px] font-black">
+                                                    <span className="text-amber-400 truncate">{info.badge}</span>
+                                                    <span className="text-amber-300 bg-amber-950/80 px-1.5 py-0.5 rounded border border-amber-500/40">{info.rank}</span>
+                                                </div>
+                                            )}
                                         </div>
-                                        {currentCourse.id === c.id && <div className="bg-duo-green rounded-full p-1"><CheckCircleIcon className="w-5 h-5 text-white"/></div>}
-                                    </div>
-                                ))}
+                                    );
+                                })}
 
                                 {searchCatalog(courseSearch).map(item => (
                                     <div 
@@ -6648,6 +7717,7 @@ const getTodayChallenge = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => {
+                                                        if (!handleAttemptSwitchLanguage(speakerLanguage)) return;
                                                         playSound('select');
                                                         setUser({ ...user, language: speakerLanguage as any });
                                                     }}
@@ -6753,10 +7823,9 @@ const getTodayChallenge = () => {
                                             return (
                                                 <div 
                                                     key={c.id} 
-                                                    onClick={() => { playSound('select'); setCurrentCourse(c); setScreen(AppScreen.PATH); }} 
-                                                    className={`relative p-4 rounded-2xl border-2 border-b-4 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all flex flex-col justify-between shadow-xl group ${isSelected ? 'bg-orange-950/50 border-orange-500 ring-2 ring-orange-500' : 'bg-gray-800/90 border-gray-700/80 hover:bg-gray-750 hover:border-orange-500/50'}`}
+                                                    className={`relative p-4 rounded-2xl border-2 border-b-4 transition-all flex flex-col justify-between shadow-xl group ${isSelected ? 'bg-orange-950/50 border-orange-500 ring-2 ring-orange-500' : 'bg-gray-800/90 border-gray-700/80 hover:bg-gray-750 hover:border-orange-500/50'}`}
                                                 >
-                                                    <div className="flex items-start justify-between gap-3 mb-2">
+                                                    <div className="flex items-start justify-between gap-3 mb-2 cursor-pointer" onClick={() => { playSound('select'); setCurrentCourse(c); setScreen(AppScreen.PATH); }}>
                                                         <div className="flex items-center space-x-3 min-w-0">
                                                             <img src={`https://flagcdn.com/w80/${c.flagCode}.png`} className="w-12 h-8 rounded-md object-cover shadow-md group-hover:scale-110 transition-transform" alt={c.name} />
                                                             <div className="flex-1 min-w-0">
@@ -6767,7 +7836,7 @@ const getTodayChallenge = () => {
                                                         {isSelected && <div className="bg-duo-green rounded-full p-1"><CheckCircleIcon className="w-5 h-5 text-white"/></div>}
                                                     </div>
                                                     {info && (
-                                                        <div className="mt-2 pt-2 border-t border-gray-700/60 flex flex-col space-y-1">
+                                                        <div className="mt-2 pt-2 border-t border-gray-700/60 flex flex-col space-y-2">
                                                             <div className="flex items-center justify-between text-[10px] font-black">
                                                                 <span className="text-amber-400">{info.badge}</span>
                                                                 <span className="text-gray-400">{info.rank}</span>
@@ -6775,6 +7844,22 @@ const getTodayChallenge = () => {
                                                             <p className="text-[10px] text-gray-300 font-medium leading-tight line-clamp-2">
                                                                 {user.language === 'ru' ? info.reasonRu : info.reasonEn}
                                                             </p>
+                                                            <div className="flex items-center gap-2 pt-1">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => { e.stopPropagation(); playSound('click'); setSelectedHardestLanguageId(c.id); }}
+                                                                    className="flex-1 py-1.5 px-3 bg-orange-600/80 hover:bg-orange-500 text-white font-black text-[10px] uppercase tracking-wider rounded-xl transition-all shadow cursor-pointer border border-orange-400/50 text-center"
+                                                                >
+                                                                    {user.language === 'ru' ? '📖 Подробнее' : '📖 Details'}
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => { e.stopPropagation(); playSound('select'); setCurrentCourse(c); setScreen(AppScreen.PATH); }}
+                                                                    className="py-1.5 px-3 bg-duo-green hover:brightness-110 text-white font-black text-[10px] uppercase tracking-wider rounded-xl transition-all shadow cursor-pointer"
+                                                                >
+                                                                    {user.language === 'ru' ? 'Изучать' : 'Learn'}
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     )}
                                                 </div>
@@ -6961,6 +8046,142 @@ const getTodayChallenge = () => {
                                                 )}
                                             </div>
                                         ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* SECTION 6: BETA TESTING LANGUAGE COURSES */}
+                            {(courseRegionTab === 'all' || courseRegionTab === 'beta') && (
+                                <div className="rounded-3xl p-5 md:p-6 bg-gradient-to-br from-purple-950/60 via-indigo-950/40 to-slate-900 border-2 border-purple-500/40 shadow-2xl relative overflow-hidden">
+                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="w-12 h-12 rounded-2xl bg-purple-600/30 border border-purple-400/40 flex items-center justify-center text-3xl shadow-inner animate-pulse">
+                                                🧪
+                                            </div>
+                                            <div>
+                                                <h3 className="text-xl md:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-pink-200 to-indigo-300 uppercase tracking-widest flex items-center gap-2">
+                                                    {user.language === 'ru' ? 'Бета-тестирование языковых курсов' : 'Language Courses in Beta Testing'}
+                                                    <span className="bg-purple-500 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-purple-300">
+                                                        BETA STAGE
+                                                    </span>
+                                                </h3>
+                                                <p className="text-xs text-purple-200/80 font-bold mt-0.5">
+                                                    {user.language === 'ru'
+                                                        ? 'Экспериментальные курсы: тестируйте грамматику, алфавиты и словарь (+50 XP тестеру)'
+                                                        : 'Experimental & evolving courses: test grammar, alphabets and vocabulary (+50 XP tester bonus)'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    playSound('select');
+                                                    setShowBetaModal(true);
+                                                }}
+                                                className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-black text-xs uppercase tracking-wider rounded-xl border-b-4 border-purple-900 transition-all flex items-center space-x-1.5 shadow-md active:scale-95 cursor-pointer"
+                                            >
+                                                <span>🧪 Бета-Центр</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    playSound('click');
+                                                    setScreen(AppScreen.FEEDBACK);
+                                                }}
+                                                className="px-3 py-2 bg-gray-800 hover:bg-gray-750 text-amber-300 font-black text-xs uppercase tracking-wider rounded-xl border border-amber-500/30 transition-all flex items-center space-x-1 shadow-md active:scale-95 cursor-pointer"
+                                            >
+                                                <span>⭐ Отзывы по курсам</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                        {BETA_COURSES.map(c => {
+                                            const isSelected = currentCourse.id === c.id;
+                                            return (
+                                                <div 
+                                                    key={c.id} 
+                                                    className={`relative p-4 rounded-2xl border-2 border-b-4 transition-all flex flex-col justify-between shadow-xl group ${isSelected ? 'bg-purple-950/60 border-purple-400 ring-2 ring-purple-400' : 'bg-gray-850/90 border-purple-900/50 hover:bg-gray-800 hover:border-purple-500/50'}`}
+                                                >
+                                                    <div 
+                                                        className="flex items-start justify-between gap-3 mb-2 cursor-pointer"
+                                                        onClick={() => {
+                                                            playSound('select');
+                                                            setCurrentCourse(c);
+                                                            localStorage.setItem('duo_course_id_6601', c.id);
+                                                            setScreen(AppScreen.PATH);
+                                                        }}
+                                                    >
+                                                        <div className="flex items-center space-x-3 min-w-0">
+                                                            <img 
+                                                                src={`https://flagcdn.com/w80/${c.flagCode}.png`} 
+                                                                className="w-12 h-8 rounded-md object-cover shadow-md group-hover:scale-110 transition-transform" 
+                                                                alt={c.name} 
+                                                            />
+                                                            <div className="flex-1 min-w-0">
+                                                                <h3 className="font-bold text-base text-white truncate">
+                                                                    {getLocalizedCourseName(c)}
+                                                                </h3>
+                                                                <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                                                                    <span className="text-[10px] text-purple-300 font-bold uppercase tracking-wider">
+                                                                        {c.name}
+                                                                    </span>
+                                                                    <span className="text-[9px] px-1.5 py-0.2 rounded font-black bg-purple-500/20 text-purple-200 border border-purple-400/30">
+                                                                        {c.betaVersion || 'Beta'}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        {isSelected && (
+                                                            <div className="bg-duo-green rounded-full p-1 shrink-0">
+                                                                <CheckCircleIcon className="w-5 h-5 text-white"/>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="mt-2 pt-2 border-t border-purple-500/20 flex flex-col space-y-2">
+                                                        <div className="flex items-center justify-between text-[10px] font-black">
+                                                            <span className="text-amber-300 flex items-center space-x-1">
+                                                                <span>🏷️</span>
+                                                                <span>{c.betaTag}</span>
+                                                            </span>
+                                                            <span className="text-purple-300 font-bold">
+                                                                💬 {c.betaFeedbackCount || 50}+ отчётов
+                                                            </span>
+                                                        </div>
+
+                                                        <div className="flex items-center gap-2 pt-1">
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    playSound('select');
+                                                                    setCurrentCourse(c);
+                                                                    localStorage.setItem('duo_course_id_6601', c.id);
+                                                                    setScreen(AppScreen.PATH);
+                                                                }}
+                                                                className="flex-1 py-1.5 px-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-[10px] uppercase tracking-wider rounded-xl transition-all shadow cursor-pointer border border-purple-400/40 text-center active:scale-95"
+                                                            >
+                                                                {user.language === 'ru' ? 'Тестировать курс' : 'Test Course'}
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    playSound('click');
+                                                                    setScreen(AppScreen.FEEDBACK);
+                                                                }}
+                                                                className="py-1.5 px-2.5 bg-gray-800 hover:bg-gray-750 text-amber-300 hover:text-white font-black text-[10px] uppercase tracking-wider rounded-xl transition-all shadow cursor-pointer border border-gray-700 active:scale-95"
+                                                                title="Оставить отзыв или баг-репорт"
+                                                            >
+                                                                ⭐
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}
@@ -7316,9 +8537,10 @@ const getTodayChallenge = () => {
                         {/* Topic Selector Menu */}
                         <div className="hidden md:flex items-center space-x-1.5 bg-white/5 p-1 rounded-2xl border border-white/10">
                             {(isArabicCourse ? [
-                                { name: '☕ في المقهى', topic: 'Заказ в кафе' },
+                                { name: '☕ في المقهى', topic: 'Заказ в кафе и цены (1 / ١)' },
                                 { name: '🤝 التعارف', topic: 'Знакомство' },
-                                { name: '🛒 في السوق', topic: 'Рынок и покупки' },
+                                { name: '🛒 في السوق', topic: 'Рынок и покупки (1 / ١)' },
+                                { name: '🔢 الأرقام (1 / ١)', topic: 'Арабские цифры (1 / ١)' },
                                 { name: '💬 حوار حر', topic: 'Свободный разговор' }
                             ] : [
                                 { name: '☕ Кафе', topic: 'Заказ в кафе' },
@@ -7453,7 +8675,7 @@ const getTodayChallenge = () => {
                             }`}
                         >
                             <MicIcon className="w-7 h-7"/>
-                            <span>{isRecording ? "Слушаю вас..." : "Говорить с Duo"}</span>
+                            <span>{isRecording ? "Слушаю вас..." : "Говорить с DuoWindo6601"}</span>
                         </button>
 
                         <button 
@@ -7480,6 +8702,8 @@ const getTodayChallenge = () => {
                             <MonitorIcon className="w-6 h-6"/>
                         </button>
                     </div>
+
+
 
                     {/* Quick Text Input for Typing Reply */}
                     <form 
@@ -7574,6 +8798,69 @@ const getTodayChallenge = () => {
                   </div>
                 );
               })()}
+              {/* SPECIFIC BETA LANGUAGE COURSE BANNER */}
+              {currentCourse.isBeta && (
+                <div className="w-full max-w-md bg-gradient-to-r from-fuchsia-950/90 via-purple-900/80 to-indigo-950 border-2 border-b-8 border-purple-500 rounded-[2.5rem] p-6 mb-8 shadow-2xl relative animate-in zoom-in duration-300">
+                  <div className="flex items-start space-x-4">
+                    <div className="bg-purple-600/30 p-3.5 rounded-2xl mt-1 border border-purple-400/40 flex-shrink-0 animate-pulse">
+                      <span className="text-3xl">🧪</span>
+                    </div>
+                    <div className="flex-1 min-w-0 pr-2">
+                      <div className="flex items-center space-x-2 mb-1.5 flex-wrap">
+                        <span className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow">
+                          {currentCourse.betaVersion || 'Beta Course'}
+                        </span>
+                        <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9.5px] font-bold px-2 py-0.5 rounded-full uppercase">
+                          ⚡ +50 XP Тестеру
+                        </span>
+                      </div>
+                      <h3 className="font-din font-black text-xl text-white tracking-widest uppercase mb-1">
+                        Курс в Бета-Тесте: {getLocalizedCourseName(currentCourse)}
+                      </h3>
+                      <p className="font-din font-bold text-xs text-purple-200 leading-normal mb-3">
+                        {user.language === 'ru' 
+                          ? `Курс «${getLocalizedCourseName(currentCourse)}» (${currentCourse.betaTag || 'Бета'}) проходит испытания. Помогите улучшить упражнения и лексику!`
+                          : `The course "${currentCourse.name}" (${currentCourse.betaTag || 'Beta'}) is under active testing. Help us test and refine lessons!`}
+                      </p>
+
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <button 
+                          onClick={() => {
+                            playSound('select');
+                            setShowBetaModal(true);
+                          }}
+                          className="font-din font-black text-xs uppercase tracking-widest bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white hover:scale-[1.02] active:scale-95 px-3.5 py-2.5 rounded-xl border-b-4 border-indigo-950 transition-all shadow-md text-center flex-1 flex items-center justify-center space-x-1.5 cursor-pointer"
+                        >
+                          <span>🧪 Бета-Центр</span>
+                        </button>
+                        
+                        <button 
+                          onClick={() => {
+                            playSound('click');
+                            setScreen(AppScreen.FEEDBACK);
+                          }}
+                          className="font-din font-black text-xs uppercase tracking-widest bg-gray-800 hover:bg-gray-750 text-amber-300 hover:scale-[1.02] active:scale-95 px-3 py-2.5 rounded-xl border-b-4 border-gray-950 border border-amber-500/30 transition-all shadow-md text-center flex items-center justify-center space-x-1 cursor-pointer"
+                        >
+                          <span>⭐ Баг-репорт курса</span>
+                        </button>
+
+                        <button 
+                          onClick={() => {
+                            playSound('click');
+                            setScreen(AppScreen.COURSE_SELECT);
+                            setCourseRegionTab('beta');
+                          }}
+                          className="font-din font-black text-xs uppercase tracking-widest bg-purple-950 hover:bg-purple-900 text-purple-200 hover:scale-[1.02] active:scale-95 px-3 py-2.5 rounded-xl border-b-4 border-purple-950 border border-purple-500/40 transition-all shadow-md text-center flex items-center justify-center space-x-1 cursor-pointer"
+                          title="Посмотреть все 8 бета-курсов"
+                        >
+                          <span>🔀 Все бета-курсы</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {!betaDismissed && (
                   <div className="w-full max-w-md bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 border-2 border-b-8 border-purple-950 rounded-[2.5rem] p-6 mb-8 shadow-2xl relative animate-in zoom-in duration-300">
                       {/* Close button */}
@@ -7628,6 +8915,10 @@ const getTodayChallenge = () => {
                       </div>
                   </div>
               )}
+
+              {/* PWA STANDALONE INSTALLATION BANNER */}
+              <PWAInstallButton isRu={user.language === 'ru'} variant="banner" className="mb-8 w-full max-w-md" onOpenReviews={() => setScreen(AppScreen.FEEDBACK)} />
+
               {!androidDismissed && (
                   <div className="w-full max-w-md bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-700 border-2 border-b-8 border-emerald-900 rounded-[2.5rem] p-6 mb-8 shadow-2xl relative animate-in zoom-in duration-300">
                       {/* Close button */}
@@ -7739,16 +9030,131 @@ const getTodayChallenge = () => {
 
               {currentCourse.id === 'chess' ? (
                   <div className="w-full max-w-md flex flex-col items-center px-4 relative">
-                      <div className={`bg-duo-green w-full p-6 rounded-2xl border-b-8 border-duo-greenDark mb-12 flex justify-between items-center shadow-2xl transition-transform hover:scale-[1.02]`}>
+                      {/* CHESS BANNER */}
+                      <div className="bg-gradient-to-r from-emerald-600 to-green-700 w-full p-6 rounded-3xl border-b-8 border-green-900 mb-6 flex justify-between items-center shadow-2xl transition-transform hover:scale-[1.01]">
                           <div>
-                              <p className="text-sm font-bold opacity-80 uppercase tracking-widest mb-1 text-white">{t('module1')}</p>
-                              <h2 className="text-2xl font-bold text-white">{t('chessUnitName')}</h2>
+                              <div className="flex items-center space-x-2 mb-1">
+                                  <span className="text-xs font-black uppercase tracking-widest text-emerald-200 bg-black/30 px-2.5 py-0.5 rounded-full">
+                                      {user.language === 'ru' ? 'Не язык • Курс логики' : 'Not a Language • Logic Course'}
+                                  </span>
+                              </div>
+                              <h2 className="text-2xl font-black text-white">{t('playChess')}</h2>
+                              <p className="text-xs text-emerald-100 font-bold mt-0.5">
+                                  {user.language === 'ru' ? `Раздел ${chessSection} из 7 • Тактика и эндшпили` : `Section ${chessSection} of 7 • Tactics & Endgames`}
+                              </p>
                           </div>
-                          <button className="w-12 h-12 rounded-xl bg-gray-800/50 flex items-center justify-center hover:bg-gray-800 transition-colors">
-                              <span className="text-red-500 font-bold text-2xl">🐞</span>
+                          <span className="text-5xl drop-shadow-md">♔</span>
+                      </div>
+
+                      {/* CHESS SECTIONS SELECTOR: РАЗДЕЛ 1-7 (ВКЛЮЧАЯ 6-7) */}
+                      <div className="w-full bg-gray-900/80 border border-gray-800 p-3 rounded-2xl mb-6 shadow-inner">
+                          <div className="flex items-center justify-between mb-2 px-1">
+                              <span className="text-xs font-black uppercase tracking-wider text-gray-300">
+                                  {user.language === 'ru' ? 'Выберите раздел курса:' : 'Select course section:'}
+                              </span>
+                              <span className="text-[10px] font-black text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/30">
+                                  7 {user.language === 'ru' ? 'разделов' : 'sections'}
+                              </span>
+                          </div>
+                          <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                              {[
+                                  { num: 1, nameRu: '1: Фигуры', nameEn: '1: Pieces' },
+                                  { num: 2, nameRu: '2: Мат', nameEn: '2: Mate' },
+                                  { num: 3, nameRu: '3: Тактика', nameEn: '3: Tactics' },
+                                  { num: 4, nameRu: '4: Дебют', nameEn: '4: Openings' },
+                                  { num: 5, nameRu: '5: Миттельшпиль', nameEn: '5: Middlegame' },
+                                  { num: 6, nameRu: '⭐ 6: Эндшпили', nameEn: '⭐ 6: Endgames' },
+                                  { num: 7, nameRu: '🏆 7: Мастер', nameEn: '🏆 7: Master' }
+                              ].map(sec => {
+                                  const isSel = chessSection === sec.num;
+                                  return (
+                                      <button
+                                          key={sec.num}
+                                          type="button"
+                                          onClick={() => {
+                                              playSound('click');
+                                              setChessSection(sec.num);
+                                              localStorage.setItem('duo_chess_section_6601', String(sec.num));
+                                              setToast(user.language === 'ru' ? `Открыт Раздел ${sec.num}: ${sec.nameRu}` : `Opened Section ${sec.num}`);
+                                          }}
+                                          className={`px-3 py-2 rounded-xl font-black text-xs whitespace-nowrap transition-all cursor-pointer ${
+                                              isSel
+                                                  ? 'bg-emerald-500 text-black shadow-lg scale-105 border-b-2 border-emerald-700'
+                                                  : sec.num >= 6
+                                                  ? 'bg-emerald-950/60 text-emerald-300 hover:bg-emerald-900/80 border border-emerald-500/40'
+                                                  : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
+                                          }`}
+                                      >
+                                          {user.language === 'ru' ? sec.nameRu : sec.nameEn}
+                                      </button>
+                                  );
+                              })}
+                          </div>
+                      </div>
+
+                      {/* ACTIVE CHESS SECTION CARD */}
+                      <div className="w-full bg-gray-800/90 border border-emerald-500/30 p-4 rounded-2xl mb-6 shadow-md text-left">
+                          <div className="flex items-center space-x-2 mb-1">
+                              <span className="bg-emerald-500 text-black text-[10px] font-black px-2 py-0.5 rounded uppercase">
+                                  {user.language === 'ru' ? `Раздел ${chessSection}` : `Section ${chessSection}`}
+                              </span>
+                              <h3 className="font-din font-black text-white text-sm">
+                                  {chessSection === 1 && (user.language === 'ru' ? 'Правила и ходы фигур' : 'Rules & Piece Moves')}
+                                  {chessSection === 2 && (user.language === 'ru' ? 'Шах, мат и пат' : 'Check, Checkmate & Stalemate')}
+                                  {chessSection === 3 && (user.language === 'ru' ? 'Тактические удары: связки и вилки' : 'Tactics: Pins & Forks')}
+                                  {chessSection === 4 && (user.language === 'ru' ? 'Основы дебюта и центр' : 'Opening Principles & Center')}
+                                  {chessSection === 5 && (user.language === 'ru' ? 'Стратегия миттельшпиля' : 'Middlegame Strategy')}
+                                  {chessSection === 6 && (user.language === 'ru' ? 'Продвинутые эндшпили (Ладьи и Короли)' : 'Advanced Endgames & King Activity')}
+                                  {chessSection === 7 && (user.language === 'ru' ? 'Партии гроссмейстеров и мастерский расчет' : 'Grandmaster Games & Deep Tactics')}
+                              </h3>
+                          </div>
+                          <p className="text-xs text-gray-300 font-bold leading-relaxed">
+                              {chessSection === 6 && (user.language === 'ru' 
+                                  ? 'Разбор ладейных окончаний, правило Тарраша, построение мостика Лусены, оппозиция королей и пешечный прорыв.' 
+                                  : 'Rook endgames, Tarrasch rule, Lucena bridge, king opposition and pawn breakthroughs.')}
+                              {chessSection === 7 && (user.language === 'ru' 
+                                  ? 'Анализ бессмертных партий Каспарова, Фишера и Таля. Глубокий позиционный расчет и жертвы качества.' 
+                                  : 'Masterclass games analysis, deep tactical combinations and exchange sacrifices.')}
+                              {chessSection < 6 && (user.language === 'ru' 
+                                  ? 'Базовые и средние темы шахматного мастерства, упражнения на решение задач и интерактивные партии.' 
+                                  : 'Chess fundamentals, interactive puzzle solving and full matches.')}
+                          </p>
+                      </div>
+
+                      {/* ЕЖЕДНЕВНОЕ ПОВТОРЕНИЕ (ШАХМАТЫ) */}
+                      <div className="w-full bg-gradient-to-r from-emerald-950 via-gray-900 to-teal-950 border-2 border-b-6 border-emerald-600 rounded-3xl p-5 mb-8 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                          <div className="flex items-center space-x-3 text-left">
+                              <div className="w-12 h-12 rounded-2xl bg-emerald-600 flex items-center justify-center text-2xl shadow-md shrink-0">
+                                  🔥
+                              </div>
+                              <div>
+                                  <div className="flex items-center space-x-2">
+                                      <h4 className="font-din font-black text-white text-base md:text-lg">
+                                          {user.language === 'ru' ? 'Ежедневное повторение' : 'Daily Review'}
+                                      </h4>
+                                      <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-500/30">
+                                          {user.language === 'ru' ? 'СЕРИЯ ДНЕЙ' : 'STREAK'}
+                                      </span>
+                                  </div>
+                                  <p className="font-din font-bold text-xs text-emerald-200/90 mt-0.5">
+                                      {user.language === 'ru' ? 'Возвращайтесь каждый день, чтобы не терять.' : 'Come back every day so you don\'t lose progress.'}
+                                  </p>
+                              </div>
+                          </div>
+                          <button
+                              type="button"
+                              onClick={() => {
+                                  playSound('select');
+                                  setScreen(AppScreen.CHESS_MATCH);
+                                  setToast(user.language === 'ru' ? '♟️ Ежедневное повторение шахмат: решите партию дня (+25 XP)!' : '♟️ Daily chess review (+25 XP)!');
+                              }}
+                              className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs uppercase tracking-wider shadow-lg active:scale-95 transition-all whitespace-nowrap shrink-0 cursor-pointer text-center"
+                          >
+                              {user.language === 'ru' ? 'Повторить сегодня (+25 XP)' : 'Review Today (+25 XP)'}
                           </button>
                       </div>
                       
+                      {/* CHESS PATH INTERACTIVE BUTTONS */}
                       <div className="flex flex-col items-center space-y-8 relative w-full">
                           <button onClick={() => setScreen(AppScreen.CHESS_MATCH)} className="w-20 h-20 rounded-full bg-duo-green border-b-8 border-duo-greenDark active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center shadow-2xl hover:brightness-110 z-10">
                               <StarIcon className="w-10 h-10 text-white" />
@@ -7770,19 +9176,538 @@ const getTodayChallenge = () => {
                           <button onClick={() => setScreen(AppScreen.CHESS_MATCH)} className="w-24 h-24 rounded-2xl bg-yellow-400 border-b-8 border-yellow-600 active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center shadow-2xl hover:brightness-110 z-10">
                               <ChestIcon className="w-12 h-12 text-white" />
                           </button>
-                          
-                          <button onClick={() => setScreen(AppScreen.CHESS_MATCH)} className="w-20 h-20 rounded-full bg-duo-green border-b-8 border-duo-greenDark active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center shadow-2xl hover:brightness-110 z-10">
-                              <StarIcon className="w-10 h-10 text-white" />
+                      </div>
+                  </div>
+              ) : currentCourse.id === 'music' ? (
+                  <div className="w-full max-w-md flex flex-col items-center px-4 relative">
+                      {/* MUSIC BANNER */}
+                      <div className="bg-pink-600 w-full p-6 rounded-3xl border-b-8 border-pink-800 mb-6 flex justify-between items-center shadow-2xl">
+                          <div>
+                              <div className="flex items-center space-x-2 mb-1">
+                                  <span className="text-xs font-black uppercase tracking-widest text-pink-200 bg-black/30 px-2.5 py-0.5 rounded-full">
+                                      {user.language === 'ru' ? 'Не язык • Курс музыки' : 'Not a Language • Music Course'}
+                                  </span>
+                              </div>
+                              <h2 className="text-2xl font-black text-white">{user.language === 'ru' ? 'Музыка и Мелодии' : 'Music & Melodies'}</h2>
+                              <p className="text-xs text-pink-100 font-bold mt-0.5">
+                                  {user.language === 'ru' ? `Раздел ${musicSection} из 4 • Теория и слух` : `Section ${musicSection} of 4 • Theory & Ear`}
+                              </p>
+                          </div>
+                          <span className="text-4xl drop-shadow-md">🎵</span>
+                      </div>
+
+                      {/* MUSIC SECTIONS SELECTOR: РАЗДЕЛ 1-4 */}
+                      <div className="w-full bg-gray-900/80 border border-gray-800 p-3 rounded-2xl mb-6 shadow-inner">
+                          <div className="flex items-center justify-between mb-2 px-1">
+                              <span className="text-xs font-black uppercase tracking-wider text-gray-300">
+                                  {user.language === 'ru' ? 'Выберите раздел музыки:' : 'Select music section:'}
+                              </span>
+                              <span className="text-[10px] font-black text-pink-400 bg-pink-950/80 px-2 py-0.5 rounded border border-pink-500/30">
+                                  4 {user.language === 'ru' ? 'раздела' : 'sections'}
+                              </span>
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                              {[
+                                  { num: 1, nameRu: '1: Ноты', nameEn: '1: Notes' },
+                                  { num: 2, nameRu: '2: Ритмика', nameEn: '2: Rhythm' },
+                                  { num: 3, nameRu: '3: Аккорды', nameEn: '3: Chords' },
+                                  { num: 4, nameRu: '4: Шедевры', nameEn: '4: Masters' }
+                              ].map(sec => {
+                                  const isSel = musicSection === sec.num;
+                                  return (
+                                      <button
+                                          key={sec.num}
+                                          type="button"
+                                          onClick={() => {
+                                              playSound('click');
+                                              setMusicSection(sec.num);
+                                              localStorage.setItem('duo_music_section_6601', String(sec.num));
+                                              setToast(user.language === 'ru' ? `Открыт Музыкальный Раздел ${sec.num}` : `Opened Music Section ${sec.num}`);
+                                          }}
+                                          className={`px-3 py-2 rounded-xl font-black text-xs text-center transition-all cursor-pointer ${
+                                              isSel
+                                                  ? 'bg-pink-500 text-white shadow-lg border-b-2 border-pink-700'
+                                                  : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
+                                          }`}
+                                      >
+                                          {user.language === 'ru' ? sec.nameRu : sec.nameEn}
+                                      </button>
+                                  );
+                              })}
+                          </div>
+                      </div>
+
+                      {/* ACTIVE MUSIC SECTION CARD */}
+                      <div className="w-full bg-gray-800/90 border border-pink-500/30 p-4 rounded-2xl mb-6 shadow-md text-left">
+                          <div className="flex items-center space-x-2 mb-1">
+                              <span className="bg-pink-500 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase">
+                                  {user.language === 'ru' ? `Раздел ${musicSection}` : `Section ${musicSection}`}
+                              </span>
+                              <h3 className="font-din font-black text-white text-sm">
+                                  {musicSection === 1 && (user.language === 'ru' ? 'Основы нот и звукоряда' : 'Basics of Notes & Scale')}
+                                  {musicSection === 2 && (user.language === 'ru' ? 'Ритмика и разучивание мелодий' : 'Rhythm & Melody Practice')}
+                                  {musicSection === 3 && (user.language === 'ru' ? 'Интервалы, лады и аккорды' : 'Intervals, Modes & Chords')}
+                                  {musicSection === 4 && (user.language === 'ru' ? 'Мастер композиции и полифония' : 'Master Composition & Polyphony')}
+                              </h3>
+                          </div>
+                          <p className="text-xs text-gray-300 font-bold leading-relaxed">
+                              {musicSection === 1 && (user.language === 'ru' ? 'Азбука нотной грамоты, октава C4-C5, скрипичный ключ и чистота звучания нот.' : 'Note basics, octave C4-C5, treble clef and note recognition.')}
+                              {musicSection === 2 && (user.language === 'ru' ? 'Длительности (целые, четверти), тактовый размер 4/4 и пошаговый разбор мелодий.' : 'Note lengths, meter 4/4 and step-by-step melody learning.')}
+                              {musicSection === 3 && (user.language === 'ru' ? 'Мажорные и минорные трезвучия, ступени звукоряда, чистые квинты и кварты.' : 'Major and minor triads, chord progressions and harmony ear training.')}
+                              {musicSection === 4 && (user.language === 'ru' ? 'Свободная импровизация, синтезатор, темы Баха, Моцарта и Бетховена.' : 'Free improvisation, synthesizer sandbox and classical masterworks.')}
+                          </p>
+                      </div>
+
+                      {/* ЕЖЕДНЕВНОЕ ПОВТОРЕНИЕ (МУЗЫКА) */}
+                      <div className="w-full bg-gradient-to-r from-pink-950 via-gray-900 to-purple-950 border-2 border-b-6 border-pink-600 rounded-3xl p-5 mb-8 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                          <div className="flex items-center space-x-3 text-left">
+                              <div className="w-12 h-12 rounded-2xl bg-pink-600 flex items-center justify-center text-2xl shadow-md shrink-0">
+                                  🔥
+                              </div>
+                              <div>
+                                  <div className="flex items-center space-x-2">
+                                      <h4 className="font-din font-black text-white text-base md:text-lg">
+                                          {user.language === 'ru' ? 'Ежедневное повторение' : 'Daily Review'}
+                                      </h4>
+                                      <span className="bg-pink-500/20 text-pink-300 text-[10px] font-black px-2 py-0.5 rounded-full border border-pink-500/30">
+                                          {user.language === 'ru' ? 'СЕРИЯ ДНЕЙ' : 'STREAK'}
+                                      </span>
+                                  </div>
+                                  <p className="font-din font-bold text-xs text-pink-200/90 mt-0.5">
+                                      {user.language === 'ru' ? 'Возвращайтесь каждый день, чтобы не терять.' : 'Come back every day so you don\'t lose progress.'}
+                                  </p>
+                              </div>
+                          </div>
+                          <button
+                              type="button"
+                              onClick={() => {
+                                  playSound('select');
+                                  setMusicStudioTab('repeat');
+                                  setShowMusicStudioModal(true);
+                                  setToast(user.language === 'ru' ? '🎵 Ежедневное музыкальное повторение (+20 XP)!' : '🎵 Daily music repetition (+20 XP)!');
+                              }}
+                              className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-pink-500 hover:bg-pink-400 text-black font-black text-xs uppercase tracking-wider shadow-lg active:scale-95 transition-all whitespace-nowrap shrink-0 cursor-pointer text-center"
+                          >
+                              {user.language === 'ru' ? 'Повторить сегодня (+20 XP)' : 'Review Today (+20 XP)'}
                           </button>
+                      </div>
+
+                      {/* 4 CORE MUSIC ACTIONS */}
+                      <div className="flex flex-col space-y-4 w-full">
+                          <div 
+                              onClick={() => { playSound('select'); setMusicStudioTab('notes'); setShowMusicStudioModal(true); }}
+                              className="bg-gray-800 border-2 border-b-6 border-pink-600 p-5 rounded-3xl cursor-pointer hover:scale-[1.02] active:scale-95 transition-all flex items-center space-x-4 shadow-xl group"
+                          >
+                              <div className="w-14 h-14 rounded-2xl bg-red-600 flex items-center justify-center text-2xl text-white shadow-md group-hover:scale-110 transition-transform shrink-0">
+                                  📖
+                              </div>
+                              <div className="flex-1 text-left">
+                                  <h3 className="text-lg font-black text-white">{user.language === 'ru' ? 'Изучить ноты' : 'Study Notes'}</h3>
+                                  <p className="text-xs text-gray-400">{user.language === 'ru' ? 'Азбука нотной грамоты, звучание и характеристики нот' : 'Note alphabet & frequencies'}</p>
+                              </div>
+                              <span className="text-red-400 text-xl font-black">→</span>
+                          </div>
+
+                          <div 
+                              onClick={() => { playSound('select'); setMusicStudioTab('learn'); setShowMusicStudioModal(true); }}
+                              className="bg-gray-800 border-2 border-b-6 border-pink-600 p-5 rounded-3xl cursor-pointer hover:scale-[1.02] active:scale-95 transition-all flex items-center space-x-4 shadow-xl group"
+                          >
+                              <div className="w-14 h-14 rounded-2xl bg-pink-600 flex items-center justify-center text-2xl text-white shadow-md group-hover:scale-110 transition-transform shrink-0">
+                                  🎼
+                              </div>
+                              <div className="flex-1 text-left">
+                                  <h3 className="text-lg font-black text-white">{user.language === 'ru' ? 'Разучите мелодию' : 'Learn Melody'}</h3>
+                                  <p className="text-xs text-gray-400">{user.language === 'ru' ? 'Интерактивный разбор известных произведений нота за нотой' : 'Step by step note practice'}</p>
+                              </div>
+                              <span className="text-pink-400 text-xl font-black">→</span>
+                          </div>
+
+                          <div 
+                              onClick={() => { playSound('select'); setMusicStudioTab('tempo'); setShowMusicStudioModal(true); }}
+                              className="bg-gray-800 border-2 border-b-6 border-pink-600 p-5 rounded-3xl cursor-pointer hover:scale-[1.02] active:scale-95 transition-all flex items-center space-x-4 shadow-xl group"
+                          >
+                              <div className="w-14 h-14 rounded-2xl bg-purple-600 flex items-center justify-center text-2xl text-white shadow-md group-hover:scale-110 transition-transform shrink-0">
+                                  🎹
+                              </div>
+                              <div className="flex-1 text-left">
+                                  <h3 className="text-lg font-black text-white">{user.language === 'ru' ? 'Сыграйте в своём темпе' : 'Play at Your Tempo'}</h3>
+                                  <p className="text-xs text-gray-400">{user.language === 'ru' ? 'Свободный режим фортепиано и импровизации' : 'Freeplay synthesizer sandbox'}</p>
+                              </div>
+                              <span className="text-purple-400 text-xl font-black">→</span>
+                          </div>
+
+                          <div 
+                              onClick={() => { playSound('select'); setMusicStudioTab('repeat'); setShowMusicStudioModal(true); }}
+                              className="bg-gray-800 border-2 border-b-6 border-pink-600 p-5 rounded-3xl cursor-pointer hover:scale-[1.02] active:scale-95 transition-all flex items-center space-x-4 shadow-xl group"
+                          >
+                              <div className="w-14 h-14 rounded-2xl bg-amber-600 flex items-center justify-center text-2xl text-white shadow-md group-hover:scale-110 transition-transform shrink-0">
+                                  🎧
+                              </div>
+                              <div className="flex-1 text-left">
+                                  <h3 className="text-lg font-black text-white">{user.language === 'ru' ? 'Повторите композицию' : 'Repeat Composition'}</h3>
+                                  <p className="text-xs text-gray-400">{user.language === 'ru' ? 'Проверка музыкального слуха и памяти на ноты' : 'Ear training & note memory challenge'}</p>
+                              </div>
+                              <span className="text-amber-400 text-xl font-black">→</span>
+                          </div>
+                      </div>
+                  </div>
+              ) : currentCourse.id === 'math' ? (
+                  <div className="w-full max-w-md flex flex-col items-center px-4 relative">
+                      {/* MATH BANNER */}
+                      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 w-full p-6 rounded-3xl border-b-8 border-indigo-900 mb-6 flex justify-between items-center shadow-2xl transition-transform hover:scale-[1.01]">
+                          <div>
+                              <div className="flex items-center space-x-2 mb-1">
+                                  <span className="text-xs font-black uppercase tracking-widest text-blue-200 bg-black/30 px-2.5 py-0.5 rounded-full">
+                                      {user.language === 'ru' ? 'Не язык • Курс математики' : 'Not a Language • Math Course'}
+                                  </span>
+                              </div>
+                              <h2 className="text-2xl font-black text-white">{user.language === 'ru' ? 'Математика' : 'Mathematics'}</h2>
+                              <p className="text-xs text-blue-100 font-bold mt-0.5">
+                                  {user.language === 'ru' ? `${mathGrade} класс • ${mathTopic === 'arithmetic' ? 'Арифметика' : 'Алгебра'}` : `Grade ${mathGrade} • ${mathTopic === 'arithmetic' ? 'Arithmetic' : 'Algebra'}`}
+                              </p>
+                          </div>
+                          <span className="text-5xl drop-shadow-md">Σ</span>
+                      </div>
+
+                      {/* GRADE SELECTOR: КЛАСС 2-8 ДОСТУП РАЗДЕЛ */}
+                      <div className="w-full bg-gray-900/80 border border-gray-800 p-3 rounded-2xl mb-4 shadow-inner">
+                          <div className="flex items-center justify-between mb-2 px-1">
+                              <span className="text-xs font-black uppercase tracking-wider text-gray-300">
+                                  {user.language === 'ru' ? 'Класс 2-8 (доступ к разделам):' : 'Grade 2-8 selection:'}
+                              </span>
+                              <span className="text-[10px] font-black text-blue-400 bg-blue-950/80 px-2 py-0.5 rounded border border-blue-500/30">
+                                  {mathGrade} {user.language === 'ru' ? 'класс' : 'grade'}
+                              </span>
+                          </div>
+                          <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                              {[2, 3, 4, 5, 6, 7, 8].map(gradeNum => {
+                                  const isSel = mathGrade === gradeNum;
+                                  return (
+                                      <button
+                                          key={gradeNum}
+                                          type="button"
+                                          onClick={() => {
+                                              playSound('click');
+                                              setMathGrade(gradeNum);
+                                              localStorage.setItem('duo_math_grade_6601', String(gradeNum));
+                                              setToast(user.language === 'ru' ? `Выбран ${gradeNum} класс математики!` : `Selected Math Grade ${gradeNum}!`);
+                                          }}
+                                          className={`px-3 py-2 rounded-xl font-black text-xs whitespace-nowrap transition-all cursor-pointer ${
+                                              isSel
+                                                  ? 'bg-blue-500 text-white shadow-lg scale-105 border-b-2 border-blue-700'
+                                                  : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
+                                          }`}
+                                      >
+                                          {gradeNum} {user.language === 'ru' ? 'класс' : 'gr'}
+                                      </button>
+                                  );
+                              })}
+                          </div>
+                      </div>
+
+                      {/* TOPIC SELECTOR: ТЕМЫ АРИФМЕТИКА И АЛГЕБРА */}
+                      <div className="w-full bg-gray-900/80 border border-gray-800 p-2 rounded-2xl mb-6 flex gap-2">
+                          <button
+                              type="button"
+                              onClick={() => {
+                                  playSound('click');
+                                  setMathTopic('arithmetic');
+                                  localStorage.setItem('duo_math_topic_6601', 'arithmetic');
+                              }}
+                              className={`flex-1 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                                  mathTopic === 'arithmetic'
+                                      ? 'bg-blue-600 text-white shadow-md border-b-4 border-blue-800'
+                                      : 'bg-gray-800 text-gray-400 hover:text-white'
+                              }`}
+                          >
+                              <span>🔢</span>
+                              <span>{user.language === 'ru' ? 'Арифметика' : 'Arithmetic'}</span>
+                          </button>
+                          <button
+                              type="button"
+                              onClick={() => {
+                                  playSound('click');
+                                  setMathTopic('algebra');
+                                  localStorage.setItem('duo_math_topic_6601', 'algebra');
+                              }}
+                              className={`flex-1 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                                  mathTopic === 'algebra'
+                                      ? 'bg-indigo-600 text-white shadow-md border-b-4 border-indigo-800'
+                                      : 'bg-gray-800 text-gray-400 hover:text-white'
+                              }`}
+                          >
+                              <span>📐</span>
+                              <span>{user.language === 'ru' ? 'Алгебра' : 'Algebra'}</span>
+                          </button>
+                      </div>
+
+                      {/* ACTIVE MATH TOPIC & GRADE CARD */}
+                      <div className="w-full bg-gray-800/90 border border-blue-500/30 p-4 rounded-2xl mb-6 shadow-md text-left">
+                          <div className="flex items-center space-x-2 mb-1">
+                              <span className="bg-blue-500 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase">
+                                  {mathGrade} {user.language === 'ru' ? 'класс' : 'Grade'} • {mathTopic === 'arithmetic' ? (user.language === 'ru' ? 'Арифметика' : 'Arithmetic') : (user.language === 'ru' ? 'Алгебра' : 'Algebra')}
+                              </span>
+                          </div>
+                          <p className="text-xs text-gray-300 font-bold leading-relaxed">
+                              {mathTopic === 'arithmetic' && mathGrade === 2 && (user.language === 'ru' ? 'Сложение и вычитание в пределах 100, умножение на 2 и 3, состав числа.' : 'Addition and subtraction within 100, basic multiplication.')}
+                              {mathTopic === 'arithmetic' && mathGrade === 3 && (user.language === 'ru' ? 'Таблица умножения и деления до 100, скобки и порядок действий.' : 'Multiplication & division table to 100, order of operations.')}
+                              {mathTopic === 'arithmetic' && mathGrade === 4 && (user.language === 'ru' ? 'Многозначные числа, умножение столбиком, деление с остатком, простые дроби.' : 'Multi-digit operations, long division, basic fractions.')}
+                              {mathTopic === 'arithmetic' && mathGrade === 5 && (user.language === 'ru' ? 'Десятичные дроби, округление, проценты и действия со смешанными числами.' : 'Decimals, rounding, percentages and mixed numbers.')}
+                              {mathTopic === 'arithmetic' && mathGrade === 6 && (user.language === 'ru' ? 'Отрицательные числа, модуль числа, пропорции, НОД и НОК.' : 'Negative numbers, absolute values, proportions, GCD and LCM.')}
+                              {mathTopic === 'arithmetic' && mathGrade === 7 && (user.language === 'ru' ? 'Рациональные числа, стандартный вид числа, степени с целым показателем.' : 'Rational numbers, scientific notation, integer exponents.')}
+                              {mathTopic === 'arithmetic' && mathGrade === 8 && (user.language === 'ru' ? 'Арифметический квадратный корень √x, свойства корней, иррациональные числа.' : 'Square roots √x, radical properties and real numbers.')}
+                              {mathTopic === 'algebra' && mathGrade === 2 && (user.language === 'ru' ? 'Числовые равенства и базовые уравнения вида x + a = b.' : 'Number equalities and simple x + a = b equations.')}
+                              {mathTopic === 'algebra' && mathGrade === 3 && (user.language === 'ru' ? 'Уравнения с умножением и делением: a · x = b, x : a = b.' : 'Multiplication and division equations: a · x = b.')}
+                              {mathTopic === 'algebra' && mathGrade === 4 && (user.language === 'ru' ? 'Составные уравнения со скобками: (x + a) · b = c.' : 'Compound equations with brackets: (x + a) · b = c.')}
+                              {mathTopic === 'algebra' && mathGrade === 5 && (user.language === 'ru' ? 'Буквенные выражения, упрощение выражений, приведение подобных слагаемых.' : 'Algebraic expressions and combining like terms.')}
+                              {mathTopic === 'algebra' && mathGrade === 6 && (user.language === 'ru' ? 'Линейные уравнения с переносом слагаемых через знак равенства: 4x - 8 = 2x + 6.' : 'Linear equations with terms moved across equals sign.')}
+                              {mathTopic === 'algebra' && mathGrade === 7 && (user.language === 'ru' ? 'Одночлены и многочлены, формулы сокращенного умножения (a+b)², графики y = kx + b.' : 'Polynomials, binomial squares (a+b)², linear functions.')}
+                              {mathTopic === 'algebra' && mathGrade === 8 && (user.language === 'ru' ? 'Квадратные уравнения ax² + bx + c = 0, дискриминант D, теорема Виета и неравенства.' : 'Quadratic equations ax² + bx + c = 0, discriminant and Vieta.')}
+                          </p>
+                      </div>
+
+                      {/* ЕЖЕДНЕВНОЕ ПОВТОРЕНИЕ (МАТЕМАТИКА) */}
+                      <div className="w-full bg-gradient-to-r from-blue-950 via-gray-900 to-indigo-950 border-2 border-b-6 border-blue-600 rounded-3xl p-5 mb-8 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                          <div className="flex items-center space-x-3 text-left">
+                              <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-2xl shadow-md shrink-0">
+                                  🔥
+                              </div>
+                              <div>
+                                  <div className="flex items-center space-x-2">
+                                      <h4 className="font-din font-black text-white text-base md:text-lg">
+                                          {user.language === 'ru' ? 'Ежедневное повторение' : 'Daily Review'}
+                                      </h4>
+                                      <span className="bg-blue-500/20 text-blue-300 text-[10px] font-black px-2 py-0.5 rounded-full border border-blue-500/30">
+                                          {user.language === 'ru' ? 'СЕРИЯ ДНЕЙ' : 'STREAK'}
+                                      </span>
+                                  </div>
+                                  <p className="font-din font-bold text-xs text-blue-200/90 mt-0.5">
+                                      {user.language === 'ru' ? 'Возвращайтесь каждый день, чтобы не терять.' : 'Come back every day so you don\'t lose progress.'}
+                                  </p>
+                              </div>
+                          </div>
+                          <button
+                              type="button"
+                              onClick={() => {
+                                  playSound('select');
+                                  startMathTraining(mathGrade, mathTopic);
+                                  setToast(user.language === 'ru' ? `📐 Ежедневная математическая разминка: ${mathGrade} класс (+20 XP)!` : `📐 Daily math workout: Grade ${mathGrade} (+20 XP)!`);
+                              }}
+                              className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-blue-500 hover:bg-blue-400 text-black font-black text-xs uppercase tracking-wider shadow-lg active:scale-95 transition-all whitespace-nowrap shrink-0 cursor-pointer text-center"
+                          >
+                              {user.language === 'ru' ? 'Повторить сегодня (+20 XP)' : 'Review Today (+20 XP)'}
+                          </button>
+                      </div>
+
+                      {/* MATH INTERACTIVE BUTTONS */}
+                      <div className="flex flex-col items-center space-y-8 relative w-full">
+                          <button 
+                              onClick={() => startMathTraining(mathGrade, mathTopic)} 
+                              className="w-28 h-28 rounded-full bg-blue-600 border-b-8 border-blue-800 active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center shadow-2xl hover:brightness-110 group cursor-pointer"
+                              title={user.language === 'ru' ? `Начать урок: ${mathTopic === 'arithmetic' ? 'Арифметика' : 'Алгебра'}` : 'Start Math Lesson'}
+                          >
+                              <span className="text-3xl font-black text-white group-hover:scale-110 transition-transform">
+                                  {mathTopic === 'arithmetic' ? '🔢' : '📐'}
+                              </span>
+                          </button>
+
+                          <div className="w-full bg-gradient-to-r from-blue-900/60 to-indigo-900/60 border border-blue-500/40 p-5 rounded-3xl shadow-xl flex items-center justify-between gap-3">
+                              <div className="text-left">
+                                  <h4 className="font-din font-black text-white text-base">
+                                      {user.language === 'ru' ? `Урок: ${mathTopic === 'arithmetic' ? 'Арифметика' : 'Алгебра'}` : `Lesson: ${mathTopic === 'arithmetic' ? 'Arithmetic' : 'Algebra'}`}
+                                  </h4>
+                                  <p className="text-xs text-blue-200 font-bold">
+                                      {user.language === 'ru' ? `Задачи по стандартам ${mathGrade} класса • +20 XP` : `Grade ${mathGrade} curriculum practice • +20 XP`}
+                                  </p>
+                              </div>
+                              <button
+                                  type="button"
+                                  onClick={() => startMathTraining(mathGrade, mathTopic)}
+                                  className="px-5 py-2.5 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-black font-black text-xs uppercase tracking-wider shadow-md active:scale-95 transition-all whitespace-nowrap cursor-pointer"
+                              >
+                                  {user.language === 'ru' ? 'Начать' : 'Start'} →
+                              </button>
+                          </div>
+
+                          <Mascot emotion="neutral" className="w-56 h-56 mt-4 animate-float" variant="math" />
                       </div>
                   </div>
               ) : (
                   <>
-                  <div className={`${currentCourse.themeColor} w-full max-w-md p-8 rounded-[2.5rem] border-b-8 ${currentCourse.themeBorder} mb-16 flex justify-between items-center shadow-2xl transition-transform hover:scale-[1.02]`}><div><p className="text-xs font-bold opacity-80 uppercase tracking-widest mb-1">{t('unit')} {user.currentUnit}</p><h2 className="text-3xl font-bold">{getLocalizedCourseName(currentCourse)}</h2></div>{currentCourse.id === 'chess' ? <span className="text-5xl">♔</span> : <ActivityIcon className="w-12 h-12 text-white" />}</div>
+                  {/* LANGUAGE COURSE PATH (РУССКИЙ, ENGLISH, DE, FR, ES, JA, ZH, AR, ETC.) */}
+                  <div className={`${currentCourse.themeColor} w-full max-w-md p-8 rounded-[2.5rem] border-b-8 ${currentCourse.themeBorder} mb-6 flex justify-between items-center shadow-2xl transition-transform hover:scale-[1.01]`}>
+                      <div>
+                          <p className="text-xs font-bold opacity-80 uppercase tracking-widest mb-1">
+                              {user.language === 'ru' ? `Раздел ${langSection} из 8 • Уровень ${langSection <= 2 ? 'A1' : langSection <= 4 ? 'A2' : langSection <= 6 ? 'B1' : 'B2'}` : `Section ${langSection} of 8`}
+                          </p>
+                          <h2 className="text-3xl font-bold">{getLocalizedCourseName(currentCourse)}</h2>
+                      </div>
+                      <ActivityIcon className="w-12 h-12 text-white" />
+                  </div>
+
+                  {/* LANGUAGE SECTIONS SELECTOR: РАЗДЕЛ 1-8 */}
+                  <div className="w-full max-w-md bg-gray-900/80 border border-gray-800 p-3 rounded-2xl mb-6 shadow-inner">
+                      <div className="flex items-center justify-between mb-2 px-1">
+                          <span className="text-xs font-black uppercase tracking-wider text-gray-300">
+                              {user.language === 'ru' ? 'Разделы курса (1-8):' : 'Course sections (1-8):'}
+                          </span>
+                          <span className="text-[10px] font-black text-amber-400 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-500/30">
+                              8 {user.language === 'ru' ? 'разделов' : 'sections'}
+                          </span>
+                      </div>
+                      <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                          {[
+                              { num: 1, nameRu: '1: Знакомство', nameEn: '1: Basics' },
+                              { num: 2, nameRu: '2: Семья & Кафе', nameEn: '2: Family' },
+                              { num: 3, nameRu: '3: Город & Маршруты', nameEn: '3: City' },
+                              { num: 4, nameRu: '4: Путешествия', nameEn: '4: Travel' },
+                              { num: 5, nameRu: '5: Работа & Хобби', nameEn: '5: Routine' },
+                              { num: 6, nameRu: '6: Времена & Истории', nameEn: '6: Tenses' },
+                              { num: 7, nameRu: '7: Грамматика B2', nameEn: '7: Grammar' },
+                              { num: 8, nameRu: '8: Свободная речь', nameEn: '8: Fluency' }
+                          ].map(sec => {
+                              const isSel = langSection === sec.num;
+                              return (
+                                  <button
+                                      key={sec.num}
+                                      type="button"
+                                      onClick={() => {
+                                          playSound('click');
+                                          setLangSection(sec.num);
+                                          localStorage.setItem('duo_lang_section_6601', String(sec.num));
+                                          setToast(user.language === 'ru' ? `Открыт Раздел ${sec.num}: ${sec.nameRu}` : `Opened Section ${sec.num}`);
+                                      }}
+                                      className={`px-3 py-2 rounded-xl font-black text-xs whitespace-nowrap transition-all cursor-pointer ${
+                                          isSel
+                                              ? 'bg-amber-400 text-black shadow-lg scale-105 border-b-2 border-amber-600'
+                                              : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
+                                      }`}
+                                  >
+                                      {user.language === 'ru' ? sec.nameRu : sec.nameEn}
+                                  </button>
+                              );
+                          })}
+                      </div>
+                  </div>
+
+                  {/* ACTIVE LANGUAGE SECTION CARD */}
+                  <div className="w-full max-w-md bg-gray-800/90 border border-amber-500/30 p-4 rounded-2xl mb-6 shadow-md text-left">
+                      <div className="flex items-center space-x-2 mb-1">
+                          <span className="bg-amber-400 text-black text-[10px] font-black px-2 py-0.5 rounded uppercase">
+                              {user.language === 'ru' ? `Раздел ${langSection}` : `Section ${langSection}`}
+                          </span>
+                          <h3 className="font-din font-black text-white text-sm">
+                              {langSection === 1 && (user.language === 'ru' ? 'Знакомство и первые фразы (A1.1)' : 'Basics & Greetings (A1.1)')}
+                              {langSection === 2 && (user.language === 'ru' ? 'Семья, дом и кафе (A1.2)' : 'Family, Home & Dining (A1.2)')}
+                              {langSection === 3 && (user.language === 'ru' ? 'Город, маршруты и покупки (A2.1)' : 'City, Directions & Shopping (A2.1)')}
+                              {langSection === 4 && (user.language === 'ru' ? 'Путешествия, транспорт и отели (A2.2)' : 'Travel, Transport & Hotels (A2.2)')}
+                              {langSection === 5 && (user.language === 'ru' ? 'Работа, увлечения и распорядок дня (B1.1)' : 'Work, Hobbies & Routine (B1.1)')}
+                              {langSection === 6 && (user.language === 'ru' ? 'Времена и рассказы о событиях (B1.2)' : 'Tenses & Event Narratives (B1.2)')}
+                              {langSection === 7 && (user.language === 'ru' ? 'Сложная грамматика и общение (B2.1)' : 'Complex Grammar & Discussions (B2.1)')}
+                              {langSection === 8 && (user.language === 'ru' ? 'Мастерство, идиомы и свободная речь (B2.2)' : 'Mastery, Idioms & Fluency (B2.2)')}
+                          </h3>
+                      </div>
+                      <p className="text-xs text-gray-300 font-bold leading-relaxed">
+                          {langSection === 1 && (user.language === 'ru' ? 'Приветствия, вежливые слова, базовые местоимения и числа.' : 'Greetings, courtesies, basic pronouns and numbers.')}
+                          {langSection === 2 && (user.language === 'ru' ? 'Члены семьи, описания предметов, заказ блюд и напитков в кафе.' : 'Family members, descriptions, ordering food and drinks.')}
+                          {langSection === 3 && (user.language === 'ru' ? 'Ориентирование в городе, покупки в магазине, стоимость и вопросы где/куда.' : 'Asking directions, shopping, prices and location questions.')}
+                          {langSection === 4 && (user.language === 'ru' ? 'Аэропорт, вокзал, бронирование отеля, прогноз погоды и транспорт.' : 'Airports, hotels, weather forecast and tickets.')}
+                          {langSection === 5 && (user.language === 'ru' ? 'Профессии, рабочий день, распорядок дня и любимые хобби.' : 'Professions, daily routine and favorite hobbies.')}
+                          {langSection === 6 && (user.language === 'ru' ? 'Прошедшее и будущее время, повествование историй и согласование времен.' : 'Past and future tenses, storytelling and time prepositions.')}
+                          {langSection === 7 && (user.language === 'ru' ? 'Условные предложения, пассивный залог, аргументация и сложноподчиненные фразы.' : 'Conditionals, passive voice, debate and complex phrases.')}
+                          {langSection === 8 && (user.language === 'ru' ? 'Идиоматические выражения, современный сленг, беглость речи и беседа без барьеров.' : 'Idioms, modern expressions, fluency and natural conversations.')}
+                      </p>
+                  </div>
+
+                  {/* ЕЖЕДНЕВНОЕ ПОВТОРЕНИЕ (ЯЗЫКОВЫЕ КУРСЫ) */}
+                  <div className="w-full max-w-md bg-gradient-to-r from-amber-950 via-gray-900 to-yellow-950 border-2 border-b-6 border-amber-500 rounded-3xl p-5 mb-8 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="flex items-center space-x-3 text-left">
+                          <div className="w-12 h-12 rounded-2xl bg-amber-500 flex items-center justify-center text-2xl shadow-md shrink-0">
+                              🔥
+                          </div>
+                          <div>
+                              <div className="flex items-center space-x-2">
+                                  <h4 className="font-din font-black text-white text-base md:text-lg">
+                                      {user.language === 'ru' ? 'Ежедневное повторение' : 'Daily Review'}
+                                  </h4>
+                                  <span className="bg-amber-500/20 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-500/30">
+                                      {user.language === 'ru' ? 'СЕРИЯ ДНЕЙ' : 'STREAK'}
+                                  </span>
+                              </div>
+                              <p className="font-din font-bold text-xs text-amber-200/90 mt-0.5">
+                                  {user.language === 'ru' ? 'Возвращайтесь каждый день, чтобы не терять.' : 'Come back every day so you don\'t lose progress.'}
+                              </p>
+                          </div>
+                      </div>
+                      <button
+                          type="button"
+                          onClick={() => {
+                              playSound('select');
+                              startTraining('translation', `Ежедневное повторение: Раздел ${langSection}`);
+                              setToast(user.language === 'ru' ? `📚 Ежедневное повторение: Раздел ${langSection} (+20 XP)!` : `📚 Daily review (+20 XP)!`);
+                          }}
+                          className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-black font-black text-xs uppercase tracking-wider shadow-lg active:scale-95 transition-all whitespace-nowrap shrink-0 cursor-pointer text-center"
+                      >
+                          {user.language === 'ru' ? 'Повторить сегодня (+20 XP)' : 'Review Today (+20 XP)'}
+                      </button>
+                  </div>
+                  
+                  {/* КУРС ЯЗЫК: ВЫУЧИТЬ СТИХОТВОРЕНИЕ НАИЗУСТЬ */}
+                  {!poemMilestoneDismissed && (
+                    <div 
+                      onClick={() => {
+                        playSound('select');
+                        setShowPoemModal(true);
+                      }}
+                      className="w-full max-w-md bg-gradient-to-r from-purple-900/90 via-indigo-950 to-slate-900 border-2 border-b-8 border-purple-900 rounded-[2.5rem] p-6 mb-12 shadow-2xl relative transition-all hover:scale-[1.02] active:scale-[0.99] cursor-pointer group animate-in zoom-in"
+                    >
+                      <button 
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          playSound('click');
+                          setPoemMilestoneDismissed(true);
+                          localStorage.setItem('duo_poem_milestone_dismissed', 'true');
+                          setToast(user.language === 'ru' ? 'Стихотворение пропущено. Доступно в разделе «Практика»' : 'Poem skipped. Still available in Practice');
+                        }}
+                        className="absolute top-4 right-4 text-purple-200 hover:text-white bg-black/40 hover:bg-black/60 border border-purple-500/30 hover:border-purple-400 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider transition-all z-10 flex items-center gap-1 cursor-pointer active:scale-95 shadow-md"
+                        title={user.language === 'ru' ? 'Пропустить выучить стихотворение наизусть' : 'Skip poem memorization'}
+                      >
+                        <span>{user.language === 'ru' ? 'Пропустить' : 'Skip'}</span>
+                        <CloseIcon className="w-3.5 h-3.5" />
+                      </button>
+
+                      <div className="flex items-center space-x-4 pr-24 sm:pr-28">
+                        <div className="w-14 h-14 rounded-2xl bg-purple-600/30 border border-purple-400/40 flex items-center justify-center text-3xl shrink-0 group-hover:scale-110 transition-transform">
+                          📜
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2 mb-1 flex-wrap">
+                            <span className="bg-purple-500 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                              {user.language === 'ru' ? 'Курс Поэзии' : 'Poetry Milestone'}
+                            </span>
+                            <span className="text-amber-300 font-black text-xs flex items-center gap-1">
+                              <span>⚡</span>
+                              <span>+35 XP</span>
+                            </span>
+                          </div>
+                          <h3 className="font-din font-black text-lg md:text-xl text-white tracking-wide uppercase truncate">
+                            {user.language === 'ru' ? 'Выучить стихотворение наизусть' : 'Memorize Poem by Heart'}
+                          </h3>
+                          <p className="font-din font-bold text-xs text-purple-200 mt-0.5 leading-snug">
+                            {user.language === 'ru' 
+                              ? `Классические стихи (${getLocalizedCourseName(currentCourse)}): метод исчезающих слов и декламация`
+                              : `Learn classic poetry by heart in ${getLocalizedCourseName(currentCourse)} with interactive reciting`}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex flex-col items-center space-y-16">
-                    <button onClick={() => startTraining('translation')} className="w-28 h-28 rounded-full bg-duo-green border-b-8 border-duo-greenDark active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center shadow-2xl hover:brightness-110 group"><StarIcon className="w-14 h-14 text-white group-hover:scale-110 transition-transform" /></button>
+                    <button onClick={() => startTraining('translation')} className="w-28 h-28 rounded-full bg-duo-green border-b-8 border-duo-greenDark active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center shadow-2xl hover:brightness-110 group cursor-pointer"><StarIcon className="w-14 h-14 text-white group-hover:scale-110 transition-transform" /></button>
                     <div className="w-3 h-16 bg-gray-800 rounded-full"></div>
-                    <button onClick={() => { playSound('click'); setScreen(AppScreen.VOCABULARY); }} className="bg-gradient-to-r from-emerald-600 to-teal-600 p-8 md:p-10 rounded-[2.5rem] border-b-8 border-emerald-800 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center justify-between shadow-2xl group md:col-span-2">
+                    <button onClick={() => { playSound('click'); setScreen(AppScreen.VOCABULARY); }} className="bg-gradient-to-r from-emerald-600 to-teal-600 p-8 md:p-10 rounded-[2.5rem] border-b-8 border-emerald-800 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center justify-between shadow-2xl group md:col-span-2 cursor-pointer">
                   <div className="flex items-center space-x-6 md:space-x-8">
                       <div className="bg-white/20 p-4 md:p-5 rounded-3xl group-hover:rotate-6 transition-transform">
                           <NewWordIcon className="w-10 h-10 md:w-14 md:h-14 text-white" />
@@ -7797,7 +9722,7 @@ const getTodayChallenge = () => {
                   </div>
                   <ArrowRightIcon className="w-8 h-8 text-white group-hover:translate-x-2 transition-transform hidden sm:block" />
               </button>
-              <button onClick={() => startTraining('listening')} className="w-24 h-24 rounded-full bg-duo-blue border-b-8 border-duo-blueDark active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center shadow-xl hover:brightness-110">{currentCourse.id === 'chess' ? <span className="text-3xl">♟</span> : <VolumeIcon className="w-10 h-10 text-white" />}</button>
+              <button onClick={() => startTraining('listening')} className="w-24 h-24 rounded-full bg-duo-blue border-b-8 border-duo-blueDark active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center shadow-xl hover:brightness-110 cursor-pointer">{currentCourse.id === 'chess' ? <span className="text-3xl">♟</span> : <VolumeIcon className="w-10 h-10 text-white" />}</button>
                     <Mascot emotion="neutral" className="w-64 h-64 mt-10 animate-float" variant={currentCourse.mascotVariant} />
                   </div>
                   </>
@@ -7806,154 +9731,623 @@ const getTodayChallenge = () => {
           )}
 
           {screen === AppScreen.CHESS_MATCH && (
-            <div className="fixed inset-0 z-[100] bg-[#00cd9c] flex flex-col items-center justify-center p-4 md:p-6 animate-in fade-in duration-300 font-din h-[100dvh] overflow-y-auto">
-                <div className="w-full max-w-md flex flex-col items-center px-4 mt-auto mb-auto">
-                    <div className="relative mb-8">
-                        <Mascot variant="chess" className="w-64 h-64" />
-                    </div>
-                    
-                    <h1 className="text-3xl font-black uppercase text-center mb-2 text-gray-900 tracking-tight flex items-center justify-center space-x-2">
-                        <ChessPieceIcon type="n" color="b" className="w-8 h-8" />
-                        <span>{t('playChess')}</span>
-                    </h1>
-                    <p className="text-gray-800 font-bold mb-10 text-center text-sm">{t('chessSubtitle')}</p>
-                    
-                    <div className="grid grid-cols-3 gap-4 w-full mb-10">
-                        <div className="bg-teal-600/20 rounded-2xl p-4 flex flex-col items-center border-t-8 border-teal-700/30 shadow-sm">
-                            <span className="text-[10px] font-black text-gray-800 uppercase mb-2 tracking-widest">{t('games')}</span>
-                            <div className="flex items-center space-x-2">
-                                <GridIcon className="w-5 h-5 text-white" />
-                                <span className="text-xl font-black text-gray-900">{user.chessStats?.games || 0}</span>
-                            </div>
+            <div className={`fixed inset-0 z-[100] ${isLightMode ? 'bg-slate-100 text-slate-900' : 'bg-gradient-to-br from-[#0c141c] via-[#101b22] to-[#0c141c] text-white'} flex flex-col font-din overflow-y-auto animate-in fade-in duration-200`}>
+                
+                {/* TOP HEADER: Back button, Title, Settings, Time control & ELO */}
+                <header className={`sticky top-0 z-30 ${isLightMode ? 'bg-white/95' : 'bg-[#131f28]/95'} backdrop-blur-md px-4 sm:px-6 py-3 shadow-md shrink-0`}>
+                  <div className="max-w-6xl mx-auto w-full flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center space-x-2 sm:space-x-3">
+                      <button
+                        type="button"
+                        onClick={() => { playSound('click'); setScreen(AppScreen.PATH); }}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-white border border-gray-700 transition-all cursor-pointer font-bold text-xs uppercase tracking-wider active:scale-95 shadow-sm"
+                        title={user.language === 'ru' ? 'Вернуться к курсу' : 'Back to course'}
+                      >
+                        <span>←</span>
+                        <span>{user.language === 'ru' ? 'К курсу' : 'Back'}</span>
+                      </button>
+
+                      <div className="flex items-center space-x-2">
+                        <div className="w-8 h-8 rounded-xl bg-[#00cd9c]/20 border border-[#00cd9c]/40 flex items-center justify-center text-lg shadow-inner">
+                          ♟️
                         </div>
-                        <div className="bg-teal-600/20 rounded-2xl p-4 flex flex-col items-center border-t-8 border-teal-700/30 shadow-sm">
-                            <span className="text-[10px] font-black text-gray-800 uppercase mb-2 tracking-widest">{t('wins')}</span>
-                            <div className="flex items-center space-x-2">
-                                <CheckCircleIcon className="w-5 h-5 text-white" />
-                                <span className="text-xl font-black text-gray-900">{user.chessStats?.wins || 0}</span>
-                            </div>
+                        <div>
+                          <h1 className="text-base sm:text-lg md:text-xl font-black uppercase tracking-tight flex items-center space-x-1.5">
+                            <span>{t('playChess')}</span>
+                          </h1>
+                          <span className="text-[10px] text-gray-400 font-bold block leading-none">
+                            {user.language === 'ru' ? 'Предметы & Игры • DuoWindo6601' : 'Subjects & Games • DuoWindo6601'}
+                          </span>
                         </div>
-                        <div className="bg-teal-600/20 rounded-2xl p-4 flex flex-col items-center border-t-8 border-teal-700/30 shadow-sm">
-                            <span className="text-[10px] font-black text-gray-800 uppercase mb-2 tracking-widest">{t('elo')}</span>
-                            <div className="flex items-center space-x-2">
-                                <ActivityIcon className="w-5 h-5 text-white" />
-                                <span className="text-xl font-black text-gray-900">{user.chessStats?.elo || 0}</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    {/* Course header badge */}
-                    <div className="mb-4">
-                        <span className="bg-gray-900/20 text-gray-900 text-xs font-black px-4 py-1.5 rounded-full border border-gray-900/30 uppercase tracking-widest shadow-sm">
-                            {user.language === 'ru' ? 'Не язык • Курс Шахматы' : 'Non-language • Chess Course'}
-                        </span>
+                      </div>
                     </div>
 
-                    <div className="flex flex-col w-full space-y-3">
-                        {/* 1. Играть с DuoWindo6601 */}
-                        <button 
-                            onClick={() => { 
-                                setChessMode('pve'); 
-                                const opp = { name: 'DuoWindo6601', elo: 1500, avatar: '🦉', isBot: true };
-                                setChessOpponent(opp); 
-                                initChessGame(opp);
-                                startTraining('chess'); 
-                            }} 
-                            className="w-full p-4 bg-gray-900 text-[#00cd9c] rounded-2xl font-black uppercase tracking-wider border-b-6 border-black active:border-b-0 active:translate-y-1 transition-all shadow-xl hover:bg-gray-800 flex items-center justify-between group cursor-pointer"
-                        >
-                            <div className="flex items-center space-x-3 text-left">
-                                <span className="text-3xl group-hover:scale-110 transition-transform">🦉</span>
-                                <div>
-                                    <div className="text-sm sm:text-base font-black text-[#00cd9c]">
-                                        {user.language === 'ru' ? 'Играть с DuoWindo6601' : 'Play with DuoWindo6601'}
-                                    </div>
-                                    <div className="text-[10px] text-gray-400 font-bold">
-                                        {user.language === 'ru' ? 'Одиночная партия с ИИ-ботом' : 'Single match vs AI Grandmaster'}
-                                    </div>
-                                </div>
+                    <div className="flex items-center space-x-2 sm:space-x-3">
+                      {/* Quick Time Control buttons */}
+                      <div className="flex items-center bg-gray-900/60 p-1 rounded-xl border border-gray-700/60 text-xs">
+                        {[
+                          { m: 5, label: user.language === 'ru' ? '5 мин' : '5m', icon: '⚡' },
+                          { m: 10, label: user.language === 'ru' ? '10 мин' : '10m', icon: '⏱️' },
+                          { m: 20, label: user.language === 'ru' ? '20 мин' : '20m', icon: '🏆' }
+                        ].map(({ m, label, icon }) => {
+                          const isSel = (user.chessTimeControl || 20) === m;
+                          return (
+                            <button
+                              key={m}
+                              type="button"
+                              onClick={() => {
+                                playSound('select');
+                                handleUpdateChessTimeControl(m);
+                              }}
+                              className={`px-2.5 py-1 rounded-lg font-black text-xs transition-all cursor-pointer flex items-center space-x-1 ${
+                                isSel
+                                  ? 'bg-[#00cd9c] text-gray-950 shadow-md font-black scale-105'
+                                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                              }`}
+                              title={user.language === 'ru' ? `Контроль времени: ${m} минут` : `Time control: ${m} minutes`}
+                            >
+                              <span>{icon}</span>
+                              <span className="hidden xs:inline">{label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Settings Button */}
+                      <button
+                        type="button"
+                        onClick={() => { playSound('click'); setIsChessSettingsModalOpen(true); }}
+                        className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-gray-800 hover:bg-gray-750 text-[#00cd9c] hover:text-white border border-gray-700 transition-all font-bold text-xs uppercase tracking-wider flex items-center space-x-1.5 shadow-sm active:scale-95 cursor-pointer"
+                        title={user.language === 'ru' ? 'Настройки шахмат' : 'Chess settings'}
+                      >
+                        <GearIcon className="w-4 h-4 text-[#00cd9c]" />
+                        <span className="hidden sm:inline">{user.language === 'ru' ? 'Настройки' : 'Settings'}</span>
+                      </button>
+
+                      {/* ELO Pill */}
+                      <div className="bg-amber-400/20 text-amber-300 border border-amber-400/40 text-xs font-black px-2.5 py-1 rounded-xl flex items-center space-x-1">
+                        <span>⭐</span>
+                        <span>{user.chessStats?.elo || 1500}</span>
+                      </div>
+                    </div>
+                  </div>
+                </header>
+
+                {/* MAIN CONTENT CONTAINER */}
+                <main className="max-w-6xl mx-auto w-full p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
+
+                  {/* QUICK STATS BAR */}
+                  <div className="grid grid-cols-3 gap-3 w-full max-w-4xl mx-auto">
+                    <div className="bg-gray-850/90 border border-gray-750 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center text-center shadow-md">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-1">{t('games')}</span>
+                      <div className="flex items-center space-x-1.5">
+                        <GridIcon className="w-4 h-4 sm:w-5 sm:h-5 text-duo-blue" />
+                        <span className="text-xl sm:text-2xl font-black text-white">{user.chessStats?.games || 0}</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-850/90 border border-gray-750 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center text-center shadow-md">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-1">{t('wins')}</span>
+                      <div className="flex items-center space-x-1.5">
+                        <CheckCircleIcon className="w-4 h-4 sm:w-5 sm:h-5 text-[#00cd9c]" />
+                        <span className="text-xl sm:text-2xl font-black text-white">{user.chessStats?.wins || 0}</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-850/90 border border-gray-750 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center text-center shadow-md">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-1">{t('elo')}</span>
+                      <div className="flex items-center space-x-1.5">
+                        <ActivityIcon className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
+                        <span className="text-xl sm:text-2xl font-black text-white">{user.chessStats?.elo || 1500}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* RESPONSIVE MODE SELECTOR: Mobile ergonomic 1-tap tabs + PC view switcher */}
+                  <div className="flex items-center justify-center gap-1.5 p-1.5 bg-gray-900/90 border border-gray-750 rounded-2xl max-w-2xl mx-auto w-full shadow-lg">
+                    <button
+                      type="button"
+                      onClick={() => { playSound('click'); setChessLobbyTab('bot'); }}
+                      className={`flex-1 py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-1.5 cursor-pointer active:scale-95 ${
+                        chessLobbyTab === 'bot'
+                          ? 'bg-[#00cd9c] text-gray-950 shadow-md font-black scale-[1.02]'
+                          : 'text-gray-300 hover:text-white hover:bg-gray-800'
+                      }`}
+                    >
+                      <span className="text-sm">🦉</span>
+                      <span className="truncate">{user.language === 'ru' ? 'С DuoWindo6601' : 'Vs AI Bot'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => { playSound('click'); setChessLobbyTab('pvp'); }}
+                      className={`flex-1 py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-1.5 cursor-pointer active:scale-95 ${
+                        chessLobbyTab === 'pvp'
+                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md font-black scale-[1.02]'
+                          : 'text-gray-300 hover:text-white hover:bg-gray-800'
+                      }`}
+                    >
+                      <span className="text-sm">⚔️</span>
+                      <span className="truncate">{user.language === 'ru' ? 'С пользователем' : 'Vs Player'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => { playSound('click'); setChessLobbyTab('analysis'); }}
+                      className={`py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-1.5 cursor-pointer active:scale-95 ${
+                        chessLobbyTab === 'analysis'
+                          ? 'bg-amber-500 text-slate-950 shadow-md font-black scale-[1.02]'
+                          : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                      }`}
+                      title={user.language === 'ru' ? 'Анализ и обучение' : 'Analysis & study'}
+                    >
+                      <span className="text-sm">🔍</span>
+                      <span className="hidden sm:inline">{user.language === 'ru' ? 'Анализ' : 'Analysis'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => { playSound('click'); setChessLobbyTab('all'); }}
+                      className={`hidden lg:flex py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all items-center justify-center space-x-1 cursor-pointer active:scale-95 ${
+                        chessLobbyTab === 'all'
+                          ? 'bg-gray-800 text-white border border-gray-600 shadow-sm'
+                          : 'text-gray-500 hover:text-gray-300'
+                      }`}
+                      title={user.language === 'ru' ? 'Показать все режимы на экране' : 'Show all modes'}
+                    >
+                      <span>🖥️</span>
+                      <span>{user.language === 'ru' ? 'Все' : 'All'}</span>
+                    </button>
+                  </div>
+
+                  {/* CHESS ARENA CONTENT CONTAINER */}
+                  <div className={chessLobbyTab === 'all' ? "grid grid-cols-1 lg:grid-cols-12 gap-6 items-start" : "max-w-2xl mx-auto w-full space-y-6"}>
+                    
+                    {/* SECTION A: Одиночная игра с DuoWindo6601 (ИИ-ботом) */}
+                    {(chessLobbyTab === 'bot' || chessLobbyTab === 'all') && (
+                      <div className={chessLobbyTab === 'all' ? "lg:col-span-5 space-y-4" : "space-y-4"}>
+                        
+                        {/* CARD 1: Играть с DuoWindo6601 */}
+                        <div className="bg-gray-850 border-2 border-gray-750 rounded-3xl p-5 sm:p-6 shadow-xl flex flex-col justify-between space-y-4 relative overflow-hidden group">
+                          <div className="flex items-start space-x-4">
+                            <div className="relative shrink-0">
+                              <Mascot variant="chess" className="w-20 h-20 sm:w-24 sm:h-24 drop-shadow-md group-hover:scale-105 transition-transform" />
+                              <span className="absolute -bottom-1 -right-1 bg-amber-400 text-gray-950 text-[10px] font-black px-1.5 py-0.5 rounded-md shadow">
+                                GM
+                              </span>
                             </div>
-                            <span className="bg-[#00cd9c]/20 text-[#00cd9c] text-[11px] font-black px-2.5 py-1 rounded-xl border border-[#00cd9c]/40 uppercase tracking-wider whitespace-nowrap">
-                                +30 очков опыта
+                            <div className="flex-1 min-w-0">
+                              <span className="inline-block bg-[#00cd9c]/20 text-[#00cd9c] text-[10px] font-black px-2.5 py-0.5 rounded-full border border-[#00cd9c]/40 uppercase tracking-widest mb-1.5">
+                                {user.language === 'ru' ? 'Одиночная партия с ИИ-ботом' : 'Single Match vs AI'}
+                              </span>
+                              <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight">
+                                {user.language === 'ru' ? 'Играть с DuoWindo6601' : 'Play with DuoWindo6601'}
+                              </h2>
+                              <p className="text-xs text-gray-400 font-medium mt-1 leading-relaxed">
+                                {user.language === 'ru'
+                                  ? 'Сыграйте одиночную партию против гроссмейстера Совиного Королевства (1500 ELO). Анализирует ходы и подсказывает тактику!'
+                                  : 'Single match against Owl Grandmaster DuoWindo6601 (1500 ELO). Real-time tactician and live commentary!'}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Quick Time Control Selection within Bot Card */}
+                          <div className="bg-gray-900/80 rounded-2xl p-3 border border-gray-750 flex items-center justify-between text-xs flex-wrap gap-2">
+                            <div className="flex items-center space-x-1.5">
+                              <span className="text-gray-400 font-bold">{user.language === 'ru' ? 'Контроль времени:' : 'Time control:'}</span>
+                              <div className="flex items-center space-x-1">
+                                {[5, 10, 20].map((mins) => (
+                                  <button
+                                    key={mins}
+                                    type="button"
+                                    onClick={() => { playSound('select'); handleUpdateChessTimeControl(mins); }}
+                                    className={`px-2 py-0.5 rounded-lg text-xs font-black transition-colors ${
+                                      (user.chessTimeControl || 20) === mins
+                                        ? 'bg-[#00cd9c] text-gray-950'
+                                        : 'bg-gray-800 text-gray-400 hover:text-white'
+                                    }`}
+                                  >
+                                    {mins}м
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            <span className="text-amber-400 font-black uppercase text-[11px] bg-amber-400/10 px-2.5 py-0.5 rounded-lg border border-amber-400/30">
+                              +30 XP
                             </span>
-                        </button>
+                          </div>
 
-                        {/* 2. Играть с другим Пользователем */}
-                        <button 
+                          <button 
                             onClick={() => { 
-                                playSound('click'); 
-                                setIsChessInviteModalOpen(true); 
+                              setChessMode('pve'); 
+                              const opp = { name: 'DuoWindo6601', elo: 1500, avatar: '🦉', isBot: true };
+                              setChessOpponent(opp); 
+                              initChessGame(opp);
+                              startTraining('chess'); 
                             }} 
-                            className="w-full p-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white rounded-2xl font-black uppercase tracking-wider border-b-6 border-indigo-950 active:border-b-0 active:translate-y-1 transition-all shadow-xl hover:brightness-110 flex items-center justify-between group cursor-pointer ring-2 ring-white/30"
-                        >
-                            <div className="flex items-center space-x-3 text-left">
-                                <span className="text-3xl group-hover:scale-110 transition-transform">⚔️</span>
-                                <div>
-                                    <div className="text-sm sm:text-base font-black text-white">
-                                        {user.language === 'ru' ? 'Играть с другим Пользователем' : 'Play with another User'}
-                                    </div>
-                                    <div className="text-[10px] text-blue-200 font-bold">
-                                        {user.language === 'ru' ? 'Пригласить друга • Ссылка • Поиск' : 'Invite friend • Link • Search'}
-                                    </div>
-                                </div>
-                            </div>
-                            <span className="bg-amber-400 text-gray-950 text-[11px] font-black px-2.5 py-1 rounded-xl shadow-md uppercase tracking-wider whitespace-nowrap">
-                                +30 очков опыта
-                            </span>
-                        </button>
+                            className="w-full py-4 px-6 bg-[#00cd9c] hover:bg-[#00cd9c]/90 text-gray-950 rounded-2xl font-black text-sm uppercase tracking-wider border-b-4 border-teal-800 active:border-b-0 active:translate-y-1 transition-all shadow-xl flex items-center justify-center space-x-2 cursor-pointer"
+                          >
+                            <span className="text-lg">🦉</span>
+                            <span>{user.language === 'ru' ? 'НАЧАТЬ ОДИНОЧНУЮ ПАРТИЮ С ИИ' : 'START SINGLE MATCH WITH AI'}</span>
+                          </button>
+                        </div>
 
-                        {/* 3. АНАЛИЗИРОВАТЬ ПАРТИЮ ШАХМАТЫ */}
-                        <button 
-                            onClick={() => { 
+                        {/* Analysis Card shown with Bot if tab === all */}
+                        {chessLobbyTab === 'all' && (
+                          <div className="bg-gray-850 border-2 border-gray-750 rounded-3xl p-5 shadow-xl space-y-3.5">
+                            <div className="flex items-center space-x-2.5">
+                              <span className="text-2xl">🔍</span>
+                              <div>
+                                <h3 className="text-sm font-black text-white uppercase tracking-wider">
+                                  {user.language === 'ru' ? 'ИИ-Анализ и Обучение' : 'AI Analysis & Learning'}
+                                </h3>
+                                <p className="text-[11px] text-gray-400 font-medium">
+                                  {user.language === 'ru' ? 'Разбор партий движком и тактические уроки' : 'Engine move analysis & tactical lessons'}
+                                </p>
+                              </div>
+                            </div>
+
+                            <button 
+                              onClick={() => { 
                                 playSound('click'); 
                                 setScreen(AppScreen.CHESS_ANALYSIS); 
-                            }} 
-                            className="w-full p-4 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-slate-950 rounded-2xl font-black uppercase tracking-wider border-b-6 border-amber-900 active:border-b-0 active:translate-y-1 transition-all shadow-xl hover:brightness-105 flex items-center justify-between group cursor-pointer ring-2 ring-white/40"
-                        >
-                            <div className="flex items-center space-x-3 text-left">
-                                <span className="text-3xl group-hover:scale-110 transition-transform">🔍</span>
-                                <div>
-                                    <div className="text-sm sm:text-base font-black text-slate-950 flex items-center gap-1.5">
-                                        <span>{user.language === 'ru' ? 'АНАЛИЗИРОВАТЬ ПАРТИЮ ШАХМАТЫ' : 'ANALYZE CHESS GAME'}</span>
-                                    </div>
-                                    <div className="text-[10px] text-amber-950 font-bold">
-                                        {user.language === 'ru' ? 'ИИ-разбор ходов • Оценка позиции • Точность' : 'AI Move Breakdown • Position Eval • Accuracy'}
-                                    </div>
-                                </div>
-                            </div>
-                            <span className="bg-slate-950 text-amber-400 text-[11px] font-black px-2.5 py-1 rounded-xl shadow-md uppercase tracking-wider whitespace-nowrap">
-                                {user.language === 'ru' ? 'ИИ-Анализ' : 'AI Analysis'}
-                            </span>
-                        </button>
+                              }} 
+                              className="w-full py-3.5 px-4 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-slate-950 rounded-2xl font-black uppercase tracking-wider border-b-4 border-amber-900 active:border-b-0 active:translate-y-1 transition-all shadow-lg hover:brightness-105 flex items-center justify-between text-xs sm:text-sm cursor-pointer"
+                            >
+                              <div className="flex items-center space-x-2">
+                                <span>🔍</span>
+                                <span>{user.language === 'ru' ? 'АНАЛИЗИРОВАТЬ ПАРТИЮ ШАХМАТЫ' : 'ANALYZE CHESS GAME'}</span>
+                              </div>
+                              <span className="bg-slate-950 text-amber-400 text-[10px] font-black px-2 py-0.5 rounded-lg">
+                                Stockfish
+                              </span>
+                            </button>
 
-                        {/* Secondary: Tutorial & Lesson */}
-                        <div className="grid grid-cols-2 gap-2.5 pt-1">
-                            <button 
+                            <div className="grid grid-cols-2 gap-2.5 pt-1">
+                              <button 
                                 onClick={() => { setChessMode('tutorial'); setTutorialMessage(t('eduWelcome')); startTraining('chess'); }} 
-                                className="py-3 px-3 bg-teal-800/40 hover:bg-teal-800/60 text-gray-900 rounded-xl font-bold uppercase text-xs tracking-wider border border-teal-700/40 transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
-                            >
-                                <span className="text-base">💡</span>
+                                className="py-2.5 px-3 bg-gray-800 hover:bg-gray-750 text-gray-200 rounded-xl font-bold uppercase text-xs tracking-wider border border-gray-700 transition-all flex items-center justify-center space-x-1.5 cursor-pointer active:scale-95"
+                              >
+                                <span>💡</span>
                                 <span>{t('eduBtn')}</span>
+                              </button>
+                              <button 
+                                onClick={() => { setChessMode('study'); setTutorialMessage(t('lessonWelcome')); startTraining('chess'); }} 
+                                className="py-2.5 px-3 bg-gray-800 hover:bg-gray-750 text-gray-200 rounded-xl font-bold uppercase text-xs tracking-wider border border-gray-700 transition-all flex items-center justify-center space-x-1.5 cursor-pointer active:scale-95"
+                              >
+                                <span>📖</span>
+                                <span>{t('lessonBtn')}</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* SECTION B: Играть с другим Пользователем (Пригласить друга • Ссылка • Поиск) */}
+                    {(chessLobbyTab === 'pvp' || chessLobbyTab === 'all') && (
+                      <div className={chessLobbyTab === 'all' ? "lg:col-span-7 space-y-4" : "space-y-4"}>
+                        
+                        <div className="bg-gray-850 border-2 border-indigo-500/50 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-5 relative overflow-hidden">
+                          
+                          {/* Header */}
+                          <div className="flex items-start justify-between gap-3 flex-wrap">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-2xl shadow-lg border-b-4 border-indigo-950 shrink-0">
+                                ⚔️
+                              </div>
+                              <div>
+                                <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight">
+                                  {user.language === 'ru' ? 'Играть с другим Пользователем' : 'Play with another User'}
+                                </h2>
+                                <p className="text-xs text-indigo-300 font-bold mt-0.5 flex items-center gap-1.5">
+                                  <span>👥 {user.language === 'ru' ? 'Пригласить друга' : 'Invite friend'}</span>
+                                  <span>•</span>
+                                  <span>🔗 {user.language === 'ru' ? 'Ссылка' : 'Link'}</span>
+                                  <span>•</span>
+                                  <span>🔍 {user.language === 'ru' ? 'Поиск' : 'Search'}</span>
+                                </p>
+                              </div>
+                            </div>
+
+                            <span className="bg-amber-400 text-gray-950 text-[10px] sm:text-xs font-black px-2.5 py-1 rounded-xl shadow-md uppercase tracking-wider shrink-0">
+                              +30 XP
+                            </span>
+                          </div>
+
+                          {/* 3 ACTION TABS: Ссылка • Пригласить друга • Поиск */}
+                          <div className="grid grid-cols-3 gap-1.5 p-1 bg-gray-900/90 border border-gray-750 rounded-2xl">
+                            <button
+                              type="button"
+                              onClick={() => { playSound('click'); setChessPvpSubTab('link'); }}
+                              className={`py-2 px-2 rounded-xl font-black text-[11px] sm:text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-1 cursor-pointer active:scale-95 ${
+                                chessPvpSubTab === 'link'
+                                  ? 'bg-indigo-600 text-white shadow-md font-black'
+                                  : 'text-gray-400 hover:text-white'
+                              }`}
+                            >
+                              <span>🔗</span>
+                              <span className="truncate">{user.language === 'ru' ? 'Ссылка' : 'Link'}</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => { playSound('click'); setChessPvpSubTab('invite'); }}
+                              className={`py-2 px-2 rounded-xl font-black text-[11px] sm:text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-1 cursor-pointer active:scale-95 ${
+                                chessPvpSubTab === 'invite'
+                                  ? 'bg-indigo-600 text-white shadow-md font-black'
+                                  : 'text-gray-400 hover:text-white'
+                              }`}
+                            >
+                              <span>👥</span>
+                              <span className="truncate">{user.language === 'ru' ? 'Друзья' : 'Friends'}</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => { playSound('click'); setChessPvpSubTab('search'); }}
+                              className={`py-2 px-2 rounded-xl font-black text-[11px] sm:text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-1 cursor-pointer active:scale-95 ${
+                                chessPvpSubTab === 'search'
+                                  ? 'bg-indigo-600 text-white shadow-md font-black'
+                                  : 'text-gray-400 hover:text-white'
+                              }`}
+                            >
+                              <span>🔍</span>
+                              <span className="truncate">{user.language === 'ru' ? 'Поиск' : 'Search'}</span>
+                            </button>
+                          </div>
+
+                          {/* SUB-TAB 1: ССЫЛКА НА ПАРТИЮ (Ссылка) */}
+                          {(chessPvpSubTab === 'link' || chessLobbyTab === 'all') && (
+                            <div className="bg-gray-900/90 rounded-2xl p-4 border border-indigo-500/30 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-2 text-xs font-black text-indigo-200 uppercase tracking-wider">
+                                  <span>🔗</span>
+                                  <span>{user.language === 'ru' ? 'Ссылка для приглашения друга' : 'Friend Invite Link'}</span>
+                                </div>
+                                <span className="bg-indigo-950/80 text-indigo-300 text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg border border-indigo-500/30">
+                                  {chessHubRoomCode}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 bg-black/50 border border-gray-700 rounded-xl px-3 py-2 text-xs text-gray-300 font-mono truncate select-all">
+                                  {typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}#chess-party?room=${chessHubRoomCode}` : `https://duowindo6601.applet.run/#chess?room=${chessHubRoomCode}`}
+                                </div>
+                                
+                                <button
+                                  type="button"
+                                  onClick={handleChessHubCopyLink}
+                                  className={`px-3.5 py-2 rounded-xl font-black text-xs uppercase tracking-wider border-b-2 active:border-b-0 active:translate-y-0.5 transition-all flex items-center space-x-1.5 shrink-0 cursor-pointer ${
+                                    chessHubLinkCopied
+                                      ? 'bg-emerald-600 text-white border-emerald-800'
+                                      : 'bg-duo-blue hover:bg-blue-500 text-white border-duo-blueDark'
+                                  }`}
+                                >
+                                  <span>{chessHubLinkCopied ? '✅' : '📋'}</span>
+                                  <span className="hidden sm:inline">{chessHubLinkCopied ? (user.language === 'ru' ? 'Скопировано!' : 'Copied!') : (user.language === 'ru' ? 'Копировать' : 'Copy')}</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={handleChessHubShareLink}
+                                  className="p-2 sm:px-3 sm:py-2 bg-gray-750 hover:bg-gray-700 text-gray-200 rounded-xl font-bold text-xs uppercase tracking-wider border border-gray-600 transition-all flex items-center space-x-1 shrink-0 cursor-pointer"
+                                  title={user.language === 'ru' ? 'Поделиться ссылкой' : 'Share link'}
+                                >
+                                  <span>📤</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* SUB-TAB 2: ПРИГЛАСИТЬ ДРУГА / КОНТАКТЫ (Пригласить друга) */}
+                          {(chessPvpSubTab === 'invite' || chessLobbyTab === 'all') && (
+                            <div className="bg-gray-900/90 rounded-2xl p-4 border border-indigo-500/30 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-2 text-xs font-black text-indigo-200 uppercase tracking-wider">
+                                  <span>👥</span>
+                                  <span>{user.language === 'ru' ? 'Пригласить друга из списка' : 'Invite from Friends & Contacts'}</span>
+                                </div>
+                                <span className="text-[10px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-lg border border-purple-500/30 font-bold">
+                                  🔒 {user.language === 'ru' ? 'Приватность' : 'Privacy'}
+                                </span>
+                              </div>
+
+                              <p className="text-xs text-gray-400 font-medium">
+                                {user.language === 'ru'
+                                  ? 'Откройте список друзей или контактов для отправки персонального вызова с защитой телефонных номеров и email.'
+                                  : 'Open friends & contacts modal to send invitations with phone and email privacy.'}
+                              </p>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => { playSound('click'); setIsChessInviteModalOpen(true); }}
+                                  className="py-3 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-xs uppercase tracking-wider border-b-2 border-indigo-900 active:translate-y-0.5 transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-md"
+                                >
+                                  <span>📱</span>
+                                  <span>{user.language === 'ru' ? 'Пригласить друга' : 'Invite Friend'}</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    playSound('click');
+                                    handleStartPvpChess({
+                                      id: 'local-pass-play',
+                                      name: user.language === 'ru' ? 'Игрок 2 (На одном экране)' : 'Player 2 (Pass & Play)',
+                                      username: '@player_2',
+                                      avatar: '👤',
+                                      elo: user.chessStats?.elo || 1400,
+                                      status: 'online'
+                                    });
+                                  }}
+                                  className="py-3 px-4 bg-purple-700/60 hover:bg-purple-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider border border-purple-500/50 transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-95 shadow-md"
+                                >
+                                  <span>👥</span>
+                                  <span>{user.language === 'ru' ? 'Партия на 1 экране' : 'Pass & Play on 1 Device'}</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* SUB-TAB 3: ПОИСК ИГРОКОВ (Поиск) */}
+                          {(chessPvpSubTab === 'search' || chessLobbyTab === 'all') && (
+                            <div className="space-y-2.5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-black text-gray-300 uppercase tracking-wider flex items-center space-x-1.5">
+                                  <span>🔍</span>
+                                  <span>{user.language === 'ru' ? 'Поиск игроков онлайн' : 'Search Players Online'}</span>
+                                </span>
+                                <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                                  <span>{user.language === 'ru' ? 'В сети' : 'Online'}</span>
+                                </span>
+                              </div>
+
+                              <div className="relative">
+                                <SearchIcon className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                                <input
+                                  type="text"
+                                  value={chessHubSearchQuery}
+                                  onChange={(e) => setChessHubSearchQuery(e.target.value)}
+                                  placeholder={user.language === 'ru' ? 'Поиск по имени или @username...' : 'Search by name or @username...'}
+                                  className="w-full pl-10 pr-8 py-2.5 bg-gray-900 border border-gray-700 rounded-xl text-white placeholder-gray-500 font-bold text-xs focus:outline-none focus:border-indigo-400 transition-colors"
+                                />
+                                {chessHubSearchQuery && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setChessHubSearchQuery('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-xs font-bold"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Search Opponents List */}
+                              <div className="space-y-2 max-h-56 overflow-y-auto pr-1 custom-scrollbar">
+                                {getSearchableChessOpponents(user.language === 'ru')
+                                  .filter(opp => {
+                                    if (!chessHubSearchQuery.trim()) return true;
+                                    const q = chessHubSearchQuery.toLowerCase();
+                                    return opp.name.toLowerCase().includes(q) || (opp.username && opp.username.toLowerCase().includes(q));
+                                  })
+                                  .slice(0, 4)
+                                  .map((opp) => (
+                                    <div
+                                      key={opp.id}
+                                      className="bg-gray-900/80 hover:bg-gray-800 p-2.5 sm:p-3 rounded-2xl border border-gray-750 flex items-center justify-between gap-2 transition-all shadow-sm group"
+                                    >
+                                      <div className="flex items-center space-x-2.5 min-w-0">
+                                        <div className="w-10 h-10 rounded-xl bg-gray-800 border border-gray-700 flex items-center justify-center text-xl shrink-0 relative">
+                                          {opp.avatar}
+                                          <span className={`absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full border-2 border-gray-900 ${opp.status === 'online' ? 'bg-emerald-400' : 'bg-gray-500'}`} />
+                                        </div>
+                                        <div className="min-w-0">
+                                          <h4 className="text-white font-black text-xs sm:text-sm truncate group-hover:text-indigo-300 transition-colors">
+                                            {opp.name}
+                                          </h4>
+                                          <div className="flex items-center space-x-2 text-[10px] font-bold text-gray-400">
+                                            <span className="text-gray-500 truncate">{opp.username}</span>
+                                            <span>•</span>
+                                            <span className="text-amber-400">⭐ {opp.elo} ELO</span>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handleStartPvpChess(opp)}
+                                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black text-xs uppercase tracking-wider border-b-2 border-indigo-900 active:border-b-0 active:translate-y-0.5 transition-all shadow-md shrink-0 cursor-pointer flex items-center space-x-1"
+                                      >
+                                        <span>⚔️</span>
+                                        <span>{user.language === 'ru' ? 'Вызов' : 'Duel'}</span>
+                                      </button>
+                                    </div>
+                                  ))}
+                              </div>
+                            </div>
+                          )}
+
+                        </div>
+
+                      </div>
+                    )}
+
+                    {/* SECTION C: ИИ-Анализ & Обучение (When explicitly selected in tab mode) */}
+                    {chessLobbyTab === 'analysis' && (
+                      <div className="space-y-4">
+                        <div className="bg-gray-850 border-2 border-amber-500/40 rounded-3xl p-6 shadow-xl space-y-4">
+                          <div className="flex items-center space-x-3">
+                            <span className="text-3xl">🔍</span>
+                            <div>
+                              <h3 className="text-base sm:text-lg font-black text-white uppercase tracking-wider">
+                                {user.language === 'ru' ? 'ИИ-Анализ и Обучение' : 'AI Analysis & Learning'}
+                              </h3>
+                              <p className="text-xs text-gray-400 font-medium">
+                                {user.language === 'ru' ? 'Глубокий разбор партий шахматным движком Stockfish и тактические уроки' : 'Stockfish engine move analysis & tactical lessons'}
+                              </p>
+                            </div>
+                          </div>
+
+                          <button 
+                            onClick={() => { 
+                              playSound('click'); 
+                              setScreen(AppScreen.CHESS_ANALYSIS); 
+                            }} 
+                            className="w-full py-4 px-5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-slate-950 rounded-2xl font-black uppercase tracking-wider border-b-4 border-amber-900 active:border-b-0 active:translate-y-1 transition-all shadow-lg hover:brightness-105 flex items-center justify-between text-sm cursor-pointer"
+                          >
+                            <div className="flex items-center space-x-2">
+                              <span>🔍</span>
+                              <span>{user.language === 'ru' ? 'АНАЛИЗИРОВАТЬ ПАРТИЮ ШАХМАТЫ' : 'ANALYZE CHESS GAME'}</span>
+                            </div>
+                            <span className="bg-slate-950 text-amber-400 text-xs font-black px-2.5 py-1 rounded-lg">
+                              Stockfish 16
+                            </span>
+                          </button>
+
+                          <div className="grid grid-cols-2 gap-3 pt-1">
+                            <button 
+                              onClick={() => { setChessMode('tutorial'); setTutorialMessage(t('eduWelcome')); startTraining('chess'); }} 
+                              className="py-3 px-4 bg-gray-800 hover:bg-gray-750 text-gray-200 rounded-xl font-bold uppercase text-xs tracking-wider border border-gray-700 transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-95 shadow"
+                            >
+                              <span>💡</span>
+                              <span>{t('eduBtn')}</span>
                             </button>
                             <button 
-                                onClick={() => { setChessMode('study'); setTutorialMessage(t('lessonWelcome')); startTraining('chess'); }} 
-                                className="py-3 px-3 bg-teal-800/40 hover:bg-teal-800/60 text-gray-900 rounded-xl font-bold uppercase text-xs tracking-wider border border-teal-700/40 transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+                              onClick={() => { setChessMode('study'); setTutorialMessage(t('lessonWelcome')); startTraining('chess'); }} 
+                              className="py-3 px-4 bg-gray-800 hover:bg-gray-750 text-gray-200 rounded-xl font-bold uppercase text-xs tracking-wider border border-gray-700 transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-95 shadow"
                             >
-                                <span className="text-base">📖</span>
-                                <span>{t('lessonBtn')}</span>
+                              <span>📖</span>
+                              <span>{t('lessonBtn')}</span>
                             </button>
+                          </div>
                         </div>
-                    </div>
-                </div>
-                
-                {/* Bottom Navigation for this screen */}
-                <div className="mt-auto w-full max-w-md flex justify-between items-center px-6 py-4 bg-gray-900/10 rounded-3xl mb-4">
-                    <button onClick={() => setScreen(AppScreen.PATH)} className="p-2 opacity-50 hover:opacity-100 transition-opacity"><HomeIcon className="w-8 h-8 text-gray-900" /></button>
-                    <button className="p-2 opacity-100"><ChessPieceIcon type="n" color="b" className="w-8 h-8" /></button>
-                    <button onClick={() => setScreen(AppScreen.LEADERBOARD)} className="p-2 opacity-50 hover:opacity-100 transition-opacity"><ShieldIcon className="w-8 h-8 text-gray-900" /></button>
-                    <button className="p-2 opacity-50 hover:opacity-100 transition-opacity"><ChestIcon className="w-8 h-8 text-gray-900" /></button>
-                    <button onClick={() => setScreen(AppScreen.SHOP)} className="p-2 opacity-50 hover:opacity-100 transition-opacity"><span className="text-3xl font-black text-gray-900">🏪</span></button>
-                    <button onClick={() => setScreen(AppScreen.PROFILE)} className="p-2 opacity-50 hover:opacity-100 transition-opacity"><UserIcon className="w-8 h-8 text-gray-900" /></button>
-                </div>
+                      </div>
+                    )}
+
+                  </div>
+
+                </main>
+
+                {/* BOTTOM FOOTER */}
+                <footer className={`py-4 px-6 border-t ${isLightMode ? 'bg-white/80 border-slate-200' : 'bg-[#101920]/80 border-gray-800'} text-center text-xs text-gray-400 font-bold shrink-0 flex items-center justify-between max-w-6xl mx-auto w-full`}>
+                  <button
+                    type="button"
+                    onClick={() => setScreen(AppScreen.PATH)}
+                    className="flex items-center space-x-1.5 text-gray-400 hover:text-white transition-colors cursor-pointer"
+                  >
+                    <span>←</span>
+                    <span>{user.language === 'ru' ? 'Вернуться к обучению DuoWindo6601' : 'Back to DuoWindo6601 path'}</span>
+                  </button>
+
+                  <div className="flex items-center space-x-3 text-[11px]">
+                    <span className="text-gray-500">{user.language === 'ru' ? 'Таймер:' : 'Timer:'} {user.chessTimeControl || 20}m</span>
+                    <span>•</span>
+                    <span className="text-gray-500">{user.language === 'ru' ? 'Фигуры:' : 'Theme:'} {user.chessPieceTheme === 'unicode' ? 'Unicode' : 'Staunton'}</span>
+                  </div>
+                </footer>
             </div>
           )}
 
@@ -7965,7 +10359,7 @@ const getTodayChallenge = () => {
                 gameResult={
                   chessStatus === 'mate'
                     ? (feedback.status === 'correct' ? (user.language === 'ru' ? 'Победа белых' : 'White wins') : (user.language === 'ru' ? 'Победа черных' : 'Black wins'))
-                    : chessStatus === 'draw'
+                    : (chessStatus as string) === 'draw'
                     ? (user.language === 'ru' ? 'Ничья' : 'Draw')
                     : (chessHistory.length > 0 ? (user.language === 'ru' ? 'Текущая партия' : 'Active game') : undefined)
                 }
@@ -8008,7 +10402,7 @@ const getTodayChallenge = () => {
                     setChessValidMoves([]);
                     setChessStatus(chessObj.isGameOver() ? 'mate' : 'active');
                     setChessLastMove(null);
-                    setChessTimerSeconds(20 * 60);
+                    setChessTimerSeconds((user.chessTimeControl || 20) * 60);
                     setChessChat([{
                       role: 'model',
                       text: turn === 'b'
@@ -8054,60 +10448,26 @@ const getTodayChallenge = () => {
           )}
 
           {screen === AppScreen.PRACTICE && (
-            <div className="grid md:grid-cols-2 gap-8 py-10 animate-in fade-in">
-              {/* VIDEO CALL & ROLEPLAY FEATURED CARDS */}
-              <div className="md:col-span-2 grid sm:grid-cols-2 gap-4">
-                  <button 
-                      onClick={() => startVideoCall(t('videoCall'))} 
-                      className="bg-gradient-to-r from-purple-700 via-indigo-700 to-blue-700 p-6 md:p-8 rounded-[2.5rem] border-b-8 border-purple-900 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center justify-between shadow-2xl group relative overflow-hidden"
-                  >
-                      <div className="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest animate-pulse border border-white/20">
-                          NEW DuoWindo6601
-                      </div>
-                      <div className="flex items-center space-x-5 relative z-10">
-                          <div className="bg-white/20 p-4 rounded-3xl group-hover:scale-110 transition-transform">
-                              <VideoIcon className="w-10 h-10 text-white" />
-                          </div>
-                          <div>
-                              <div className="flex items-center space-x-2 mb-1">
-                                  <h3 className="text-2xl md:text-3xl font-black text-white">{t('videoCall')}</h3>
-                              </div>
-                              <p className="opacity-90 font-bold text-xs md:text-sm text-purple-200">
-                                  {t('videoCallDesc')}
-                              </p>
-                          </div>
-                      </div>
-                  </button>
-
-                  <button 
-                      onClick={() => startTraining('roleplay')} 
-                      className="bg-gradient-to-r from-purple-600 to-pink-600 p-6 md:p-8 rounded-[2.5rem] border-b-8 border-purple-800 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center justify-between shadow-2xl group"
-                  >
-                      <div className="flex items-center space-x-5">
-                          <div className="bg-white/20 p-4 rounded-3xl group-hover:rotate-6 transition-transform">
-                              <ChatBubbleIcon className="w-10 h-10 text-white" />
-                          </div>
-                          <div>
-                              <div className="flex items-center space-x-2 mb-1">
-                                  <h3 className="text-2xl md:text-3xl font-black text-white">{t('roleplays')}</h3>
-                                  {user.subscription === 'max' && <span className="bg-black text-duo-blue text-[10px] px-2 py-0.5 rounded font-black border border-duo-blue">MAX</span>}
-                              </div>
-                              <p className="opacity-90 font-bold text-xs md:text-sm text-white/80">{t('startSpeak')}</p>
-                          </div>
-                      </div>
-                      <Mascot emotion="happy" className="w-20 h-20 hidden sm:block" variant={currentCourse.mascotVariant} />
-                  </button>
-              </div>
-              <button onClick={() => startTraining('listening')} className="bg-duo-blue p-12 rounded-[3rem] border-b-8 border-blue-800 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center space-x-8 shadow-2xl"><div className="bg-white/20 p-5 rounded-3xl"><VolumeIcon className="w-14 h-14 text-white" /></div><div><h3 className="text-3xl font-bold mb-1">{t('audio')}</h3><p className="opacity-80 font-bold uppercase tracking-widest text-xs">{t('whatHeard')}</p></div></button>
-              <button onClick={() => startTraining('speech')} className="bg-duo-orange p-12 rounded-[3rem] border-b-8 border-orange-700 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center space-x-8 shadow-2xl"><div className="bg-white/20 p-5 rounded-3xl"><MicIcon className="w-14 h-14 text-white" /></div><div><h3 className="text-3xl font-bold mb-1">{t('speech')}</h3><p className="opacity-80 font-bold uppercase tracking-widest text-xs">{t('speakForDuo')}</p></div></button>
-              <button onClick={() => startTraining('translation')} className="bg-duo-green p-12 rounded-[3rem] border-b-8 border-duo-greenDark text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center space-x-8 shadow-2xl"><div className="bg-white/20 p-5 rounded-3xl"><BookIcon className="w-14 h-14 text-white" /></div><div><h3 className="text-3xl font-bold mb-1">{t('translate')}</h3><p className="opacity-80 font-bold uppercase tracking-widest text-xs">{t('readPractice')}</p></div></button>
-              <button onClick={() => startTraining('reading')} className="bg-teal-500 p-12 rounded-[3rem] border-b-8 border-teal-700 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center space-x-8 shadow-2xl"><div className="bg-white/20 p-5 rounded-3xl"><BookIcon className="w-14 h-14 text-white" /></div><div><h3 className="text-3xl font-bold mb-1">{t('practice')}</h3><p className="opacity-80 font-bold uppercase tracking-widest text-xs">{t('storiesAndWriting')}</p></div></button>
-              <button onClick={() => setScreen(AppScreen.TRANSLATOR)} className="bg-gray-700 p-12 rounded-[3rem] border-b-8 border-gray-900 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center space-x-8 shadow-2xl"><div className="bg-white/20 p-5 rounded-3xl"><BookIcon className="w-14 h-14 text-white" /></div><div><h3 className="text-3xl font-bold mb-1 text-white">{t('translator')}</h3><p className="opacity-80 font-bold uppercase tracking-widest text-xs text-white">{t('aiTrans')}</p></div></button>
-              <button onClick={() => startTraining('illusion')} className="bg-indigo-600 p-12 rounded-[3rem] border-b-8 border-indigo-800 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center space-x-8 shadow-2xl"><div className="bg-white/20 p-5 rounded-3xl"><EarIcon className="w-14 h-14 text-white" /></div><div><h3 className="text-3xl font-bold mb-1">{t('illusion')}</h3><p className="opacity-80 font-bold uppercase tracking-widest text-xs">{t('realOrNot')}</p></div></button>
-              <button onClick={() => startTraining('drawing')} className="bg-pink-600 p-12 rounded-[3rem] border-b-8 border-pink-800 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center space-x-8 shadow-2xl"><div className="bg-white/20 p-5 rounded-3xl"><PenIcon className="w-14 h-14 text-white" /></div><div><h3 className="text-3xl font-bold mb-1">{t('drawing')}</h3><p className="opacity-80 font-bold uppercase tracking-widest text-xs">{t('writePractice')}</p></div></button>
-              <button onClick={() => startTraining('ishihara')} className="bg-teal-600 p-12 rounded-[3rem] border-b-8 border-teal-800 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center space-x-8 shadow-2xl"><div className="bg-white/20 p-5 rounded-3xl"><PaletteIcon className="w-14 h-14 text-white" /></div><div><h3 className="text-3xl font-bold mb-1">{t('ishihara')}</h3><p className="opacity-80 font-bold uppercase tracking-widest text-xs">{t('ishiharaDesc')}</p></div></button>
-              <div className="md:col-span-2 bg-duo-card border-2 border-gray-700 rounded-[3rem] p-8 mt-4 shadow-xl"><h3 className="text-xl font-bold mb-4 flex items-center"><NewWordIcon className="w-6 h-6 mr-2 text-duo-blue"/> {t('topicPrompt')}</h3><div className="flex flex-col sm:flex-row gap-4"><input type="text" value={customTopic} onChange={(e) => setCustomTopic(e.target.value)} placeholder={t('topicPlaceholder')} className="flex-1 bg-duo-dark border-2 border-gray-600 rounded-2xl px-6 py-4 font-bold text-white placeholder-gray-500 focus:border-duo-blue focus:outline-none transition-colors" /><button onClick={() => { if (customTopic.trim() === "") { setToast(t('t_topic_empty')); } startTraining('translation', customTopic); }} className="bg-duo-blue border-b-4 border-duo-blueDark rounded-2xl px-8 py-4 font-bold uppercase tracking-widest hover:brightness-110 active:translate-y-1 active:border-b-0 transition-all">{t('start')}</button></div></div>
-            </div>
+            <DuoWindo6601PracticeHub
+              user={user}
+              setUser={setUser}
+              currentCourse={currentCourse}
+              startTraining={startTraining}
+              startVideoCall={startVideoCall}
+              setScreen={setScreen}
+              playSound={playSound}
+              setToast={setToast}
+              customTopic={customTopic}
+              setCustomTopic={setCustomTopic}
+              setCurrentExercise={setCurrentExercise}
+              setAvailableTokens={setAvailableTokens}
+              setSelectedWordIds={setSelectedWordIds}
+              setFeedback={setFeedback}
+              setExplanation={setExplanation}
+              setShowExplanationModal={setShowExplanationModal}
+              speakText={(text, courseId, slow) => speakText(text, courseId, slow, user.preferredVoice, user.voiceProvider)}
+              t={t}
+            />
           )}
 
           {/* ... (LEADERBOARD) ... */}
@@ -8205,13 +10565,13 @@ const getTodayChallenge = () => {
                 <div className="bg-duo-card border-2 border-purple-500/50 rounded-2xl p-4 mb-6 shadow-xl">
                   <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                     <span className="text-xs font-black text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
-                      <span>🌐</span> Имя переводчик / Лидеры (8 языков)
+                      <span>🌐</span> {user.language === 'ru' ? 'Переводчик имен лидера (18 языков)' : 'Leaderboard Name Translator (18 languages)'}
                     </span>
                     <span className="text-[10px] bg-purple-900/50 text-purple-200 px-2 py-0.5 rounded-md border border-purple-500/40 font-mono">
                       {leaderboardLang.toUpperCase()}
                     </span>
                   </div>
-                  <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
+                  <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-9 gap-1.5">
                     {[
                       { code: 'ru', label: 'RU', flag: '🇷🇺' },
                       { code: 'en', label: 'EN', flag: '🇬🇧' },
@@ -8221,20 +10581,48 @@ const getTodayChallenge = () => {
                       { code: 'ja', label: 'JA', flag: '🇯🇵' },
                       { code: 'zh', label: 'ZH', flag: '🇨🇳' },
                       { code: 'ar', label: 'AR', flag: '🇸🇦' },
-                    ].map((l) => (
-                      <button
-                        key={l.code}
-                        onClick={() => { playSound('click'); setLeaderboardLang(l.code); }}
-                        className={`py-1.5 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center gap-0.5 border ${
-                          leaderboardLang === l.code
-                            ? 'bg-purple-600 text-white border-purple-400 shadow-md scale-105'
-                            : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border-gray-700'
-                        }`}
-                      >
-                        <span className="text-base">{l.flag}</span>
-                        <span className="text-[10px]">{l.label}</span>
-                      </button>
-                    ))}
+                      { code: 'pt', label: 'PT', flag: '🇧🇷' },
+                      { code: 'it', label: 'IT', flag: '🇮🇹' },
+                      { code: 'tr', label: 'TR', flag: '🇹🇷' },
+                      { code: 'ko', label: 'KO', flag: '🇰🇷' },
+                      { code: 'hi', label: 'HI', flag: '🇮🇳' },
+                      { code: 'pl', label: 'PL', flag: '🇵🇱' },
+                      { code: 'id', label: 'ID', flag: '🇮🇩' },
+                      { code: 'bn', label: 'BN', flag: '🇧🇩' },
+                      { code: 'th', label: 'TH', flag: '🇹🇭' },
+                      { code: 'vi', label: 'VI', flag: '🇻🇳' },
+                    ].map((l) => {
+                      const isLocked = isLanguageSwitchLocked(l.code);
+                      return (
+                        <button
+                          key={l.code}
+                          onClick={() => {
+                            if (isLocked) {
+                              playSound('wrong');
+                              setToast(getLanguageLockedToastMessage(l.code, user.language || 'ru'));
+                              setLeaderboardLang(l.code);
+                              return;
+                            }
+                            playSound('click');
+                            setLeaderboardLang(l.code);
+                          }}
+                          className={`py-1.5 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center gap-0.5 border relative ${
+                            leaderboardLang === l.code
+                              ? 'bg-purple-600 text-white border-purple-400 shadow-md scale-105'
+                              : isLocked
+                                ? 'bg-amber-950/40 text-amber-200 border-amber-900/60 hover:bg-amber-900/50'
+                                : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border-gray-700'
+                          }`}
+                          title={isLocked ? `${l.label}: Доступно до 1 ноября 2026 г. 🔒` : l.label}
+                        >
+                          <div className="flex items-center gap-0.5">
+                            <span className="text-base">{l.flag}</span>
+                            {isLocked && <span className="text-[8px]">🔒</span>}
+                          </div>
+                          <span className="text-[10px]">{l.label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
                 
@@ -8313,8 +10701,20 @@ const getTodayChallenge = () => {
           )}
 
           {screen === AppScreen.SHOP && (
-             <div className="py-10 space-y-8 animate-in fade-in">
+             <div className="py-10 space-y-8 animate-in fade-in max-w-4xl mx-auto w-full px-4">
                 <h2 className="text-4xl font-bold text-center mb-10 tracking-tight uppercase">{t('shopTitle')}</h2>
+
+                {/* FREE 3-DAY DUOWINDO6601 SUPER TRIAL & SUBSCRIPTION SECTION */}
+                <ShopSuperTrialSection
+                   user={user}
+                   setUser={setUser}
+                   playSound={playSound}
+                   setToast={(msg) => setToast(msg)}
+                   upgradeSubscription={(tier) => upgradeSubscription(tier)}
+                   isIncognitoUser={isIncognitoUser}
+                   STORAGE_KEY={STORAGE_KEY}
+                />
+
                 {user.subscription === 'free' && (
                   <div onClick={() => { playSound('click'); setScreen(AppScreen.SUBSCRIPTION); }} className={`bg-gradient-to-r from-blue-600 to-purple-600 p-8 rounded-3xl border-b-8 border-purple-800 cursor-pointer hover:scale-[1.02] transition-all shadow-2xl mb-10 flex items-center justify-between relative overflow-hidden`}>
                     {isIncognitoUser && (
@@ -8598,6 +10998,73 @@ const getTodayChallenge = () => {
                             <span>{t('streakLessonAction')}</span>
                          </button>
                       </div>
+
+                      {/* Chess Profile & Quick Settings Card */}
+                      <div className="w-full bg-duo-card border-2 border-emerald-500/50 rounded-3xl p-5 shadow-xl text-center space-y-3.5">
+                         <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2.5">
+                               <span className="text-2xl p-1.5 bg-emerald-950/60 rounded-xl border border-emerald-500/40">♟️</span>
+                               <div className="text-left">
+                                 <h3 className="text-sm font-black text-white uppercase tracking-wider">
+                                   {user.language === 'ru' ? 'Шахматы DuoWindo6601' : 'DuoWindo6601 Chess'}
+                                 </h3>
+                                 <p className="text-[10px] text-gray-400 font-bold">
+                                   {user.chessStats?.games || 0} {user.language === 'ru' ? 'партий' : 'games'} • {user.chessStats?.elo || 590} ELO
+                                 </p>
+                               </div>
+                            </div>
+                            <button
+                               onClick={() => { playSound('click'); setIsChessSettingsModalOpen(true); }}
+                               className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-black px-3 py-1.5 rounded-xl border-b-2 border-emerald-800 active:border-b-0 active:translate-y-0.5 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                            >
+                               <GearIcon className="w-3.5 h-3.5 text-white" />
+                               <span>{user.language === 'ru' ? 'Настройки' : 'Settings'}</span>
+                            </button>
+                         </div>
+
+                         {/* Quick Settings Grid in Profile */}
+                         <div className="grid grid-cols-3 gap-2 bg-black/40 p-3 rounded-2xl border border-gray-800 text-xs text-left">
+                            <div className="space-y-0.5">
+                               <span className="text-[10px] text-gray-400 font-bold uppercase block">{user.language === 'ru' ? 'Таймер' : 'Timer'}</span>
+                               <span className="font-mono font-black text-amber-300 text-xs sm:text-sm flex items-center gap-1">
+                                 <span>⏱️</span>
+                                 <span>{user.chessTimeControl || 20} {user.language === 'ru' ? 'мин' : 'm'}</span>
+                               </span>
+                            </div>
+                            <div className="space-y-0.5">
+                               <span className="text-[10px] text-gray-400 font-bold uppercase block">{user.language === 'ru' ? 'Звуки' : 'Sounds'}</span>
+                               <button
+                                 type="button"
+                                 onClick={() => {
+                                   playSound('click');
+                                   handleToggleChessSoundEffects(!(user.chessSoundEffects ?? true));
+                                 }}
+                                 className={`font-black text-[11px] px-2 py-0.5 rounded-lg border flex items-center gap-1 cursor-pointer transition-colors ${
+                                   (user.chessSoundEffects ?? true)
+                                     ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40'
+                                     : 'bg-gray-900 text-gray-400 border-gray-700'
+                                 }`}
+                               >
+                                 <span>{(user.chessSoundEffects ?? true) ? '🔊' : '🔇'}</span>
+                                 <span>{(user.chessSoundEffects ?? true) ? (user.language === 'ru' ? 'ВКЛ' : 'ON') : (user.language === 'ru' ? 'ВЫКЛ' : 'OFF')}</span>
+                               </button>
+                            </div>
+                            <div className="space-y-0.5">
+                               <span className="text-[10px] text-gray-400 font-bold uppercase block">{user.language === 'ru' ? 'Фигуры' : 'Theme'}</span>
+                               <button
+                                 type="button"
+                                 onClick={() => {
+                                   playSound('click');
+                                   handleUpdateChessPieceTheme(user.chessPieceTheme === 'unicode' ? 'graphical' : 'unicode');
+                                 }}
+                                 className="font-black text-[11px] text-sky-300 bg-sky-950/60 border border-sky-500/40 px-2 py-0.5 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+                                 title="Переключить тему фигур"
+                               >
+                                 <span>{user.chessPieceTheme === 'unicode' ? '♔ Unicode' : '🎨 Staunton'}</span>
+                               </button>
+                            </div>
+                         </div>
+                      </div>
                    </div>
 
                    {/* COLUMN 2: CLOUD SYNC & FEEDBACK */}
@@ -8791,6 +11258,125 @@ const getTodayChallenge = () => {
                          </button>
                       </div>
                    </div>
+
+                   {/* SECURITY & DATA MANAGEMENT CARD IN PROFILE */}
+                   <div className="w-full bg-duo-card rounded-3xl border-2 border-gray-800 p-5 md:p-6 shadow-xl space-y-4 md:col-span-2">
+                     <div className="flex items-center justify-between border-b border-gray-800 pb-3 flex-wrap gap-2">
+                       <div className="flex items-center space-x-3">
+                         <div className="w-10 h-10 rounded-2xl bg-red-600/20 border border-red-500/40 flex items-center justify-center text-xl shadow shrink-0">
+                           🛡️
+                         </div>
+                         <div>
+                           <h3 className="text-base sm:text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
+                             <span>{user.language === 'ru' ? 'Безопасность и удаление данных' : 'Security & Data Management'}</span>
+                           </h3>
+                           <p className="text-[11px] text-gray-400 font-bold">
+                             {user.language === 'ru'
+                               ? 'Запрет удаления аккаунта и локальных данных, экспорт и сброс'
+                               : 'Protection against account/data deletion, export, and reset'}
+                           </p>
+                         </div>
+                       </div>
+
+                       {isUserAdminAccount(user, firebaseUser) && (
+                         <span className="bg-red-500/20 text-red-300 border border-red-500/40 text-[10px] font-black px-2.5 py-1 rounded-xl uppercase tracking-wider flex items-center gap-1 shrink-0">
+                           <span>👑</span>
+                           <span>{user.language === 'ru' ? 'Аккаунт Администратора защищён' : 'Admin Protected'}</span>
+                         </span>
+                       )}
+                     </div>
+
+                     {/* ADMIN PROTECTION WARNING */}
+                     {isUserAdminAccount(user, firebaseUser) && (
+                       <div className="p-3.5 bg-red-950/60 border border-red-500/60 rounded-2xl flex items-start space-x-3 text-left">
+                         <span className="text-xl shrink-0">⛔</span>
+                         <div className="space-y-1">
+                           <span className="text-xs font-black text-red-300 uppercase tracking-wide block">
+                             {user.language === 'ru' ? 'Запрещено удаление аккаунта Администрации' : 'Administration Account Deletion Prohibited'}
+                           </span>
+                           <p className="text-[11px] text-red-200/90 font-medium leading-relaxed">
+                             {user.language === 'ru'
+                               ? 'Учётная запись и локальные данные Администратора неприкасаемы и защищены от случайного или принудительного удаления.'
+                               : 'The administrator account and local application data are protected by system security.'}
+                           </p>
+                         </div>
+                       </div>
+                     )}
+
+                     {/* TOGGLE: PREVENT ACCOUNT & DATA DELETION */}
+                     <div className="flex items-center justify-between p-3.5 bg-black/40 border border-gray-700 rounded-2xl">
+                       <div className="space-y-0.5 text-left">
+                         <span className="text-xs font-black text-white flex items-center gap-1.5">
+                           <span>🔒</span>
+                           <span>{user.language === 'ru' ? 'Запретить удаление аккаунта и данных' : 'Prevent Account & Data Deletion'}</span>
+                         </span>
+                         <span className="text-[11px] text-gray-400 block font-medium">
+                           {user.language === 'ru'
+                             ? 'Блокирует любые попытки очистки данных и удаления аккаунта'
+                             : 'Locks out any attempts to wipe data or delete account'}
+                         </span>
+                       </div>
+                       <button
+                         type="button"
+                         onClick={() => {
+                           playSound('click');
+                           const newVal = !Boolean(user.preventAccountDeletion);
+                           setUser(prev => {
+                             const updated = { ...prev, preventAccountDeletion: newVal };
+                             localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+                             return updated;
+                           });
+                           setToast(
+                             newVal
+                               ? (user.language === 'ru' ? '🔒 Запрет удаления включен!' : '🔒 Deletion protection enabled!')
+                               : (user.language === 'ru' ? '🔓 Запрет удаления выключен' : '🔓 Deletion protection disabled')
+                           );
+                         }}
+                         className={`w-12 h-7 rounded-full p-1 transition-colors duration-300 flex-shrink-0 cursor-pointer ${
+                           user.preventAccountDeletion ? 'bg-emerald-600 border border-emerald-400' : 'bg-gray-700 border border-gray-600'
+                         }`}
+                       >
+                         <div
+                           className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-300 ${
+                             user.preventAccountDeletion ? 'translate-x-5' : 'translate-x-0'
+                           }`}
+                         />
+                       </button>
+                     </div>
+
+                     {/* ACTION BUTTONS: EXPERT TRANSFER & DATA DELETION */}
+                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                       <button
+                         type="button"
+                         onClick={() => {
+                           playSound('click');
+                           setShowDataTransferModal(true);
+                         }}
+                         className="py-3 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl border-b-4 border-indigo-900 active:translate-y-0.5 transition-all flex items-center justify-center space-x-2 shadow cursor-pointer"
+                       >
+                         <span>🛠️</span>
+                         <span>{user.language === 'ru' ? 'Эксперт: Перенести данные' : 'Expert: Transfer Data'}</span>
+                       </button>
+
+                       <button
+                         type="button"
+                         onClick={() => {
+                           playSound('click');
+                           setShowDataDeletionModal(true);
+                         }}
+                         className={`py-3 px-4 font-black text-xs uppercase tracking-wider rounded-2xl border-b-4 active:translate-y-0.5 transition-all flex items-center justify-center space-x-2 shadow cursor-pointer ${
+                           isUserAdminAccount(user, firebaseUser)
+                             ? 'bg-gray-800 text-red-400 border-gray-900 hover:bg-gray-750'
+                             : user.preventAccountDeletion
+                             ? 'bg-gray-800 text-amber-400 border-gray-900 hover:bg-gray-750'
+                             : 'bg-red-600 hover:bg-red-500 text-white border-red-900'
+                         }`}
+                       >
+                         <span>💣</span>
+                         <span>{user.language === 'ru' ? 'Удалить все данные' : 'Wipe All Data'}</span>
+                       </button>
+                     </div>
+                   </div>
                 </div>
              </div>
           )}
@@ -8821,7 +11407,7 @@ const getTodayChallenge = () => {
               currentCourse={currentCourse}
               onSetLanguage={(newLang) => {
                 setUser((prev) => {
-                  const updated = { ...prev, language: newLang };
+                  const updated: UserProgress = { ...prev, language: newLang as UserProgress['language'] };
                   localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
                   return updated;
                 });
@@ -9055,6 +11641,7 @@ const getTodayChallenge = () => {
               user.dailyChallengeCompletedDate !== todayStr && 
               dailyChallengeDismissedDate !== todayStr;
             const isActive = screen === item.screen;
+            const isAlphabetRestricted = item.screen === AppScreen.ALPHABET && (isNonLangCourse || isBetaWritingRestricted(currentCourse.id));
             return (
               <button 
                 key={item.screen} 
@@ -9062,14 +11649,19 @@ const getTodayChallenge = () => {
                 className={`flex flex-col items-center justify-center min-w-[44px] py-1 px-1 rounded-xl transition-all duration-200 relative cursor-pointer flex-shrink-0 ${
                   isActive 
                     ? 'text-duo-blue scale-105 font-black bg-duo-blue/10' 
-                    : isLightMode 
-                      ? 'text-slate-500 hover:text-slate-900' 
-                      : 'text-gray-400 hover:text-white'
+                    : isAlphabetRestricted
+                      ? 'text-gray-500 opacity-60'
+                      : isLightMode 
+                        ? 'text-slate-500 hover:text-slate-900' 
+                        : 'text-gray-400 hover:text-white'
                 }`}
                 title={item.label}
               >
                 <div className="relative">
-                  <item.icon className="w-6 h-6 sm:w-7 sm:h-7" />
+                  <item.icon className={`w-6 h-6 sm:w-7 sm:h-7 ${isAlphabetRestricted ? 'opacity-40' : ''}`} />
+                  {isAlphabetRestricted && (
+                    <span className="absolute -top-1.5 -right-1.5 text-[10px]">🔒</span>
+                  )}
                   {isTodayChallengePending && (
                     <span className={`absolute -top-1 -right-1 w-2.5 h-2.5 bg-duo-orange rounded-full border-2 ${isLightMode ? 'border-white' : 'border-duo-dark'} animate-pulse`} />
                   )}
@@ -9094,6 +11686,19 @@ const getTodayChallenge = () => {
         playSound={playSound}
       />
 
+      {/* CHESS SETTINGS MODAL (Time control 5/10/20m, Sound toggle, Piece theme switcher) */}
+      <ChessSettingsModal
+        isOpen={isChessSettingsModalOpen}
+        onClose={() => setIsChessSettingsModalOpen(false)}
+        timeControl={user.chessTimeControl || 20}
+        onChangeTimeControl={handleUpdateChessTimeControl}
+        soundEffectsEnabled={user.chessSoundEffects ?? true}
+        onToggleSoundEffects={handleToggleChessSoundEffects}
+        pieceTheme={user.chessPieceTheme || 'graphical'}
+        onChangePieceTheme={handleUpdateChessPieceTheme}
+        language={user.language}
+      />
+
       {/* AUTHENTICATION & REGISTRATION MODAL (Email, Username, Password, Google, Incognito) */}
       <AuthModal
         isOpen={showRegisterModal}
@@ -9109,6 +11714,15 @@ const getTodayChallenge = () => {
         onOpenIncognitoExport={() => setShowIncognitoExportModal(true)}
         onOpenFirebaseExport={() => setShowFirebaseExportModal(true)}
         initialTab={regInitialTab}
+        onSwitchCourse={(course) => {
+          setCurrentCourse(course);
+          localStorage.setItem('duo_course_id_6601', course.id);
+        }}
+        allCourses={COURSES}
+        onOpenLanguageLockModal={(code) => {
+          setLockedModalLang(code || null);
+          setShowLanguageLockModal(true);
+        }}
       />
 
       {/* INCOGNITO RESTRICTIONS MODAL */}
@@ -9146,6 +11760,100 @@ const getTodayChallenge = () => {
         onOpenRegister={openRegisterModal}
       />
 
+      {/* DATA DELETION & APPLICATION WIPING MODAL */}
+      <DataDeletionModal
+        isOpen={showDataDeletionModal}
+        onClose={() => setShowDataDeletionModal(false)}
+        user={user}
+        setUser={setUser}
+        firebaseUser={firebaseUser}
+        onConfirmWipe={handleWipeAllLocalData}
+        language={user.language || 'ru'}
+        playSound={playSound}
+        setToast={setToast}
+      />
+
+      {/* EXPERT DATA TRANSFER & MIGRATION MODAL */}
+      <DataTransferExpertModal
+        isOpen={showDataTransferModal}
+        onClose={() => setShowDataTransferModal(false)}
+        user={user}
+        setUser={setUser}
+        firebaseUser={firebaseUser}
+        language={user.language || 'ru'}
+        playSound={playSound}
+        setToast={setToast}
+      />
+
+      {/* LANGUAGE PLACEMENT TEST MODAL */}
+      {placementCourse && (
+        <PlacementTestModal
+          isOpen={showPlacementTestModal}
+          onClose={() => {
+            setShowPlacementTestModal(false);
+            setPlacementCourse(null);
+          }}
+          course={placementCourse}
+          user={user}
+          setUser={setUser}
+          onApplyModule={(moduleNum, bonusXp) => {
+            setUser(prev => {
+              const updated = {
+                ...prev,
+                currentModule: moduleNum,
+                xp: prev.xp + bonusXp
+              };
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+              return updated;
+            });
+            setShowPlacementTestModal(false);
+            setPlacementCourse(null);
+            setToast(user.language === 'ru' ? `🎯 Тест пройден! Уровень ${moduleNum} разблокирован (+${bonusXp} XP)` : `🎯 Placement complete! Level ${moduleNum} unlocked (+${bonusXp} XP)`);
+          }}
+          language={user.language || 'ru'}
+          playSound={playSound}
+          setToast={setToast}
+        />
+      )}
+
+      {/* LANGUAGE LOCK / UNAVAILABLE MODAL (Available Nov 1, 2026) */}
+      <LanguageLockModal
+        isOpen={showLanguageLockModal}
+        onClose={() => {
+          setShowLanguageLockModal(false);
+          setLockedModalLang(null);
+        }}
+        selectedLang={lockedModalLang}
+        userLanguage={user.language}
+        isLightMode={isLightMode}
+        onOpenFeedback={() => {
+          setShowLanguageLockModal(false);
+          setLockedModalLang(null);
+          setScreen(AppScreen.FEEDBACK);
+        }}
+      />
+
+      {/* DUOWINDO6601 POEM MEMORIZATION MODAL (КУРС И ПРАКТИКА) */}
+      <DuoWindo6601PoemModal
+        isOpen={showPoemModal}
+        onClose={() => setShowPoemModal(false)}
+        currentCourse={currentCourse}
+        user={user}
+        setUser={setUser}
+        playSound={playSound}
+        setToast={setToast}
+        speakText={(text, courseId, slow) => speakText(text, courseId, slow, user.preferredVoice, user.voiceProvider)}
+      />
+
+      {/* DUOWINDO6601 MUSIC STUDIO MODAL (КУРС МУЗЫКА) */}
+      <MusicStudioModal
+        isOpen={showMusicStudioModal}
+        onClose={() => setShowMusicStudioModal(false)}
+        user={user}
+        onUpdateUser={(updated) => setUser(prev => ({ ...prev, ...updated }))}
+        initialTab={musicStudioTab}
+      />
+
       {/* DUOWINDO6601 BETA TESTING CENTER MODAL */}
       {showBetaModal && (
         <BetaModal
@@ -9164,6 +11872,10 @@ const getTodayChallenge = () => {
             setShowBetaModal(false);
             setScreen(AppScreen.FEEDBACK);
           }}
+          onOpenPoems={() => {
+            setShowBetaModal(false);
+            setShowPoemModal(true);
+          }}
           courses={COURSES}
           onSelectCourse={(course) => {
             setCurrentCourse(course);
@@ -9177,6 +11889,13 @@ const getTodayChallenge = () => {
             setShowBetaModal(false);
           }}
           playSound={playSound}
+          onAttemptSwitchLanguage={(code) => handleAttemptSwitchLanguage(code, () => {
+            setUser(prev => ({ ...prev, language: code as any }));
+          })}
+          onOpenLanguageLockModal={(code) => {
+            setLockedModalLang(code || null);
+            setShowLanguageLockModal(true);
+          }}
         />
       )}
 
@@ -9605,7 +12324,7 @@ const getTodayChallenge = () => {
                     <span className="absolute inset-0 flex items-center justify-center text-[10px] md:text-xs font-black text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] pointer-events-none z-10 tracking-wider">
                       {feedback.status === 'correct' ? 100 : feedback.status === 'wrong' ? 30 : selectedWordIds.length > 0 ? Math.min(95, Math.max(10, Math.round((selectedWordIds.length / Math.max(1, availableTokens.length)) * 100))) : 45}%
                     </span>
-                    {(currentExercise.isCached || offlineMode) && (
+                    {(offlineMode || (typeof navigator !== 'undefined' && !navigator.onLine)) && (
                       <span className="absolute right-3 text-[9px] md:text-[10px] uppercase font-black tracking-widest text-emerald-400/90 pointer-events-none drop-shadow">
                         {user.language === 'ru' ? 'Офлайн' : 'Offline'}
                       </span>
@@ -9620,6 +12339,22 @@ const getTodayChallenge = () => {
                    <div className="w-8 md:w-10"></div>
                )}
              </div>
+
+             {/* Beta Course Writing Restriction Notice during Lesson */}
+             {isBetaWritingRestricted(currentCourse.id) && (
+               <div className="w-full mb-3 px-3.5 py-2 bg-gradient-to-r from-amber-950/80 via-stone-900/90 to-purple-950/80 border-2 border-amber-500/60 rounded-2xl text-center flex flex-col sm:flex-row items-center justify-between gap-1.5 shrink-0 shadow-xl animate-in fade-in">
+                 <div className="flex items-center space-x-2 text-amber-300 font-black text-xs sm:text-sm">
+                   <span className="text-base">🔒</span>
+                   <span>Бета Курс: {currentCourse.localName || currentCourse.name}</span>
+                   <span className="font-mono text-purple-300 bg-purple-900/70 border border-purple-500/40 px-2 py-0.5 rounded-md text-[10px] shrink-0">
+                     {getBetaWritingRestrictedInfo(currentCourse.id)?.version || 'Beta'}
+                   </span>
+                 </div>
+                 <div className="text-[11px] text-amber-200 font-bold">
+                   Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год
+                 </div>
+               </div>
+             )}
 
              {/* 1. CHESS UI */}
              {currentExercise.type === 'chess' ? (
@@ -9645,6 +12380,23 @@ const getTodayChallenge = () => {
                                  <span className="text-sm animate-pulse">⏱</span>
                                  <span>{formatChessTimer(chessTimerSeconds)}</span>
                              </div>
+                             <button
+                                 type="button"
+                                 onClick={() => { playSound('click'); setShowChessAutoTranslatorModal(true); }}
+                                 className="px-2 py-1 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/40 font-bold text-xs transition-colors cursor-pointer shadow-sm active:scale-95 flex items-center space-x-1"
+                                 title={user.language === 'ru' ? '⚡ Авто-Переводчик нотации и терминов шахмат' : '⚡ Chess Auto-Translator'}
+                             >
+                                 <span>⚡</span>
+                                 <span className="hidden sm:inline">Переводчик</span>
+                             </button>
+                             <button
+                                 type="button"
+                                 onClick={() => { playSound('click'); setIsChessSettingsModalOpen(true); }}
+                                 className="p-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-[#00cd9c] hover:text-white border border-gray-700 transition-colors cursor-pointer shadow-sm active:scale-95"
+                                 title={user.language === 'ru' ? 'Настройки шахмат' : 'Chess settings'}
+                             >
+                                 <GearIcon className="w-3.5 h-3.5" />
+                             </button>
                              <div className="bg-amber-400 text-gray-950 font-black text-[10px] px-2.5 py-1 rounded-xl uppercase tracking-wider shadow-sm">
                                  +30 XP
                              </div>
@@ -9720,6 +12472,7 @@ const getTodayChallenge = () => {
                                                  <ChessPieceIcon 
                                                     type={square.piece} 
                                                     color={square.color} 
+                                                    theme={user.chessPieceTheme || 'graphical'}
                                                     className="w-full h-full filter drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]"
                                                  />
                                              </div>
@@ -10318,6 +13071,37 @@ const getTodayChallenge = () => {
           </div>
         </div>
       )}
+      <HardestLanguageDetailModal
+        languageInfo={selectedHardestLanguageId ? HARDEST_LANGUAGE_DETAILS[selectedHardestLanguageId] || null : null}
+        course={selectedHardestLanguageId ? COURSES.find(c => c.id === selectedHardestLanguageId) || null : null}
+        isOpen={Boolean(selectedHardestLanguageId)}
+        onClose={() => setSelectedHardestLanguageId(null)}
+        onSelectCourse={(c) => { setCurrentCourse(c); setScreen(AppScreen.PATH); }}
+        isRussian={user.language === 'ru'}
+        playSound={playSound}
+      />
+
+      {showAndroidModal && (
+        <PWAInstructionModal 
+          isRu={user.language === 'ru'} 
+          isIOS={false} 
+          onClose={() => setShowAndroidModal(false)} 
+          onSkip={() => setShowAndroidModal(false)}
+          onOpenReviews={() => {
+            setShowAndroidModal(false);
+            setScreen(AppScreen.FEEDBACK);
+          }}
+        />
+      )}
+
+      <ChessAutoTranslatorModal
+        isOpen={showChessAutoTranslatorModal}
+        onClose={() => setShowChessAutoTranslatorModal(false)}
+        userLanguage={user.language}
+      />
+
+      {/* OFFLINE INDICATOR */}
+      <OfflineIndicator isRu={user.language === 'ru'} />
 </div>
 );
 };

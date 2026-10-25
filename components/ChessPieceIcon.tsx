@@ -1,13 +1,53 @@
 import React from 'react';
 
 export type ChessColor = 'w' | 'b';
+export type ChessPieceTheme = 'graphical' | 'unicode';
 
-export const ChessPieceIcon: React.FC<{ type: string; color: ChessColor; className?: string }> = ({ type, color, className }) => {
+export const CHESS_UNICODE: Record<string, { w: string; b: string }> = {
+  p: { w: '♙', b: '♟' },
+  r: { w: '♖', b: '♜' },
+  n: { w: '♘', b: '♞' },
+  b: { w: '♗', b: '♝' },
+  q: { w: '♕', b: '♛' },
+  k: { w: '♔', b: '♚' },
+};
+
+export const ChessPieceIcon: React.FC<{
+  type: string;
+  color: ChessColor;
+  className?: string;
+  theme?: ChessPieceTheme;
+}> = ({ type, color, className, theme }) => {
   const isWhite = color === 'w';
+  const t = type.toLowerCase();
+
+  const activeTheme: ChessPieceTheme = theme || (typeof window !== 'undefined' ? (() => {
+    try {
+      const raw = localStorage.getItem('duowindo6601_user_progress_v1');
+      if (raw) return JSON.parse(raw).chessPieceTheme || 'graphical';
+    } catch {}
+    return 'graphical';
+  })() : 'graphical');
+
+  if (activeTheme === 'unicode') {
+    const char = CHESS_UNICODE[t]?.[color] || '?';
+    return (
+      <span
+        className={`inline-flex items-center justify-center select-none font-serif leading-none ${className || ''} ${
+          isWhite
+            ? 'text-white [text-shadow:_0_0_2px_#000000,_0_2px_4px_rgba(0,0,0,0.9)]'
+            : 'text-slate-950 [text-shadow:_0_0_2px_#ffffff,_0_1px_3px_rgba(255,255,255,0.7)]'
+        }`}
+        style={{ fontSize: '1.9em' }}
+      >
+        {char}
+      </span>
+    );
+  }
+
   const fill = isWhite ? "#FFFFFF" : "#1E293B";
   const stroke = isWhite ? "#0F172A" : "#FFFFFF";
   const strokeWidth = 1.5;
-  const t = type.toLowerCase(); 
 
   if (t === 'p') {
     return (

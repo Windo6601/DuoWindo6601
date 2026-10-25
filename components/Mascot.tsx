@@ -1,14 +1,12 @@
-
 import React from 'react';
 
-// A CSS-only/SVG reconstruction of the Mascot with variants
+// A clean SVG reconstruction of the Mascot with variants and proportional original Duolingo crying tears (no face distortion)
 export const Mascot: React.FC<{ 
-    emotion?: 'neutral' | 'happy' | 'confused'; 
+    emotion?: 'neutral' | 'happy' | 'confused' | 'sad' | 'thinking' | 'surprised'; 
     className?: string;
     variant?: 'default' | 'math' | 'music' | 'chess';
 }> = ({ emotion = 'neutral', className = "w-48 h-48", variant = 'default' }) => {
   
-  // Render Owl for all variants (Chess is now an Owl with a crown)
   return (
     <div className={`relative mx-auto ${className}`}>
        {/* React Atom Static */}
@@ -60,52 +58,73 @@ export const Mascot: React.FC<{
                 <path d="M103 85 Q 125 75 147 80" stroke="#131F24" strokeWidth="6" fill="none" />
                 </>
             )}
+            {emotion === 'sad' && (
+                <>
+                {/* Proportional Sad Eyes (No facial distortion) */}
+                <circle cx="75" cy="90" r="9" fill="#131F24" />
+                <circle cx="125" cy="90" r="9" fill="#131F24" />
+                <path d="M53 78 Q 75 88 97 78" stroke="#131F24" strokeWidth="5" fill="none" />
+                <path d="M103 78 Q 125 88 147 78" stroke="#131F24" strokeWidth="5" fill="none" />
+                
+                {/* Original Duolingo Crying Tears (Blue Teardrops streaming from eyes) */}
+                <path d="M 67 105 Q 73 122 67 132 Q 61 122 67 105 Z" fill="#38bdf8" opacity="0.95" />
+                <path d="M 123 105 Q 129 122 123 132 Q 117 122 123 105 Z" fill="#38bdf8" opacity="0.95" />
+                <circle cx="67" cy="137" r="3" fill="#38bdf8" opacity="0.9" />
+                <circle cx="123" cy="137" r="3" fill="#38bdf8" opacity="0.9" />
+                </>
+            )}
+            {emotion === 'thinking' && (
+                <>
+                <circle cx="75" cy="85" r="9" fill="#131F24" />
+                <circle cx="125" cy="90" r="9" fill="#131F24" />
+                <path d="M53 75 Q 75 80 97 75" stroke="#131F24" strokeWidth="5" fill="none" />
+                <path d="M103 80 Q 125 80 147 80" stroke="#131F24" strokeWidth="5" fill="none" />
+                </>
+            )}
+            {emotion === 'surprised' && (
+                <>
+                <circle cx="75" cy="90" r="12" fill="#131F24" />
+                <circle cx="125" cy="90" r="12" fill="#131F24" />
+                <path d="M53 72 Q 75 68 97 72" stroke="#131F24" strokeWidth="5" fill="none" />
+                <path d="M103 72 Q 125 68 147 72" stroke="#131F24" strokeWidth="5" fill="none" />
+                </>
+            )}
         </g>
 
-        {/* Beak */}
-        <path d="M90 115 Q 100 135 110 115 Q 100 110 90 115" fill="#FF8C00" />
+        {/* Beak / Sad Mouth */}
+        {emotion === 'sad' ? (
+            <path d="M85 125 Q 100 115 115 125 Q 100 135 85 125" fill="#FF8C00" />
+        ) : (
+            <path d="M90 115 Q 100 135 110 115 Q 100 110 90 115" fill="#FF8C00" />
+        )}
         
         {/* Accessories based on Variant */}
         {variant === 'math' && (
             <g>
-                {/* Glasses */}
                 <circle cx="75" cy="90" r="25" stroke="#333" strokeWidth="3" fill="none" opacity="0.6"/>
                 <circle cx="125" cy="90" r="25" stroke="#333" strokeWidth="3" fill="none" opacity="0.6"/>
                 <line x1="100" y1="90" x2="100" y2="85" stroke="#333" strokeWidth="3"/>
-                {/* Ruler in wing */}
                 <rect x="10" y="80" width="20" height="60" fill="#FFD700" transform="rotate(-15 20 110)" />
-                <line x1="15" y1="90" x2="20" y2="90" stroke="#000" strokeWidth="1" transform="rotate(-15 20 110)" />
-                <line x1="15" y1="100" x2="20" y2="100" stroke="#000" strokeWidth="1" transform="rotate(-15 20 110)" />
             </g>
         )}
 
         {variant === 'music' && (
              <g>
-                {/* Headphones */}
                 <path d="M50 90 Q 50 30 100 30 Q 150 30 150 90" stroke="#333" strokeWidth="8" fill="none" />
                 <rect x="35" y="80" width="20" height="40" rx="5" fill="#FF4081" />
                 <rect x="145" y="80" width="20" height="40" rx="5" fill="#FF4081" />
-                {/* Note */}
                 <text x="140" y="160" fontSize="30" fill="white">♪</text>
             </g>
         )}
 
         {variant === 'chess' && (
              <g>
-                {/* Crown */}
                 <path d="M70 50 L 70 30 L 85 40 L 100 25 L 115 40 L 130 30 L 130 50 Z" fill="#FFD700" stroke="#DAA520" strokeWidth="2" />
-                
-                {/* Board at bottom - perspective */}
                 <path d="M20 170 L 180 170 L 195 190 L 5 190 Z" fill="#f0d9b5" stroke="#b58863" strokeWidth="2" />
-                {/* Dark squares */}
-                <path d="M40 170 L 60 170 L 55 190 L 30 190 Z" fill="#b58863" />
-                <path d="M80 170 L 100 170 L 100 190 L 75 190 Z" fill="#b58863" />
-                <path d="M120 170 L 140 170 L 145 190 L 120 190 Z" fill="#b58863" />
-                <path d="M160 170 L 180 170 L 190 190 L 165 190 Z" fill="#b58863" />
             </g>
         )}
 
-        {/* Book (Hidden if holding something else in variants) */}
+        {/* Book */}
         {variant === 'default' && (
             <>
                 <path d="M60 140 L 100 155 L 140 140 L 140 170 L 100 185 L 60 170 Z" fill="#FFC800" />

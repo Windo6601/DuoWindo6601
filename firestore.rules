@@ -57,6 +57,16 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // 7. Real-time Multiplayer Chess Rooms
+    match /chess_rooms/{roomId} {
+      allow read, write: if true;
+    }
+
+    // 8. Real-time Collaborative Shared Sessions
+    match /shared_sessions/{sessionId} {
+      allow read, write: if true;
+    }
+
     // --- HELPER FUNCTIONS ---
 
     function isSignedIn() {

@@ -1,6 +1,7 @@
 
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { Exercise, AdventureScenario, RoleplayMessage } from "../types";
+import { playKlingonSpeech } from "./klingonSpeechService";
 import { 
   getTodayAiUsage, 
   recordAiUsage, 
@@ -16,9 +17,9 @@ import {
   getGeminiKeyPriority
 } from "./aiLimitManager";
 
-export const MODEL_FREE = "gemini-3.6-flash";
-export const MODEL_PRO = "gemini-3.6-flash";
-const TTS_MODEL = "gemini-3.1-flash-tts-preview";
+export const MODEL_FREE = "gemini-3.8-flash";
+export const MODEL_PRO = "gemini-4-argon";
+const TTS_MODEL = "gemini-3.8-flash-lite-tts";
 
 const sanitizeKey = (k: string): string => {
   if (!k) return '';
@@ -209,6 +210,9 @@ export async function fetchGeminiWithRetry<T>(
           const usage = getTodayAiUsage();
           triggerAiLimitModal(usage);
         }
+        if (isRateLimit) {
+           throw new Error("Превышена частота запросов к ИИ (Rate Limit). Пожалуйста, подождите минуту и попробуйте снова.");
+        }
         throw error;
       }
 
@@ -219,7 +223,7 @@ export async function fetchGeminiWithRetry<T>(
       await new Promise(resolve => setTimeout(resolve, backoffDelay));
     }
   }
-  throw new Error("Достигнуто максимальное число попыток повтора к Gemini API");
+  throw new Error("Достигнуто максимальное число попыток повтора к Gemini API. Превышена частота (Rate exceeded).");
 }
 
 interface RateLimiterTask<T> {
@@ -230,15 +234,15 @@ interface RateLimiterTask<T> {
 
 /**
  * 2. Клиентский Rate Limiter и Очередь Запросов
- * Распределяет запросы во времени согласно ограничениям бесплатного тарифа (12 RPM = 1 запрос в 5 секунд)
+ * Распределяет запросы во времени согласно ограничениям бесплатного тарифа (10 RPM = 1 запрос в 6 секунд)
  */
 export class GeminiRateLimiterQueue {
   private delayBetweenRequests: number;
   private queue: RateLimiterTask<any>[] = [];
   private isProcessing: boolean = false;
 
-  constructor(requestsPerMinute: number = 12) {
-    // 60,000ms / 12 = 5,000ms между запросами (безопасный запас относительно лимита в 15 RPM)
+  constructor(requestsPerMinute: number = 10) {
+    // 60,000ms / 10 = 6,000ms между запросами (безопасный запас относительно лимита в 15 RPM)
     this.delayBetweenRequests = (60 * 1000) / requestsPerMinute;
   }
 
@@ -283,12 +287,12 @@ export class GeminiRateLimiterQueue {
   }
 }
 
-// Глобальный экземпляр очереди с ограничением частоты запросов (12 RPM)
-export const geminiRateLimiter = new GeminiRateLimiterQueue(12);
+// Глобальный экземпляр очереди с ограничением частоты запросов (10 RPM)
+export const geminiRateLimiter = new GeminiRateLimiterQueue(10);
 
 /**
  * Центральный шлюз вызова Gemini API:
- * Маршрутизирует вызовы через очередь ограничения частоты (12 RPM) и
+ * Маршрутизирует вызовы через очередь ограничения частоты (10 RPM) и
  * механизм Exponential Backoff + Jitter при ошибках 429.
  */
 export async function callGeminiWithRetry<T>(
@@ -337,104 +341,207 @@ async function decodeAudioData(
 
 let audioContext: AudioContext | null = null;
 
-const playPCM = async (base64Audio: string) => {
+const playWav = async (base64Audio: string) => {
   try {
-    if (!audioContext) {
-      audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    }
-    if (audioContext.state === 'suspended') {
-      await audioContext.resume();
-    }
-    const bytes = decode(base64Audio);
-    const audioBuffer = await decodeAudioData(bytes, audioContext, 24000, 1);
-    
-    const source = audioContext.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(audioContext.destination);
-    source.start();
+    const audio = new Audio(`data:audio/wav;base64,${base64Audio}`);
+    await audio.play();
   } catch (e) {
-    console.error("Error playing PCM audio:", e);
+    console.error("Error playing WAV audio:", e);
+    try {
+      const binaryString = atob(base64Audio);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: 'audio/wav' });
+      const url = URL.createObjectURL(blob);
+      const audio2 = new Audio(url);
+      await audio2.play();
+    } catch (e2) {
+      console.error("Fallback WAV play error:", e2);
+    }
   }
 };
 
 const fallbackSpeak = (text: string, lang: string = 'en', slow: boolean = false, provider: 'google' | 'yandex' | 'system' = 'system') => {
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = slow ? 0.6 : 1.0;
-    
-    const langMap: Record<string, string> = {
-      'en': 'en-US', 'de': 'de-DE', 'fr': 'fr-FR', 'es': 'es-ES', 'ja': 'ja-JP', 
-      'zh': 'zh-CN', 'ko': 'ko-KR', 'it': 'it-IT', 'pt': 'pt-BR', 'ru': 'ru-RU',
-      'be': 'ru-RU', 'uk': 'uk-UA', 'et': 'et-EE', 'lv': 'lv-LV', 'lt': 'lt-LT', 'tr': 'tr-TR',
-      'ar': 'ar-SA', 'hu': 'hu-HU', 'fi': 'fi-FI', 'is': 'is-IS', 'pl': 'pl-PL', 'eu': 'eu-ES',
-      'nv': 'en-US', 'tab': 'ru-RU'
-    };
-    
-    // Default lang
-    utterance.lang = langMap[lang] || lang;
-    
-    // Ensure voices are loaded (Chrome sometimes loads asynchronously)
-    let voices = window.speechSynthesis.getVoices();
-    
-    const findVoice = () => {
-        let matchingVoice: SpeechSynthesisVoice | undefined;
+  const cleanText = text
+    .replace(/Speak clearly and easily in English[:.]?/gi, '')
+    .replace(/Say clearly and naturally in [^:]+[:.]?/gi, '')
+    .trim();
+  if (!cleanText) return;
 
-        if (provider === 'yandex') {
-            matchingVoice = voices.find(v => (v.name.toLowerCase().includes("yandex") || v.name.toLowerCase().includes("yuri")) && v.lang.startsWith(utterance.lang.split('-')[0]));
-        } else if (provider === 'google') {
-            matchingVoice = voices.find(v => v.name.toLowerCase().includes("google") && v.lang.startsWith(utterance.lang.split('-')[0]));
-        }
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.rate = slow ? 0.6 : 1.0;
+      
+      const langMap: Record<string, string> = {
+        'en': 'en-US', 'de': 'de-DE', 'fr': 'fr-FR', 'es': 'es-ES', 'ja': 'ja-JP', 
+        'zh': 'zh-CN', 'ko': 'ko-KR', 'it': 'it-IT', 'pt': 'pt-BR', 'ru': 'ru-RU',
+        'be': 'ru-RU', 'uk': 'uk-UA', 'et': 'et-EE', 'lv': 'lv-LV', 'lt': 'lt-LT', 'tr': 'tr-TR',
+        'ar': 'ar-SA', 'hu': 'hu-HU', 'fi': 'fi-FI', 'is': 'is-IS', 'pl': 'pl-PL', 'eu': 'eu-ES',
+        'nv': 'en-US', 'tab': 'ru-RU'
+      };
+      
+      // Default lang
+      utterance.lang = langMap[lang] || lang;
+      
+      // Ensure voices are loaded (Chrome sometimes loads asynchronously)
+      let voices = window.speechSynthesis.getVoices();
+      
+      const findVoice = () => {
+        try {
+          let matchingVoice: SpeechSynthesisVoice | undefined;
 
-        if (!matchingVoice) {
-            matchingVoice = voices.find(v => v.lang === utterance.lang);
-        }
-        if (!matchingVoice) {
-            matchingVoice = voices.find(v => v.lang.startsWith(utterance.lang.split('-')[0]));
-        }
+          if (provider === 'yandex') {
+              matchingVoice = voices.find(v => (v.name.toLowerCase().includes("yandex") || v.name.toLowerCase().includes("yuri")) && v.lang.startsWith(utterance.lang.split('-')[0]));
+          } else if (provider === 'google') {
+              matchingVoice = voices.find(v => v.name.toLowerCase().includes("google") && v.lang.startsWith(utterance.lang.split('-')[0]));
+          }
 
-        if (matchingVoice) {
-            utterance.voice = matchingVoice;
-        }
-        window.speechSynthesis.speak(utterance);
-    };
+          if (!matchingVoice) {
+              matchingVoice = voices.find(v => v.lang === utterance.lang);
+          }
+          if (!matchingVoice) {
+              matchingVoice = voices.find(v => v.lang.startsWith(utterance.lang.split('-')[0]));
+          }
+          if (!matchingVoice && voices.length > 0) {
+              matchingVoice = voices[0];
+          }
 
-    if (voices.length === 0) {
-        window.speechSynthesis.onvoiceschanged = () => {
-            voices = window.speechSynthesis.getVoices();
-            findVoice();
-        };
-    } else {
-        findVoice();
+          if (matchingVoice) {
+              utterance.voice = matchingVoice;
+          }
+          window.speechSynthesis.speak(utterance);
+        } catch (e) {
+          console.warn("fallbackSpeak findVoice error:", e);
+        }
+      };
+
+      if (voices.length === 0) {
+          window.speechSynthesis.onvoiceschanged = () => {
+              voices = window.speechSynthesis.getVoices();
+              findVoice();
+          };
+          setTimeout(() => {
+              try {
+                  if (!window.speechSynthesis.speaking) {
+                      findVoice();
+                  }
+              } catch {}
+          }, 300);
+      } else {
+          findVoice();
+      }
+    } catch (e) {
+      console.warn("fallbackSpeak error:", e);
     }
   }
 };
 
-export const speakText = async (text: string, lang: string = 'en', slow: boolean = false, voiceName: string = 'Kore', provider: 'gemini' | 'google' | 'yandex' | 'system' = 'gemini') => {
-  if (!text) return;
+const fishAudioCache = new Map<string, ArrayBuffer>();
 
-  if (provider === 'google' || provider === 'yandex' || provider === 'system') {
-      fallbackSpeak(text, lang, slow, provider);
+export const speakWithFishAudio = async (text: string, lang: string = 'ru', slow: boolean = false): Promise<void> => {
+  if (!text) return;
+  const cacheKey = `fish_${text}_${slow}`;
+
+  let arrayBuffer = fishAudioCache.get(cacheKey);
+
+  if (!arrayBuffer) {
+    const res = await fetch('/api/tts/fish', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ text, format: 'mp3', lang })
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Fish Audio TTS failed (${res.status}): ${errText}`);
+    }
+
+    arrayBuffer = await res.arrayBuffer();
+    fishAudioCache.set(cacheKey, arrayBuffer);
+  }
+
+  const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
+  const audioUrl = URL.createObjectURL(blob);
+  const audio = new Audio(audioUrl);
+
+  if (slow) {
+    audio.playbackRate = 0.75;
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    audio.onended = () => {
+      URL.revokeObjectURL(audioUrl);
+      resolve();
+    };
+    audio.onerror = (e) => {
+      URL.revokeObjectURL(audioUrl);
+      reject(e);
+    };
+    audio.play().catch(reject);
+  });
+};
+
+export const speakText = async (
+  text: string, 
+  lang: string = 'en', 
+  slow: boolean = false, 
+  voiceName: string = 'Kore', 
+  provider: 'fish' | 'gemini' | 'google' | 'yandex' | 'system' | 'sapi53' = 'gemini'
+) => {
+  if (!text) return;
+  const cleanText = text
+    .replace(/\([^)]*\)/g, '') // Remove (text in parentheses) - often translations
+    .replace(/\[[^\]]*\]/g, '') // Remove [text in brackets]
+    .replace(/Speak clearly and easily in English[:.]?/gi, '')
+    .replace(/Say clearly and naturally in [^:]+[:.]?/gi, '')
+    .replace(/[:;]\s*$/g, '.') // Ensure it ends with a dot if it ends with colon/semicolon
+    .trim();
+  if (!cleanText) return;
+
+  if (lang === 'tlh' || lang === 'klingon') {
+    await playKlingonSpeech(cleanText, slow);
+    return;
+  }
+
+  if (provider === 'fish') {
+    try {
+      await speakWithFishAudio(cleanText, lang, slow);
+      return;
+    } catch (e) {
+      console.warn("Fish Audio TTS failed, falling back to Gemini / System:", e);
+    }
+  }
+
+  if ((typeof navigator !== 'undefined' && !navigator.onLine) || provider === 'google' || provider === 'yandex' || provider === 'system' || provider === 'sapi53') {
+      fallbackSpeak(cleanText, lang, slow, (provider === 'google' || provider === 'yandex') ? provider : 'system');
       return;
   }
 
-  const cacheKey = `${text}_${lang}_${slow}_${voiceName}`;
-  if (audioCache.has(cacheKey)) return playPCM(audioCache.get(cacheKey)!);
+  const cacheKey = `${cleanText}_${lang}_${slow}_${voiceName}`;
+  if (audioCache.has(cacheKey)) return playWav(audioCache.get(cacheKey)!);
 
   try {
     const base64Audio = await callGeminiWithRetry(async () => {
       const ai = createGenAiClient();
-      const prompt = slow 
-        ? `Say VERY slowly, clearly and naturally in ${lang} language: ${text}` 
-        : `Say clearly and naturally in ${lang} language: ${text}`;
-      
       const response = await ai.models.generateContent({
         model: TTS_MODEL,
-        contents: [{ parts: [{ text: prompt }] }],
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: cleanText }],
+          },
+        ],
         config: {
-          responseModalities: [Modality.AUDIO],
+          responseModalities: ["AUDIO"],
           speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } },
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName || "Kore" } },
           },
         },
       });
@@ -443,11 +550,11 @@ export const speakText = async (text: string, lang: string = 'en', slow: boolean
 
     if (base64Audio) {
       audioCache.set(cacheKey, base64Audio);
-      return playPCM(base64Audio);
+      return playWav(base64Audio);
     } else throw new Error("No audio data");
   } catch (error) {
     console.warn("TTS failed, using fallback:", error);
-    fallbackSpeak(text, lang, slow, 'system');
+    fallbackSpeak(cleanText, lang, slow, 'system');
   }
 };
 
@@ -466,6 +573,8 @@ export const saveLessonToCache = (subjectId: string, exercise: Exercise) => {
     if (!exists) {
       const cleanExercise: Exercise = {
         ...exercise,
+        originalSentence: exercise.originalSentence?.replace(/Speak clearly and easily in English[:.]?/gi, '').trim() || '',
+        targetTranslation: exercise.targetTranslation?.replace(/Speak clearly and easily in English[:.]?/gi, '').trim() || '',
         id: exercise.id || crypto.randomUUID(),
         isFallback: false,
         isCached: true
@@ -614,7 +723,7 @@ if (typeof window !== 'undefined') {
   }, 1000);
 }
 
-export const getFallbackExercise = (subjectId: string, type: Exercise['type'], subjectName: string): Exercise => {
+export const getFallbackExercise = (subjectId: string, type: Exercise['type'], subjectName: string, userLanguage: string = 'ru'): Exercise => {
     // 1. Try local cache first!
     const cached = getCachedExercise(subjectId, type);
     if (cached) {
@@ -651,14 +760,28 @@ export const getFallbackExercise = (subjectId: string, type: Exercise['type'], s
             isFallback: true
         };
     }
-    if (subjectId.startsWith('rf-')) {
-        return {
-            id: crypto.randomUUID(), type: 'translation', originalSentence: `Это регион РФ: ${subjectName}?`,
-            targetTranslation: "Да", wordBank: ["Да", "Нет", "Возможно", "Не знаю"], isFallback: true
-        };
-    }
-
     const hardestFallbacks: Record<string, { orig: string; trans: string; bank: string[] }[]> = {
+      cv: [
+        { orig: "Ырӑ кун! Мӗнле пурӑнатӑр?", trans: "Добрый день! Как поживаете?", bank: ["Добрый", "день!", "Как", "поживаете?", "Спасибо", "Хорошо", "дела"] },
+        { orig: "Эпӗ чӑваш чӗлхине вӗренетӗп", trans: "Я изучаю чувашский язык", bank: ["Я", "изучаю", "чувашский", "язык", "Мы", "говорим", "книга"] },
+        { orig: "Салам! Юлташӑм, ырӑ кӑмӑл пултӑр", trans: "Привет! Друг мой, хорошего настроения", bank: ["Привет!", "Друг", "мой,", "хорошего", "настроения", "здравствуйте", "утро"] },
+        { orig: "Тавах сире пысӑк пулӑшушӑн", trans: "Спасибо вам за большую помощь", bank: ["Спасибо", "вам", "за", "большую", "помощь", "пожалуйста", "очень"] },
+        { orig: "Чӑваш Ен — пирӗн тӑван ҫӗршыв", trans: "Чувашия — наша родная земля", bank: ["Чувашия", "—", "наша", "родная", "земля", "город", "страна"] },
+        { orig: "Аннепе атте маншӑн чи ҫывӑх ҫынсем", trans: "Мама и папа для меня самые близкие люди", bank: ["Мама", "и", "папа", "для", "меня", "самые", "близкие", "люди"] },
+        { orig: "Шкулта эпир нумай кӗнеке вулатпӑр", trans: "В школе мы читаем много книг", bank: ["В", "школе", "мы", "читаем", "много", "книг", "пишем"] },
+        { orig: "Паян ҫутӑ хӗвел пӑхать, ҫанталӑк ӑшӑ", trans: "Сегодня светит яркое солнце, погода теплая", bank: ["Сегодня", "светит", "яркое", "солнце,", "погода", "теплая", "ветер"] },
+        { orig: "Эсир чӑвашла калаҫатӑр-и?", trans: "Вы говорите по-чувашски?", bank: ["Вы", "говорите", "по-чувашски?", "Я", "понимаю", "немного"] },
+        { orig: "Ҫӑкӑр — пурнӑҫ тӗрекӗ", trans: "Хлеб — основа жизни", bank: ["Хлеб", "—", "основа", "жизни", "вода", "соль"] },
+        { orig: "Добрый день, друг!", trans: "Ырӑ кун, юлташ!", bank: ["Ырӑ", "кун,", "юлташ!", "Салам", "тавах", "сывӑ", "пул"] },
+        { orig: "Я люблю свой родной край", trans: "Эпӗ хамӑн тӑван ҫӗршыва юрататӑп", bank: ["Эпӗ", "хамӑн", "тӑван", "ҫӗршыва", "юрататӑп", "вӗренетӗп", "пирӗн"] }
+      ],
+      'rf-chuvash': [
+        { orig: "Ырӑ кун! Мӗнле пурӑнатӑр?", trans: "Добрый день! Как поживаете?", bank: ["Добрый", "день!", "Как", "поживаете?", "Спасибо", "Хорошо", "дела"] },
+        { orig: "Эпӗ чӑваш чӗлхине вӗренетӗп", trans: "Я изучаю чувашский язык", bank: ["Я", "изучаю", "чувашский", "язык", "Мы", "говорим", "книга"] },
+        { orig: "Салам! Юлташӑм, ырӑ кӑмӑл пултӑр", trans: "Привет! Друг мой, хорошего настроения", bank: ["Привет!", "Друг", "мой,", "хорошего", "настроения", "здравствуйте", "утро"] },
+        { orig: "Тавах сире пысӑк пулӑшушӑн", trans: "Спасибо вам за большую помощь", bank: ["Спасибо", "вам", "за", "большую", "помощь", "пожалуйста", "очень"] },
+        { orig: "Чӑваш Ен — пирӗн тӑван ҫӗршыв", trans: "Чувашия — наша родная земля", bank: ["Чувашия", "—", "наша", "родная", "земля", "город", "страна"] }
+      ],
       hu: [
         { orig: "Szia! Hogy vagy?", trans: "Привет! Как дела?", bank: ["Привет!", "Как", "дела?", "Спасибо", "Пока", "Хорошо"] },
         { orig: "A macska a házban van", trans: "Кот в доме", bank: ["Кот", "в", "доме", "на", "улице", "собака"] },
@@ -714,6 +837,13 @@ export const getFallbackExercise = (subjectId: string, type: Exercise['type'], s
         wordBank: [...item.bank].sort(() => Math.random() - 0.5),
         isFallback: true
       };
+    }
+
+    if (subjectId.startsWith('rf-')) {
+        return {
+            id: crypto.randomUUID(), type: 'translation', originalSentence: `Это регион РФ: ${subjectName}?`,
+            targetTranslation: "Да", wordBank: ["Да", "Нет", "Возможно", "Не знаю"], isFallback: true
+        };
     }
 
     // Dynamic procedural sentence builder to prevent repetitive sentences!
@@ -789,14 +919,59 @@ export const getFallbackExercise = (subjectId: string, type: Exercise['type'], s
 
 export const generateExercise = async (
     targetSubject: string, subjectId: string, isLanguage: boolean = true,
-    type: Exercise['type'] = 'translation', isPro: boolean = false, customTopic?: string
+    type: Exercise['type'] = 'translation', isPro: boolean = false, customTopic?: string,
+    userLanguage: string = 'ru'
 ): Promise<Exercise> => {
+  // Fast offline return when physically offline
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return getFallbackExercise(subjectId, type, targetSubject, userLanguage);
+  }
+
   const model = isPro ? MODEL_PRO : MODEL_FREE;
   const topic = (customTopic && customTopic.trim()) ? customTopic : TOPICS[Math.floor(Math.random() * TOPICS.length)];
   const nonce = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
-  const prompt = isLanguage 
-    ? `Сгенерируй СЛУЧАЙНОЕ, УНИКАЛЬНОЕ И РАЗНООБРАЗНОЕ упражнение типа "${type}" для изучения ${targetSubject}. Тема: ${topic}. Составь новое предложение, избегай банальных и повторяющихся фраз. Код уникальности: ${nonce}.`
-    : `Сгенерируй новую УНИКАЛЬНУЮ задачу для предмета "${targetSubject}". Код уникальности: ${nonce}.`;
+
+  const speakerLangNames: Record<string, string> = {
+    ru: 'русский язык (Russian)',
+    en: 'English',
+    de: 'Deutsch (German)',
+    fr: 'Français (French)',
+    es: 'Español (Spanish)',
+    ja: '日本語 (Japanese)',
+    zh: '中文 (Chinese)',
+    ar: 'العربية (Arabic)',
+    pt: 'Português (Portuguese)',
+    it: 'Italiano (Italian)',
+    tr: 'Türkçe (Turkish)',
+    ko: '한국어 (Korean)',
+    hi: 'हिन्दी (Hindi)',
+    pl: 'Polski (Polish)'
+  };
+  const translationLangName = speakerLangNames[userLanguage] || 'русский язык (Russian)';
+
+  const isChuvash = subjectId === 'cv' || subjectId === 'rf-chuvash' || targetSubject.toLowerCase().includes('чуваш') || targetSubject.toLowerCase().includes('chuvash');
+
+  let prompt = '';
+  if (isChuvash) {
+    prompt = `Ты создаешь упражнение для курса ЧУВАШСКОГО ЯЗЫКА (Чӑвашла / Chuvash language).
+Упражнение должно быть ИСКЛЮЧИТЕЛЬНО на ЧУВАШСКОМ и ${translationLangName} языках.
+Тема урока: ${topic}. Тип упражнения: "${type}".
+Обязательно используй настоящие чувашские буквы: Ӑ, Ӗ, Ҫ, Ӳ (например: ырӑ кун, салам, тавах, эпӗ, эсир, вӗренетӗп, юлташ, ҫӗршыв, шкул, кӗнеке, пурнӑҫ, апат, ҫӑкӑр, шыв).
+
+Структура JSON:
+- originalSentence: фраза на чувашском языке ИЛИ на языке перевода (${translationLangName}).
+- targetTranslation: правильный перевод на ${translationLangName} (если оригинал на чувашском) ИЛИ на чувашский (если оригинал на ${translationLangName}).
+- wordBank: массив отдельных слов для составления targetTranslation плюс 3-4 похожих слова-дистрактора на том же языке.
+Код уникальности: ${nonce}.`;
+  } else if (isLanguage) {
+    prompt = `Сгенерируй СЛУЧАЙНОЕ, УНИКАЛЬНОЕ И РАЗНООБРАЗНОЕ упражнение типа "${type}" для изучения языка: "${targetSubject}". Тема: ${topic}.
+Язык изучаемого предмета: ${targetSubject}.
+Язык интерфейса/перевода обучающегося (Speaker UI language): ${translationLangName}.
+ОБЯЗАТЕЛЬНО: Поле "targetTranslation" должно быть написано на языке пользователя (${translationLangName}), а "originalSentence" — на изучаемом языке (${targetSubject}) или наоборот!
+Составь новое предложение, избегай банальных и повторяющихся фраз. Код уникальности: ${nonce}.`;
+  } else {
+    prompt = `Сгенерируй новую УНИКАЛЬНУЮ задачу для предмета "${targetSubject}" на языке интерфейса пользователя (${translationLangName}). Код уникальности: ${nonce}.`;
+  }
 
   try {
     const data = await callGeminiWithRetry(async () => {
@@ -844,6 +1019,18 @@ export const checkAnswerWithAI = async (
   
   if (normUser === normCorrect) {
       return { isCorrect: true, feedback: "Верно!" };
+  }
+
+  // Fast offline return when physically offline
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    const isClose = normUser === normCorrect || 
+      normUser.replace(/\s+/g, '') === normCorrect.replace(/\s+/g, '') ||
+      (normCorrect.includes(normUser) && normUser.length >= 3);
+    return { 
+      isCorrect: isClose, 
+      feedback: isClose ? "Правильно (офлайн)!" : `Офлайн-режим: правильный ответ — «${correctAnswer}»`, 
+      isFallback: true 
+    };
   }
 
   try {
@@ -1145,7 +1332,15 @@ export const translateText = async (text: string, targetLang: string, sourceLang
 
 export const startRoleplay = async (subject: string, subjectId: string): Promise<Exercise> => {
     const isArabic = subjectId === 'ar' || subject.toLowerCase().includes('араб') || subject.toLowerCase().includes('arabic');
+    const isChuvash = subjectId === 'cv' || subjectId === 'rf-chuvash' || subject.toLowerCase().includes('чуваш') || subject.toLowerCase().includes('chuvash');
     
+    const chuvashScenarios = [
+        "Саламлашу тата паллашу (Знакомство и приветствие)",
+        "Шкулта тата кӗнекесар библиотекара (В школе и библиотеке)",
+        "Апатланни тата чей ӗҫни (За чаем и угощением)",
+        "Тӑван ялти пурнӑҫ (В родной деревне)"
+    ];
+
     const arabicScenarios = [
         "في المقهى (Заказ в арабском кафе)",
         "التعارف والتحية (Знакомство и приветствие)",
@@ -1153,19 +1348,23 @@ export const startRoleplay = async (subject: string, subjectId: string): Promise
         "السفر في المطار (Путешествие и аэропорт)"
     ];
     
-    const scenario = isArabic 
-        ? arabicScenarios[Math.floor(Math.random() * arabicScenarios.length)]
-        : "Ordering coffee";
+    const scenario = isChuvash
+        ? chuvashScenarios[Math.floor(Math.random() * chuvashScenarios.length)]
+        : isArabic 
+            ? arabicScenarios[Math.floor(Math.random() * arabicScenarios.length)]
+            : "Ordering coffee";
 
     try {
         const firstMessage = await callGeminiWithRetry(async () => {
             const ai = createGenAiClient();
-            const prompt = isArabic 
-                ? `You are an AI Arabic conversation partner in a roleplay. Scenario: "${scenario}". Greet the student in warm natural Arabic (with Russian/English translation in parentheses if helpful). Keep it 1-2 short sentences.`
-                : `Act as a friendly local who speaks ${subject}. Scenario: ${scenario}. Start the conversation.`;
+            const prompt = isChuvash
+                ? `Ты дружелюбный собеседник на ЧУВАШСКОМ ЯЗЫКЕ (Чӑвашла). Тема: "${scenario}". Поприветствуй собеседника на правильном чувашском языке (с буквами Ӑ, Ӗ, Ҫ, Ӳ), в скобках можно краткий перевод на русский. 1-2 коротких предложения. НИКАКОГО АНГЛИЙСКОГО!`
+                : isArabic 
+                    ? `You are an AI Arabic conversation partner in a roleplay. Scenario: "${scenario}". Greet the student in warm natural Arabic (with Russian/English translation in parentheses). When mentioning numbers or prices, display dual numerals: Western/European digits on the left and Eastern Arabic digits on the right (e.g. 1 / ١, 5 / ٥, 10 / ١٠). Do not replace modern European digits. Keep it 1-2 short sentences.`
+                    : `Act as a friendly local who speaks ${subject}. Scenario: ${scenario}. Start the conversation.`;
             
             const response = await ai.models.generateContent({ model: MODEL_FREE, contents: prompt });
-            return response.text?.trim() || (isArabic ? "مرحباً بك! أهلاً وسهلاً. كيف يمكنني مساعدتك اليوم؟" : "Hello!");
+            return response.text?.trim() || (isChuvash ? "Ырӑ кун! Салам, юлташӑм. Эсир мӗнле пурӑнатӑр? (Добрый день! Привет, мой друг. Как поживаешь?)" : isArabic ? "مرحباً بك! أهلاً وسهلاً. كيف يمكنني مساعدتك اليوم؟ (1 / ١)" : "Hello!");
         });
         return {
             id: crypto.randomUUID(), type: 'roleplay', originalSentence: scenario, targetTranslation: "", wordBank: [],
@@ -1173,10 +1372,10 @@ export const startRoleplay = async (subject: string, subjectId: string): Promise
         };
     } catch (e) {
         return {
-            id: 'fallback-rp', type: 'roleplay', originalSentence: isArabic ? "ممارسة اللغة العربية" : "Offline Practice", targetTranslation: "", wordBank: [], isFallback: true,
+            id: 'fallback-rp', type: 'roleplay', originalSentence: isChuvash ? "Чӑвашла калаҫу" : isArabic ? "ممارسة اللغة العربية" : "Offline Practice", targetTranslation: "", wordBank: [], isFallback: true,
             roleplayData: { 
                 topic: scenario, 
-                messages: [{ role: 'model', text: isArabic ? "مرحباً بك! أهلاً وسهلاً في درس المحادثة العربية." : "Hello! Welcome to conversation practice." }], 
+                messages: [{ role: 'model', text: isChuvash ? "Ырӑ кун! Салам, юлташӑм. Эпӗ чӑваш чӗлхи вӗрентекенӗ. (Добрый день! Привет, друг. Я учитель чувашского языка.)" : isArabic ? "مرحباً بك! أهلاً وسهلاً في درس المحادثة العربية (1 / ١)." : "Hello! Welcome to conversation practice." }], 
                 userTurn: true 
             }
         };
@@ -1185,12 +1384,17 @@ export const startRoleplay = async (subject: string, subjectId: string): Promise
 
 export const replyToRoleplay = async (history: RoleplayMessage[], userMessageText: string, subject: string, isMax: boolean): Promise<RoleplayMessage> => {
     const isArabic = subject.toLowerCase().includes('араб') || subject.toLowerCase().includes('arabic');
+    const isChuvash = subject.toLowerCase().includes('чуваш') || subject.toLowerCase().includes('chuvash');
     try {
          const data = await callGeminiWithRetry(async () => {
              const ai = createGenAiClient();
              const context = history.map(m => `${m.role}: ${m.text}`).join('\n');
              const prompt = `${context}\nUser: ${userMessageText}
-             ${isArabic ? 'You are a friendly Arabic language tutor. Reply in clear natural Arabic with RTL formatting. If user made a mistake in Arabic, provide a brief correction.' : 'Reply naturally in ' + subject + '.'}`;
+             ${isChuvash 
+               ? 'You are a warm friendly Chuvash language tutor from Cheboksary. Reply in natural authentic Chuvash (Чӑвашла) using letters Ӑ, Ӗ, Ҫ, Ӳ with brief Russian translation in parentheses. NEVER USE ENGLISH.'
+               : isArabic 
+                 ? 'You are a friendly Arabic language tutor. Reply in clear natural Arabic with RTL formatting. If numbers, prices or counts are mentioned, use dual Arabic numerals: European/Western digits on the left and Eastern Arabic digits on the right (e.g. 1 / ١, 5 / ٥, 10 / ١٠). Do not break modern digits. If user made a mistake in Arabic, provide a brief correction.' 
+                 : 'Reply naturally in ' + subject + '.'}`;
 
              const response = await ai.models.generateContent({
                  model: isMax ? MODEL_PRO : MODEL_FREE,
@@ -1364,6 +1568,7 @@ export const generateIshihara = async (subjectId: string): Promise<Exercise> => 
 export const generateReading = async (subject: string, subjectId: string): Promise<Exercise> => {
     const mode = Math.random() > 0.5 ? 'fill-blanks' : 'write';
     const topic = TOPICS[Math.floor(Math.random() * TOPICS.length)];
+    const isRf = subjectId.startsWith('rf-') || subjectId === 'cv' || subject.toLowerCase().includes('республик') || subject.toLowerCase().includes('чуваш') || subject.toLowerCase().includes('татар') || subject.toLowerCase().includes('башкир');
 
     try {
         const ai = createGenAiClient();
@@ -1371,15 +1576,25 @@ export const generateReading = async (subject: string, subjectId: string): Promi
         let schema: any = {};
 
         if (mode === 'fill-blanks') {
-            prompt = `Generate a short reading exercise in ${subject} about ${topic}.
-            Create a short text (3-5 sentences).
-            Identify 3-5 key words to be "blanks".
-            Return JSON with:
-            - title: A short title.
-            - text: The text with blanks replaced by "___".
-            - blanks: An array of objects { id: "b1", word: "correctWord" }.
-            - wordBank: An array of strings including the correct words and 3-4 distractors.
-            `;
+            prompt = isRf
+                ? `Создай короткое упражнение на чтение для курса "${subject}" на тему: "${topic}".
+                Напиши короткий текст (3-5 предложений) на русском или родном языке региона.
+                Выдели 3-5 ключевых слов для пропусков ("___").
+                Верни JSON:
+                - title: Короткий заголовок.
+                - text: Текст, где пропущенные слова заменены на "___".
+                - blanks: Массив объектов { id: "b1", word: "правильноеСлово" }.
+                - wordBank: Массив строк, включающий правильные слова и 3-4 похожих дистрактора.
+                КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО ИСПОЛЬЗОВАТЬ АНГЛИЙСКИЙ ЯЗЫК!`
+                : `Generate a short reading exercise in ${subject} about ${topic}.
+                Create a short text (3-5 sentences).
+                Identify 3-5 key words to be "blanks".
+                Return JSON with:
+                - title: A short title.
+                - text: The text with blanks replaced by "___".
+                - blanks: An array of objects { id: "b1", word: "correctWord" }.
+                - wordBank: An array of strings including the correct words and 3-4 distractors.
+                `;
             schema = {
                 type: Type.OBJECT,
                 properties: {
@@ -1391,12 +1606,19 @@ export const generateReading = async (subject: string, subjectId: string): Promi
                 required: ["title", "text", "blanks", "wordBank"]
             };
         } else {
-            prompt = `Generate a creative writing prompt in ${subject} about ${topic}.
-            Return JSON with:
-            - title: A short title.
-            - text: A story starter or context (1-2 sentences).
-            - prompt: A specific instruction for what the user should write (e.g., "Finish the story", "Describe the character").
-            `;
+            prompt = isRf
+                ? `Создай творческое задание по письму для курса "${subject}" на тему: "${topic}".
+                Верни JSON:
+                - title: Короткий заголовок.
+                - text: Вводный текст или контекст (1-2 предложения на русском/национальном языке).
+                - prompt: Конкретное задание для пользователя (например, "Опишите природу родного края", "Напишите письмо другу").
+                КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО ИСПОЛЬЗОВАТЬ АНГЛИЙСКИЙ ЯЗЫК!`
+                : `Generate a creative writing prompt in ${subject} about ${topic}.
+                Return JSON with:
+                - title: A short title.
+                - text: A story starter or context (1-2 sentences).
+                - prompt: A specific instruction for what the user should write (e.g., "Finish the story", "Describe the character").
+                `;
             schema = {
                 type: Type.OBJECT,
                 properties: {
@@ -1445,6 +1667,23 @@ export const generateReading = async (subject: string, subjectId: string): Promi
         };
 
     } catch (e) {
+        const isChuvash = subjectId === 'cv' || subjectId === 'rf-chuvash' || subject.toLowerCase().includes('чуваш') || subject.toLowerCase().includes('chuvash');
+        if (isChuvash) {
+            return {
+                id: 'fallback-reading-cv',
+                type: 'reading',
+                originalSentence: "Чӑвашла вулав",
+                targetTranslation: "Эпӗ паян шкула каятӑп тата кӗнеке вулатӑп.",
+                wordBank: ["шкула", "кӗнеке", "паян", "ҫӑкӑр", "юлташ"],
+                isFallback: true,
+                readingData: {
+                    title: "Шкулти пурнӑҫ",
+                    text: "Эпӗ паян ___ каятӑп тата ___ вулатӑп.",
+                    mode: 'fill-blanks',
+                    blanks: [{ id: 'b1', word: 'шкула' }, { id: 'b2', word: 'кӗнеке' }]
+                }
+            };
+        }
         // Fallback
         return {
             id: 'fallback-reading',
@@ -1678,6 +1917,7 @@ export const generateVideoCallRoleplayResponse = async (
     try {
         const ai = createGenAiClient();
         const context = history.map(m => `${m.role === 'user' ? 'User' : 'DuoWindo6601'}: ${m.text}`).join('\n');
+        const isArabic = language.toLowerCase().includes('араб') || language.toLowerCase().includes('arabic');
         const prompt = `You are DuoWindo6601, an AI language tutor in a LIVE interactive Video Call with a student learning ${language}. 
 Current topic/scenario: "${topic}".
 Recent conversation:
@@ -1685,6 +1925,7 @@ ${context}
 User said during video call: "${userText}"
 
 Reply naturally, warmly, and concisely as DuoWindo6601 (1-2 sentences max for spoken video call).
+${isArabic ? 'For Arabic language practice: when mentioning numbers, prices, or time, show dual numerals with European/Western digits on the left and Eastern Arabic digits on the right (e.g. 1 / ١, 5 / ٥, 10 / ١٠). Do not remove modern European digits.' : ''}
 If user made a language/grammar mistake, provide a very brief friendly correction.
 Return JSON with { "text": "...", "correction": "..." }`;
 
@@ -1724,9 +1965,11 @@ export const pingGeminiApi = async (customKeyToTest?: string): Promise<{ ok: boo
   const startTime = Date.now();
   try {
     const ai = createGenAiClient(apiKey || 'SYSTEM_FREE_TRAFFIC');
-    const response = await ai.models.generateContent({
-      model: MODEL_FREE,
-      contents: "Reply with the single word: 'ONLINE'",
+    const response = await callGeminiWithRetry(async () => {
+      return ai.models.generateContent({
+        model: MODEL_FREE,
+        contents: "Reply with the single word: 'ONLINE'",
+      });
     });
     const latencyMs = Date.now() - startTime;
     if (response && response.text) {
