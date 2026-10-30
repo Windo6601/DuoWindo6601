@@ -552,19 +552,29 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
             </div>
           </button>
 
-          {/* 7. Переводчик (AI Переводчик) */}
+          {/* 7. Переводчик (AI и Словари без интернета) */}
           <button 
             type="button"
             onClick={() => setScreen(AppScreen.TRANSLATOR)} 
-            className="bg-gray-700 p-8 md:p-10 rounded-[2.5rem] border-b-8 border-gray-900 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center space-x-6 shadow-2xl cursor-pointer"
+            className="bg-gradient-to-r from-sky-700 to-indigo-800 p-8 md:p-10 rounded-[2.5rem] border-b-8 border-indigo-950 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center justify-between shadow-2xl cursor-pointer relative overflow-hidden group"
           >
-            <div className="bg-white/20 p-4 md:p-5 rounded-3xl">
-              <BookIcon className="w-12 h-12 text-white" />
+            <div className="flex items-center space-x-6">
+              <div className="bg-white/20 p-4 md:p-5 rounded-3xl group-hover:scale-105 transition-transform">
+                <BookIcon className="w-12 h-12 text-white" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-2xl md:text-3xl font-bold text-white">{t('translator')}</h3>
+                  <span className="bg-emerald-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    {isRu ? 'СЛОВАРИ БЕЗ ИНТЕРНЕТА 💾' : 'OFFLINE DICTIONARIES 💾'}
+                  </span>
+                </div>
+                <p className="opacity-90 font-bold uppercase tracking-widest text-xs text-sky-200 mt-0.5">
+                  {isRu ? 'Переключение языков стран ⇄ и офлайн-пакеты' : 'Country language switching ⇄ & offline packs'}
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-2xl md:text-3xl font-bold mb-1 text-white">{t('translator')}</h3>
-              <p className="opacity-80 font-bold uppercase tracking-widest text-xs text-white">{t('aiTrans')}</p>
-            </div>
+            <span className="text-2xl hidden sm:inline group-hover:translate-x-1 transition-transform">⇄</span>
           </button>
 
           {/* 8. Звуковая Иллюзия (Что реально, а что нет?) */}
@@ -586,14 +596,33 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
           <button 
             type="button"
             onClick={() => startTraining('drawing')} 
-            className="bg-pink-600 p-8 md:p-10 rounded-[2.5rem] border-b-8 border-pink-800 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center space-x-6 shadow-2xl cursor-pointer"
+            className="bg-pink-600 p-8 md:p-10 rounded-[2.5rem] border-b-8 border-pink-800 text-left hover:brightness-110 active:translate-y-2 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xl cursor-pointer md:col-span-2 group relative overflow-hidden"
           >
-            <div className="bg-white/20 p-4 md:p-5 rounded-3xl">
-              <PenIcon className="w-12 h-12 text-white" />
+            <div className="flex items-center space-x-6">
+              <div className="bg-white/20 p-4 md:p-5 rounded-3xl shrink-0 group-hover:scale-105 transition-transform">
+                <PenIcon className="w-12 h-12 text-white" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-2xl md:text-3xl font-black text-white">{t('drawing')}</h3>
+                  <span className="bg-amber-400 text-slate-950 text-[10px] md:text-xs font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-sm">
+                    <span>🔒</span>
+                    <span>{isRu ? 'В разработке • Доступно 1 ноября 2026 г.' : 'In Development • Available Nov 1, 2026'}</span>
+                  </span>
+                </div>
+                <p className="font-bold text-xs md:text-sm text-pink-100">
+                  {isRu 
+                    ? 'Переключение на эти языки и раздел «Письмо» откроются 1 ноября 2026 года' 
+                    : 'Switching to these languages and "Writing" section will unlock on November 1, 2026'}
+                </p>
+                <p className="opacity-80 font-bold uppercase tracking-widest text-[11px] text-white/90">
+                  {t('writePractice')} • DuoWindo6601
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-2xl md:text-3xl font-bold mb-1 text-white">{t('drawing')}</h3>
-              <p className="opacity-80 font-bold uppercase tracking-widest text-xs text-white">{t('writePractice')}</p>
+            <div className="bg-pink-800/80 border border-pink-400/30 px-3.5 py-2 rounded-2xl text-white font-black text-xs uppercase tracking-wider self-start sm:self-center shrink-0 flex items-center space-x-1.5 shadow-md">
+              <span>✍️</span>
+              <span>1 нояб. 2026</span>
             </div>
           </button>
 

@@ -16,6 +16,10 @@ interface DrawingCanvasProps {
   onSpeak?: () => void;
   showTrace: boolean;
   setShowTrace: (show: boolean) => void;
+  initialBrushSize?: number;
+  brushSize?: number;
+  brushColor?: string;
+  onUpdateBrushSize?: (size: number) => void;
 }
 
 export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
@@ -24,9 +28,24 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   instruction,
   onSpeak,
   showTrace,
-  setShowTrace
+  setShowTrace,
+  initialBrushSize = 12,
+  brushSize: propBrushSize,
+  brushColor = '#1CB0F6',
+  onUpdateBrushSize
 }) => {
   const [paths, setPaths] = useState<Point[][]>([]);
+  const [internalBrushSize, setInternalBrushSize] = useState<number>(propBrushSize || initialBrushSize);
+  const brushSize = propBrushSize !== undefined ? propBrushSize : internalBrushSize;
+
+  const handleBrushChange = (newSize: number) => {
+    const clamped = Math.max(4, Math.min(36, newSize));
+    if (onUpdateBrushSize) {
+      onUpdateBrushSize(clamped);
+    } else {
+      setInternalBrushSize(clamped);
+    }
+  };
   const currentPathRef = useRef<Point[]>([]);
   const isDrawingRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -73,17 +92,17 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     if (!ctx) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.lineWidth = 12;
+    ctx.lineWidth = brushSize;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.strokeStyle = '#1e293b';
-    ctx.fillStyle = '#1e293b';
+    ctx.strokeStyle = brushColor;
+    ctx.fillStyle = brushColor;
 
     paths.forEach(path => {
       if (path.length === 0) return;
       if (path.length === 1) {
         ctx.beginPath();
-        ctx.arc(path[0].x, path[0].y, 6, 0, Math.PI * 2);
+        ctx.arc(path[0].x, path[0].y, Math.max(3, brushSize / 2), 0, Math.PI * 2);
         ctx.fill();
       } else {
         ctx.beginPath();
@@ -98,7 +117,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
         ctx.stroke();
       }
     });
-  }, [canvasRef, paths]);
+  }, [canvasRef, paths, brushSize]);
 
   useEffect(() => {
     redraw();
@@ -116,18 +135,18 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.lineWidth = 12;
+    ctx.lineWidth = brushSize;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.strokeStyle = '#1e293b';
     ctx.fillStyle = '#1e293b';
 
     ctx.beginPath();
-    ctx.arc(pt.x, pt.y, 6, 0, Math.PI * 2);
+    ctx.arc(pt.x, pt.y, Math.max(3, brushSize / 2), 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
     ctx.moveTo(pt.x, pt.y);
-  }, [canvasRef, getCanvasCoordinates]);
+  }, [canvasRef, getCanvasCoordinates, brushSize]);
 
   const moveDrawing = useCallback((clientX: number, clientY: number) => {
     if (!isDrawingRef.current) return;
@@ -148,7 +167,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.lineWidth = 12;
+    ctx.lineWidth = brushSize;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.strokeStyle = '#1e293b';
@@ -345,7 +364,38 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
         />
       </div>
 
-      <div className="mt-3 flex items-center justify-center gap-2 md:gap-4 p-2 md:p-3 bg-duo-card rounded-2xl border-2 border-gray-700 shadow-xl animate-in fade-in slide-in-from-bottom-2">
+      <div className="mt-3 flex items-center justify-center flex-wrap gap-1.5 md:gap-3 p-2 md:p-3 bg-duo-card rounded-2xl border-2 border-gray-700 shadow-xl animate-in fade-in slide-in-from-bottom-2">
+        {/* Brush Size - and + Controls */}
+        <div className="flex items-center space-x-1 bg-gray-800/90 p-1 rounded-xl border border-gray-700">
+          <button
+            type="button"
+            onClick={() => handleBrushChange(brushSize - 2)}
+            className="w-8 h-8 rounded-lg bg-gray-700 hover:bg-gray-600 text-white font-black text-lg flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
+            title="Уменьшить кисть (-)"
+          >
+            -
+          </button>
+          
+          <div className="flex items-center space-x-1.5 px-1.5" title={`Толщина кисти: ${brushSize}px`}>
+            <div
+              className="rounded-full shadow-sm"
+              style={{ backgroundColor: brushColor, width: `${Math.min(18, Math.max(6, brushSize))}px`, height: `${Math.min(18, Math.max(6, brushSize))}px` }}
+            />
+            <span className="text-[11px] font-black font-mono text-emerald-300">{brushSize}px</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => handleBrushChange(brushSize + 2)}
+            className="w-8 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black text-lg flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
+            title="Увеличить кисть (+)"
+          >
+            +
+          </button>
+        </div>
+
+        <div className="w-px h-6 bg-gray-600 mx-0.5 hidden sm:block"></div>
+
         <button
           type="button"
           onClick={handleUndo}

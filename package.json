@@ -4,7 +4,7 @@
   "version": "1.0.3",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "tsx server.ts",
     "build": "vite build && node -e \"import('fs').then(fs => fs.cpSync('dist', 'build', { recursive: true }))\"",
     "preview": "vite preview",
     "start": "node server.ts",
@@ -16,6 +16,8 @@
     "@vitejs/plugin-react": "^5.0.0",
     "canvas-confetti": "^1.9.4",
     "chess.js": "^1.4.0",
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
     "firebase": "^11.4.0",
     "framer-motion": "^12.42.0",
     "react": "^19.0.0",
@@ -27,9 +29,12 @@
   },
   "devDependencies": {
     "@types/canvas-confetti": "^1.9.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
     "@types/node": "^22.13.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "tsx": "^4.23.15",
     "typescript": "~5.7.3"
   }
 }

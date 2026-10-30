@@ -56,6 +56,15 @@ export const HandwritingScreen: React.FC<HandwritingScreenProps> = ({
     initialItem || CYRILLIC_LETTERS[0]
   );
 
+  // Brush Size State
+  const [brushSize, setBrushSize] = useState<number>(user.handwritingBrushSize || 10);
+
+  useEffect(() => {
+    if (user.handwritingBrushSize) {
+      setBrushSize(user.handwritingBrushSize);
+    }
+  }, [user.handwritingBrushSize]);
+
   // Stroke-by-stroke guidance state
   const [currentStrokeIndex, setCurrentStrokeIndex] = useState<number>(0);
   const [completedStrokes, setCompletedStrokes] = useState<number[]>([]);
@@ -160,7 +169,7 @@ export const HandwritingScreen: React.FC<HandwritingScreenProps> = ({
     // Draw completed paths in vibrant emerald
     userPaths.forEach((path, idx) => {
       if (path.length === 0) return;
-      ctx.lineWidth = 10;
+      ctx.lineWidth = brushSize;
       ctx.strokeStyle = '#10b981'; // emerald-500
       ctx.shadowColor = 'rgba(16, 185, 129, 0.4)';
       ctx.shadowBlur = 8;
@@ -176,7 +185,7 @@ export const HandwritingScreen: React.FC<HandwritingScreenProps> = ({
     // Reset shadow
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
-  }, [userPaths]);
+  }, [userPaths, brushSize]);
 
   useEffect(() => {
     redrawCanvas();
@@ -275,7 +284,7 @@ export const HandwritingScreen: React.FC<HandwritingScreenProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.lineWidth = 10;
+    ctx.lineWidth = brushSize;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.strokeStyle = '#10b981';
@@ -302,7 +311,7 @@ export const HandwritingScreen: React.FC<HandwritingScreenProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.lineWidth = 10;
+    ctx.lineWidth = brushSize;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.strokeStyle = '#10b981';
@@ -863,6 +872,45 @@ export const HandwritingScreen: React.FC<HandwritingScreenProps> = ({
 
             {/* ACTION TOOLBAR BUTTONS */}
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2 md:gap-3 p-2 bg-gray-800/90 rounded-2xl border border-gray-700 shadow-xl">
+              {/* Brush Size Controls (- and +) */}
+              <div className="flex items-center space-x-1 bg-gray-900/90 p-1 rounded-xl border border-gray-700">
+                <button
+                  type="button"
+                  onClick={() => {
+                    playSound('click');
+                    const newSize = Math.max(4, brushSize - 2);
+                    setBrushSize(newSize);
+                    setUser(prev => ({ ...prev, handwritingBrushSize: newSize }));
+                  }}
+                  className="w-7 h-7 rounded-lg bg-gray-800 hover:bg-gray-700 text-white font-black text-sm flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
+                  title="Уменьшить кисть (-)"
+                >
+                  -
+                </button>
+                <div className="flex items-center space-x-1 px-1" title={`Толщина кисти: ${brushSize}px`}>
+                  <div
+                    className="rounded-full bg-emerald-400 shadow-sm transition-all"
+                    style={{ width: `${Math.min(16, Math.max(5, brushSize))}px`, height: `${Math.min(16, Math.max(5, brushSize))}px` }}
+                  />
+                  <span className="text-[10px] font-black font-mono text-emerald-300">{brushSize}px</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    playSound('click');
+                    const newSize = Math.min(36, brushSize + 2);
+                    setBrushSize(newSize);
+                    setUser(prev => ({ ...prev, handwritingBrushSize: newSize }));
+                  }}
+                  className="w-7 h-7 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
+                  title="Увеличить кисть (+)"
+                >
+                  +
+                </button>
+              </div>
+
+              <div className="w-px h-6 bg-gray-700 mx-0.5"></div>
+
               <button
                 type="button"
                 onClick={handlePlayDemo}

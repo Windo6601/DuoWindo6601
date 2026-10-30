@@ -287,18 +287,39 @@ export class GeminiRateLimiterQueue {
   }
 }
 
-// Глобальный экземпляр очереди с ограничением частоты запросов (10 RPM)
-export const geminiRateLimiter = new GeminiRateLimiterQueue(10);
+// Глобальный экземпляр очереди с оптимизированной высокой частотой запросов
+export const geminiRateLimiter = new GeminiRateLimiterQueue(60);
+
+/**
+ * Вспомогательная обертка таймаута для предотвращения зависания загрузки уроков.
+ * Автоматически сбрасывает длинные вызовы и переключает на автономное упражнение.
+ */
+export const fetchWithTimeout = <T>(promise: Promise<T>, ms: number = 3200): Promise<T> => {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`API request timed out after ${ms}ms`));
+    }, ms);
+    promise
+      .then(res => {
+        clearTimeout(timer);
+        resolve(res);
+      })
+      .catch(err => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+};
 
 /**
  * Центральный шлюз вызова Gemini API:
- * Маршрутизирует вызовы через очередь ограничения частоты (10 RPM) и
+ * Маршрутизирует вызовы через очередь ограничения частоты и
  * механизм Exponential Backoff + Jitter при ошибках 429.
  */
 export async function callGeminiWithRetry<T>(
   apiCall: () => Promise<T>,
-  retries: number = 5,
-  baseDelay: number = 1000,
+  retries: number = 3,
+  baseDelay: number = 800,
   _skipLimitCheck: boolean = true
 ): Promise<T> {
   return geminiRateLimiter.enqueue(() => fetchGeminiWithRetry(apiCall, retries, baseDelay));
@@ -364,12 +385,48 @@ const playWav = async (base64Audio: string) => {
   }
 };
 
+const resolveSpeechLanguage = (text: string, lang: string): string => {
+  const clean = text.trim();
+  if (!clean) return lang || 'en';
+
+  const lower = clean.toLowerCase();
+  const englishWords = ['hello', 'hi', 'welcome', 'thank', 'thanks', 'good', 'morning', 'afternoon', 'evening', 'night', 'how', 'are', 'you', 'what', 'where', 'when', 'why', 'who', 'yes', 'no', 'apple', 'banana', 'cat', 'dog', 'house', 'water', 'book', 'friend', 'school', 'computer'];
+  const hasEnglishWord = englishWords.some(w => new RegExp(`\\b${w}\\b`, 'i').test(lower));
+
+  // If text contains English words or pure English ASCII when lang is 'ru' or empty, switch to 'en'
+  if ((lang === 'ru' || lang === 'be' || lang === 'uk' || lang === 'cv' || lang === 'tt' || !lang) && (hasEnglishWord || /^[a-zA-Z0-9\s.,!?'"\-]+$/.test(clean))) {
+    return 'en';
+  }
+
+  // If text contains Cyrillic characters
+  if (/[\u0400-\u04FF]/.test(clean)) {
+    if (lang === 'uk') return 'uk';
+    if (lang === 'be') return 'be';
+    return 'ru';
+  }
+
+  // Arabic
+  if (/[\u0600-\u06FF]/.test(clean)) return 'ar';
+  // CJK
+  if (/[\u4e00-\u9fa5]/.test(clean)) return 'zh';
+  if (/[\u3040-\u30ff]/.test(clean)) return 'ja';
+  if (/[\uac00-\ud7af]/.test(clean)) return 'ko';
+
+  // Force 'en' for common greetings and basic English words regardless of lowercase/uppercase
+  const forcedEnglish = ['hello', 'hi', 'how are you', 'welcome', 'goodbye', 'thanks', 'thank you', 'morning', 'afternoon', 'evening'];
+  if (forcedEnglish.some(w => lower.includes(w))) return 'en';
+
+  return lang || 'en';
+};
+
 const fallbackSpeak = (text: string, lang: string = 'en', slow: boolean = false, provider: 'google' | 'yandex' | 'system' = 'system') => {
   const cleanText = text
     .replace(/Speak clearly and easily in English[:.]?/gi, '')
     .replace(/Say clearly and naturally in [^:]+[:.]?/gi, '')
     .trim();
   if (!cleanText) return;
+
+  const effectiveLang = resolveSpeechLanguage(cleanText, lang);
 
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     try {
@@ -386,7 +443,7 @@ const fallbackSpeak = (text: string, lang: string = 'en', slow: boolean = false,
       };
       
       // Default lang
-      utterance.lang = langMap[lang] || lang;
+      utterance.lang = langMap[effectiveLang] || effectiveLang;
       
       // Ensure voices are loaded (Chrome sometimes loads asynchronously)
       let voices = window.speechSynthesis.getVoices();
@@ -442,10 +499,46 @@ const fallbackSpeak = (text: string, lang: string = 'en', slow: boolean = false,
 };
 
 const fishAudioCache = new Map<string, ArrayBuffer>();
+const grokAudioCache = new Map<string, ArrayBuffer>();
 
-export const speakWithFishAudio = async (text: string, lang: string = 'ru', slow: boolean = false): Promise<void> => {
+export const speakWithGrokAudio = async (text: string, lang: string = 'ru', slow: boolean = false): Promise<void> => {
   if (!text) return;
-  const cacheKey = `fish_${text}_${slow}`;
+  const cacheKey = `grok_${text}_${slow}`;
+
+  let arrayBuffer = grokAudioCache.get(cacheKey);
+
+  if (!arrayBuffer) {
+    const res = await fetch('/api/tts/grok', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ text, format: 'mp3', lang })
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Grok TTS failed (${res.status}): ${errText}`);
+    }
+
+    arrayBuffer = await res.arrayBuffer();
+    grokAudioCache.set(cacheKey, arrayBuffer);
+  }
+
+  const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
+  const audioUrl = URL.createObjectURL(blob);
+  const audio = new Audio(audioUrl);
+
+  if (slow) {
+    audio.playbackRate = 0.75;
+  }
+
+  await audio.play();
+};
+
+export const speakWithFishAudio = async (text: string, lang: string = 'ru', slow: boolean = false, model: string = 's2.1-pro-free'): Promise<void> => {
+  if (!text) return;
+  const cacheKey = `fish_${text}_${slow}_${model}`;
 
   let arrayBuffer = fishAudioCache.get(cacheKey);
 
@@ -455,7 +548,7 @@ export const speakWithFishAudio = async (text: string, lang: string = 'ru', slow
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ text, format: 'mp3', lang })
+      body: JSON.stringify({ text, format: 'mp3', lang, model })
     });
 
     if (!res.ok) {
@@ -493,7 +586,7 @@ export const speakText = async (
   lang: string = 'en', 
   slow: boolean = false, 
   voiceName: string = 'Kore', 
-  provider: 'fish' | 'gemini' | 'google' | 'yandex' | 'system' | 'sapi53' = 'gemini'
+  provider: 'fish' | 'fish-drama-3' | 'grok' | 'gemini' | 'google' | 'yandex' | 'system' | 'sapi53' = 'gemini'
 ) => {
   if (!text) return;
   const cleanText = text
@@ -505,26 +598,37 @@ export const speakText = async (
     .trim();
   if (!cleanText) return;
 
-  if (lang === 'tlh' || lang === 'klingon') {
+  const effectiveLang = resolveSpeechLanguage(cleanText, lang);
+
+  if (effectiveLang === 'tlh' || effectiveLang === 'klingon') {
     await playKlingonSpeech(cleanText, slow);
     return;
   }
 
-  if (provider === 'fish') {
+  if (provider === 'fish' || provider === 'fish-drama-3') {
     try {
-      await speakWithFishAudio(cleanText, lang, slow);
+      await speakWithFishAudio(cleanText, effectiveLang, slow, provider === 'fish-drama-3' ? 'drama-3' : 's2.1-pro-free');
       return;
     } catch (e) {
       console.warn("Fish Audio TTS failed, falling back to Gemini / System:", e);
     }
   }
 
+  if (provider === 'grok') {
+    try {
+      await speakWithGrokAudio(cleanText, effectiveLang, slow);
+      return;
+    } catch (e) {
+      console.warn("Grok TTS failed, falling back to Gemini / System:", e);
+    }
+  }
+
   if ((typeof navigator !== 'undefined' && !navigator.onLine) || provider === 'google' || provider === 'yandex' || provider === 'system' || provider === 'sapi53') {
-      fallbackSpeak(cleanText, lang, slow, (provider === 'google' || provider === 'yandex') ? provider : 'system');
+      fallbackSpeak(cleanText, effectiveLang, slow, (provider === 'google' || provider === 'yandex') ? provider : 'system');
       return;
   }
 
-  const cacheKey = `${cleanText}_${lang}_${slow}_${voiceName}`;
+  const cacheKey = `${cleanText}_${effectiveLang}_${slow}_${voiceName}`;
   if (audioCache.has(cacheKey)) return playWav(audioCache.get(cacheKey)!);
 
   try {
@@ -731,16 +835,60 @@ export const getFallbackExercise = (subjectId: string, type: Exercise['type'], s
     }
 
     if (subjectId === 'math') {
-        const a = Math.floor(Math.random() * 50) + 1;
-        const b = Math.floor(Math.random() * 50) + 1;
-        const op = Math.random() > 0.5 ? '+' : '-';
-        const res = op === '+' ? a + b : a - b;
-        return {
-            id: crypto.randomUUID(), type: 'translation', originalSentence: `${a} ${op} ${b} = ?`,
-            targetTranslation: res.toString(),
-            wordBank: [res.toString(), (res + 1).toString(), (res - 1).toString(), (res + 10).toString()].sort(() => Math.random() - 0.5),
-            isFallback: true
-        };
+        const mathType = Math.random();
+        if (mathType < 0.25) {
+            // 🔢 Арифметика (1-6 класс)
+            const a = Math.floor(Math.random() * 80) + 10;
+            const b = Math.floor(Math.random() * 80) + 10;
+            const op = Math.random() > 0.5 ? '+' : '-';
+            const res = op === '+' ? a + b : a - b;
+            return {
+                id: crypto.randomUUID(), type: 'translation', originalSentence: `🔢 [Арифметика] ${a} ${op} ${b} = ?`,
+                targetTranslation: res.toString(),
+                wordBank: [res.toString(), (res + 1).toString(), (res - 1).toString(), (res + 10).toString()].sort(() => Math.random() - 0.5),
+                isFallback: true
+            };
+        } else if (mathType < 0.5) {
+            // 📐 Алгебра (7-9 класс)
+            const x = Math.floor(Math.random() * 12) + 1;
+            const coef = Math.floor(Math.random() * 5) + 2;
+            const b = Math.floor(Math.random() * 20) + 1;
+            const rhs = coef * x + b;
+            return {
+                id: crypto.randomUUID(), type: 'translation', originalSentence: `📐 [Алгебра] Найдите x: ${coef}x + ${b} = ${rhs}`,
+                targetTranslation: x.toString(),
+                wordBank: [x.toString(), (x + 2).toString(), (x - 1).toString(), (x * 2).toString()].sort(() => Math.random() - 0.5),
+                isFallback: true
+            };
+        } else if (mathType < 0.75) {
+            // 🎓 10-11 класс • Логарифмы
+            const base = [2, 3, 5, 10][Math.floor(Math.random() * 4)];
+            const exp = Math.floor(Math.random() * 4) + 1;
+            const val = Math.pow(base, exp);
+            return {
+                id: crypto.randomUUID(), type: 'translation', originalSentence: `🎓 [10–11 класс • Логарифмы] log${base === 10 ? '' : `_` + base}(${val}) = ?`,
+                targetTranslation: exp.toString(),
+                wordBank: [exp.toString(), (exp + 1).toString(), (exp - 1).toString(), (exp * 2).toString()].sort(() => Math.random() - 0.5),
+                isFallback: true
+            };
+        } else {
+            // 🎓 10-11 класс • Тригонометрия
+            const trigQuestions = [
+                { q: "🎓 [10–11 класс • Тригонометрия] Чему равно sin²(x) + cos²(x)?", ans: "1" },
+                { q: "🎓 [10–11 класс • Тригонометрия] Чему равен sin(90°)?", ans: "1" },
+                { q: "🎓 [10–11 класс • Тригонометрия] Чему равен cos(0°)?", ans: "1" },
+                { q: "🎓 [10–11 класс • Тригонометрия] Чему равен sin(0°)?", ans: "0" },
+                { q: "🎓 [10–11 класс • Тригонометрия] Чему равен tg(45°)?", ans: "1" },
+                { q: "🎓 [10–11 класс • Алгебра] Чему равен √144?", ans: "12" }
+            ];
+            const item = trigQuestions[Math.floor(Math.random() * trigQuestions.length)];
+            return {
+                id: crypto.randomUUID(), type: 'translation', originalSentence: item.q,
+                targetTranslation: item.ans,
+                wordBank: [item.ans, "0", "2", "-1", "0.5"].filter(w => w !== item.ans).slice(0, 3).concat([item.ans]).sort(() => Math.random() - 0.5),
+                isFallback: true
+            };
+        }
     }
     if (subjectId === 'music') {
         const notes = [
@@ -823,6 +971,21 @@ export const getFallbackExercise = (subjectId: string, type: Exercise['type'], s
         { orig: "Узу табасаран чIал аьгъю апIураза", trans: "Я изучаю табасаранский язык", bank: ["Я", "изучаю", "табасаранский", "язык", "Мы"] },
         { orig: "Баб ва дад ккунраза", trans: "Я люблю маму и папу", bank: ["Я", "люблю", "маму", "и", "папу", "семью"] },
         { orig: "Чугъул сагъул кумек бадали", trans: "Большое спасибо за помощь", bank: ["Большое", "спасибо", "за", "помощь", "пожалуйста"] }
+      ],
+      eo: [
+        { orig: "Saluton! Kiel vi fartas?", trans: "Привет! Как ваши дела?", bank: ["Привет!", "Как", "ваши", "дела?", "Хорошо", "Спасибо"] },
+        { orig: "Mi lernas Esperanton — la plej facilan lingvon en la mondo", trans: "Я изучаю эсперанто — самый лёгкий язык в мире", bank: ["Я", "изучаю", "эсперанто", "—", "самый", "лёгкий", "язык", "в", "мире"] },
+        { orig: "Esperanto estas mirinde facila kaj logika lingvo", trans: "Эсперанто — удивительно лёгкий и логичный язык", bank: ["Эсперанто", "—", "удивительно", "лёгкий", "и", "логичный", "язык"] },
+        { orig: "Dankon al vi pro via granda helpo!", trans: "Большое спасибо вам за помощь!", bank: ["Большое", "спасибо", "вам", "за", "помощь!", "друг"] },
+        { orig: "La hundo kuras en la bela ĝardeno", trans: "Собака бежит в красивом саду", bank: ["Собака", "бежит", "в", "красивом", "саду", "кот"] },
+        { orig: "Bonan tagon, mia kara amiko!", trans: "Добрый день, мой дорогой друг!", bank: ["Добрый", "день,", "мой", "дорогой", "друг!", "Привет"] }
+      ],
+      id: [
+        { orig: "Halo! Apa kabar?", trans: "Привет! Как дела?", bank: ["Привет!", "Как", "дела?", "Хорошо", "Спасибо"] },
+        { orig: "Saya belajar bahasa Indonesia, bahasa yang sangat mudah", trans: "Я изучаю индонезийский язык, очень простой язык", bank: ["Я", "изучаю", "индонезийский", "язык,", "очень", "простой", "язык"] },
+        { orig: "Terima kasih banyak atas bantuannya", trans: "Большое спасибо за помощь", bank: ["Большое", "спасибо", "за", "помощь", "пожалуйста"] },
+        { orig: "Selamat pagi dan selamat belajar!", trans: "Доброе утро и приятной учёбы!", bank: ["Доброе", "утро", "и", "приятной", "учёбы!", "день"] },
+        { orig: "Kucing makan ikan di rumah", trans: "Кот ест рыбу дома", bank: ["Кот", "ест", "рыбу", "дома", "собака"] }
       ]
     };
 
@@ -963,6 +1126,17 @@ export const generateExercise = async (
 - targetTranslation: правильный перевод на ${translationLangName} (если оригинал на чувашском) ИЛИ на чувашский (если оригинал на ${translationLangName}).
 - wordBank: массив отдельных слов для составления targetTranslation плюс 3-4 похожих слова-дистрактора на том же языке.
 Код уникальности: ${nonce}.`;
+  } else if (subjectId === 'math') {
+    prompt = `Сгенерируй случайное математическое задание для школьного курса "Математика (1–11 классы)".
+Разделы на выбор:
+1) 🔢 Арифметика (числа, дроби, проценты, пропорции - 1–6 классы)
+2) 📐 Алгебра (уравнения, неравенства, степени, корни, функции - 7–9 классы)
+3) 🎓 10–11 Класс (логарифмы, тригонометрия, производные, начала анализа, задачи ЕГЭ - 10–11 классы)
+
+Оригинал ("originalSentence") — математическое выражение или условие задачи на языке ${translationLangName} (например: "🎓 [10–11 класс • Логарифмы] Чему равен log₂(32)?").
+Перевод ("targetTranslation") — правильный числовой ответ или формула.
+"wordBank" — массив, содержащий правильный ответ и 3 разумных числовых дистрактора.
+Код уникальности: ${nonce}.`;
   } else if (isLanguage) {
     prompt = `Сгенерируй СЛУЧАЙНОЕ, УНИКАЛЬНОЕ И РАЗНООБРАЗНОЕ упражнение типа "${type}" для изучения языка: "${targetSubject}". Тема: ${topic}.
 Язык изучаемого предмета: ${targetSubject}.
@@ -974,7 +1148,7 @@ export const generateExercise = async (
   }
 
   try {
-    const data = await callGeminiWithRetry(async () => {
+    const data = await fetchWithTimeout(callGeminiWithRetry(async () => {
       const ai = createGenAiClient();
       const response = await ai.models.generateContent({
         model: model,
@@ -994,7 +1168,7 @@ export const generateExercise = async (
         }
       });
       return JSON.parse(response.text || '{}');
-    });
+    }), 3200);
     const exercise: Exercise = { id: crypto.randomUUID(), ...data, type: type };
     // Save to session tracking
     shownExerciseSentences.add(exercise.originalSentence);
@@ -1002,7 +1176,8 @@ export const generateExercise = async (
     saveLessonToCache(subjectId, exercise);
     return exercise;
   } catch (error) {
-    return getFallbackExercise(subjectId, type, targetSubject);
+    console.warn("API exercise generation failed/timed out, smoothly returning offline exercise:", error);
+    return getFallbackExercise(subjectId, type, targetSubject, userLanguage);
   }
 };
 
@@ -1355,7 +1530,7 @@ export const startRoleplay = async (subject: string, subjectId: string): Promise
             : "Ordering coffee";
 
     try {
-        const firstMessage = await callGeminiWithRetry(async () => {
+        const firstMessage = await fetchWithTimeout(callGeminiWithRetry(async () => {
             const ai = createGenAiClient();
             const prompt = isChuvash
                 ? `Ты дружелюбный собеседник на ЧУВАШСКОМ ЯЗЫКЕ (Чӑвашла). Тема: "${scenario}". Поприветствуй собеседника на правильном чувашском языке (с буквами Ӑ, Ӗ, Ҫ, Ӳ), в скобках можно краткий перевод на русский. 1-2 коротких предложения. НИКАКОГО АНГЛИЙСКОГО!`
@@ -1365,7 +1540,7 @@ export const startRoleplay = async (subject: string, subjectId: string): Promise
             
             const response = await ai.models.generateContent({ model: MODEL_FREE, contents: prompt });
             return response.text?.trim() || (isChuvash ? "Ырӑ кун! Салам, юлташӑм. Эсир мӗнле пурӑнатӑр? (Добрый день! Привет, мой друг. Как поживаешь?)" : isArabic ? "مرحباً بك! أهلاً وسهلاً. كيف يمكنني مساعدتك اليوم؟ (1 / ١)" : "Hello!");
-        });
+        }), 3200);
         return {
             id: crypto.randomUUID(), type: 'roleplay', originalSentence: scenario, targetTranslation: "", wordBank: [],
             roleplayData: { topic: scenario, messages: [{ role: 'model', text: firstMessage }], userTurn: true }
@@ -1386,7 +1561,7 @@ export const replyToRoleplay = async (history: RoleplayMessage[], userMessageTex
     const isArabic = subject.toLowerCase().includes('араб') || subject.toLowerCase().includes('arabic');
     const isChuvash = subject.toLowerCase().includes('чуваш') || subject.toLowerCase().includes('chuvash');
     try {
-         const data = await callGeminiWithRetry(async () => {
+         const data = await fetchWithTimeout(callGeminiWithRetry(async () => {
              const ai = createGenAiClient();
              const context = history.map(m => `${m.role}: ${m.text}`).join('\n');
              const prompt = `${context}\nUser: ${userMessageText}
@@ -1409,20 +1584,123 @@ export const replyToRoleplay = async (history: RoleplayMessage[], userMessageTex
                  }
              });
              return JSON.parse(response.text || '{}');
-         });
+         }), 3500);
          return { role: 'model', text: data.text || (isArabic ? "أهلاً بك! هذا رائع." : "I see."), correction: data.correction };
     } catch (e) {
         return { role: 'model', text: isArabic ? "مرحباً بك! شكراً لك." : "Offline reply.", isFallback: true };
     }
 };
 
+const MINIMAL_PAIRS_BANK: Record<string, Array<{ wordA: string; wordB: string; diffRu: string; diffEn: string }>> = {
+    eo: [
+        { wordA: "ĉielo", wordB: "cielo", diffRu: "ĉielo [небо] (аффриката «ĉ» /ч/) против cielo [цель/мишень] (звук «c» /ц/).", diffEn: "ĉielo [sky] ('ĉ' /tʃ/) vs cielo [target/aim] ('c' /ts/)." },
+        { wordA: "ŝipo", wordB: "sipo", diffRu: "ŝipo [корабль] (шипящая «ŝ» /ш/) против sipo [сифон] (свистящая «s» /с/).", diffEn: "ŝipo [ship] ('ŝ' /ʃ/) vs sipo [siphon] ('s' /s/)." },
+        { wordA: "ĝardeno", wordB: "jardeno", diffRu: "ĝardeno [сад] (звонкая аффриката «ĝ» /дж/) против jardeno [ярды] (полугласный «j» /й/).", diffEn: "ĝardeno [garden] ('ĝ' /dʒ/) vs jardeno [yards] ('j' /j/)." },
+        { wordA: "peco", wordB: "peso", diffRu: "peco [кусок, часть] (звук «c» /ц/) против peso [вес] (звук «s» /с/).", diffEn: "peco [piece] ('c' /ts/) vs peso [weight] ('s' /s/)." },
+        { wordA: "koro", wordB: "korvo", diffRu: "koro [сердце] против korvo [ворон] — различие одного слога и согласного звука.", diffEn: "koro [heart] vs korvo [raven/crow]." },
+        { wordA: "jaro", wordB: "ĉaro", diffRu: "jaro [год] (звук «j» /й/) против ĉaro [повозка] (звук «ĉ» /ч/).", diffEn: "jaro [year] ('j') vs ĉaro [cart] ('ĉ')." },
+        { wordA: "lupo", wordB: "supo", diffRu: "lupo [волк] (звук «l») против supo [суп] (звук «s»).", diffEn: "lupo [wolf] ('l') vs supo [soup] ('s')." }
+    ],
+    id: [
+        { wordA: "apel", wordB: "apel", diffRu: "В индонезийском «apel» с гласной /e/ означает яблоко, а с редуцированной /ə/ — построение/перекличку.", diffEn: "In Indonesian, 'apel' with /e/ is apple, while with /ə/ is roll call/assembly." },
+        { wordA: "batu", wordB: "satu", diffRu: "batu [камень] (взрывной звонкий «b») против satu [один] (глухой щелевой «s»).", diffEn: "batu [stone] ('b') vs satu [one] ('s')." },
+        { wordA: "pola", wordB: "pula", diffRu: "pola [узор/модель] (гласный «o») против pula [тоже/также] (гласный «u»).", diffEn: "pola [pattern] ('o') vs pula [too/also] ('u')." },
+        { wordA: "mari", wordB: "mati", diffRu: "mari [давай/пойдём] (дрожащий «r») против mati [умереть/мёртвый] (взрывной «t»).", diffEn: "mari [come on] ('r') vs mati [dead] ('t')." },
+        { wordA: "baca", wordB: "kaca", diffRu: "baca [читать] (звонкий «b») против kaca [стекло/зеркало] (глухой «k»).", diffEn: "baca [read] ('b') vs kaca [glass] ('k')." },
+        { wordA: "kiri", wordB: "kira", diffRu: "kiri [лево] (конечный гласный «i») против kira [думать/считать] (гласный «a»).", diffEn: "kiri [left] ('i') vs kira [guess/think] ('a')." }
+    ],
+    es: [
+        { wordA: "pero", wordB: "perro", diffRu: "pero [но] (краткий альвеолярный удар «r») против perro [собака] (яркая раскатистая вибрация «rr»).", diffEn: "pero [but] (single flap 'r') vs perro [dog] (trilled 'rr')." },
+        { wordA: "caro", wordB: "carro", diffRu: "caro [дорогой] (одинарная «r») против carro [автомобиль/телега] (двойная «rr»).", diffEn: "caro [expensive] ('r') vs carro [car] ('rr')." },
+        { wordA: "casa", wordB: "caza", diffRu: "casa [дом] (альвеолярный [s]) против caza [охота] (межзубный [θ] в Испании).", diffEn: "casa [house] ('s') vs caza [hunt] ('z' /θ/ in Castilian)." },
+        { wordA: "peso", wordB: "beso", diffRu: "peso [вес] (глухой [p]) против beso [поцелуй] (звонкий [b]).", diffEn: "peso [weight] ('p') vs beso [kiss] ('b')." },
+        { wordA: "año", wordB: "amo", diffRu: "año [год] (палатальный носовой «ñ» /ɲ/) против amo [хозяин/люблю] (губной «m»).", diffEn: "año [year] ('ñ' /ɲ/) vs amo [master/I love] ('m')." },
+        { wordA: "cero", wordB: "cerro", diffRu: "cero [ноль] (краткая «r») против cerro [холм] (долгая раскатистая «rr»).", diffEn: "cero [zero] ('r') vs cerro [hill] ('rr')." }
+    ],
+    it: [
+        { wordA: "casa", wordB: "cassa", diffRu: "casa [дом] (одинарная согласная «s») против cassa [касса/ящик] (удвоенная напряженная «ss»).", diffEn: "casa [house] (single 's') vs cassa [cashbox/crate] (geminate 'ss')." },
+        { wordA: "note", wordB: "notte", diffRu: "note [ноты] (одинарный звук «t») против note [ночь] (удвоенный смычный звук «tt»).", diffEn: "note [musical notes] ('t') vs notte [night] ('tt')." },
+        { wordA: "caro", wordB: "carro", diffRu: "caro [дорогой] (одинарная «r») против carro [повозка] (двойная «rr»).", diffEn: "caro [dear/expensive] ('r') vs carro [cart] ('rr')." },
+        { wordA: "sete", wordB: "sette", diffRu: "sete [жажда] (одинарная «t») против sette [семь] (удвоенная «tt»).", diffEn: "sete [thirst] ('t') vs sette [seven] ('tt')." },
+        { wordA: "pala", wordB: "palla", diffRu: "pala [лопата] (одинарная «l») против palla [мяч] (удвоенная «ll»).", diffEn: "pala [shovel] ('l') vs palla [ball] ('ll')." },
+        { wordA: "rosa", wordB: "rossa", diffRu: "rosa [роза] (звонкая одиночная «s») против rossa [красная] (глухая удвоенная «ss»).", diffEn: "rosa [rose] (single 's') vs rossa [red fem.] (geminate 'ss')." }
+    ],
+    en: [
+        { wordA: "ship", wordB: "sheep", diffRu: "ship [корабль] (краткий расслабленный [ɪ]) против sheep [овца] (долгий напряжённый [iː]).", diffEn: "ship (short lax /ɪ/) vs sheep (long tense /iː/)." },
+        { wordA: "bit", wordB: "beat", diffRu: "bit [кусочек] (краткий звук [ɪ]) против beat [бить/ритм] (долгий гласный [iː]).", diffEn: "bit (short /ɪ/) vs beat (long /iː/)." },
+        { wordA: "bed", wordB: "bad", diffRu: "bed [кровать] (гласный среднего подъема [e]) против bad [плохой] (широкий открытый [æ]).", diffEn: "bed (mid /e/) vs bad (open /æ/)." },
+        { wordA: "tree", wordB: "three", diffRu: "tree [дерево] (взрывной альвеолярный [t]) против three [три] (глухой межзубный [θ]).", diffEn: "tree ('t') vs three ('th' /θ/)." },
+        { wordA: "live", wordB: "leave", diffRu: "live [жить] (краткий [ɪ]) против leave [уходить] (долгий [iː]).", diffEn: "live (/lɪv/) vs leave (/liːv/)." },
+        { wordA: "desk", wordB: "disk", diffRu: "desk [письменный стол] (гласный [e]) против disk [диск] (гласный [ɪ]).", diffEn: "desk (/e/) vs disk (/ɪ/)." }
+    ],
+    de: [
+        { wordA: "bitten", wordB: "bieten", diffRu: "bitten [просить] (краткий [ɪ]) против bieten [предлагать] (долгий [iː]).", diffEn: "bitten (short /ɪ/) vs bieten (long /iː/)." },
+        { wordA: "Stadt", wordB: "Staat", diffRu: "Stadt [город] (краткий открытый [a]) против Staat [государство] (долгий [aː]).", diffEn: "Stadt (short /a/) vs Staat (long /aː/)." },
+        { wordA: "Miete", wordB: "Mitte", diffRu: "Miete [аренда] (долгий [iː]) против Mitte [середина] (краткий [ɪ]).", diffEn: "Miete (long /iː/) vs Mitte (short /ɪ/)." },
+        { wordA: "Schule", wordB: "Schwüle", diffRu: "Schule [школа] (гласный [uː]) против Schwüle [духота] (умлаут [yː]).", diffEn: "Schule (/uː/) vs Schwüle (/yː/)." }
+    ],
+    fr: [
+        { wordA: "poisson", wordB: "poison", diffRu: "poisson [рыба] (глухой согласный [s]) против poison [яд] (звонкий согласный [z]).", diffEn: "poisson [fish] (voiceless /s/) vs poison [poison] (voiced /z/)." },
+        { wordA: "vin", wordB: "vent", diffRu: "vin [вино] (носовой гласный [ɛ̃]) против vent [ветер] (носовой гласный [ɑ̃]).", diffEn: "vin [wine] (nasal /ɛ̃/) vs vent [wind] (nasal /ɑ̃/)." },
+        { wordA: "dessus", wordB: "dessous", diffRu: "dessus [наверху/над] (передний огубленный [y]) против dessous [внизу/под] (задний огубленный [u]).", diffEn: "dessus [above] (/y/) vs dessous [below] (/u/)." },
+        { wordA: "rose", wordB: "rousse", diffRu: "rose [роза] (звонкий [z]) против rousse [рыжая] (глухой [s]).", diffEn: "rose (/z/) vs rousse (/s/)." }
+    ],
+    ru: [
+        { wordA: "лук", wordB: "луг", diffRu: "«лук» (овощ/оружие) и «луг» (поляна) — оглушение звонкого согласного на конце слова в русском языке.", diffEn: "«лук» (onion/bow) vs «луг» (meadow) — terminal devoicing in Russian." },
+        { wordA: "плод", wordB: "плот", diffRu: "«плод» (фрукт/результат) и «плот» (деревянный настил на воде) — парные по глухости-звонкости звуки.", diffEn: "«плод» (fruit) vs «плот» (raft) — voiced/voiceless pair." },
+        { wordA: "мел", wordB: "мель", diffRu: "«мел» (твердый звук «л») против «мель» (мягкий звук «ль»).", diffEn: "«мел» (chalk, hard 'l') vs «мель» (shoal, soft 'l')." },
+        { wordA: "быть", wordB: "бить", diffRu: "«быть» (твердый губной «б» и звук «ы») против «бить» (мягкий «б'» и гласный «и»).", diffEn: "«быть» (to be, hard 'b') vs «бить» (to hit, soft 'b')." }
+    ]
+};
+
+const getCuratedIllusion = (subject: string, subjectId: string): { soundText: string; optionA: string; optionB: string; correctOption: 'A' | 'B'; explanation: string } => {
+    const sId = (subjectId || '').toLowerCase();
+    const sName = (subject || '').toLowerCase();
+    
+    let langKey = 'en';
+    if (sId.includes('eo') || sName.includes('esperanto') || sName.includes('эсперанто')) langKey = 'eo';
+    else if (sId.includes('id') || sName.includes('indones') || sName.includes('индонез')) langKey = 'id';
+    else if (sId.includes('es') || sName.includes('span') || sName.includes('испан')) langKey = 'es';
+    else if (sId.includes('it') || sName.includes('ital') || sName.includes('италь')) langKey = 'it';
+    else if (sId.includes('de') || sName.includes('german') || sName.includes('немец')) langKey = 'de';
+    else if (sId.includes('fr') || sName.includes('french') || sName.includes('франц')) langKey = 'fr';
+    else if (sId.includes('ru') || sName.includes('russ') || sName.includes('рус')) langKey = 'ru';
+
+    const pairs = MINIMAL_PAIRS_BANK[langKey] || MINIMAL_PAIRS_BANK.es;
+    const item = pairs[Math.floor(Math.random() * pairs.length)];
+    
+    const chooseA = Math.random() < 0.5;
+    const swapOptions = Math.random() < 0.5;
+
+    const optA = swapOptions ? item.wordB : item.wordA;
+    const optB = swapOptions ? item.wordA : item.wordB;
+    const correctOption: 'A' | 'B' = chooseA ? 'A' : 'B';
+    const soundText = correctOption === 'A' ? optA : optB;
+
+    return {
+        soundText,
+        optionA: optA,
+        optionB: optB,
+        correctOption,
+        explanation: item.diffRu
+    };
+};
+
 export const generateIllusion = async (subject: string, subjectId: string): Promise<Exercise> => {
     try {
-        const data = await callGeminiWithRetry(async () => {
+        const data = await fetchWithTimeout(callGeminiWithRetry(async () => {
             const ai = createGenAiClient();
             const response = await ai.models.generateContent({
                 model: MODEL_FREE,
-                contents: `Generate a 'Minimal Pair' auditory exercise for learning ${subject}. Return JSON.`,
+                contents: `Generate a challenging Minimal Pair auditory discrimination exercise for a student learning ${subject} (code: ${subjectId}).
+IMPORTANT RULES:
+- NEVER use dummy, placeholder, or generic words like "Test", "Toast", "Sample", or "Hello".
+- Provide two real, authentic words in ${subject} that sound very similar (minimal pair, e.g. vowel length, single vs double consonant, or subtle phoneme contrast).
+- Choose one of them as 'soundText' (which the audio will pronounce).
+- Set 'optionA' and 'optionB' to the two words.
+- Set 'correctOption' to "A" or "B" depending on which one matches 'soundText'.
+- Provide a helpful, clear linguistic explanation in Russian highlighting the acoustic difference to listen for.
+Return valid JSON.`,
                 config: {
                     responseMimeType: "application/json",
                     responseSchema: {
@@ -1433,20 +1711,95 @@ export const generateIllusion = async (subject: string, subjectId: string): Prom
                 }
             });
             return JSON.parse(response.text || '{}');
-        });
-        return { id: crypto.randomUUID(), type: 'illusion', originalSentence: "Sound Illusion", targetTranslation: "", wordBank: [], illusionData: data };
+        }), 4500);
+
+        // Sanity check: strictly prevent any placeholder or dummy "Test"/"Toast" words
+        const badWordRegex = /^(test|toast|sample|hello|dummy)$/i;
+        if (!data || !data.soundText || badWordRegex.test(data.soundText) || badWordRegex.test(data.optionA) || badWordRegex.test(data.optionB)) {
+            const curated = getCuratedIllusion(subject, subjectId);
+            return { id: crypto.randomUUID(), type: 'illusion', originalSentence: "Sound Illusion", targetTranslation: "", wordBank: [], illusionData: curated };
+        }
+
+        const validCorrect: 'A' | 'B' = (data.correctOption === 'B' || data.correctOption === 'b') ? 'B' : 'A';
+        return { 
+            id: crypto.randomUUID(), 
+            type: 'illusion', 
+            originalSentence: "Sound Illusion", 
+            targetTranslation: "", 
+            wordBank: [], 
+            illusionData: {
+                soundText: data.soundText,
+                optionA: data.optionA,
+                optionB: data.optionB,
+                correctOption: validCorrect,
+                explanation: data.explanation || "Обратите внимание на тонкие различия в произношении звуков."
+            } 
+        };
     } catch (e) {
-        return { id: 'fb-ill', type: 'illusion', originalSentence: "Offline", targetTranslation: "", wordBank: [], isFallback: true, illusionData: { soundText: "Test", optionA: "Test", optionB: "Toast", correctOption: "A", explanation: "Offline." } };
+        const curated = getCuratedIllusion(subject, subjectId);
+        return { 
+            id: crypto.randomUUID(), 
+            type: 'illusion', 
+            originalSentence: "Sound Illusion", 
+            targetTranslation: "", 
+            wordBank: [], 
+            isFallback: true, 
+            illusionData: curated 
+        };
     }
 };
 
-export const generateDrawing = async (subject: string, subjectId: string, specificChar?: string): Promise<Exercise> => {
+export const getFallbackCharForLanguage = (subjectId: string): string => {
+  const sId = (subjectId || '').toLowerCase();
+  if (sId === 'eo') {
+    const chars = ['ĉ', 'ĝ', 'ĥ', 'ĵ', 'ŝ', 'ŭ', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'R', 'S', 'T', 'U', 'V', 'Z'];
+    return chars[Math.floor(Math.random() * chars.length)];
+  }
+  if (sId === 'id') {
+    const chars = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+    return chars[Math.floor(Math.random() * chars.length)];
+  }
+  if (sId === 'es') {
+    const chars = ['Ñ', 'Á', 'É', 'Í', 'Ó', 'Ú', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'L', 'M', 'N', 'O', 'P', 'R', 'S', 'T', 'U', 'V', 'Z'];
+    return chars[Math.floor(Math.random() * chars.length)];
+  }
+  if (sId === 'it') {
+    const chars = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'Z'];
+    return chars[Math.floor(Math.random() * chars.length)];
+  }
+  if (sId === 'de') {
+    const chars = ['Ä', 'Ö', 'Ü', 'ß', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'R', 'S', 'T', 'U', 'V', 'W', 'Z'];
+    return chars[Math.floor(Math.random() * chars.length)];
+  }
+  if (sId === 'fr') {
+    const chars = ['É', 'È', 'Ç', 'À', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'R', 'S', 'T', 'U', 'V', 'Z'];
+    return chars[Math.floor(Math.random() * chars.length)];
+  }
+  if (sId === 'cv' || sId === 'rf-chuvash') {
+    const chars = ['Ӑ', 'Ӗ', 'Ҫ', 'Ӳ', 'А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж', 'З', 'И', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ', 'Э', 'Ю', 'Я'];
+    return chars[Math.floor(Math.random() * chars.length)];
+  }
+  if (sId === 'ru' || sId === 'be' || sId === 'uk' || sId.startsWith('rf-')) {
+    const chars = ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж', 'З', 'И', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ', 'Э', 'Ю', 'Я'];
+    return chars[Math.floor(Math.random() * chars.length)];
+  }
+  if (sId === 'zh') return ['人', '口', '日', '月', '水', '火', '木', '金', '土'][Math.floor(Math.random() * 9)];
+  if (sId === 'ja') return ['あ', 'い', 'う', 'え', 'お', 'か', 'き', 'く', 'け', 'こ', 'さ', 'し', 'す', 'せ', 'そ'][Math.floor(Math.random() * 15)];
+  if (sId === 'ko') return ['ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅅ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'][Math.floor(Math.random() * 14)];
+  if (sId === 'ar') return ['ا', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي'][Math.floor(Math.random() * 28)];
+  if (sId === 'he') return ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 'י', 'כ', 'ל', 'מ', 'נ', 'ס', 'ע', 'פ', 'צ', 'ק', 'ר', 'ש', 'ת'][Math.floor(Math.random() * 22)];
+
+  const latinChars = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+  return latinChars[Math.floor(Math.random() * latinChars.length)];
+};
+
+export const generateDrawing = async (subject: string, subjectId: string, specificChar?: string, userLanguage: string = 'ru'): Promise<Exercise> => {
     try {
         const prompt = specificChar 
             ? `Generate a writing challenge for the character "${specificChar}" in ${subject}. Return JSON.`
-            : `Generate a writing challenge for a random letter in ${subject}. Return JSON.`;
+            : `Generate a writing challenge for a random letter or character in ${subject}. NEVER output generic test strings like "Test A" or "Test". Return JSON with "character" and "instruction".`;
 
-        const data = await callGeminiWithRetry(async () => {
+        const data = await fetchWithTimeout(callGeminiWithRetry(async () => {
             const ai = createGenAiClient();
             const response = await ai.models.generateContent({
                 model: MODEL_FREE,
@@ -1461,22 +1814,20 @@ export const generateDrawing = async (subject: string, subjectId: string, specif
                 }
             });
             return JSON.parse(response.text || '{}');
-        });
+        }), 3200);
         
         // Force the character if specificChar was requested (in case AI hallucinates)
         if (specificChar) data.character = specificChar;
 
+        // Strip any dummy "Test A" or "Test" hallucination
+        if (!data.character || /^test(\s*a)?$/i.test(data.character.trim())) {
+            data.character = getFallbackCharForLanguage(subjectId);
+            data.instruction = (userLanguage === 'ru' || subjectId === 'ru') ? `Нарисуйте символ: ${data.character}` : `Draw the character: ${data.character}`;
+        }
+
         return { id: crypto.randomUUID(), type: 'drawing', originalSentence: "Draw", targetTranslation: "", wordBank: [], drawingData: data };
     } catch (e) {
-        let fallbackChar = specificChar || "A";
-        if (!specificChar) {
-            if (subjectId === 'zh') fallbackChar = "人";
-            else if (subjectId === 'ja') fallbackChar = "あ";
-            else if (subjectId === 'ko') fallbackChar = "ㄱ";
-            else if (subjectId === 'ru') fallbackChar = "А";
-            else if (subjectId === 'ar') fallbackChar = "ا";
-            else if (subjectId === 'he') fallbackChar = "א";
-        }
+        const fallbackChar = specificChar || getFallbackCharForLanguage(subjectId);
         return { 
             id: 'fb-dr', 
             type: 'drawing', 

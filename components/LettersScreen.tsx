@@ -17,8 +17,10 @@ import { ArabicNumeralsConverter } from './ArabicNumeralsConverter';
 import { 
   isBetaWritingRestricted, 
   getBetaWritingRestrictedInfo, 
-  getDaysRemainingUntilUnlock 
+  getDaysRemainingUntilUnlock,
+  isWritingSectionLocked
 } from '../services/languageLockService';
+import { LanguageLockModal } from './LanguageLockModal';
 
 interface LettersScreenProps {
   currentCourse: Course;
@@ -69,9 +71,10 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
   const [hasTraced, setHasTraced] = useState<boolean>(false);
   const [showCoursePickerModal, setShowCoursePickerModal] = useState<boolean>(false);
   const [showBetaLockModal, setShowBetaLockModal] = useState<boolean>(false);
-  const [courseCategoryTab, setCourseCategoryTab] = useState<'cis' | 'russia' | 'world' | 'hardest' | 'beta'>('cis');
+  const [courseCategoryTab, setCourseCategoryTab] = useState<'cis' | 'russia' | 'world' | 'easiest' | 'hardest' | 'beta'>('cis');
 
-  const isBetaRestricted = isBetaWritingRestricted(currentCourse.id);
+  const isWritingLocked = isWritingSectionLocked(currentCourse.id);
+  const isBetaRestricted = isWritingLocked || isBetaWritingRestricted(currentCourse.id);
   const betaLockInfo = getBetaWritingRestrictedInfo(currentCourse.id);
   const daysUntilUnlock = getDaysRemainingUntilUnlock();
   
@@ -85,6 +88,13 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
   const [drawnPointsCount, setDrawnPointsCount] = useState<number>(0);
+  const [brushSize, setBrushSize] = useState<number>(user.handwritingBrushSize || 14);
+
+  useEffect(() => {
+    if (user.handwritingBrushSize) {
+      setBrushSize(user.handwritingBrushSize);
+    }
+  }, [user.handwritingBrushSize]);
 
   // When course changes, automatically reset category index and selected letter
   useEffect(() => {
@@ -113,6 +123,9 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
       lt: { ru: 'Литовский', en: 'Lithuanian', de: 'Litauisch', fr: 'Lituanien', es: 'Lituano', ja: 'リトアニア語', zh: '立陶宛语' },
       lv: { ru: 'Латышский', en: 'Latvian', de: 'Lettisch', fr: 'Letton', es: 'Letón', ja: 'ラトビア語', zh: '拉脱维亚语' },
       et: { ru: 'Эстонский', en: 'Estonian', de: 'Estnisch', fr: 'Estonien', es: 'Estonio', ja: 'エストニア語', zh: '爱沙尼亚语' },
+      eo: { ru: 'Эсперанто', en: 'Esperanto', de: 'Esperanto', fr: 'Espéranto', es: 'Esperanto', ja: 'エスペラント語', zh: '世界语' },
+      id: { ru: 'Индонезийский', en: 'Indonesian', de: 'Indonesisch', fr: 'Indonésien', es: 'Indonesio', ja: 'インドネシア語', zh: '印度尼西亚语' },
+      it: { ru: 'Итальянский', en: 'Italian', de: 'Italienisch', fr: 'Italien', es: 'Italiano', ja: 'イタリア語', zh: '意大利语' },
       en: { ru: 'Английский', en: 'English', de: 'Englisch', fr: 'Anglais', es: 'Inglés', ja: '英語', zh: '英语' },
       de: { ru: 'Немецкий', en: 'German', de: 'Deutsch', fr: 'Allemand', es: 'Alemán', ja: 'ドイツ語', zh: '德语' },
       fr: { ru: 'Французский', en: 'French', de: 'Französisch', fr: 'Français', es: 'Francés', ja: 'フランス語', zh: '法语' },
@@ -132,24 +145,48 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
 
   // Get Alphabet list for current course
   const alphabetCategories: AlphabetCategory[] = useMemo(() => {
+    let rawCats: AlphabetCategory[] = [];
     if (CIS_ALPHABET_DATA[currentCourse.id]) {
-      return CIS_ALPHABET_DATA[currentCourse.id];
+      rawCats = CIS_ALPHABET_DATA[currentCourse.id];
+    } else {
+      // Fallback for languages with standard Latin or generic alphabet
+      const defaultChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
+      rawCats = [{
+        title: 'Alphabet',
+        description: `${currentCourse.name} writing system`,
+        script: 'latin',
+        items: defaultChars.map(c => ({
+          char: c,
+          name: c.toLowerCase(),
+          sound: `[${c.toLowerCase()}]`,
+          word: c + '...',
+          translation: ''
+        }))
+      }];
     }
-    // Fallback for languages with standard Latin or generic alphabet
-    const defaultChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
-    return [{
-      title: 'Alphabet',
-      description: `${currentCourse.name} writing system`,
-      script: 'latin',
-      items: defaultChars.map(c => ({
-        char: c,
-        name: c.toLowerCase(),
-        sound: `[${c.toLowerCase()}]`,
-        word: c + '...',
-        translation: ''
-      }))
-    }];
-  }, [currentCourse.id, currentCourse.name]);
+
+    // Prepend a unified "🌟 Все символы и особенности" category at index 0 if multiple categories exist
+    if (rawCats.length > 1) {
+      const allItemsMap = new Map<string, AlphabetItem | string>();
+      rawCats.forEach(cat => {
+        cat.items.forEach(item => {
+          const key = typeof item === 'string' ? item : item.char;
+          if (!allItemsMap.has(key)) {
+            allItemsMap.set(key, item);
+          }
+        });
+      });
+      const unifiedCategory: AlphabetCategory = {
+        title: user.language === 'ru' ? '🌟 Все символы и особенности' : '🌟 All Symbols & Features',
+        description: user.language === 'ru' ? `Полный набор букв, диакритики и знаков (${allItemsMap.size})` : `Full character set & features (${allItemsMap.size})`,
+        script: rawCats[0]?.script || 'latin',
+        items: Array.from(allItemsMap.values())
+      };
+      return [unifiedCategory, ...rawCats];
+    }
+
+    return rawCats;
+  }, [currentCourse.id, currentCourse.name, user.language]);
 
   const currentCategory = alphabetCategories[selectedCategoryIdx] || alphabetCategories[0];
   
@@ -439,7 +476,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
     ctx.beginPath();
     ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
     ctx.strokeStyle = '#1CB0F6';
-    ctx.lineWidth = 14;
+    ctx.lineWidth = brushSize;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     triggerHapticFeedback('light');
@@ -632,6 +669,11 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
     );
   }, [allCourses]);
 
+  const easiestCoursesList = useMemo(() => {
+    const easyIds = ['eo', 'id', 'es', 'it'];
+    return allCourses.filter(c => easyIds.includes(c.id));
+  }, [allCourses]);
+
   const hardestCoursesList = useMemo(() => {
     const hardIds = ['tab', 'hu', 'eu', 'fi', 'nv', 'is', 'pl', 'ja', 'zh', 'ar', 'ko'];
     return allCourses.filter(c => hardIds.includes(c.id));
@@ -708,8 +750,8 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                 </button>
               </div>
 
-              {/* Tabs: CIS vs Russia Regions vs World vs Hardest vs Beta */}
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 rounded-2xl bg-gray-800/80 p-1 mb-4">
+              {/* Tabs: CIS vs Russia Regions vs World vs Easiest vs Hardest vs Beta */}
+              <div className="grid grid-cols-2 sm:grid-cols-6 gap-1.5 rounded-2xl bg-gray-800/80 p-1 mb-4">
                 <button
                   onClick={() => {
                     playSound('click');
@@ -746,6 +788,17 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                 <button
                   onClick={() => {
                     playSound('click');
+                    setCourseCategoryTab('easiest');
+                  }}
+                  className={`py-2 px-1 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all cursor-pointer text-center ${
+                    courseCategoryTab === 'easiest' ? 'bg-amber-500 text-black shadow-md font-bold' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  🏆 {user.language === 'ru' ? 'Лёгкие' : 'Easy'}
+                </button>
+                <button
+                  onClick={() => {
+                    playSound('click');
                     setCourseCategoryTab('hardest');
                   }}
                   className={`py-2 px-1 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all cursor-pointer text-center ${
@@ -776,6 +829,8 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                     ? russiaCoursesList
                     : courseCategoryTab === 'world'
                     ? worldCoursesList
+                    : courseCategoryTab === 'easiest'
+                    ? easiestCoursesList
                     : courseCategoryTab === 'hardest'
                     ? hardestCoursesList
                     : betaCoursesList
@@ -953,7 +1008,46 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                   </button>
                 </div>
 
-                <p className="text-xs text-gray-400 font-bold mt-4">
+                {/* Brush Size Adjustment Toolbar (+ and -) */}
+                <div className="mt-3 flex items-center justify-center space-x-2 bg-gray-800/90 border border-gray-700/80 px-3 py-1.5 rounded-2xl shadow-md">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playSound('click');
+                      const newSize = Math.max(4, brushSize - 2);
+                      setBrushSize(newSize);
+                      setUser(prev => ({ ...prev, handwritingBrushSize: newSize }));
+                    }}
+                    className="w-8 h-8 rounded-xl bg-gray-700 hover:bg-gray-600 text-white font-black text-lg flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
+                    title="Уменьшить толщину кисти (-)"
+                  >
+                    -
+                  </button>
+
+                  <div className="flex items-center space-x-2 px-2" title={`Размер кисти: ${brushSize}px`}>
+                    <div
+                      className="rounded-full bg-duo-blue shadow-sm transition-all"
+                      style={{ width: `${Math.min(18, Math.max(6, brushSize))}px`, height: `${Math.min(18, Math.max(6, brushSize))}px` }}
+                    />
+                    <span className="text-xs font-black font-mono text-duo-blue">{brushSize}px</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playSound('click');
+                      const newSize = Math.min(36, brushSize + 2);
+                      setBrushSize(newSize);
+                      setUser(prev => ({ ...prev, handwritingBrushSize: newSize }));
+                    }}
+                    className="w-8 h-8 rounded-xl bg-duo-blue hover:bg-[#1899D6] text-white font-black text-lg flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
+                    title="Увеличить толщину кисти (+)"
+                  >
+                    +
+                  </button>
+                </div>
+
+                <p className="text-xs text-gray-400 font-bold mt-2">
                   {user.language === 'ru' ? 'Проведите пальцем или мышкой по контуру буквы' : 'Trace along the character outline'}
                 </p>
               </div>
@@ -1230,12 +1324,30 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                 : `Get to know the ${getCourseDisplayName(currentCourse)} writing system`}
             </p>
 
-            {/* Beta Course Writing Restriction Notice Banner */}
-            {isBetaRestricted && betaLockInfo && (
+            {/* Writing Restriction Notice Banner */}
+            {isWritingLocked ? (
+              <div className="w-full max-w-lg mt-4 p-4 rounded-3xl bg-rose-950/40 border-2 border-rose-500/50 shadow-xl text-center space-y-2 animate-in fade-in">
+                <div className="flex items-center justify-center space-x-2 text-rose-300 font-black text-xs sm:text-sm uppercase tracking-wider">
+                  <span>🔒</span>
+                  <span>Раздел Письмо Будут доступ 1 ноября 2026 год</span>
+                </div>
+                <div className="text-xs font-bold text-gray-300">
+                  🔒 {currentCourse.localName || currentCourse.name} — в разработке • Доступно 1 ноября 2026 г.
+                </div>
+                <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
+                  <span className="px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[11px] font-black uppercase">
+                    🔒 1 нояб. 2026
+                  </span>
+                  <span className="text-amber-400 font-mono text-xs font-bold">
+                    Доступно через {daysUntilUnlock} {daysUntilUnlock === 1 ? 'день' : daysUntilUnlock < 5 ? 'дня' : 'дней'}
+                  </span>
+                </div>
+              </div>
+            ) : isBetaRestricted && betaLockInfo ? (
               <div className="w-full max-w-md mt-4 p-4 rounded-3xl bg-amber-950/40 border-2 border-amber-500/50 shadow-xl text-center space-y-2 animate-in fade-in">
                 <div className="flex items-center justify-center space-x-2 text-amber-300 font-black text-xs sm:text-sm uppercase tracking-wider">
                   <span>🔒</span>
-                  <span>Ограничение раздел письма будут доступ до 1 ноября 2026 год</span>
+                  <span>В разработке • Доступно 1 ноября 2026 г.</span>
                 </div>
                 <div className="flex items-center justify-center flex-wrap gap-2 text-xs font-bold text-gray-300">
                   <span className="text-white font-black">{currentCourse.localName || currentCourse.name}</span>
@@ -1251,19 +1363,26 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                   </div>
                 )}
               </div>
-            )}
+            ) : null}
 
             {/* Prominent "LEARN THE LETTERS" Button (Screenshot 1) */}
             <div className="w-full max-w-md mt-6">
               <button
                 onClick={() => startLetterLesson()}
                 className={`w-full py-4 px-8 active:border-b-0 active:translate-y-1 text-white font-black text-sm uppercase tracking-widest rounded-2xl border-b-4 shadow-xl flex items-center justify-center space-x-3 transition-all cursor-pointer group ${
-                  isBetaRestricted
+                  isWritingLocked
+                    ? 'bg-rose-700 hover:bg-rose-600 border-rose-900'
+                    : isBetaRestricted
                     ? 'bg-amber-600 hover:bg-amber-500 border-amber-800'
                     : 'bg-duo-blue hover:bg-[#1899D6] border-[#1899D6]'
                 }`}
               >
-                {isBetaRestricted ? (
+                {isWritingLocked ? (
+                  <>
+                    <span>🔒</span>
+                    <span>{user.language === 'ru' ? 'РАЗДЕЛ ПИСЬМО (ДО 1 НОЯБРЯ 2026)' : 'LETTERS LOCKED (UNTIL NOV 1, 2026)'}</span>
+                  </>
+                ) : isBetaRestricted ? (
                   <>
                     <span>🔒</span>
                     <span>{user.language === 'ru' ? 'ОГРАНИЧЕНИЕ ПИСЬМА (ДО 1 НОЯ 2026)' : 'WRITING RESTRICTED (UNTIL NOV 1 2026)'}</span>
@@ -1494,8 +1613,8 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                   </button>
                 </div>
 
-                {/* Tabs: CIS vs Russia Regions vs World vs Hardest vs Beta */}
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 rounded-2xl bg-gray-800/80 p-1 mb-4">
+                {/* Tabs: CIS vs Russia Regions vs World vs Easiest vs Hardest vs Beta */}
+                <div className="grid grid-cols-2 sm:grid-cols-6 gap-1.5 rounded-2xl bg-gray-800/80 p-1 mb-4">
                   <button
                     onClick={() => {
                       playSound('click');
@@ -1532,6 +1651,17 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                   <button
                     onClick={() => {
                       playSound('click');
+                      setCourseCategoryTab('easiest');
+                    }}
+                    className={`py-2 px-1 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all cursor-pointer text-center ${
+                      courseCategoryTab === 'easiest' ? 'bg-amber-500 text-black shadow-md font-bold' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    🏆 {user.language === 'ru' ? 'Лёгкие' : 'Easiest'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      playSound('click');
                       setCourseCategoryTab('hardest');
                     }}
                     className={`py-2 px-1 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all cursor-pointer text-center ${
@@ -1562,6 +1692,8 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                       ? russiaCoursesList
                       : courseCategoryTab === 'world'
                       ? worldCoursesList
+                      : courseCategoryTab === 'easiest'
+                      ? easiestCoursesList
                       : courseCategoryTab === 'hardest'
                       ? hardestCoursesList
                       : betaCoursesList
@@ -1598,12 +1730,17 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                             <span className="text-xs text-gray-400 font-bold block truncate">
                               {c.name}
                             </span>
-                            {isBeta && (
+                            {isWritingSectionLocked(c.id) ? (
+                              <div className="mt-1 text-[10px] text-rose-300 font-black bg-rose-500/20 border border-rose-500/40 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                <span>🔒</span>
+                                <span className="truncate">Раздел Письмо Будут доступ 1 ноября 2026 год • 🔒 1 нояб.</span>
+                              </div>
+                            ) : isBeta ? (
                               <div className="mt-1 text-[9px] text-amber-300 font-bold bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-md flex items-center gap-1">
                                 <span>🔒</span>
-                                <span className="truncate">Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год</span>
+                                <span className="truncate">В разработке • Доступно 1 ноября 2026 г.</span>
                               </div>
-                            )}
+                            ) : null}
                             {c.id === 'tlh' && (
                               <div className="mt-1 text-[9px] text-emerald-300 font-bold flex items-center gap-1">
                                 <span className="font-klingon text-xs">tlhIngan Hol</span>
@@ -1624,55 +1761,14 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
             </div>
           )}
 
-          {/* Beta Writing Lock Modal Dialog */}
-          {showBetaLockModal && betaLockInfo && (
-            <div className="fixed inset-0 z-[120] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
-              <div className="bg-[#182329] border-2 border-amber-500/60 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-4">
-                <div className="w-16 h-16 mx-auto rounded-2xl bg-amber-500/20 border-2 border-amber-500/40 flex items-center justify-center text-3xl shadow-inner">
-                  🔒
-                </div>
-                <div>
-                  <span className="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                    Бета Курс Язык
-                  </span>
-                  <h3 className="text-xl sm:text-2xl font-black text-white mt-3 leading-snug">
-                    Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год
-                  </h3>
-                  <p className="text-xs text-gray-300 font-medium mt-2 leading-relaxed">
-                    Курс <strong>{currentCourse.localName || currentCourse.name}</strong> (<span className="font-mono text-purple-300">{betaLockInfo.version}</span>). Интерактивный тренажёр прописей и написания букв для данного бета-курса будет открыт 1 ноября 2026 года (осталось {daysUntilUnlock} дн.).
-                  </p>
-                  <p className="text-xs text-amber-300 font-bold mt-1">
-                    Вы можете нажимать на буквы в таблице ниже, чтобы прослушивать их правильное произношение и примеры слов!
-                  </p>
-                </div>
-
-                {currentCourse.id === 'tlh' && (
-                  <div className="p-3 rounded-2xl bg-purple-950/40 border border-purple-500/40 text-left space-y-1">
-                    <div className="flex items-center justify-between text-xs font-bold text-purple-200">
-                      <span>Шрифт языка:</span>
-                      <span className="font-klingon text-base text-emerald-400">tlhIngan Hol</span>
-                    </div>
-                    <div className="text-[10px] text-gray-400">
-                      Шрифт Klingon Font активирован (fontomania.ru/17807-klingon.html)
-                    </div>
-                  </div>
-                )}
-
-                <div className="pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      playSound('click');
-                      setShowBetaLockModal(false);
-                    }}
-                    className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-black font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg transition-all cursor-pointer"
-                  >
-                    ПОНЯТНО (ПРОСМОТР БУКВ И ОЗВУЧКА)
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Writing Lock Modal Dialog */}
+          <LanguageLockModal
+            isOpen={showBetaLockModal}
+            onClose={() => setShowBetaLockModal(false)}
+            selectedLang={currentCourse.id}
+            userLanguage={user.language}
+            isLightMode={isLightMode}
+          />
 
         </div>
       )}

@@ -300,5 +300,174 @@ export const HARDEST_LANGUAGE_DETAILS: Record<string, LanguageDetailInfo> = {
     },
     difficultyRank: '#12',
     badge: '🎎 Иерархия вежливости'
+  },
+  eo: {
+    id: 'eo',
+    name: 'Esperanto',
+    localName: 'Эсперанто (Esperanto)',
+    family: 'Плановый международный язык (регулярная грамматика)',
+    speakers: '~2 000 000 человек (более 120 стран мира, сообщество эсперантистов)',
+    writingSystem: 'Латиница из 28 букв, 100% фонетический принцип: как пишется, так и читается (1 буква = 1 звук)',
+    grammarHighlights: [
+      { ru: 'Рекорд Гиннесса и ЮНЕСКО: ровно 16 фундаментальных правил без единого исключения (0 неправильных глаголов!).', en: 'Guinness & UNESCO record: exactly 16 fundamental rules with zero exceptions (0 irregular verbs!).' },
+      { ru: 'Чёткие окончания частей речи: существительные на -o (domo), прилагательные на -a (bela), наречия на -e (bone), глаголы на -i (lerni).', en: 'Strict part-of-speech endings: nouns end in -o, adjectives in -a, adverbs in -e, verb infinitives in -i.' },
+      { ru: 'Единые времена глаголов: настоящее -as (mi lernas), прошедшее -is (mi lernis), будущее -os (mi lernos) для всех лиц и чисел.', en: 'Universal verb tense suffixes: present -as, past -is, future -os across all persons and numbers.' },
+      { ru: 'Логический конструктор слов: зная 1 корень и суффиксы, можно образовать десятки слов (san-a = здоровый, mal-san-a = больной, mal-san-ul-ej-o = больница).', en: 'Transparent word building: prefixes and suffixes derive dozens of words from a single root effortlessly.' }
+    ],
+    samplePhrases: [
+      { orig: 'Saluton! Kiel vi fartas?', transRu: 'Привет! Как ваши дела?', transEn: 'Hello! How are you?', translit: 'Салютон! Киэль ви фартас?' },
+      { orig: 'Mi lernas Esperanton — la plej facilan lingvon en la mondo', transRu: 'Я изучаю эсперанто — самый лёгкий язык в мире', transEn: 'I am learning Esperanto — the easiest language in the world', translit: 'Ми лэрнас Эспэрантон — ла плэй фацилан лингвон эн ла мондо' },
+      { orig: 'Dankon al vi pro via granda helpo!', transRu: 'Большое спасибо вам за помощь!', transEn: 'Thank you very much for your help!', translit: 'Данкон ал ви про виа гранда хэльпо!' },
+      { orig: 'Esperanto estas mirinde facila kaj bela lingvo', transRu: 'Эсперанто — удивительно лёгкий и красивый язык', transEn: 'Esperanto is an amazingly easy and beautiful language', translit: 'Эспэранто эстас мириндэ фацила кай бэла лингво' }
+    ],
+    funFact: {
+      ru: 'Эсперанто официально признан ЮНЕСКО и занесен в лингвистические справочники как самый лёгкий язык для изучения на планете: он усваивается в 4–5 раз быстрее любого естественного языка благодаря полному отсутствию исключений!',
+      en: 'Esperanto is recognized by UNESCO and Guinness as the easiest language to learn in the world, requiring 4-5 times less study time than any natural language thanks to zero grammatical exceptions.'
+    },
+    difficultyRank: '№1 Самый лёгкий в мире',
+    badge: '🏆 Рекорд простоты: 0 исключений'
+  },
+  id: {
+    id: 'id',
+    name: 'Indonesian',
+    localName: 'Индонезийский (Bahasa Indonesia)',
+    family: 'Австронезийская семья (малайско-полинезийская ветвь)',
+    speakers: '~300 миллионов человек (Индонезия)',
+    writingSystem: 'Стандартная латиница (26 букв без диакритики), строгое фонетическое чтение',
+    grammarHighlights: [
+      { ru: 'Полное отсутствие спряжения глаголов: форма глагола никогда не меняется по лицам, числам или родам (saya makan - я ем, kamu makan - ты ешь, mereka makan - они едят).', en: 'No verb conjugations: verb forms never change for person, number, or gender.' },
+      { ru: 'Нет грамматических времён: вместо сложных окончаний используются простые слова-маркеры времени (kemarin - вчера, sudah - уже, besok - завтра).', en: 'No verb tenses: time is indicated using simple aspect words like yesterday, already, or tomorrow.' },
+      { ru: 'Нет грамматического рода и падежей: нет артиклей вроде the/a, нет окончаний родительного, дательного или винительного падежей.', en: 'No grammatical gender, no noun cases, and no articles.' },
+      { ru: 'Множественное число образуется простым удвоением слова: anak (ребёнок) -> anak-anak (дети), orang (человек) -> orang-orang (люди).', en: 'Plurals are formed by simple reduplication: anak (child) -> anak-anak (children).' }
+    ],
+    samplePhrases: [
+      { orig: 'Halo! Apa kabar?', transRu: 'Привет! Как дела?', transEn: 'Hello! How are you?', translit: 'Хало! Апа кабар?' },
+      { orig: 'Saya belajar bahasa Indonesia, bahasa yang sangat mudah', transRu: 'Я изучаю индонезийский язык, очень простой язык', transEn: 'I am learning Indonesian, a very easy language', translit: 'Сая бэладжар бахаса Индонезиа' },
+      { orig: 'Terima kasih banyak atas bantuannya', transRu: 'Большое спасибо за помощь', transEn: 'Thank you very much for help', translit: 'Терима касих баньяк' },
+      { orig: 'Selamat pagi dan selamat belajar!', transRu: 'Доброе утро и приятной учёбы!', transEn: 'Good morning and happy learning!', translit: 'Селамат паги дан селамат беладжар!' }
+    ],
+    funFact: {
+      ru: 'Среди всех естественных государственных языков мира индонезийский признан лингвистами самым простым для изучения: в нём нет родов, нет падежей, нет спряжений и используется простая латиница.',
+      en: 'Among all natural national languages, Indonesian is recognized by linguists as the simplest to learn: no grammatical gender, no cases, no verb conjugations, and standard Latin alphabet.'
+    },
+    difficultyRank: '№1 Естественный язык',
+    badge: '🌴 Самый лёгкий естественный язык'
+  },
+  es: {
+    id: 'es',
+    name: 'Spanish',
+    localName: 'Испанский (Español)',
+    family: 'Индоевропейская семья (романская группа)',
+    speakers: '~550 миллионов человек (20+ стран мира)',
+    writingSystem: 'Латиница с диакритикой ударений (á, é, í, ó, ú, ñ). 100% регулярные правила чтения',
+    grammarHighlights: [
+      { ru: 'Фонетическая орфография: почти все буквы читаются строго однозначно, ударения графически обозначены.', en: 'Phonetic spelling: predictable pronunciation and explicit accent marks.' },
+      { ru: 'Огромный интернациональный словарный запас: тысячи родственных слов с русским и английским языками.', en: 'Massive cognate vocabulary shared with international languages.' },
+      { ru: 'Логичные грамматические спряжения по 3 спряжениям (-ar, -er, -ir) с устойчивыми моделями.', en: 'Clean verb conjugation patterns based on three regular paradigms.' },
+      { ru: 'Отсутствие падежей существительных: связь слов передаётся простыми предлогами.', en: 'No nominal cases: syntax is handled via intuitive prepositions.' }
+    ],
+    samplePhrases: [
+      { orig: '¡Hola! ¿Cómo estás?', transRu: 'Привет! Как дела?', transEn: 'Hello! How are you?', translit: 'Ола! Комо эстас?' },
+      { orig: 'Aprender español es muy fácil y divertido', transRu: 'Учить испанский очень легко и весело', transEn: 'Learning Spanish is very easy and fun', translit: 'Апрәндэр эспаньоль эс муй фасиль и дивэртидо' },
+      { orig: 'Muchas gracias por su atención', transRu: 'Большое спасибо за ваше внимание', transEn: 'Thank you very much for your attention', translit: 'Мучас грасиас пор су атэнсьон' },
+      { orig: '¡Vamos a aprender juntos!', transRu: 'Пойдёмте учиться вместе!', transEn: 'Let us learn together!', translit: 'Вамос а апрәндэр хунтос!' }
+    ],
+    funFact: {
+      ru: 'Институт FSI (США) признал испанский одним из самых быстро осваиваемых языков в мире (категория I: всего ~600 часов для свободного владения).',
+      en: 'The US Foreign Service Institute categorizes Spanish in Category I — among the fastest languages to achieve professional proficiency (approx. 600 hours).'
+    },
+    difficultyRank: 'ТОП-3 Простых',
+    badge: '🇪🇸 Самый популярный лёгкий'
+  },
+  it: {
+    id: 'it',
+    name: 'Italian',
+    localName: 'Итальянский (Italiano)',
+    family: 'Индоевропейская семья (италийская / романская группа)',
+    speakers: '~85 миллионов человек (Италия, Швейцария, ЕС)',
+    writingSystem: 'Латиница из 21 буквы, максимально музыкальная и открытая фонетика',
+    grammarHighlights: [
+      { ru: 'Кристально чистые гласные: слова почти всегда заканчиваются на гласный звук, что дарит непревзойдённую мелодичность.', en: 'Pure vowel endings: words almost always terminate in open vowels for supreme musical clarity.' },
+      { ru: 'Прямолинейные правила произношения: буквы c и g читаются предсказуемо перед e/i и a/o/u.', en: 'Highly straightforward phonetics with clear consonant pairing rules.' },
+      { ru: 'Всего два грамматических рода: мужской (-o) и женский (-a), простое образование множественного (-i, -e).', en: 'Only two genders: masculine (-o) and feminine (-a), with transparent plurals (-i, -e).' },
+      { ru: 'Никаких падежей: прямой порядок слов в предложении облегчает свободное общение с первых дней.', en: 'No nominal cases: natural sentence order makes speaking effortless.' }
+    ],
+    samplePhrases: [
+      { orig: 'Ciao! Come va?', transRu: 'Привет! Как дела?', transEn: 'Hi! How is it going?', translit: 'Чао! Комэ ва?' },
+      { orig: 'Imparare l’italiano è un vero piacere', transRu: 'Учить итальянский — настоящее удовольствие', transEn: 'Learning Italian is a true pleasure', translit: 'Импарарэ литальяно э ун вэро пьячэрэ' },
+      { orig: 'Grazie mille per il tuo aiuto!', transRu: 'Тысяча благодарностей за твою помощь!', transEn: 'Thanks a million for your help!', translit: 'Грацие миллэ пэр иль туо айюто!' },
+      { orig: 'La vita è bella!', transRu: 'Жизнь прекрасна!', transEn: 'Life is beautiful!', translit: 'Ла вита э бэлла!' }
+    ],
+    funFact: {
+      ru: 'Итальянский считается самым благозвучным языком на Земле: соотношение гласных к согласным здесь близко к 1:1, благодаря чему слова льются гладко и запоминаются мгновенно.',
+      en: 'Italian is considered the most melodious language on Earth, with near 1:1 vowel-to-consonant distribution allowing words to flow musically and stick easily.'
+    },
+    difficultyRank: 'ТОП-4 Простых',
+    badge: '🇮🇹 Музыкальная простота'
+  },
+  ka: {
+    id: 'ka',
+    name: 'Georgian',
+    localName: 'Грузинский (ქართული ენა)',
+    family: 'Картвельская семья (южнокавказская группа)',
+    speakers: '~4 миллиона человек (Грузия, диаспора)',
+    writingSystem: 'Мхедрули (грузинский алфавит из 33 уникальных букв)',
+    grammarHighlights: [
+      { ru: 'Сложнейший государственный язык стран бывшего СССР и СНГ: полиперсональное спряжение глаголов (глагол согласуется одновременно с субъектом, прямым и косвенным объектами).', en: 'Most complex national language of the post-Soviet/CIS space: polypersonal agreement encoding subject, direct, and indirect objects simultaneously in the verb.' },
+      { ru: 'Эргативно-номинативный строй предложения: падеж подлежащего меняется в зависимости от временной серии глагола и его переходности.', en: 'Split-ergative syntax: noun case marking shifts depending on verb tense series and transitivity.' },
+      { ru: 'Экстремальные консонантные кластеры: скопления до 6-8 согласных подряд без единой гласной (например, «гвпртсквни» — ты ощипываешь нас).', en: 'Extreme consonant clusters: up to 6-8 consonants in a row without vowels (e.g. gvprtskvni).' },
+      { ru: '7 падежей существительных и развитая система пространственных превербов направления движения.', en: '7 noun cases and directional verbal preverbs.' }
+    ],
+    samplePhrases: [
+      { orig: 'გამარჯობა! როგორ ხარ?', transRu: 'Привет! Как дела?', transEn: 'Hello! How are you?', translit: 'Гамарджоба! Рогор хар?' },
+      { orig: 'მე ვსწავლობ ქართულ ენას — ურთულეს და ულამაზეს ენას', transRu: 'Я изучаю грузинский — сложнейший и прекраснейший язык', transEn: 'I am learning Georgian — a complex and beautiful language', translit: 'Ме всцавлоб картул энас' },
+      { orig: 'დიდი მადლობა დახმარებისთვის!', transRu: 'Большое спасибо за помощь!', transEn: 'Thank you very much for help!', translit: 'Диди мадлоба дахмаребиствис!' },
+      { orig: 'საქართველო ულამაზესი ქვეყანაა', transRu: 'Грузия — прекраснейшая страна', transEn: 'Georgia is a gorgeous country', translit: 'Сакартвело уламазеси квеканаа' }
+    ],
+    funFact: {
+      ru: 'Грузинский признан лингвистами самым грамматически сложным среди государственных языков стран бывшего СССР / СНГ: в одном слове-глаголе может одновременно выражаться субъект, объект, адресат и направленность действия!',
+      en: 'Georgian is ranked by linguists as the most grammatically intricate national language among post-Soviet states, encoding subject, object, and recipient in a single verb.'
+    },
+    difficultyRank: '№1 Гос. язык экс-СССР',
+    badge: '🇬🇪 Сложнейший гос. язык СНГ'
+  },
+  hy: {
+    id: 'hy',
+    name: 'Armenian',
+    localName: 'Армянский (Հայերեն)',
+    family: 'Индоевропейская семья (обособленная самостоятельная ветвь)',
+    speakers: '~7 миллионов человек (Армения, диаспора)',
+    writingSystem: 'Армянский алфавит из 39 букв (создан Месропом Маштоцем в 405 г.)',
+    grammarHighlights: [
+      { ru: 'Особая обособленная ветвь индоевропейской семьи: не имеет близких живых родственников среди других европейских ветвей.', en: 'Independent single-member branch of the Indo-European language family.' },
+      { ru: '7 падежей существительных с развитой агглютинативно-флективной системой склонения.', en: '7 noun cases with distinctive agglutinative nominal declension.' },
+      { ru: 'Уникальная древняя письменность: 39 самобытных букв, передающих тончайшие фонетические нюансы.', en: 'Unique ancient script of 39 letters created by Mesrop Mashtots in 405 AD.' }
+    ],
+    samplePhrases: [
+      { orig: 'Բարև ձեզ! Ինչպե՞ս եք:', transRu: 'Здравствуйте! Как вы поживаете?', transEn: 'Hello! How are you?', translit: 'Барев дзез! Инчпес ек?' },
+      { orig: 'Ես սովորում եմ հայերեն', transRu: 'Я изучаю армянский язык', transEn: 'I am learning Armenian', translit: 'Ес соворум ем хайерен' },
+      { orig: 'Շատ շնորհակալություն օգնության համար!', transRu: 'Большое спасибо за вашу помощь!', transEn: 'Thank you very much for your help!', translit: 'Шат шнорхакалутюн огнутян хамар!' }
+    ],
+    funFact: {
+      ru: 'Армянский алфавит Месропа Маштоца существует практически в неизменном виде с 405 года — более 1600 лет непрерывной письменной истории!',
+      en: 'The Armenian alphabet created by Mesrop Mashtots has endured virtually unchanged since 405 AD — over 1,600 years of literary history.'
+    },
+    difficultyRank: 'ТОП сложность Кавказа',
+    badge: '🇦🇲 1600 лет алфавита Маштоца'
   }
 };
+
+export const EASIEST_LANGUAGE_DETAILS: Record<string, LanguageDetailInfo> = {
+  eo: HARDEST_LANGUAGE_DETAILS.eo,
+  id: HARDEST_LANGUAGE_DETAILS.id,
+  es: HARDEST_LANGUAGE_DETAILS.es,
+  it: HARDEST_LANGUAGE_DETAILS.it
+};
+
+export const CIS_HARDEST_LANGUAGE_DETAILS: Record<string, LanguageDetailInfo> = {
+  tab: HARDEST_LANGUAGE_DETAILS.tab,
+  ka: HARDEST_LANGUAGE_DETAILS.ka,
+  cv: HARDEST_LANGUAGE_DETAILS.cv,
+  hy: HARDEST_LANGUAGE_DETAILS.hy,
+};
+

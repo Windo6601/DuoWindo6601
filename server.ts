@@ -9,7 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = 3000;
 
 app.use(cors());
 
@@ -46,11 +46,15 @@ app.use('/api/gemini-proxy', express.raw({ type: '*/*', limit: '50mb' }), async 
       : undefined;
 
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
     const googleRes = await fetch(targetUrl, {
       method: req.method,
       headers,
       body: bodyBuffer,
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
 
     res.status(googleRes.status);
     googleRes.headers.forEach((val, key) => {
@@ -86,13 +90,13 @@ app.post('/api/tts/fish', express.json(), async (req, res) => {
     return;
   }
 
-  const { text, format = 'mp3', reference_id, lang } = req.body || {};
+  const { text, format = 'mp3', reference_id, lang, model = 's2.1-pro-free' } = req.body || {};
   if (!text || typeof text !== 'string') {
     res.status(400).json({ error: { message: 'Text is required' } });
     return;
   }
 
-  const fishApiKey = process.env.FISH_AUDIO_API_KEY || 'sk-fish-4AQDQGlpw6stJiyg5JTTJabhtkgPpmwBTu_Gveo7DMI';
+  const fishApiKey = process.env.FISH_AUDIO_API_KEY || 'sk-fish-eeRI1K1-YeiTi0uS5E_FdXnZktU8SfQ42PYPIEUvTOY';
 
   try {
     const fishRes = await fetch('https://api.fish.audio/v1/tts', {
@@ -104,7 +108,7 @@ app.post('/api/tts/fish', express.json(), async (req, res) => {
       body: JSON.stringify({
         text,
         format: format || 'mp3',
-        model: 's2.1-pro-free',
+        model,
         normalize: true,
         latency: 'normal',
         top_p: 0.5,
@@ -127,6 +131,61 @@ app.post('/api/tts/fish', express.json(), async (req, res) => {
   } catch (err: any) {
     console.error('[Fish Audio Proxy Exception]:', err);
     res.status(502).json({ error: { message: err?.message || 'Fish Audio proxy failed' } });
+  }
+});
+
+// Grok TTS API Proxy
+app.post('/api/tts/grok', express.json(), async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+
+  const { text, format = 'mp3', lang } = req.body || {};
+  if (!text || typeof text !== 'string') {
+    res.status(400).json({ error: { message: 'Text is required' } });
+    return;
+  }
+
+  const xaiApiKey = process.env.XAI_API_KEY || 'xai-dOiFtHEvohXMcr3ifgfKB5S3tYNG9fl9jRyTdD1oe4C9SEpsyUEIqeNPbcMrssdWrHFzy0eL9h3NjbFm';
+
+  try {
+    console.log('[Grok TTS Proxy]: Generating speech for text:', text.substring(0, 50) + '...');
+    const xaiRes = await fetch('https://api.x.ai/v1/tts', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${xaiApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        text,
+        format: format || 'mp3',
+        voice_id: 'eve'
+      })
+    });
+
+    const requestId = xaiRes.headers.get('x-request-id') || xaiRes.headers.get('trace-id');
+    if (requestId) {
+      console.log('[Grok TTS Proxy]: Request ID:', requestId);
+    }
+
+    if (!xaiRes.ok) {
+      const errText = await xaiRes.text();
+      console.error('[Grok TTS Proxy Error]:', xaiRes.status, errText, 'Request ID:', requestId);
+      res.status(xaiRes.status).json({ error: { message: errText || 'x.AI API error', requestId } });
+      return;
+    }
+
+    res.setHeader('Content-Type', xaiRes.headers.get('content-type') || 'audio/mpeg');
+    const arrayBuffer = await xaiRes.arrayBuffer();
+    res.send(Buffer.from(arrayBuffer));
+  } catch (err: any) {
+    console.error('[Grok TTS Proxy Exception]:', err);
+    res.status(502).json({ error: { message: err?.message || 'Grok TTS proxy failed' } });
   }
 });
 
@@ -154,6 +213,27 @@ async function startServer() {
       appType: 'spa',
     });
     app.use(vite.middlewares);
+
+    // Ensure all GET navigation requests serve the Vite-transformed index.html
+    app.use(async (req, res, next) => {
+      if (req.method !== 'GET') {
+        return next();
+      }
+      try {
+        const indexPath = path.resolve(__dirname, 'index.html');
+        if (!fs.existsSync(indexPath)) {
+          return next();
+        }
+        let template = fs.readFileSync(indexPath, 'utf-8');
+        template = await vite.transformIndexHtml(req.originalUrl || req.url, template);
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+      } catch (e: any) {
+        if (vite.ssrFixStacktrace) {
+          vite.ssrFixStacktrace(e);
+        }
+        next(e);
+      }
+    });
   } else {
     const distPath = fs.existsSync(path.resolve(__dirname, 'dist'))
       ? path.resolve(__dirname, 'dist')

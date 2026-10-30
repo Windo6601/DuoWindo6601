@@ -1,5 +1,6 @@
 // Service managing language switching availability and countdown
-// Certain languages and country letter sections are locked for interface/speaker switching until November 1, 2026
+// 15 languages and writing section locked until November 1, 2026
+// 10 World languages (switching locked) + 5 CIS/World languages (Letters section locked)
 
 export interface LockedLanguageInfo {
   code: string;
@@ -134,13 +135,13 @@ export const LOCKED_CIS_LANGUAGES: Record<string, LockedLanguageInfo> = {
   },
   hy: {
     code: 'hy',
-    nameRu: 'Армения (Հайերեն)',
+    nameRu: 'Армения (Հայերեն)',
     nameEn: 'Armenia (Armenian)',
-    nativeName: 'Հайերեն',
+    nativeName: 'Հայերեն',
     flagCode: 'am',
     flagEmoji: '🇦🇲',
     category: 'cis',
-    fullLabelRu: 'Армения (Հайերեն) — Армения (армянский) 🇦🇲',
+    fullLabelRu: 'Армения (Հայերեն) — Армения (армянский) 🇦🇲',
     noteRu: 'Раздел Письмо Будут доступ 1 ноября 2026 год',
     noteEn: 'Section "Letters" will be available November 1, 2026'
   },
@@ -192,12 +193,22 @@ export const UNLOCK_DEADLINE_DATE = new Date(UNLOCK_DEADLINE_ISO);
 
 export const isLanguageSwitchLocked = (langCode: string | undefined | null): boolean => {
   if (!langCode) return false;
-  const normalized = langCode.toLowerCase().trim();
-  if (!Object.prototype.hasOwnProperty.call(LOCKED_SWITCH_LANGUAGES, normalized)) {
-    return false;
-  }
-  // Check if current date is before Nov 1, 2026
-  return Date.now() < UNLOCK_DEADLINE_DATE.getTime();
+  const now = new Date();
+  if (now >= UNLOCK_DEADLINE_DATE) return false;
+
+  const clean = langCode.toLowerCase().trim();
+  return Boolean(LOCKED_WORLD_LANGUAGES[clean] || LOCKED_CIS_LANGUAGES[clean]);
+};
+
+export const isWritingSectionLocked = (courseId: string | undefined | null): boolean => {
+  if (!courseId) return false;
+  const now = new Date();
+  if (now >= UNLOCK_DEADLINE_DATE) return false;
+
+  const clean = courseId.toLowerCase().trim();
+  // Specifically the 5 CIS / world writing-locked languages:
+  // kk (Kazakhstan), uz (Uzbekistan), hy (Armenia), ka (Georgia), az (Azerbaijan)
+  return Boolean(LOCKED_CIS_LANGUAGES[clean]);
 };
 
 export const getLanguageLockInfo = (langCode: string): LockedLanguageInfo | undefined => {
@@ -218,31 +229,34 @@ export const getCisLockedLanguages = (): LockedLanguageInfo[] => {
 };
 
 export const getDaysRemainingUntilUnlock = (): number => {
-  const diffMs = UNLOCK_DEADLINE_DATE.getTime() - Date.now();
-  if (diffMs <= 0) return 0;
-  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  const now = new Date();
+  const diff = UNLOCK_DEADLINE_DATE.getTime() - now.getTime();
+  if (diff <= 0) return 0;
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
 };
 
 export const getLanguageLockedToastMessage = (langCode: string, userLang: string = 'ru'): string => {
   const info = getLanguageLockInfo(langCode);
-  const name = userLang === 'ru' ? (info?.fullLabelRu || info?.nameRu || langCode) : (info?.nameEn || langCode);
-  
-  if (info?.category === 'cis') {
-    if (userLang === 'ru') {
-      return `🔒 ${info.fullLabelRu || name}. Раздел Письмо Будут доступ 1 ноября 2026 год.`;
-    }
-    return `🔒 Switching to "${name}" is locked. Section "Letters" will be available November 1, 2026.`;
+  const isRu = userLang === 'ru';
+  if (!info) {
+    return isRu 
+      ? '🔒 В разработке • Доступно 1 ноября 2026 г.' 
+      : '🔒 Under development • Available November 1, 2026';
   }
 
-  if (userLang === 'ru') {
-    return `🔒 Переключение на язык «${name}» временно недоступно. Будет доступно 1 ноября 2026 года.`;
+  if (info.category === 'cis' || info.noteRu) {
+    return isRu
+      ? `🔒 ${info.fullLabelRu || info.nameRu}. Раздел Письмо Будут доступ 1 ноября 2026 год • 🔒 1 нояб.`
+      : `🔒 ${info.nameEn}. Section "Letters" will be available November 1, 2026.`;
   }
-  return `🔒 Switching to "${name}" is currently locked. It will be available by November 1, 2026.`;
+
+  return isRu
+    ? `🔒 ${info.nameRu} (${info.nativeName}) — в разработке. Доступно 1 ноября 2026 г. • 🔒 1 нояб.`
+    : `🔒 ${info.nameEn} (${info.nativeName}) — under development. Available November 1, 2026.`;
 };
 
 // -----------------------------------------------------------------------------
-// BETA COURSES WRITING SECTION RESTRICTION: Available until / from November 1, 2026
-// Notice: «Ограничение раздел письма будут доступ до 1 ноября 2026 год»
+// BETA COURSES WRITING SECTION RESTRICTION: Available from November 1, 2026
 // -----------------------------------------------------------------------------
 
 export interface BetaCourseLockInfo {
@@ -258,20 +272,52 @@ export interface BetaCourseLockInfo {
 }
 
 export const BETA_WRITING_RESTRICTED_COURSES: Record<string, BetaCourseLockInfo> = {
-  eo: {
-    id: 'eo',
-    name: 'Esperanto',
-    localName: 'Эсперанто (Esperanto)',
-    version: 'v0.9.4 Beta',
-    restrictionNotice: 'Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год',
-    flagCode: 'eu'
+  kk: {
+    id: 'kk',
+    name: 'Kazakhstan (Kazakh)',
+    localName: 'Казахстан (Қазақша)',
+    version: 'Раздел Письмо',
+    restrictionNotice: 'Раздел Письмо Будут доступ 1 ноября 2026 год • 🔒 1 нояб.',
+    flagCode: 'kz'
+  },
+  uz: {
+    id: 'uz',
+    name: 'Uzbekistan (Uzbek)',
+    localName: 'Узбекистан (Oʻzbekcha)',
+    version: 'Раздел Письмо',
+    restrictionNotice: 'Раздел Письмо Будут доступ 1 ноября 2026 год • 🔒 1 нояб.',
+    flagCode: 'uz'
+  },
+  hy: {
+    id: 'hy',
+    name: 'Armenia (Armenian)',
+    localName: 'Армения (Հայերեն)',
+    version: 'Раздел Письмо',
+    restrictionNotice: 'Раздел Письмо Будут доступ 1 ноября 2026 год • 🔒 1 нояб.',
+    flagCode: 'am'
+  },
+  ka: {
+    id: 'ka',
+    name: 'Georgia (Georgian)',
+    localName: 'Грузия (ქართული)',
+    version: 'Раздел Письмо',
+    restrictionNotice: 'Раздел Письмо Будут доступ 1 ноября 2026 год • 🔒 1 нояб.',
+    flagCode: 'ge'
+  },
+  az: {
+    id: 'az',
+    name: 'Azerbaijan (Azerbaijani)',
+    localName: 'Азербайджан (Azərbaycan)',
+    version: 'Раздел Письмо',
+    restrictionNotice: 'Раздел Письмо Будут доступ 1 ноября 2026 год • 🔒 1 нояб.',
+    flagCode: 'az'
   },
   la: {
     id: 'la',
     name: 'Latin',
     localName: 'Латынь (Lingua Latina)',
     version: 'v0.8.2 Beta',
-    restrictionNotice: 'Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год',
+    restrictionNotice: 'В разработке • Доступно 1 ноября 2026 г.',
     flagCode: 'it'
   },
   sv: {
@@ -279,7 +325,7 @@ export const BETA_WRITING_RESTRICTED_COURSES: Record<string, BetaCourseLockInfo>
     name: 'Swedish',
     localName: 'Шведский (Svenska)',
     version: 'v0.9.1 Beta',
-    restrictionNotice: 'Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год',
+    restrictionNotice: 'В разработке • Доступно 1 ноября 2026 г.',
     flagCode: 'se'
   },
   no: {
@@ -287,7 +333,7 @@ export const BETA_WRITING_RESTRICTED_COURSES: Record<string, BetaCourseLockInfo>
     name: 'Norwegian',
     localName: 'Норвежский (Norsk)',
     version: 'v0.9.0 Beta',
-    restrictionNotice: 'Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год',
+    restrictionNotice: 'В разработке • Доступно 1 ноября 2026 г.',
     flagCode: 'no'
   },
   tt: {
@@ -295,7 +341,7 @@ export const BETA_WRITING_RESTRICTED_COURSES: Record<string, BetaCourseLockInfo>
     name: 'Tatar',
     localName: 'Татарский (Татар теле)',
     version: 'v0.9.5 Beta',
-    restrictionNotice: 'Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год',
+    restrictionNotice: 'В разработке • Доступно 1 ноября 2026 г.',
     flagCode: 'ru'
   },
   hv: {
@@ -303,7 +349,7 @@ export const BETA_WRITING_RESTRICTED_COURSES: Record<string, BetaCourseLockInfo>
     name: 'High Valyrian',
     localName: 'Высокий валирийский (Valyrio)',
     version: 'v0.8.0 Beta',
-    restrictionNotice: 'Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год',
+    restrictionNotice: 'В разработке • Доступно 1 ноября 2026 г.',
     flagCode: 'gb'
   },
   tlh: {
@@ -311,7 +357,7 @@ export const BETA_WRITING_RESTRICTED_COURSES: Record<string, BetaCourseLockInfo>
     name: 'Klingon',
     localName: 'Клингонский (tlhIngan Hol)',
     version: 'v0.7.3 Beta',
-    restrictionNotice: 'Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год',
+    restrictionNotice: 'В разработке • Доступно 1 ноября 2026 г.',
     flagCode: 'us',
     hasSpecialFont: true,
     specialFontName: 'Klingon',
@@ -322,14 +368,19 @@ export const BETA_WRITING_RESTRICTED_COURSES: Record<string, BetaCourseLockInfo>
     name: 'Yiddish',
     localName: 'Идиш (ייִдиш)',
     version: 'v0.9.2 Beta',
-    restrictionNotice: 'Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год',
+    restrictionNotice: 'В разработке • Доступно 1 ноября 2026 г.',
     flagCode: 'il'
   }
 };
 
 export const isBetaWritingRestricted = (courseId: string | undefined | null): boolean => {
   if (!courseId) return false;
-  return Object.prototype.hasOwnProperty.call(BETA_WRITING_RESTRICTED_COURSES, courseId.toLowerCase().trim());
+  const now = new Date();
+  if (now >= UNLOCK_DEADLINE_DATE) return false;
+
+  const clean = courseId.toLowerCase().trim();
+  if (isWritingSectionLocked(clean)) return true;
+  return Boolean(BETA_WRITING_RESTRICTED_COURSES[clean]);
 };
 
 export const getBetaWritingRestrictedInfo = (courseId: string | undefined | null): BetaCourseLockInfo | undefined => {

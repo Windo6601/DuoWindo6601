@@ -1,5 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { UserProgress, TextSizeType, AppFontFamily, AppThemeType } from '../types';
+import { StreakSaverCountdown } from './StreakSaverCountdown';
+import { NotificationManager } from './NotificationManager';
+import { LanguageLockModal } from './LanguageLockModal';
+import { getLanguageLockedToastMessage } from '../services/languageLockService';
+import { 
+  getDomainSimMode, 
+  setDomainSimMode, 
+  DomainSimMode, 
+  NEW_OFFICIAL_DOMAIN, 
+  NEW_OFFICIAL_URL, 
+  AI_STUDIO_URL, 
+  getTimeUntilRunAppClosure, 
+  formatTimeUntilClosure, 
+  isRunAppHost 
+} from '../services/domainMigrationService';
 
 interface SettingsAppearanceSectionProps {
   user: UserProgress;
@@ -18,6 +33,11 @@ export const SettingsAppearanceSection: React.FC<SettingsAppearanceSectionProps>
   isLightMode,
   STORAGE_KEY,
 }) => {
+  const [showLockModal, setShowLockModal] = useState<boolean>(false);
+  const [lockedLang, setLockedLang] = useState<string | null>(null);
+  const [simMode, setSimModeState] = useState<DomainSimMode>(() => getDomainSimMode());
+  const [copiedDomain, setCopiedDomain] = useState<boolean>(false);
+
   const currentSize: TextSizeType = user.textSize || 'normal';
   const currentFont: AppFontFamily = user.fontFamily || 'din';
   const currentTheme: AppThemeType = user.theme || (user.nightMode === false ? 'light' : 'dark');
@@ -273,6 +293,24 @@ export const SettingsAppearanceSection: React.FC<SettingsAppearanceSectionProps>
 
   return (
     <div className="space-y-6">
+      {/* STREAK SAVER COUNTDOWN TIMER WIDGET */}
+      <StreakSaverCountdown
+        user={user}
+        setUser={setUser}
+        isLightMode={isLightMode}
+        playSound={playSound}
+        setToast={setToast}
+      />
+
+      {/* NOTIFICATIONS & REMINDERS MANAGER (PC & MOBILE) */}
+      <NotificationManager
+        user={user}
+        setUser={setUser}
+        isLightMode={isLightMode}
+        playSound={playSound}
+        setToast={setToast}
+      />
+
       {/* 1. TEXT SIZE CONTROLS (РАЗМЕР ТЕКСТА) */}
       <div className="bg-duo-card border-2 border-indigo-500/50 rounded-3xl p-5 sm:p-6 shadow-xl text-left">
         <div className="flex items-start justify-between flex-wrap gap-2 mb-4">
@@ -343,6 +381,137 @@ export const SettingsAppearanceSection: React.FC<SettingsAppearanceSectionProps>
               ? '🦉 DuoWindo6601: Учите языки каждый день, открывайте уроки, повторяйте грамматику и достигайте вершин!'
               : '🦉 DuoWindo6601: Practice languages every day, explore regional dialects, review grammar, and reach your goals!'}
           </p>
+        </div>
+      </div>
+
+      {/* 1.5 BRUSH SIZE CONTROLS (ТОЛЩИНА КИСТИ ДЛЯ РАЗДЕЛА ПИСЬМА) */}
+      <div className="bg-duo-card border-2 border-emerald-500/50 rounded-3xl p-5 sm:p-6 shadow-xl text-left">
+        <div className="flex items-start justify-between flex-wrap gap-2 mb-4">
+          <div className="flex items-center space-x-3">
+            <span className="text-2xl p-2.5 bg-emerald-950/60 rounded-2xl border border-emerald-500/40 text-emerald-300">
+              🖌️
+            </span>
+            <div>
+              <div className="flex items-center space-x-2">
+                <h3 className="font-extrabold text-base sm:text-lg text-white uppercase tracking-wider">
+                  {isRu ? 'Размер кисти для раздела Письма' : 'Handwriting Brush Size'}
+                </h3>
+                <span className="bg-emerald-500/30 text-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-md border border-emerald-500/50 uppercase">
+                  Writing
+                </span>
+              </div>
+              <p className="text-xs text-gray-300 font-medium mt-1">
+                {isRu
+                  ? 'Настройка толщины линии пера/кисти для обводки букв, прописей и рисования (+ и -)'
+                  : 'Adjust pen and brush thickness for tracing and drawing canvas (+ and - controls)'}
+              </p>
+            </div>
+          </div>
+          <span className="text-xs font-black px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase font-mono">
+            {user.handwritingBrushSize || 14} px
+          </span>
+        </div>
+
+        {/* Plus / Minus Buttons with Live Visual Preview Circle */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-black/40 border border-emerald-500/30 mb-4">
+          {/* Controls */}
+          <div className="flex items-center space-x-3">
+            <button
+              type="button"
+              onClick={() => {
+                playSound('click');
+                const newSize = Math.max(4, (user.handwritingBrushSize || 14) - 2);
+                setUser(prev => {
+                  const updated = { ...prev, handwritingBrushSize: newSize };
+                  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); } catch {}
+                  return updated;
+                });
+                setToast(isRu ? `🖌️ Толщина кисти: ${newSize}px` : `🖌️ Brush size: ${newSize}px`);
+              }}
+              className="w-12 h-12 rounded-2xl bg-gray-800 hover:bg-gray-700 text-white font-black text-2xl flex items-center justify-center border-b-4 border-gray-900 active:border-b-0 active:translate-y-1 transition-all cursor-pointer shadow-md"
+              title="Уменьшить кисть (-)"
+            >
+              -
+            </button>
+
+            <div className="text-center px-4">
+              <span className="text-2xl font-black text-emerald-400 font-mono">
+                {user.handwritingBrushSize || 14} <span className="text-xs text-gray-400">px</span>
+              </span>
+              <span className="text-[10px] text-gray-400 block font-bold uppercase">
+                {isRu ? 'Толщина пера' : 'Thickness'}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                playSound('click');
+                const newSize = Math.min(36, (user.handwritingBrushSize || 14) + 2);
+                setUser(prev => {
+                  const updated = { ...prev, handwritingBrushSize: newSize };
+                  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); } catch {}
+                  return updated;
+                });
+                setToast(isRu ? `🖌️ Толщина кисти: ${newSize}px` : `🖌️ Brush size: ${newSize}px`);
+              }}
+              className="w-12 h-12 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-2xl flex items-center justify-center border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all cursor-pointer shadow-md"
+              title="Увеличить кисть (+)"
+            >
+              +
+            </button>
+          </div>
+
+          {/* Live Brush Thickness Indicator Circle */}
+          <div className="flex items-center space-x-3 bg-gray-900/90 px-4 py-3 rounded-2xl border border-gray-700">
+            <span className="text-xs text-gray-400 font-bold uppercase">
+              {isRu ? 'Предпросмотр кисти:' : 'Brush Preview:'}
+            </span>
+            <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center shadow-inner overflow-hidden">
+              <div
+                className="rounded-full bg-emerald-500 shadow-sm transition-all"
+                style={{
+                  width: `${user.handwritingBrushSize || 14}px`,
+                  height: `${user.handwritingBrushSize || 14}px`
+                }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Presets */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {[
+            { size: 6, labelRu: 'Тонкая (6px)', labelEn: 'Fine (6px)', icon: '✏️' },
+            { size: 12, labelRu: 'Стандартная (12px)', labelEn: 'Standard (12px)', icon: '🖊️' },
+            { size: 18, labelRu: 'Толстая (18px)', labelEn: 'Thick (18px)', icon: '🖌️' },
+            { size: 26, labelRu: 'Крупная (26px)', labelEn: 'Ultra (26px)', icon: '🖍️' }
+          ].map(preset => {
+            const isSelected = (user.handwritingBrushSize || 14) === preset.size;
+            return (
+              <button
+                key={preset.size}
+                type="button"
+                onClick={() => {
+                  playSound('select');
+                  setUser(prev => {
+                    const updated = { ...prev, handwritingBrushSize: preset.size };
+                    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); } catch {}
+                    return updated;
+                  });
+                  setToast(isRu ? `🖌️ Толщина кисти: ${preset.size}px` : `🖌️ Brush size: ${preset.size}px`);
+                }}
+                className={`py-2.5 px-3 rounded-xl border text-xs font-black transition-all flex items-center justify-center space-x-1.5 cursor-pointer active:scale-95 ${
+                  isSelected
+                    ? 'bg-emerald-600 text-white border-emerald-400 shadow-md ring-1 ring-emerald-400'
+                    : 'bg-black/40 text-gray-300 border-gray-700 hover:text-white hover:bg-gray-800'
+                }`}
+              >
+                <span>{preset.icon}</span>
+                <span>{isRu ? preset.labelRu : preset.labelEn}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -539,36 +708,36 @@ export const SettingsAppearanceSection: React.FC<SettingsAppearanceSectionProps>
             </div>
           </div>
           <span className="text-xs font-black px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 uppercase">
-            {user.voiceProvider === 'fish' ? 'Fish Audio 🐟' : user.voiceProvider === 'google' ? 'Google' : user.voiceProvider === 'yandex' ? 'Yandex' : user.voiceProvider === 'system' ? 'System' : user.voiceProvider === 'sapi53' ? 'Microsoft SAPI 5.3' : 'Gemini AI 🤖'}
+            {user.voiceProvider === 'fish' || user.voiceProvider === 'fish-drama-3' ? 'Fish Audio 🐟' : user.voiceProvider === 'google' ? 'Google' : user.voiceProvider === 'yandex' ? 'Yandex' : user.voiceProvider === 'system' ? 'System' : user.voiceProvider === 'sapi53' ? 'Microsoft SAPI 5.3' : 'Gemini AI 🤖'}
           </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
           {/* Fish Audio */}
           <button
             type="button"
             onClick={() => {
               playSound('select');
               setUser(prev => {
-                const updated: UserProgress = { ...prev, voiceProvider: 'fish' };
+                const updated: UserProgress = { ...prev, voiceProvider: 'fish-drama-3' };
                 try { localStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); } catch {}
                 return updated;
               });
-              setToast(isRu ? '🐟 Голосовой провайдер: Fish Audio (s2.1-pro-free)' : '🐟 Voice Provider: Fish Audio (s2.1-pro-free)');
+              setToast(isRu ? '🎭 Голосовой провайдер: Fish Audio (Drama 3)' : '🎭 Voice Provider: Fish Audio (Drama 3)');
             }}
             className={`p-3.5 rounded-2xl border-2 text-left transition-all flex flex-col justify-between cursor-pointer active:scale-95 ${
-              user.voiceProvider === 'fish'
-                ? 'bg-cyan-600/90 border-cyan-400 text-white shadow-lg ring-2 ring-cyan-400/50'
+              user.voiceProvider === 'fish-drama-3'
+                ? 'bg-amber-600/90 border-amber-400 text-white shadow-lg ring-2 ring-amber-400/50'
                 : 'bg-black/40 hover:bg-black/60 border-gray-700 text-gray-200'
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className="text-xl">🐟</span>
-              <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/40">s2.1-pro</span>
+              <span className="text-xl">🎭</span>
+              <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-500/40">Drama 3</span>
             </div>
             <div className="mt-2">
               <span className="font-extrabold text-xs block text-white">Fish Audio</span>
-              <span className="text-[10px] text-cyan-200 block font-medium">Нейросетевой голос</span>
+              <span className="text-[10px] text-amber-200 block font-medium">Новейшая Drama 3</span>
             </div>
           </button>
 
@@ -928,9 +1097,14 @@ export const SettingsAppearanceSection: React.FC<SettingsAppearanceSectionProps>
 
           {/* Locked World Languages */}
           <div>
-            <div className="text-xs font-extrabold text-amber-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <span>🔒</span>
-              <span>{isRu ? 'Заблокированные языки мира (10) — до 1 ноября 2026:' : 'Locked world languages (10) — until November 1, 2026:'}</span>
+            <div className="text-xs font-extrabold text-amber-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <span>🔒</span>
+                <span>{isRu ? 'Заблокированные языки мира (10) — до 1 ноября 2026:' : 'Locked world languages (10) — until November 1, 2026:'}</span>
+              </span>
+              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                🔒 1 нояб. 2026
+              </span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
               {[
@@ -950,15 +1124,18 @@ export const SettingsAppearanceSection: React.FC<SettingsAppearanceSectionProps>
                   type="button"
                   onClick={() => {
                     playSound('wrong');
-                    setToast(isRu ? `🔒 ${locked.name} заблокирован до 1 ноября 2026 года.` : `🔒 ${locked.name} is locked until November 1, 2026.`);
+                    setToast(getLanguageLockedToastMessage(locked.code, user.language));
+                    setLockedLang(locked.code);
+                    setShowLockModal(true);
                   }}
-                  className="p-2.5 rounded-2xl border border-amber-500/30 bg-amber-950/20 text-gray-400 hover:text-amber-200 hover:border-amber-500/60 transition-all flex items-center justify-between text-left cursor-pointer opacity-80"
+                  className="p-2.5 rounded-2xl border border-amber-500/30 bg-amber-950/20 text-gray-300 hover:text-amber-200 hover:border-amber-500/60 transition-all flex items-center justify-between text-left cursor-pointer active:scale-95"
+                  title={`${locked.name} — 🔒 1 нояб. 2026`}
                 >
                   <div className="flex items-center space-x-1.5 truncate">
                     <span className="text-base">{locked.flag}</span>
                     <span className="font-bold text-[11px] truncate">{locked.name}</span>
                   </div>
-                  <span className="text-[10px]">🔒</span>
+                  <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1 py-0.2 rounded font-black shrink-0">🔒 1 нояб.</span>
                 </button>
               ))}
             </div>
@@ -966,9 +1143,14 @@ export const SettingsAppearanceSection: React.FC<SettingsAppearanceSectionProps>
 
           {/* Locked CIS / World Languages for Letters Section */}
           <div>
-            <div className="text-xs font-extrabold text-rose-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <span>🏛️</span>
-              <span>{isRu ? 'Заблокированные языки мира (Раздел Письмо до 1 ноября 2026):' : 'Locked languages (Letters section until November 1, 2026):'}</span>
+            <div className="text-xs font-extrabold text-rose-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <span>🏛️</span>
+                <span>{isRu ? 'Заблокированные языки мира (Раздел Письмо до 1 ноября 2026):' : 'Locked languages (Letters section until November 1, 2026):'}</span>
+              </span>
+              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                5 языков
+              </span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
               {[
@@ -983,18 +1165,279 @@ export const SettingsAppearanceSection: React.FC<SettingsAppearanceSectionProps>
                   type="button"
                   onClick={() => {
                     playSound('wrong');
-                    setToast(isRu ? `🔒 ${cis.fullLabel}. Раздел Письмо Будут доступ 1 ноября 2026 год.` : `🔒 ${cis.fullLabel}. Section "Letters" will be available November 1, 2026.`);
+                    setToast(getLanguageLockedToastMessage(cis.code, user.language));
+                    setLockedLang(cis.code);
+                    setShowLockModal(true);
                   }}
-                  className="p-2.5 rounded-2xl border border-rose-500/30 bg-rose-950/20 text-gray-300 hover:text-rose-200 hover:border-rose-500/60 transition-all flex items-center justify-between text-left cursor-pointer text-[11px] font-bold"
+                  className="p-3 rounded-2xl border border-rose-500/30 bg-rose-950/20 text-gray-200 hover:text-rose-200 hover:border-rose-500/60 transition-all flex items-center justify-between text-left cursor-pointer text-[11px] font-bold active:scale-95"
+                  title={`${cis.fullLabel} — Раздел Письмо Будут доступ 1 ноября 2026 год`}
                 >
                   <span className="truncate pr-1">{cis.fullLabel}</span>
-                  <span className="shrink-0 text-[10px] bg-rose-500/30 text-rose-300 px-1.5 py-0.5 rounded font-black">🔒</span>
+                  <span className="shrink-0 text-[10px] bg-rose-500/30 text-rose-300 border border-rose-500/40 px-1.5 py-0.5 rounded font-black">🔒 1 нояб.</span>
                 </button>
               ))}
             </div>
           </div>
         </div>
       </div>
+
+      {/* DOMAIN MIGRATION & US-EAST1.RUN.APP RESTRICTION SECTION */}
+      <div className={`p-6 rounded-[2.5rem] border-2 shadow-xl ${
+        isLightMode 
+          ? 'bg-white border-slate-200' 
+          : 'bg-duo-card border-gray-800'
+      }`}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center text-xl font-black">
+              🌐
+            </div>
+            <div>
+              <h3 className={`font-black text-base uppercase tracking-wider ${isLightMode ? 'text-slate-900' : 'text-white'}`}>
+                {isRu ? 'Адреса и ограничение us-east1.run.app' : 'Domains & us-east1.run.app Restriction'}
+              </h3>
+              <p className="text-xs text-amber-400 font-bold">
+                {isRu ? '1 ноября 2026 год: прекращение работы us-east1.run.app ➔ Переход на ai.studio' : 'Nov 1, 2026: us-east1.run.app shutdown ➔ Migrated to ai.studio'}
+              </p>
+            </div>
+          </div>
+
+          <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-full bg-red-500/20 text-red-300 border border-red-500/40">
+            🔒 1 нояб. 2026
+          </span>
+        </div>
+
+        {/* Current status display */}
+        <div className="space-y-3 mb-5">
+          <div className="p-4 rounded-2xl bg-[#0e1017] border border-gray-800 text-xs sm:text-sm space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-gray-400 flex items-center gap-1.5">
+                <span>🛑</span>
+                <span className="font-mono text-gray-300">us-east1.run.app</span>
+              </span>
+              <span className="text-red-400 font-black text-[11px] bg-red-950/80 px-2.5 py-0.5 rounded border border-red-500/30 uppercase">
+                {isRu ? 'Прекращение 1 ноября 2026 г.' : 'Closed Nov 1, 2026'}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-gray-400 flex items-center gap-1.5">
+                <span>🚀</span>
+                <span className="font-mono text-emerald-400 font-black">{NEW_OFFICIAL_DOMAIN}</span>
+              </span>
+              <span className="text-emerald-300 font-black text-[11px] bg-emerald-950/80 px-2.5 py-0.5 rounded border border-emerald-500/30 uppercase">
+                {isRu ? 'Официальный доступ' : 'Active Domain'}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-gray-400 flex items-center gap-1.5">
+                <span>🌐</span>
+                <span className="font-mono text-sky-400 font-black">ai.studio</span>
+              </span>
+              <span className="text-sky-300 font-black text-[11px] bg-sky-950/80 px-2.5 py-0.5 rounded border border-sky-500/30 uppercase">
+                {isRu ? 'Платформа Google AI' : 'Google AI Platform'}
+              </span>
+            </div>
+          </div>
+
+          <div className="p-3 bg-amber-950/30 border border-amber-500/40 rounded-xl text-xs text-amber-200 flex items-center justify-between">
+            <span className="font-bold">
+              ⏳ {isRu ? 'Обратный отсчёт до закрытия us-east1.run.app:' : 'Countdown to us-east1.run.app closure:'}
+            </span>
+            <span className="font-mono font-black text-amber-300">
+              {formatTimeUntilClosure(getTimeUntilRunAppClosure(), isRu)}
+            </span>
+          </div>
+        </div>
+
+        {/* Quick Links & Copy */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-5">
+          <a
+            href={NEW_OFFICIAL_URL}
+            target="_top"
+            rel="noopener noreferrer"
+            className="py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider rounded-xl border-b-2 border-emerald-800 active:translate-y-0.5 transition-all text-center flex items-center justify-center space-x-1.5 shadow"
+          >
+            <span>🚀</span>
+            <span>{isRu ? 'Перейти на duowindo6601.ai.studio' : 'Open duowindo6601.ai.studio'}</span>
+          </a>
+
+          <button
+            type="button"
+            onClick={() => {
+              playSound('click');
+              navigator.clipboard?.writeText(NEW_OFFICIAL_URL).then(() => {
+                setCopiedDomain(true);
+                setToast(isRu ? '📋 Адрес duowindo6601.ai.studio скопирован!' : '📋 Copied!');
+                setTimeout(() => setCopiedDomain(false), 2500);
+              });
+            }}
+            className="py-3 px-4 bg-gray-800 hover:bg-gray-700 text-gray-200 font-black text-xs uppercase tracking-wider rounded-xl border border-gray-700 transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+          >
+            <span>{copiedDomain ? '✅' : '📋'}</span>
+            <span>{copiedDomain ? (isRu ? 'Скопировано!' : 'Copied!') : (isRu ? 'Скопировать ссылку' : 'Copy Link')}</span>
+          </button>
+        </div>
+
+        {/* SIMULATOR SWITCHER FOR TESTING */}
+        <div className="p-4 bg-black/40 border border-gray-800 rounded-2xl">
+          <div className="flex items-center justify-between text-xs mb-2.5">
+            <span className="font-black text-gray-300 flex items-center gap-1.5">
+              <span>🧪</span>
+              <span>{isRu ? 'Симулятор режима домена (для проверки):' : 'Domain Simulator (for testing):'}</span>
+            </span>
+            <span className="font-mono text-[11px] text-amber-400 font-bold">
+              {simMode}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] font-black uppercase">
+            <button
+              type="button"
+              onClick={() => {
+                playSound('click');
+                setSimModeState('auto');
+                setDomainSimMode('auto');
+                setToast(isRu ? '⚙️ Режим: Авто (по текущей дате)' : '⚙️ Mode: Auto');
+              }}
+              className={`p-2.5 rounded-xl border transition-all text-center ${
+                simMode === 'auto'
+                  ? 'bg-blue-600 text-white border-blue-400 shadow-md'
+                  : 'bg-gray-800/80 text-gray-400 hover:text-white border-gray-700'
+              }`}
+            >
+              {isRu ? '1. Авто' : '1. Auto'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                playSound('click');
+                setSimModeState('sim_warning');
+                setDomainSimMode('sim_warning');
+                setToast(isRu ? '⚠️ Режим: Предупреждение (до 1 нояб.)' : '⚠️ Mode: Warning Banner');
+              }}
+              className={`p-2.5 rounded-xl border transition-all text-center ${
+                simMode === 'sim_warning'
+                  ? 'bg-amber-600 text-white border-amber-400 shadow-md'
+                  : 'bg-gray-800/80 text-gray-400 hover:text-white border-gray-700'
+              }`}
+            >
+              {isRu ? '2. Предупреждение' : '2. Warning'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                playSound('click');
+                setSimModeState('sim_blocked');
+                setDomainSimMode('sim_blocked');
+                setToast(isRu ? '🛑 Режим: Блокировка us-east1 (после 1 нояб.)' : '🛑 Mode: Blocked Screen');
+              }}
+              className={`p-2.5 rounded-xl border transition-all text-center ${
+                simMode === 'sim_blocked'
+                  ? 'bg-red-600 text-white border-red-400 shadow-md'
+                  : 'bg-gray-800/80 text-gray-400 hover:text-white border-gray-700'
+              }`}
+            >
+              {isRu ? '3. Блок us-east1' : '3. Block us-east1'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                playSound('click');
+                setSimModeState('sim_official');
+                setDomainSimMode('sim_official');
+                setToast(isRu ? '✅ Режим: ai.studio (Официальный)' : '✅ Mode: Official Domain');
+              }}
+              className={`p-2.5 rounded-xl border transition-all text-center ${
+                simMode === 'sim_official'
+                  ? 'bg-emerald-600 text-white border-emerald-400 shadow-md'
+                  : 'bg-gray-800/80 text-gray-400 hover:text-white border-gray-700'
+              }`}
+            >
+              {isRu ? '4. ai.studio' : '4. ai.studio'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 5. WINDOWS WALLPAPERS EXPLANATION (ОБЪЯСНЕНИЕ ОБОЕВ WINDOWS) */}
+      <div className={`p-5 rounded-3xl border-2 transition-all text-left ${isLightMode ? 'bg-white border-blue-200 shadow-md' : 'bg-gray-850/80 border-blue-900/30 shadow-xl'}`}>
+        <div className="flex items-center space-x-3 mb-4">
+          <span className="text-2xl p-2.5 bg-blue-950/60 rounded-2xl border border-blue-500/40 text-blue-300 shadow-inner">
+            🖼️
+          </span>
+          <div>
+            <div className="flex items-center space-x-2">
+              <h3 className="font-extrabold text-base sm:text-lg text-white uppercase tracking-wider">
+                {isRu ? 'Обои WINDOWS: Объяснение' : 'Windows Wallpapers: Explained'}
+              </h3>
+              <span className="bg-blue-500/30 text-blue-300 text-[10px] font-black px-2 py-0.5 rounded-md border border-blue-500/50 uppercase">
+                Design Philosophy
+              </span>
+            </div>
+            <p className="text-xs text-gray-400 font-medium mt-1">
+              {isRu ? 'Почему DuoWindo6601 использует классические обои и эстетику Windows' : 'Why DuoWindo6601 embraces classic Windows wallpapers and aesthetics'}
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl bg-black/40 border border-blue-500/20 leading-relaxed">
+            <p className="text-xs sm:text-sm text-gray-200 font-medium">
+              {isRu 
+                ? 'DuoWindo6601 — это не просто приложение для изучения языков, это портал в эпоху "золотого века" персональных компьютеров. Мы используем легендарные обои, такие как Bliss (XP), Harmony и классические интерфейсы, чтобы создать чувство стабильности, продуктивности и ностальгического уюта.' 
+                : 'DuoWindo6601 is more than a language app; it\'s a portal to the "Golden Age" of personal computing. We use legendary wallpapers like Bliss (XP), Harmony, and classic UI patterns to foster a sense of stability, productivity, and nostalgic comfort.'}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="p-3 rounded-2xl bg-blue-900/20 border border-blue-800/40 flex items-start space-x-3">
+              <span className="text-xl mt-1">🏞️</span>
+              <div>
+                <h5 className="text-xs font-black text-white uppercase">{isRu ? 'Легендарная "Безмятежность"' : 'The Bliss Legacy'}</h5>
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  {isRu ? 'Холмы Сономы — самые узнаваемые обои в истории. Они символизируют чистоту и бесконечные возможности обучения.' : 'The rolling hills of Sonoma — the most recognized photo ever. It symbolizes clarity and infinite learning possibilities.'}
+                </p>
+              </div>
+            </div>
+            <div className="p-3 rounded-2xl bg-indigo-900/20 border border-indigo-800/40 flex items-start space-x-3">
+              <span className="text-xl mt-1">💻</span>
+              <div>
+                <h5 className="text-xs font-black text-white uppercase">{isRu ? 'Стандарт DuoWindo' : 'The DuoWindo Standard'}</h5>
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  {isRu ? 'Использование Windows-эстетики помогает мозгу настроиться на серьезную работу, при этом сохраняя игровую механику.' : 'Using Windows aesthetics primes the brain for focused work while maintaining fun gamified mechanics.'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              playSound('click');
+              setToast(isRu ? '🎨 Обои Windows — это символ надежности!' : '🎨 Windows wallpapers symbolize reliability!');
+            }}
+            className="w-full py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black text-xs uppercase tracking-widest shadow-lg hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
+          >
+            {isRu ? 'Понимаю и принимаю дизайн' : 'I Understand & Love the Design'}
+          </button>
+        </div>
+      </div>
+
+      <LanguageLockModal
+        isOpen={showLockModal}
+        onClose={() => {
+          setShowLockModal(false);
+          setLockedLang(null);
+        }}
+        selectedLang={lockedLang}
+        userLanguage={user.language}
+        isLightMode={isLightMode}
+      />
     </div>
   );
 };

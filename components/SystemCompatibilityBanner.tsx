@@ -19,8 +19,9 @@ export const SystemCompatibilityBanner: React.FC<SystemCompatibilityBannerProps>
     return null;
   }
 
-  const isCritical = systemInfo.warningType === 'windows_xp_vista' || systemInfo.warningType === 'old_android';
+  const isCritical = systemInfo.warningType === 'windows_xp_vista' || systemInfo.warningType === 'old_android' || systemInfo.warningType === 'old_ios';
   const isAndroid = systemInfo.warningType === 'old_android';
+  const isIOS = systemInfo.warningType === 'old_ios';
   const isMacLinux = systemInfo.warningType === 'old_mac_linux';
   const isXpOrVista = systemInfo.warningType === 'windows_xp_vista';
 
@@ -45,12 +46,14 @@ export const SystemCompatibilityBanner: React.FC<SystemCompatibilityBannerProps>
               <h3 className="font-black text-sm sm:text-base tracking-wide uppercase flex items-center gap-1.5">
                 {isXpOrVista ? (
                   lang === 'ru' ? 'DuoWindo6601: Прекращение поддержки Win XP / 2003, Mypal 78.0.3 XP & SAPI 4.0' : 'DuoWindo6601: Windows XP / 2003, Mypal & SAPI 4.0 Support Ended'
+                ) : isIOS ? (
+                  lang === 'ru' ? 'DuoWindo6601: Старая версия iOS / iPad (< 14.0) — Не получится обновить PWA' : 'DuoWindo6601: Legacy iOS / iPad (< 14.0) — PWA Update Unsupported'
                 ) : isAndroid ? (
-                  lang === 'ru' ? 'DuoWindo6601: Старая версия Android (4.x - 7.x)' : 'DuoWindo6601: Legacy Android Version (4.x - 7.x)'
+                  lang === 'ru' ? 'DuoWindo6601: Старая версия Android (4.x - 7.x) — Не получится обновить PWA' : 'DuoWindo6601: Legacy Android Version (4.x - 7.x)'
                 ) : isMacLinux ? (
                   lang === 'ru' ? 'DuoWindo6601: Устаревшая версия macOS / Linux' : 'DuoWindo6601: Outdated macOS / Linux'
                 ) : (
-                  lang === 'ru' ? 'DuoWindo6601: Устаревший браузер' : 'DuoWindo6601: Outdated Web Browser'
+                  lang === 'ru' ? 'DuoWindo6601: Устаревший браузер — Обновление PWA не получится' : 'DuoWindo6601: Outdated Web Browser'
                 )}
               </h3>
               
@@ -74,6 +77,15 @@ export const SystemCompatibilityBanner: React.FC<SystemCompatibilityBannerProps>
                     ✓ {os}
                   </span>
                 ))}
+              </div>
+            )}
+
+            {isIOS && (
+              <div className="pt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
+                <span className="font-bold opacity-75">{lang === 'ru' ? 'Требуется для iOS / iPad:' : 'Required for iOS / iPad:'}</span>
+                <span className="bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-md font-black">
+                  ✓ iOS / iPadOS 15.0+ (Safari 15+) — Новый Систем
+                </span>
               </div>
             )}
 
@@ -101,7 +113,7 @@ export const SystemCompatibilityBanner: React.FC<SystemCompatibilityBannerProps>
         <div className="flex items-center space-x-2 w-full sm:w-auto justify-end flex-shrink-0 pt-1 sm:pt-0">
           <button
             onClick={onOpenDetails}
-            className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center space-x-1 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center space-x-1 cursor-pointer ${
               isCritical 
                 ? 'bg-red-600 hover:bg-red-500 text-white border border-red-400' 
                 : 'bg-amber-500 hover:bg-amber-400 text-black border border-amber-300'
@@ -113,7 +125,7 @@ export const SystemCompatibilityBanner: React.FC<SystemCompatibilityBannerProps>
 
           <button
             onClick={onDismiss}
-            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-black/40 hover:bg-black/60 text-white/80 hover:text-white transition-all border border-white/10"
+            className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-black/40 hover:bg-black/60 text-white/80 hover:text-white transition-all border border-white/10 cursor-pointer"
             title={lang === 'ru' ? 'Закрыть предупреждение' : 'Dismiss warning'}
           >
             ✕

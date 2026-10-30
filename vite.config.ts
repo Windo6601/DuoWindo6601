@@ -12,10 +12,11 @@ export default defineConfig(({ mode }) => {
         port: 3000,
         host: '0.0.0.0',
         strictPort: true,
+        hmr: false,
       },
       plugins: [
         tailwindcss(),
-        react(),
+        react({ fastRefresh: false }),
         VitePWA({
           registerType: 'autoUpdate',
           includeAssets: [
@@ -177,6 +178,7 @@ export default defineConfig(({ mode }) => {
       build: {
         outDir: 'dist',
         emptyOutDir: true,
+        target: ['es2020', 'chrome80', 'firefox78', 'safari13.1', 'edge80'],
       },
       optimizeDeps: {
         entries: ['index.html'],

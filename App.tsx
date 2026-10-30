@@ -13,6 +13,7 @@ import { generateExercise, checkAnswerWithAI, pingGeminiApi, speakText, startRol
 import { detectSystemCompatibility, SimulationMode, SystemCompatibilityResult } from "./services/systemCompatibilityService";
 import { SystemCompatibilityBanner } from "./components/SystemCompatibilityBanner";
 import { SystemInfoModal } from "./components/SystemInfoModal";
+import { PwaUpdateSecuritySection } from "./components/PwaUpdateSecuritySection";
 import { BetaModal } from "./components/BetaModal";
 import { playSound } from './services/audioService';
 import { 
@@ -41,6 +42,9 @@ import { PWAInstallButton, PWAInstructionModal } from './components/PWAInstallBu
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { DuoWindo6601PoemModal } from './components/DuoWindo6601PoemModal';
 import { MusicStudioModal } from './components/MusicStudioModal';
+import { StreakSaverCountdown } from './components/StreakSaverCountdown';
+import { NotificationManager, NotificationPromptBanner } from './components/NotificationManager';
+import { TranslatorScreen } from './components/TranslatorScreen';
 import { 
   downloadFirebaseExportFile, 
   copyFirebaseExportToClipboard 
@@ -92,6 +96,15 @@ import {
   isBetaWritingRestricted,
   getBetaWritingRestrictedInfo
 } from './services/languageLockService';
+import { DomainMigrationBanner } from './components/DomainMigrationBanner';
+import { DomainAccessBlockedModal } from './components/DomainAccessBlockedModal';
+import { 
+  isRunAppAccessBlocked, 
+  isRunAppWarningActive, 
+  getDomainSimMode, 
+  setDomainSimMode, 
+  DomainSimMode 
+} from './services/domainMigrationService';
 import {
   initFirestoreCacheMaintenance,
   recordFirestoreUserActivity,
@@ -375,6 +388,8 @@ const HARDEST_COURSES: Course[] = [
 const HARDEST_LANGUAGE_INFO: Record<string, { badge: string; reasonRu: string; reasonEn: string; rank: string }> = {
   tab: { badge: '🏆 Рекорд Гиннесса', reasonRu: '48–53 падежа существительных, сложнейшая эргативная грамматика', reasonEn: 'Guinness Record: 48–53 noun cases, intricate ergative grammar', rank: '#1' },
   cv: { badge: '👑 Уникальная ветвь булгар', reasonRu: 'Единственный живой огурский тюркский язык, буквы Ӑ, Ӗ, Ҫ, Ӳ, сингармонизм и сложнейшая агглютинация', reasonEn: 'Sole surviving Oghur/Bulgar Turkic branch, unique letters Ӑ, Ӗ, Ҫ, Ӳ, vowel harmony, multi-layered agglutination', rank: '#2' },
+  ka: { badge: '🇬🇪 Сложнейший в СНГ/экс-СССР', reasonRu: 'Полиперсональное спряжение глаголов, эргативный строй, кластеры до 8 согласных («гвпртсквни»)', reasonEn: 'Polypersonal verb agreement, split ergativity, clusters of up to 8 consonants (gvprtskvni)', rank: '#1 Гос. экс-СССР' },
+  hy: { badge: '🇦🇲 1600 лет алфавита', reasonRu: 'Алфавит Маштоца с 405 г., 7 падежей, изолированная индоевропейская ветвь', reasonEn: 'Mashtots script from 405 AD, 7 cases, independent Indo-European branch', rank: '#2 Гос. экс-СССР' },
   hu: { badge: '⚡ Уральский гигант', reasonRu: '18–35 падежей, сингармонизм гласных, агглютинация суффиксов', reasonEn: '18–35 noun cases, vowel harmony, agglutinative affixes', rank: '#3' },
   eu: { badge: '🗿 Древний изолят', reasonRu: 'Язык-изолят Европы, полиперсональное спряжение глаголов', reasonEn: 'European language isolate, polypersonal verb conjugation', rank: '#4' },
   fi: { badge: '❄️ 15 падежей', reasonRu: '15 падежей, чередование ступеней согласных, отсутствие предлогов', reasonEn: '15 noun cases, consonant gradation, no prepositions', rank: '#5' },
@@ -399,15 +414,68 @@ const WORLD_COURSES: Course[] = [
   { id: 'pt', name: 'Portuguese', localName: 'Португальский', flagCode: 'br', themeColor: 'bg-blue-500', themeBorder: 'border-blue-700', mascotVariant: 'default' },
   { id: 'ar', name: 'Arabic', localName: 'Арабский', flagCode: 'sa', themeColor: 'bg-emerald-600', themeBorder: 'border-emerald-800', mascotVariant: 'default' },
   { id: 'he', name: 'Hebrew', localName: 'Иврит', flagCode: 'il', themeColor: 'bg-blue-600', themeBorder: 'border-blue-800', mascotVariant: 'default' },
+  { id: 'id', name: 'Indonesian', localName: 'Индонезийский (Bahasa Indonesia)', flagCode: 'id', themeColor: 'bg-teal-600', themeBorder: 'border-teal-800', mascotVariant: 'default' },
 ];
+
+export const EASIEST_COURSES: Course[] = [
+  { id: 'eo', name: 'Esperanto', localName: 'Эсперанто (Esperanto)', flagCode: 'eu', themeColor: 'bg-emerald-600', themeBorder: 'border-emerald-800', mascotVariant: 'default' },
+  { id: 'id', name: 'Indonesian', localName: 'Индонезийский (Bahasa Indonesia)', flagCode: 'id', themeColor: 'bg-teal-600', themeBorder: 'border-teal-800', mascotVariant: 'default' },
+  { id: 'es', name: 'Spanish', localName: 'Испанский (Español)', flagCode: 'es', themeColor: 'bg-yellow-500', themeBorder: 'border-yellow-700', mascotVariant: 'default' },
+  { id: 'it', name: 'Italian', localName: 'Итальянский (Italiano)', flagCode: 'it', themeColor: 'bg-green-600', themeBorder: 'border-green-800', mascotVariant: 'default' },
+];
+
+export const ALL_EASIEST_COURSES: Course[] = EASIEST_COURSES;
+
+export const EASIEST_LANGUAGE_INFO: Record<string, { badge: string; reasonRu: string; reasonEn: string; rank: string }> = {
+  eo: { 
+    badge: '🏆 №1 Самый лёгкий в мире', 
+    reasonRu: 'Рекорд Гиннесса и ЮНЕСКО: 16 правил без единого исключения, 0 неправильных глаголов, логичные суффиксы, учится в 4-5 раз быстрее любого языка', 
+    reasonEn: 'Guinness & UNESCO record: 16 rules, 0 exceptions, 0 irregular verbs, 100% regular logic, learned 4-5x faster', 
+    rank: '#1 Рекорд простоты' 
+  },
+  id: { 
+    badge: '🌴 №1 Естественный язык', 
+    reasonRu: 'Самый простой естественный язык: 0 спряжений глаголов, 0 времён, 0 родов, 0 падежей, стандартная латиница', 
+    reasonEn: 'Easiest natural language: no verb conjugations, no tenses, no genders, no noun cases, standard Latin', 
+    rank: '#2 Самый лёгкий в мире' 
+  },
+  es: { 
+    badge: '☀️ Простая фонетика', 
+    reasonRu: 'Фонетическое правописание (как пишется, так и читается), понятные правила ударения, богатый интернациональный словарь', 
+    reasonEn: 'High phonetic consistency, transparent spelling and predictable pronunciation', 
+    rank: '#3 Самый лёгкий в мире' 
+  },
+  it: { 
+    badge: '🍕 Музыкальная гармония', 
+    reasonRu: 'Мелодичное произношение, почти все слова оканчиваются на гласные, прозрачная грамматика без сложных звуков', 
+    reasonEn: 'Melodic phonetic structure, regular vowel endings, clear phonetic rules', 
+    rank: '#4 Самый лёгкий в мире' 
+  },
+};
 
 export type CourseSortMode = 'default' | 'hardest' | 'easiest' | 'alphabetical';
 
-export const getCourseDifficultyRankNumber = (courseId: string): number => {
+export const getCourseDifficultyRankNumber = (courseId: string, sortMode: CourseSortMode = 'hardest'): number => {
+  if (sortMode === 'easiest') {
+    if (courseId === 'eo') return 1;
+    if (courseId === 'id') return 2;
+    if (courseId === 'es') return 3;
+    if (courseId === 'it') return 4;
+    const hardInfo = HARDEST_LANGUAGE_INFO[courseId];
+    if (hardInfo) {
+      const match = hardInfo.rank.match(/\d+/);
+      return match ? 100 - parseInt(match[0], 10) : 50;
+    }
+    return 20;
+  }
+  if (courseId === 'eo') return 9999;
+  if (courseId === 'id') return 9998;
+  if (courseId === 'es') return 9997;
+  if (courseId === 'it') return 9996;
   const info = HARDEST_LANGUAGE_INFO[courseId];
-  if (!info) return 999;
+  if (!info) return 500;
   const match = info.rank.match(/\d+/);
-  return match ? parseInt(match[0], 10) : 999;
+  return match ? parseInt(match[0], 10) : 500;
 };
 
 export const sortCoursesByDifficulty = (
@@ -417,22 +485,18 @@ export const sortCoursesByDifficulty = (
   if (sortMode === 'default') return courses;
   const list = [...courses];
   if (sortMode === 'hardest') {
-    // Sort from hardest to easiest: rank #1 (tab) -> #2 (hu) -> ... -> #11 (ko), then unranked courses
     return list.sort((a, b) => {
-      const rankA = getCourseDifficultyRankNumber(a.id);
-      const rankB = getCourseDifficultyRankNumber(b.id);
+      const rankA = getCourseDifficultyRankNumber(a.id, 'hardest');
+      const rankB = getCourseDifficultyRankNumber(b.id, 'hardest');
       if (rankA !== rankB) return rankA - rankB;
       return a.name.localeCompare(b.name);
     });
   }
   if (sortMode === 'easiest') {
-    // Sort from easiest to hardest: unranked/easier first, then reverse rank #11 down to #1
     return list.sort((a, b) => {
-      const rankA = getCourseDifficultyRankNumber(a.id);
-      const rankB = getCourseDifficultyRankNumber(b.id);
-      if (rankA !== rankB) {
-        return rankB - rankA;
-      }
+      const rankA = getCourseDifficultyRankNumber(a.id, 'easiest');
+      const rankB = getCourseDifficultyRankNumber(b.id, 'easiest');
+      if (rankA !== rankB) return rankA - rankB;
       return a.name.localeCompare(b.name);
     });
   }
@@ -445,13 +509,13 @@ export const sortCoursesByDifficulty = (
 const ALL_HARDEST_COURSES: Course[] = HARDEST_COURSES;
 
 const SPECIAL_COURSES: Course[] = [
-  { id: 'math', name: 'Mathematics', localName: 'Математика', flagCode: 'math', themeColor: 'bg-duo-blue', themeBorder: 'border-duo-blueDark', mascotVariant: 'math' },
-  { id: 'music', name: 'Music', localName: 'Музыка', flagCode: 'music', themeColor: 'bg-pink-500', themeBorder: 'border-pink-700', mascotVariant: 'music' },
+  { id: 'math', name: 'Mathematics', localName: 'Математика (Курс не является языком • Точная наука / Навык)', flagCode: 'math', themeColor: 'bg-duo-blue', themeBorder: 'border-duo-blueDark', mascotVariant: 'math' },
+  { id: 'music', name: 'Music', localName: 'Музыка (Курс не является языком • Навык/Теория)', flagCode: 'music', themeColor: 'bg-pink-500', themeBorder: 'border-pink-700', mascotVariant: 'music' },
   { id: 'chess', name: 'Chess', localName: 'Шахматы (Курс не является языком • Навык/Игра)', flagCode: 'chess', themeColor: 'bg-slate-600', themeBorder: 'border-slate-800', mascotVariant: 'chess' },
 ];
 
 export const BETA_COURSES: Course[] = [
-  { id: 'eo', name: 'Esperanto', localName: 'Эсперанто (Esperanto)', flagCode: 'eu', themeColor: 'bg-emerald-600', themeBorder: 'border-emerald-800', mascotVariant: 'default', isBeta: true, betaTag: 'Международный', betaVersion: 'v0.9.4 Beta', betaFeedbackCount: 142, writingRestrictionNotice: 'Ограничение раздел письма будут доступ до 1 ноября 2026 год' },
+  { id: 'eo', name: 'Esperanto', localName: 'Эсперанто (Esperanto)', flagCode: 'eu', themeColor: 'bg-emerald-600', themeBorder: 'border-emerald-800', mascotVariant: 'default', isBeta: false, betaTag: 'Самый лёгкий №1', betaVersion: 'v1.0 Официальный', betaFeedbackCount: 142 },
   { id: 'la', name: 'Latin', localName: 'Латынь (Lingua Latina)', flagCode: 'it', themeColor: 'bg-amber-600', themeBorder: 'border-amber-800', mascotVariant: 'default', isBeta: true, betaTag: 'Классический', betaVersion: 'v0.8.2 Beta', betaFeedbackCount: 98, writingRestrictionNotice: 'Ограничение раздел письма будут доступ до 1 ноября 2026 год' },
   { id: 'sv', name: 'Swedish', localName: 'Шведский (Svenska)', flagCode: 'se', themeColor: 'bg-blue-600', themeBorder: 'border-blue-800', mascotVariant: 'default', isBeta: true, betaTag: 'Скандинавский', betaVersion: 'v0.9.1 Beta', betaFeedbackCount: 115, writingRestrictionNotice: 'Ограничение раздел письма будут доступ до 1 ноября 2026 год' },
   { id: 'no', name: 'Norwegian', localName: 'Норвежский (Norsk)', flagCode: 'no', themeColor: 'bg-red-600', themeBorder: 'border-red-800', mascotVariant: 'default', isBeta: true, betaTag: 'Скандинавский', betaVersion: 'v0.9.0 Beta', betaFeedbackCount: 84, writingRestrictionNotice: 'Ограничение раздел письма будут доступ до 1 ноября 2026 год' },
@@ -467,8 +531,9 @@ const BETA_IDS = BETA_COURSES.map(c => c.id);
 const CIS_IDS = CIS_COURSES.map(c => c.id);
 
 const COURSES: Course[] = [
+  ...EASIEST_COURSES.filter(ec => !HARDEST_COURSES.some(h => h.id === ec.id)),
   ...HARDEST_COURSES,
-  ...WORLD_COURSES,
+  ...WORLD_COURSES.filter(wc => !EASIEST_COURSES.some(e => e.id === wc.id)),
   ...CIS_COURSES,
   ...SPECIAL_COURSES,
   ...BETA_COURSES.filter(bc => !SPECIAL_COURSES.some(s => s.id === bc.id)),
@@ -595,42 +660,6 @@ const ALPHABET_SETS: Record<string, AlphabetCategory[]> = {
         { char: 'É', name: 'e accent aigu', sound: '[e]', word: 'École', translation: 'Школа / School' },
         { char: 'È', name: 'e accent grave', sound: '[ɛ]', word: 'Père', translation: 'Отец / Father' },
         { char: 'Ç', name: 'c cédille', sound: '[s]', word: 'Français', translation: 'Французский / French' }
-      ]
-    }
-  ],
-  'es': [
-    {
-      title: 'Alfabeto Español (27)',
-      description: 'Испанский алфавит с буквой Ñ',
-      script: 'latin',
-      items: [
-        { char: 'A', name: 'a', sound: '[a]', word: 'Amigo', translation: 'Друг / Friend' },
-        { char: 'B', name: 'be', sound: '[be]', word: 'Barco', translation: 'Корабль / Ship' },
-        { char: 'C', name: 'ce', sound: '[θ]/[k]', word: 'Casa', translation: 'Дом / House' },
-        { char: 'D', name: 'de', sound: '[de]', word: 'Día', translation: 'День / Day' },
-        { char: 'E', name: 'e', sound: '[e]', word: 'Estrella', translation: 'Звезда / Star' },
-        { char: 'F', name: 'efe', sound: '[efe]', word: 'Flor', translation: 'Цветок / Flower' },
-        { char: 'G', name: 'ge', sound: '[xe]/[ɡ]', word: 'Gato', translation: 'Кот / Cat' },
-        { char: 'H', name: 'hache', sound: '[-]', word: 'Hola', translation: 'Привет / Hello' },
-        { char: 'I', name: 'i', sound: '[i]', word: 'Isla', translation: 'Остров / Island' },
-        { char: 'J', name: 'jota', sound: '[xota]', word: 'Jardín', translation: 'Сад / Garden' },
-        { char: 'K', name: 'ka', sound: '[ka]', word: 'Kilo', translation: 'Килограмм / Kilo' },
-        { char: 'L', name: 'ele', sound: '[ele]', word: 'Luna', translation: 'Луна / Moon' },
-        { char: 'M', name: 'eme', sound: '[eme]', word: 'Mar', translation: 'Море / Sea' },
-        { char: 'N', name: 'ene', sound: '[ene]', word: 'Noche', translation: 'Ночь / Night' },
-        { char: 'Ñ', name: 'eñe', sound: '[eɲe]', word: 'Niño', translation: 'Ребёнок / Child', tips: 'Буква N с тильдой' },
-        { char: 'O', name: 'o', sound: '[o]', word: 'Ojo', translation: 'Глаз / Eye' },
-        { char: 'P', name: 'pe', sound: '[pe]', word: 'Pan', translation: 'Хлеб / Bread' },
-        { char: 'Q', name: 'cu', sound: '[ku]', word: 'Queso', translation: 'Сыр / Cheese' },
-        { char: 'R', name: 'erre', sound: '[ere]/[r]', word: 'Río', translation: 'Река / River' },
-        { char: 'S', name: 'ese', sound: '[ese]', word: 'Sol', translation: 'Солнце / Sun' },
-        { char: 'T', name: 'te', sound: '[te]', word: 'Tierra', translation: 'Земля / Earth' },
-        { char: 'U', name: 'u', sound: '[u]', word: 'Uva', translation: 'Виноград / Grape' },
-        { char: 'V', name: 'uve', sound: '[ube]', word: 'Viento', translation: 'Ветер / Wind' },
-        { char: 'W', name: 'uve doble', sound: '[ube doble]', word: 'Web', translation: 'Веб / Web' },
-        { char: 'X', name: 'equis', sound: '[ekis]', word: 'Éxito', translation: 'Успех / Success' },
-        { char: 'Y', name: 'ye / i griega', sound: '[ʝe]', word: 'Yo', translation: 'Я / I' },
-        { char: 'Z', name: 'zeta', sound: '[θeta]', word: 'Zapato', translation: 'Обувь / Shoe' }
       ]
     }
   ],
@@ -1167,6 +1196,8 @@ const ALPHABETS: Record<string, string[]> = {
   'ky': ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ё', 'Ж', 'З', 'И', 'Й', 'К', 'Л', 'М', 'Н', 'Ң', 'О', 'Ө', 'П', 'Р', 'С', 'Т', 'У', 'Ү', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ', 'Ъ', 'Ы', 'Ь', 'Э', 'Ю', 'Я'],
   'tg': ['А', 'Б', 'В', 'Г', 'Ғ', 'Д', 'Е', 'Ё', 'Ж', 'З', 'И', 'Ӣ', 'Й', 'К', 'Қ', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ӯ', 'Ф', 'Х', 'Ҳ', 'Ч', 'Ҷ', 'Ш', 'Ъ', 'Э', 'Ю', 'Я'],
   'en': ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'],
+  'eo': ['A', 'B', 'C', 'Ĉ', 'D', 'E', 'F', 'G', 'Ĝ', 'H', 'Ĥ', 'I', 'J', 'Ĵ', 'K', 'L', 'M', 'N', 'O', 'P', 'R', 'S', 'Ŝ', 'T', 'U', 'Ŭ', 'V', 'Z'],
+  'id': ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'],
   'de': ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'Ä', 'Ö', 'Ü', 'ß'],
   'fr': ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'É', 'È', 'Ç', 'À', 'Ù', 'Â', 'Ê', 'Î', 'Ô', 'Û'],
   'es': ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'Ñ', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'],
@@ -1849,14 +1880,22 @@ const TRANSLATIONS: Record<string, any> = {
     androidModalTitle: 'Инструкция по установке',
     androidModalClose: 'Закрыть',
     coursesAndRegions: 'Курсы и Языковые регионы',
+    selectedCourseSection: 'Выбранный курс',
+    selectedCourseDesc: 'Ваш активный язык обучения прямо сейчас',
+    currentActiveCourse: 'Текущий курс',
+    easiestWorldLanguage: 'Самый лёгкий язык в мире',
     searchPlaceholder: '🔍 Поиск языка или региона...',
     allCourses: 'Все курсы',
+    easiestLanguages: 'Самый лёгкий язык (TOP)',
     hardestLanguages: 'Сложные языки (TOP)',
     cisLanguages: 'СНГ языки (15)',
     worldLanguages: 'Мировые языки',
     subjectsAndGames: 'Предметы & Игры',
     rfRegions: 'Регионы РФ',
     searchResults: 'Результаты поиска',
+    easiestSectionTitle: 'Самый лёгкий язык в мире',
+    easiestSectionDesc: 'Рекорд простоты: 0 исключений, 16 правил грамматики, регулярная логика и быстрое освоение',
+    extremeSimplicity: 'Максимальная простота',
     hardestSectionTitle: 'Самые сложные языки мира',
     hardestSectionDesc: 'Языки с рекордным количеством падежей, уникальной грамматикой, полиперсональным строем и тонами',
     extremeDifficulty: 'Экстремальная сложность',
@@ -2029,14 +2068,22 @@ const TRANSLATIONS: Record<string, any> = {
     androidModalTitle: 'Android Installation Guide',
     androidModalClose: 'Close',
     coursesAndRegions: 'Courses & Language Regions',
+    selectedCourseSection: 'Selected Course',
+    selectedCourseDesc: 'Your currently active language of study',
+    currentActiveCourse: 'Active Course',
+    easiestWorldLanguage: 'Easiest Language in the World',
     searchPlaceholder: '🔍 Search language or region...',
     allCourses: 'All Courses',
+    easiestLanguages: 'Easiest Language (TOP)',
     hardestLanguages: 'Hardest Languages (TOP)',
     cisLanguages: 'CIS Languages (15)',
     worldLanguages: 'World Languages',
     subjectsAndGames: 'Subjects & Games',
     rfRegions: 'RF Regions',
     searchResults: 'Search Results',
+    easiestSectionTitle: 'Easiest Language in the World',
+    easiestSectionDesc: 'Simplicity record: 0 exceptions, 16 fundamental rules, regular grammar and 4-5x faster learning curve',
+    extremeSimplicity: 'Maximum Simplicity',
     hardestSectionTitle: "World's Hardest Languages",
     hardestSectionDesc: 'Languages with record case systems, polysynthetic structures, polypersonal agreement and extreme complexity',
     extremeDifficulty: 'Extreme Difficulty',
@@ -3279,6 +3326,11 @@ function App() {
     return detectSystemCompatibility(simSystemMode);
   }, [simSystemMode]);
 
+  // Domain access restriction & migration states for us-east1.run.app (Closure on Nov 1, 2026)
+  const [domainSimMode, setDomainSimModeState] = useState<DomainSimMode>(() => getDomainSimMode());
+  const isDomainAccessBlocked = useMemo(() => isRunAppAccessBlocked(domainSimMode), [domainSimMode]);
+  const isDomainWarningActive = useMemo(() => isRunAppWarningActive(domainSimMode), [domainSimMode]);
+
   const [screen, setScreen] = useState<AppScreen>(AppScreen.PATH);
   const [offlineMode, setOfflineMode] = useState<boolean>(() => {
     if (typeof navigator !== 'undefined') {
@@ -3320,11 +3372,11 @@ function App() {
   const [musicSection, setMusicSection] = useState<number>(() => {
     return Number(localStorage.getItem('duo_music_section_6601') || '1');
   });
-  // Math: Класс 2-8 (2, 3, 4, 5, 6, 7, 8) & Темы (Арифметика / Алгебра)
+  // Math: Класс 1-11 & Темы (Арифметика / Алгебра / Геометрия / Тригонометрия и Анализ)
   const [mathGrade, setMathGrade] = useState<number>(() => {
     return Number(localStorage.getItem('duo_math_grade_6601') || '2');
   });
-  const [mathTopic, setMathTopic] = useState<'arithmetic' | 'algebra'>(() => {
+  const [mathTopic, setMathTopic] = useState<'arithmetic' | 'algebra' | 'geometry' | 'calculus'>(() => {
     return (localStorage.getItem('duo_math_topic_6601') as any) || 'arithmetic';
   });
   // Languages: Раздел 1-8 (A1-B2)
@@ -3336,13 +3388,84 @@ function App() {
     return Number(localStorage.getItem('duo_chess_section_6601') || '6');
   });
 
-  const generateMathExercise = (grade: number, topic: 'arithmetic' | 'algebra'): Exercise => {
+  const generateMathExercise = (grade: number, topic: 'arithmetic' | 'algebra' | 'geometry' | 'calculus'): Exercise => {
     let question = "";
     let answer = "";
     let distractors: string[] = [];
 
-    if (topic === 'arithmetic') {
-      if (grade === 2) {
+    if (topic === 'geometry') {
+      if (grade <= 3) {
+        const side = Math.floor(Math.random() * 8) + 2;
+        question = `Периметр квадрата со стороной ${side} см = ? см`;
+        answer = (side * 4).toString();
+      } else if (grade <= 5) {
+        const a = Math.floor(Math.random() * 8) + 3;
+        const b = Math.floor(Math.random() * 6) + 2;
+        question = `Площадь прямоугольника ${a} см × ${b} см = ? см²`;
+        answer = (a * b).toString();
+      } else if (grade <= 7) {
+        const angleA = [30, 40, 50, 60, 70][Math.floor(Math.random() * 5)];
+        const angleB = [30, 45, 60, 70, 80][Math.floor(Math.random() * 5)];
+        question = `Сумма углов треугольника 180°. Третий угол при ${angleA}° и ${angleB}° = ?°`;
+        answer = (180 - angleA - angleB).toString();
+      } else if (grade <= 9) {
+        const pythPairs = [[3, 4, 5], [6, 8, 10], [5, 12, 13], [8, 15, 17]];
+        const pair = pythPairs[Math.floor(Math.random() * pythPairs.length)];
+        question = `Теорема Пифагора: Катеты ${pair[0]} и ${pair[1]}. Гипотенуза c = ?`;
+        answer = pair[2].toString();
+      } else {
+        // Grade 10-11 geometry
+        const cubeSide = Math.floor(Math.random() * 5) + 2;
+        question = `Стереометрия: Объём куба со ребром ${cubeSide} см = ? см³`;
+        answer = Math.pow(cubeSide, 3).toString();
+      }
+    } else if (topic === 'calculus') {
+      if (grade <= 9) {
+        // Trigonometry basics
+        const trigList = [
+          { q: 'sin(30°) = ?', a: '1/2', d: ['1', '0', '√3/2'] },
+          { q: 'cos(60°) = ?', a: '1/2', d: ['1/3', '√2/2', '0'] },
+          { q: 'sin²(α) + cos²(α) = ?', a: '1', d: ['0', '2', 'sin(2α)'] },
+          { q: 'tg(45°) = ?', a: '1', d: ['0', '√3', '1/2'] }
+        ];
+        const choice = trigList[Math.floor(Math.random() * trigList.length)];
+        question = choice.q;
+        answer = choice.a;
+        distractors = choice.d;
+      } else if (grade === 10) {
+        const logList = [
+          { q: 'log₂(32) = ?', a: '5', d: ['4', '6', '16'] },
+          { q: 'log₃(81) = ?', a: '4', d: ['3', '9', '27'] },
+          { q: 'log₅(125) = ?', a: '3', d: ['5', '25', '2'] },
+          { q: '2ˣ = 16 ⟹ x = ?', a: '4', d: ['8', '3', '5'] },
+          { q: 'sin(π/2) = ?', a: '1', d: ['0', '-1', '1/2'] },
+          { q: 'cos(π) = ?', a: '-1', d: ['1', '0', '1/2'] }
+        ];
+        const choice = logList[Math.floor(Math.random() * logList.length)];
+        question = choice.q;
+        answer = choice.a;
+        distractors = choice.d;
+      } else {
+        // Grade 11: Derivatives and Integrals
+        const calcList = [
+          { q: 'Производная f(x) = x³ ⟹ f\'(x) = ?', a: '3x²', d: ['x²', '3x', 'x⁴/4'] },
+          { q: 'Производная f(x) = 5x⁴ ⟹ f\'(x) = ?', a: '20x³', d: ['5x³', '20x⁴', '10x²'] },
+          { q: 'Производная f(x) = sin(x) ⟹ f\'(x) = ?', a: 'cos(x)', d: ['-cos(x)', '-sin(x)', 'tg(x)'] },
+          { q: 'Первообразная ∫ 2x dx = ?', a: 'x² + C', d: ['2x² + C', 'x + C', 'x³/3 + C'] },
+          { q: 'Значение f\'(2) для f(x) = 3x² + 4x:', a: '16', d: ['12', '10', '14'] }
+        ];
+        const choice = calcList[Math.floor(Math.random() * calcList.length)];
+        question = choice.q;
+        answer = choice.a;
+        distractors = choice.d;
+      }
+    } else if (topic === 'arithmetic') {
+      if (grade === 1) {
+        const a = Math.floor(Math.random() * 10) + 1;
+        const b = Math.floor(Math.random() * 9) + 1;
+        question = `${a} + ${b} = ?`;
+        answer = (a + b).toString();
+      } else if (grade === 2) {
         const mode = Math.random();
         if (mode < 0.4) {
           const a = Math.floor(Math.random() * 40) + 12;
@@ -3417,14 +3540,36 @@ function App() {
         const exp = base === 10 ? 3 : [2, 3, 4][Math.floor(Math.random() * 3)];
         question = `${base}^${exp} = ?`;
         answer = Math.pow(base, exp).toString();
-      } else {
+      } else if (grade === 8) {
         const num = [16, 25, 36, 49, 64, 81, 100, 121, 144][Math.floor(Math.random() * 9)];
         const plus = Math.floor(Math.random() * 15) + 5;
         question = `√${num} + ${plus} = ?`;
         answer = (Math.sqrt(num) + plus).toString();
+      } else if (grade === 9) {
+        const num = [8, 27, 64, 125][Math.floor(Math.random() * 4)];
+        question = `∛${num} = ?`;
+        answer = Math.round(Math.cbrt(num)).toString();
+      } else if (grade === 10) {
+        const a = [2, 3, 4, 5][Math.floor(Math.random() * 4)];
+        const b = [3, 4][Math.floor(Math.random() * 2)];
+        question = `Вчислить: (${a}²)³ ÷ ${a}⁴ = ?`;
+        answer = Math.pow(a, 2).toString();
+      } else {
+        // Grade 11
+        const mant = [1.2, 2.5, 3.6, 4.8][Math.floor(Math.random() * 4)];
+        const p1 = 5;
+        const p2 = 3;
+        question = `Научная запись: (${mant} · 10⁵) ÷ (10³) = ?`;
+        answer = (mant * 100).toString();
       }
     } else {
-      if (grade === 2) {
+      // Algebra
+      if (grade === 1) {
+        const a = Math.floor(Math.random() * 8) + 2;
+        const b = Math.floor(Math.random() * 10) + 5;
+        question = `? + ${a} = ${a + b}`;
+        answer = b.toString();
+      } else if (grade === 2) {
         const a = Math.floor(Math.random() * 10) + 3;
         const x = Math.floor(Math.random() * 15) + 2;
         question = `x + ${a} = ${x + a}, x = ?`;
@@ -3455,13 +3600,26 @@ function App() {
         const a = [2, 3, 4, 5][Math.floor(Math.random() * 4)];
         question = `(x + ${a})² = x² + ?x + ${a * a}`;
         answer = (2 * a).toString();
-      } else {
+      } else if (grade === 8) {
         const x1 = Math.floor(Math.random() * 4) + 1;
         const x2 = Math.floor(Math.random() * 5) + 2;
         const sum = x1 + x2;
         const prod = x1 * x2;
         question = `x² - ${sum}x + ${prod} = 0, x₁ + x₂ = ?`;
         answer = sum.toString();
+      } else if (grade === 9) {
+        const a = Math.floor(Math.random() * 4) + 2;
+        question = `Арифметическая прогрессия: a₁ = 3, d = ${a}. Чему равен a₄?`;
+        answer = (3 + 3 * a).toString();
+      } else if (grade === 10) {
+        const x = [2, 3, 4, 5][Math.floor(Math.random() * 4)];
+        question = `Показательное уравнение: 3ˣ⁺¹ = ${Math.pow(3, x + 1)}, x = ?`;
+        answer = x.toString();
+      } else {
+        // Grade 11 Algebra
+        const b = [2, 3, 4][Math.floor(Math.random() * 3)];
+        question = `Логарифмическое уравнение: log₂(${b}x) = 4 ⟹ x = ?`;
+        answer = (16 / b).toString();
       }
     }
 
@@ -3487,7 +3645,7 @@ function App() {
     };
   };
 
-  const startMathTraining = (grade: number = mathGrade, topic: 'arithmetic' | 'algebra' = mathTopic) => {
+  const startMathTraining = (grade: number = mathGrade, topic: 'arithmetic' | 'algebra' | 'geometry' | 'calculus' = mathTopic) => {
     playSound('click');
     const ex = generateMathExercise(grade, topic);
     setCurrentExercise(ex);
@@ -3542,6 +3700,8 @@ const getTodayChallenge = () => {
         return {
           ...defaultChessSettings,
           ...parsed,
+          brushSize: parsed.brushSize || 14,
+          brushColor: parsed.brushColor || '#1CB0F6',
           language: safeLang,
           chessStats: parsed.chessStats || { games: 265, wins: 134, elo: 590 },
         };
@@ -3562,6 +3722,8 @@ const getTodayChallenge = () => {
       voiceProvider: 'gemini',
       chessStats: { games: 265, wins: 134, elo: 590 },
       ...defaultChessSettings,
+      brushSize: 14,
+      brushColor: '#1CB0F6',
       streakFreezeCount: 1,
       lastActiveDate: todayStr
     };
@@ -4653,11 +4815,12 @@ const getTodayChallenge = () => {
   const [translatorOutput, setTranslatorOutput] = useState("");
   const [transTarget, setTransTarget] = useState<Course>(currentCourse);
 
-  const [courseRegionTab, setCourseRegionTab] = useState<'all' | 'speaker' | 'hardest' | 'cis' | 'world' | 'special' | 'rf' | 'catalog' | 'beta'>('all');
+  const [courseRegionTab, setCourseRegionTab] = useState<'all' | 'speaker' | 'easiest' | 'hardest' | 'cis' | 'world' | 'special' | 'rf' | 'catalog' | 'beta'>('all');
   const [speakerLanguage, setSpeakerLanguage] = useState<string>(() => user.language || 'ru');
   const [courseSearch, setCourseSearch] = useState("");
   const [courseSortMode, setCourseSortMode] = useState<CourseSortMode>('default');
   const [selectedHardestLanguageId, setSelectedHardestLanguageId] = useState<string | null>(null);
+  const [cisHardestHeroTab, setCisHardestHeroTab] = useState<'tab' | 'ka'>('tab');
 
   // VIDEO CALL STATE
   const [videoCameraOn, setVideoCameraOn] = useState(true);
@@ -5609,18 +5772,14 @@ const getTodayChallenge = () => {
         wordBank: [],
         chessData: { fen: INITIAL_BOARD_FEN, pgn: [], difficulty: 'beginner' }
       });
+      setLessonLoading(false);
+      setLoading(false);
       setScreen(AppScreen.LESSON);
       return;
     }
 
     if (currentCourse.id === 'math') {
       startMathTraining(mathGrade, mathTopic);
-      return;
-    }
-
-    if (currentCourse.id === 'music') {
-      setMusicStudioTab('notes');
-      setShowMusicStudioModal(true);
       return;
     }
 
@@ -5639,7 +5798,7 @@ const getTodayChallenge = () => {
 
     const isPhysicalOffline = typeof navigator !== 'undefined' && !navigator.onLine;
     if (isPhysicalOffline || (offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max')) {
-      const ex = getFallbackExercise(currentCourse.id, type, currentCourse.localName);
+      const ex = getFallbackExercise(currentCourse.id, type, currentCourse.localName, user.language);
       setCurrentExercise(ex);
       setAvailableTokens((ex.wordBank || []).map(w => ({ id: crypto.randomUUID(), text: w })));
       setLessonLoading(false);
@@ -5647,59 +5806,73 @@ const getTodayChallenge = () => {
       return;
     }
 
+    // Safety watchdog timer: guarantees the loading overlay WILL ALWAYS UNLOCK in max 3.6 seconds
+    let watchdogTimer: any = null;
+    const watchdogPromise = new Promise<Exercise>((resolve) => {
+      watchdogTimer = setTimeout(() => {
+        console.warn("Lesson load watchdog timeout (3.6s) reached - smoothly proceeding with offline fallback exercise");
+        resolve(getFallbackExercise(currentCourse.id, type, currentCourse.localName, user.language));
+      }, 3600);
+    });
+
     try {
-      if (type === 'roleplay') {
-        if (user.subscription !== 'max') {
-          playSound('wrong');
-          setToast(
-              user.language === 'ru'
-                  ? '💎 Roleplay Max (AI) доступен только по платной подписке DuoWindo6601 Max!'
-                  : '💎 Roleplay Max (AI) requires DuoWindo6601 Max paid subscription!'
-          );
-          setScreen(AppScreen.SUBSCRIPTION);
-          return;
+      const fetchExercisePromise = (async (): Promise<Exercise> => {
+        if (type === 'roleplay') {
+          if (user.subscription !== 'max') {
+            playSound('wrong');
+            setToast(
+                user.language === 'ru'
+                    ? '💎 Roleplay Max (AI) доступен только по платной подписке DuoWindo6601 Max!'
+                    : '💎 Roleplay Max (AI) requires DuoWindo6601 Max paid subscription!'
+            );
+            setScreen(AppScreen.SUBSCRIPTION);
+            throw new Error('Subscription required for roleplay');
+          }
+          setRoleplayInput("");
+          const ex = await startRoleplay(currentCourse.localName, currentCourse.id);
+          if (ex.roleplayData?.messages[0]) speakText(ex.roleplayData.messages[0].text, currentCourse.id, false, user.preferredVoice, user.voiceProvider);
+          return ex;
+        } else if (type === 'illusion') {
+          const ex = await generateIllusion(currentCourse.localName, currentCourse.id);
+          if (ex.illusionData) speakText(ex.illusionData.soundText, currentCourse.id, false, user.preferredVoice, user.voiceProvider);
+          return ex;
+        } else if (type === 'drawing') {
+          const ex = await generateDrawing(currentCourse.localName, currentCourse.id, topicOverride);
+          setPaths([]);
+          setShowTrace(true);
+          if (ex.drawingData) speakText(ex.drawingData.character, currentCourse.id, false, user.preferredVoice, user.voiceProvider);
+          return ex;
+        } else if (type === 'ishihara') {
+          const ex = await generateIshihara(currentCourse.id);
+          setIshiharaInput("");
+          return ex;
+        } else if (type === 'reading') {
+          const ex = await generateReading(currentCourse.localName, currentCourse.id);
+          setReadingInput("");
+          return ex;
+        } else {
+          const ex = await generateExercise(currentCourse.localName, currentCourse.id, isLanguageCourse, type, user.subscription === 'max', topicOverride, user.language);
+          transcriptRef.current = "";
+          if (isLanguageCourse && type === 'listening') speakText(ex.originalSentence, currentCourse.id, false, user.preferredVoice, user.voiceProvider);
+          return ex;
         }
-        setRoleplayInput("");
-        const ex = await startRoleplay(currentCourse.localName, currentCourse.id);
-        setCurrentExercise(ex);
-        if (ex.roleplayData?.messages[0]) speakText(ex.roleplayData.messages[0].text, currentCourse.id, false, user.preferredVoice, user.voiceProvider);
-      } else if (type === 'illusion') {
-        const ex = await generateIllusion(currentCourse.localName, currentCourse.id);
-        setCurrentExercise(ex);
-        if (ex.illusionData) speakText(ex.illusionData.soundText, currentCourse.id, false, user.preferredVoice, user.voiceProvider);
-      } else if (type === 'drawing') {
-        const ex = await generateDrawing(currentCourse.localName, currentCourse.id, topicOverride);
-        setCurrentExercise(ex);
-        setPaths([]);
-        setShowTrace(true);
-        if (ex.drawingData) speakText(ex.drawingData.character, currentCourse.id, false, user.preferredVoice, user.voiceProvider);
-      } else if (type === 'ishihara') {
-        const ex = await generateIshihara(currentCourse.id);
-        setCurrentExercise(ex);
-        setIshiharaInput("");
-      } else if (type === 'reading') {
-        const ex = await generateReading(currentCourse.localName, currentCourse.id);
-        setCurrentExercise(ex);
-        setReadingInput("");
-        if (ex.readingData?.mode === 'fill-blanks') {
-          setAvailableTokens((ex.wordBank || []).map(w => ({ id: crypto.randomUUID(), text: w })));
-          setSelectedWordIds([]);
-        }
-      } else {
-        const ex = await generateExercise(currentCourse.localName, currentCourse.id, isLanguageCourse, type, user.subscription === 'max', topicOverride);
-        setAvailableTokens((ex.wordBank || []).map(w => ({ id: crypto.randomUUID(), text: w })));
-        setSelectedWordIds([]);
-        setCurrentExercise(ex);
-        transcriptRef.current = "";
-        if (isLanguageCourse && type === 'listening') speakText(ex.originalSentence, currentCourse.id, false, user.preferredVoice, user.voiceProvider);
-      }
+      })();
+
+      const ex = await Promise.race([fetchExercisePromise, watchdogPromise]);
+      clearTimeout(watchdogTimer);
+
+      setAvailableTokens((ex.wordBank || []).map(w => ({ id: crypto.randomUUID(), text: w })));
+      setSelectedWordIds([]);
+      setCurrentExercise(ex);
     } catch (e: any) {
+      if (watchdogTimer) clearTimeout(watchdogTimer);
       console.warn("API exercise generation failed, smoothly loading offline exercise:", e);
-      const ex = getFallbackExercise(currentCourse.id, type, currentCourse.localName);
+      const ex = getFallbackExercise(currentCourse.id, type, currentCourse.localName, user.language);
       setAvailableTokens((ex.wordBank || []).map(w => ({ id: crypto.randomUUID(), text: w })));
       setSelectedWordIds([]);
       setCurrentExercise(ex);
     } finally {
+      if (watchdogTimer) clearTimeout(watchdogTimer);
       setLessonLoading(false);
       setLoading(false);
     }
@@ -6006,27 +6179,45 @@ const getTodayChallenge = () => {
                         </span>
                       </button>
                     )}
-                                      {/* SYSTEM STATUS BADGE BUTTON */}
+                                      {/* SYSTEM STATUS BADGE BUTTON (DuoWindo6601 System Checker) */}
                   <button
                     onClick={() => setShowSystemInfoModal(true)}
                     className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center space-x-1 shadow-md cursor-pointer border ${
-                      systemInfo.warningType === "windows_xp_vista"
+                      systemInfo.warningType === "windows_xp_vista" || systemInfo.warningType === "old_ios" || systemInfo.warningType === "old_android"
                         ? "bg-red-950/80 hover:bg-red-900 text-red-300 border-red-500/60 animate-pulse"
-                        : systemInfo.warningType === "old_browser"
+                        : systemInfo.warningType === "old_browser" || systemInfo.warningType === "old_mac_linux"
                           ? "bg-amber-950/80 hover:bg-amber-900 text-amber-300 border-amber-500/60"
                           : isLightMode
                             ? "bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300"
                             : "bg-gray-800/80 hover:bg-gray-700 text-emerald-400 border-gray-700"
                     }`}
-                    title="Информация о системе и ОС (Windows 7/8/8.1/10/11 & XP/Vista)"
+                    title="Информация о системе: DuoWindo6601 System Checker (Windows, iOS/iPad, Android)"
                   >
-                    <span>{systemInfo.warningType === "windows_xp_vista" ? "🛑" : systemInfo.warningType === "old_browser" ? "⚠️" : "💻"}</span>
+                    <span>
+                      {systemInfo.warningType === "windows_xp_vista" 
+                        ? "🛑" 
+                        : systemInfo.warningType === "old_ios"
+                          ? "📱"
+                          : systemInfo.warningType === "old_android"
+                            ? "🤖"
+                            : systemInfo.warningType === "old_browser" 
+                              ? "⚠️" 
+                              : systemInfo.isIOS
+                                ? "🍏"
+                                : "💻"}
+                    </span>
                     <span className="hidden sm:inline">
                       {systemInfo.warningType === "windows_xp_vista" 
                         ? "Win XP/Vista" 
-                        : systemInfo.warningType === "old_browser" 
-                          ? "Старый Браузер" 
-                          : "Win 7-11"}
+                        : systemInfo.warningType === "old_ios"
+                          ? "Старый iOS"
+                          : systemInfo.warningType === "old_android"
+                            ? "Старый Android"
+                            : systemInfo.warningType === "old_browser" 
+                              ? "Старый Браузер" 
+                              : systemInfo.isIOS
+                                ? "iOS / iPad"
+                                : "Новый Систем"}
                     </span>
                   </button>
 
@@ -6158,18 +6349,56 @@ const getTodayChallenge = () => {
                  </div>
              </div>
              <div className="flex items-center space-x-3 overflow-x-auto no-scrollbar py-2 max-w-5xl mx-auto w-full px-4">
-                {COURSES.slice(0, 5).map(c => (
-                  <button key={c.id} onClick={() => { playSound('select'); setCurrentCourse(c); setScreen(AppScreen.PATH); }} className={`flex-shrink-0 w-14 h-11 rounded-2xl border-2 flex items-center justify-center transition-all ${
-                    currentCourse.id === c.id 
-                      ? 'border-duo-blue bg-duo-blue/15 scale-110 shadow-lg' 
-                      : isLightMode 
-                        ? 'border-slate-200 bg-white hover:border-slate-300 text-slate-800 shadow-sm' 
-                        : 'border-gray-800 bg-duo-card hover:border-gray-600'
-                  }`}>{SPECIAL_IDS.includes(c.id) ? <span className="text-xl font-bold">{c.id === 'math' ? 'Σ' : c.id === 'music' ? '♫' : c.id === 'chess' ? '♔' : c.id === 'hv' ? '🐉' : '🖖'}</span> : <img src={`https://flagcdn.com/w40/${c.flagCode}.png`} className="w-8 rounded-sm shadow-sm" alt={c.name} />}</button>
-                ))}
-                <button onClick={() => { playSound('click'); setScreen(AppScreen.COURSE_SELECT); }} className={`flex-shrink-0 w-14 h-11 rounded-2xl border-2 ${isLightMode ? 'border-slate-200 bg-white hover:bg-slate-100 text-slate-600 shadow-sm' : 'border-gray-700 hover:bg-gray-800 text-gray-400'} flex items-center justify-center transition-all`}><PlusIcon className="w-6 h-6 text-gray-400" /></button>
+                {[
+                  currentCourse,
+                  ...(COURSES.find(c => c.id === 'eo') && currentCourse.id !== 'eo' ? [COURSES.find(c => c.id === 'eo')!] : []),
+                  ...(COURSES.find(c => c.id === 'ka') && currentCourse.id !== 'ka' ? [COURSES.find(c => c.id === 'ka')!] : []),
+                  ...COURSES.filter(c => c.id !== currentCourse.id && c.id !== 'eo' && c.id !== 'ka').slice(0, 3)
+                ].map(c => {
+                  const isEo = c.id === 'eo';
+                  const isKa = c.id === 'ka';
+                  return (
+                    <button 
+                      key={c.id} 
+                      onClick={() => { playSound('select'); setCurrentCourse(c); setScreen(AppScreen.PATH); }} 
+                      className={`flex-shrink-0 w-14 h-11 rounded-2xl border-2 flex items-center justify-center transition-all relative ${
+                        currentCourse.id === c.id 
+                          ? 'border-duo-blue bg-duo-blue/15 scale-110 shadow-lg' 
+                          : isLightMode 
+                            ? 'border-slate-200 bg-white hover:border-slate-300 text-slate-800 shadow-sm' 
+                            : 'border-gray-800 bg-duo-card hover:border-gray-600'
+                      }`}
+                      title={isEo ? 'Эсперанто — самый лёгкий язык в мире' : isKa ? 'Грузинский — самый сложный гос. язык экс-СССР' : c.name}
+                    >
+                      {isEo && (
+                        <span className="absolute -top-1 -right-1 text-[9px] bg-emerald-500 text-slate-950 font-black rounded-full px-1 border border-emerald-300 shadow leading-tight">
+                          🟢
+                        </span>
+                      )}
+                      {isKa && (
+                        <span className="absolute -top-1 -right-1 text-[9px] bg-rose-600 text-white font-black rounded-full px-1 border border-rose-300 shadow leading-tight">
+                          🇬🇪
+                        </span>
+                      )}
+                      {SPECIAL_IDS.includes(c.id) ? (
+                        <span className="text-xl font-bold">{c.id === 'math' ? 'Σ' : c.id === 'music' ? '♫' : c.id === 'chess' ? '♔' : c.id === 'hv' ? '🐉' : '🖖'}</span>
+                      ) : (
+                        <img src={`https://flagcdn.com/w40/${c.flagCode}.png`} className="w-8 rounded-sm shadow-sm" alt={c.name} />
+                      )}
+                    </button>
+                  );
+                })}
+                <button onClick={() => { playSound('click'); setScreen(AppScreen.COURSE_SELECT); }} className={`flex-shrink-0 w-14 h-11 rounded-2xl border-2 ${isLightMode ? 'border-slate-200 bg-white hover:bg-slate-100 text-slate-600 shadow-sm' : 'border-gray-700 hover:bg-gray-800 text-gray-400'} flex items-center justify-center transition-all`} title={t('coursesAndRegions')}><PlusIcon className="w-6 h-6 text-gray-400" /></button>
              </div>
           </header>
+        )}
+
+        {/* US-EAST1.RUN.APP PRE-NOVEMBER 1 WARNING BANNER */}
+        {isDomainWarningActive && (
+          <DomainMigrationBanner
+            userLanguage={user.language}
+            playSound={playSound}
+          />
         )}
 
         {/* INCOGNITO CLOSURE NOTICE & DATA EXPORT BANNER */}
@@ -6264,44 +6493,77 @@ const getTodayChallenge = () => {
                     <button onClick={() => { playSound('click'); setScreen(AppScreen.PROFILE); }} className="mb-6 text-gray-500 hover:text-white flex items-center font-bold"><CloseIcon className="w-8 h-8 mr-2"/> {t('back')}</button>
                     <h2 className="text-4xl font-black mb-8">{t('settings')}</h2>
                     
-                                        {/* SYSTEM COMPATIBILITY CARD */}
+                                        {/* SYSTEM COMPATIBILITY & DUOWINDO6601 SYSTEM CHECKER CARD */}
                     <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl space-y-4">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between flex-wrap gap-3">
                         <div className="flex items-center space-x-3">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xl ${
-                            systemInfo.warningType === "windows_xp_vista" ? "bg-red-600 text-white" : systemInfo.warningType === "old_browser" ? "bg-amber-500 text-black" : "bg-emerald-600 text-white"
+                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-2xl shadow-md ${
+                            systemInfo.warningType === "windows_xp_vista" || systemInfo.warningType === "old_ios" || systemInfo.warningType === "old_android"
+                              ? "bg-red-600 text-white" 
+                              : systemInfo.warningType === "old_browser" || systemInfo.warningType === "old_mac_linux"
+                                ? "bg-amber-500 text-black" 
+                                : "bg-emerald-600 text-white"
                           }`}>
-                            {systemInfo.warningType === "windows_xp_vista" ? "🛑" : systemInfo.warningType === "old_browser" ? "⚠️" : "💻"}
+                            {systemInfo.warningType === "windows_xp_vista" 
+                              ? "🛑" 
+                              : systemInfo.warningType === "old_ios" 
+                                ? "📱" 
+                                : systemInfo.warningType === "old_android"
+                                  ? "🤖"
+                                  : systemInfo.warningType === "old_browser" 
+                                    ? "⚠️" 
+                                    : systemInfo.isIOS 
+                                      ? "🍏" 
+                                      : "💻"}
                           </div>
                           <div>
-                            <h4 className="font-black text-base text-white uppercase tracking-wider">
-                              Совместимость ОС и Браузера
-                            </h4>
-                            <p className="text-xs text-gray-400 font-bold">
-                              Windows 7/8/8.1/10/11 (Без предупреждений) | XP/Vista (Прекращено)
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-black text-base text-white uppercase tracking-wider">
+                                {user.language === 'ru' ? 'Информация о системе: DuoWindo6601 System Checker' : 'System Info: DuoWindo6601 System Checker'}
+                              </h4>
+                              <span className="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-500/40 px-2 py-0.5 rounded-full font-bold uppercase">
+                                {user.language === 'ru' ? 'Поддержка iOS or iPad' : 'iOS & iPad Support'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-400 font-bold mt-0.5">
+                              {user.language === 'ru'
+                                ? 'Новые Системы (Win 7-11, iOS/iPad 15+, Android 8+) | Старые Системы (XP/Vista/iOS<14) — не получится'
+                                : 'Modern Systems (Win 7-11, iOS/iPad 15+, Android 8+) | Old Systems: unsupported'}
                             </p>
                           </div>
                         </div>
 
                         <button
-                          onClick={() => setShowSystemInfoModal(true)}
-                          className="px-4 py-2 bg-duo-blue hover:bg-duo-blue/90 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition-all active:scale-95"
+                          onClick={() => { playSound('click'); setShowSystemInfoModal(true); }}
+                          className="px-4 py-2.5 bg-duo-blue hover:bg-duo-blue/90 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
                         >
-                          Проверить
+                          <span>🔍</span>
+                          <span>{user.language === 'ru' ? 'Открыть System Checker' : 'Open System Checker'}</span>
                         </button>
                       </div>
 
-                      <div className="bg-gray-800/80 p-3 rounded-2xl border border-gray-700 text-xs flex items-center justify-between">
+                      <div className="bg-gray-800/80 p-3 rounded-2xl border border-gray-700 text-xs flex items-center justify-between flex-wrap gap-2">
                         <span className="text-gray-300 font-bold">
-                          Текущая ОС: <strong className="text-white">{systemInfo.osName}</strong> | Браузер: <strong className="text-white">{systemInfo.browserName}</strong>
+                          {user.language === 'ru' ? 'Текущая ОС:' : 'Current OS:'} <strong className="text-white">{systemInfo.osName} {systemInfo.osVersion && `(${systemInfo.osVersion})`}</strong> | {user.language === 'ru' ? 'Браузер:' : 'Browser:'} <strong className="text-white">{systemInfo.browserName}</strong>
                         </span>
-                        <span className={`font-black px-2 py-0.5 rounded text-[10px] uppercase ${
-                          systemInfo.isModernSystem ? "bg-emerald-950 text-emerald-300 border border-emerald-500/40" : "bg-red-950 text-red-300 border border-red-500/40"
+                        <span className={`font-black px-2.5 py-1 rounded text-[10px] uppercase ${
+                          systemInfo.isModernSystem 
+                            ? "bg-emerald-950 text-emerald-300 border border-emerald-500/40" 
+                            : "bg-red-950 text-red-300 border border-red-500/40"
                         }`}>
-                          {systemInfo.isModernSystem ? "Поддерживается" : "Предупреждение"}
+                          {systemInfo.isModernSystem 
+                            ? (user.language === 'ru' ? '✅ Новый Систем: Поддерживается' : '✅ Modern System') 
+                            : (user.language === 'ru' ? '🛑 Старая Система: Не получится' : '🛑 Old System')}
                         </span>
                       </div>
                     </div>
+
+                    {/* DUOWINDO6601 PWA APP UPDATE & SECURITY UPDATE SECTION */}
+                    <PwaUpdateSecuritySection 
+                      systemInfo={systemInfo} 
+                      onOpenSystemChecker={() => setShowSystemInfoModal(true)} 
+                      lang={user.language} 
+                    />
 
 {/* PROFILE SUMMARY & EDIT TRIGGER */}
                     <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl flex items-center justify-between">
@@ -7402,6 +7664,33 @@ const getTodayChallenge = () => {
                                     );
                                 })}
                             </div>
+
+                            {/* SPEAKER LANGUAGES RELEASE NOTICE (1 НОЯБРЯ 2026 Г.) */}
+                            <div className="mt-3 p-3.5 rounded-2xl bg-amber-950/25 border-2 border-amber-500/40 text-left flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shadow-md">
+                                <div className="flex items-center space-x-2.5">
+                                    <span className="text-xl shrink-0">🔒</span>
+                                    <div>
+                                        <div className="text-xs font-black text-amber-300 uppercase tracking-wider flex items-center gap-2">
+                                            <span>{user.language === 'ru' ? 'В разработке • Доступно 1 ноября 2026 г.' : 'In Development • Available Nov 1, 2026'}</span>
+                                        </div>
+                                        <p className="text-[11px] text-amber-200/90 font-medium">
+                                            {user.language === 'ru' 
+                                                ? 'Переключение на эти языки и раздел «Письмо» откроются 1 ноября 2026 года' 
+                                                : 'Switching to these languages and "Letters" section will unlock on November 1, 2026'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        playSound('click');
+                                        setShowLanguageLockModal(true);
+                                    }}
+                                    className="px-3 py-1 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap cursor-pointer transition-all self-end sm:self-center"
+                                >
+                                    {user.language === 'ru' ? 'Подробнее ↗' : 'Details ↗'}
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -7516,20 +7805,20 @@ const getTodayChallenge = () => {
                         </div>
                     )}
                     {courseSortMode === 'easiest' && (
-                        <div className="bg-gradient-to-r from-amber-950/80 via-yellow-950/60 to-gray-900 border-2 border-amber-500/60 rounded-2xl p-3.5 mb-4 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in">
+                        <div className="bg-gradient-to-r from-emerald-950/80 via-teal-950/60 to-gray-900 border-2 border-emerald-500/60 rounded-2xl p-3.5 mb-4 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in">
                             <div className="flex items-center space-x-3">
-                                <span className="text-2xl">⚡</span>
+                                <span className="text-2xl animate-bounce">⚡</span>
                                 <div>
                                     <div className="text-sm font-black text-white flex items-center gap-2 flex-wrap">
                                         <span>{user.language === 'ru' ? 'Активна сортировка по сложности: От простых к сложным' : 'Active: Difficulty Sort (Easiest to Hardest)'}</span>
-                                        <span className="bg-gradient-to-r from-amber-500 to-yellow-500 text-black text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider border border-amber-300/60">
-                                            #11 → #1
+                                        <span className="bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider border border-emerald-300/60">
+                                            #1 ЭСПЕРАНТО → СЛОЖНЫЕ
                                         </span>
                                     </div>
-                                    <p className="text-xs text-amber-200/80 font-semibold mt-0.5">
+                                    <p className="text-xs text-emerald-200/80 font-semibold mt-0.5">
                                         {user.language === 'ru'
-                                            ? 'Обратный порядок: #11 Корейский → #10 Арабский → #9 Китайский → #8 Японский → #7 Польский → #6 Исландский → #5 Навахо → #4 Финский → #3 Баскский → #2 Венгерский → #1 Табасаранский'
-                                            : 'Reverse order: #11 Korean → #10 Arabic → #9 Chinese → #8 Japanese → #7 Polish → #6 Icelandic → #5 Navajo → #4 Finnish → #3 Basque → #2 Hungarian → #1 Tabasaran'}
+                                            ? 'Прямой порядок: #1 Эсперанто (0 исключений) → #2 Индонезийский (без спряжений/родов) → #3 Испанский → #4 Итальянский ... далее популярные и сложнейшие языки'
+                                            : 'Easiest order: #1 Esperanto (0 exceptions) → #2 Indonesian (no conjugations/genders) → #3 Spanish → #4 Italian ... up to the most complex languages'}
                                     </p>
                                 </div>
                             </div>
@@ -7542,6 +7831,284 @@ const getTodayChallenge = () => {
                             </button>
                         </div>
                     )}
+
+                    {/* SECTION: SELECTED COURSE, EASIEST WORLD LANGUAGE & HARDEST CIS LANGUAGE HERO SPOTLIGHT */}
+                    {!courseSearch && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                            {/* ACTIVE / SELECTED COURSE CARD */}
+                            <div className="bg-gradient-to-br from-blue-950/70 via-slate-900 to-indigo-950/60 border-2 border-duo-blue/70 rounded-3xl p-4 sm:p-5 shadow-2xl relative overflow-hidden flex flex-col justify-between">
+                                <div>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <span className="text-[11px] font-black uppercase text-duo-blue tracking-wider flex items-center space-x-1.5">
+                                            <span className="w-2.5 h-2.5 rounded-full bg-duo-blue animate-pulse" />
+                                            <span>{user.language === 'ru' ? 'Раздел: Выбранный курс' : 'Section: Selected Course'}</span>
+                                        </span>
+                                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-duo-green/20 text-emerald-300 border border-emerald-500/40 uppercase">
+                                            ✅ {user.language === 'ru' ? 'Активен сейчас' : 'Active Now'}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center space-x-3.5 mb-3">
+                                        {SPECIAL_IDS.includes(currentCourse.id) ? (
+                                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black ${currentCourse.themeColor} text-white shadow-lg`}>
+                                                {currentCourse.id === 'math' ? 'Σ' : currentCourse.id === 'music' ? '♫' : currentCourse.id === 'chess' ? '♔' : '🚀'}
+                                            </div>
+                                        ) : (
+                                            <img 
+                                                src={`https://flagcdn.com/w80/${currentCourse.flagCode}.png`} 
+                                                className="w-14 h-10 rounded-xl object-cover shadow-lg border border-white/10" 
+                                                alt={currentCourse.name} 
+                                            />
+                                        )}
+                                        <div className="min-w-0 flex-1">
+                                            <h3 className="text-lg sm:text-xl font-black text-white truncate">
+                                                {getLocalizedCourseName(currentCourse)}
+                                            </h3>
+                                            <p className="text-xs text-sky-300 font-bold uppercase tracking-wider">
+                                                {currentCourse.name} • {currentCourse.id.toUpperCase()}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-gray-300 font-medium line-clamp-2 mb-3">
+                                        {user.language === 'ru' 
+                                            ? `Выбранный вами курс в DuoWindo6601. Доступны интерактивные уровни, путь обучения и озвучивание.` 
+                                            : `Your selected learning course in DuoWindo6601. Interactive path, lessons and audio ready.`}
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2 pt-2 border-t border-gray-700/60">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            playSound('click');
+                                            setSelectedHardestLanguageId(currentCourse.id);
+                                        }}
+                                        className="flex-1 py-2 px-3 bg-gray-800 hover:bg-gray-750 text-sky-200 font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow cursor-pointer border border-sky-400/40 text-center flex items-center justify-center space-x-1"
+                                    >
+                                        <span>📖</span>
+                                        <span>{user.language === 'ru' ? 'Подробнее' : 'Details'}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            playSound('select');
+                                            setScreen(AppScreen.PATH);
+                                        }}
+                                        className="flex-1 py-2 px-3 bg-duo-green hover:brightness-110 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow cursor-pointer text-center flex items-center justify-center space-x-1"
+                                    >
+                                        <span>🚀</span>
+                                        <span>{user.language === 'ru' ? 'Изучать' : 'Learn'}</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* EASIEST LANGUAGE IN THE WORLD HERO SPOTLIGHT CARD */}
+                            <div className="bg-gradient-to-br from-emerald-950/70 via-teal-950/40 to-gray-900 border-2 border-emerald-500/70 rounded-3xl p-4 sm:p-5 shadow-2xl relative overflow-hidden flex flex-col justify-between">
+                                <div>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <span className="text-[11px] font-black uppercase text-emerald-400 tracking-wider flex items-center space-x-1.5">
+                                            <span className="text-sm">🏆</span>
+                                            <span>{user.language === 'ru' ? 'Самый лёгкий язык в мире' : 'Easiest Language in the World'}</span>
+                                        </span>
+                                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500 text-slate-950 border border-emerald-400/60 uppercase">
+                                            0 ИСКЛЮЧЕНИЙ
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center space-x-3.5 mb-3">
+                                        <img 
+                                            src="https://flagcdn.com/w80/eu.png" 
+                                            className="w-14 h-10 rounded-xl object-cover shadow-lg border border-emerald-400/30" 
+                                            alt="Esperanto" 
+                                        />
+                                        <div className="min-w-0 flex-1">
+                                            <h3 className="text-lg sm:text-xl font-black text-white truncate flex items-center gap-2">
+                                                <span>{user.language === 'ru' ? 'Эсперанто' : 'Esperanto'}</span>
+                                                <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">№1 В МИРЕ</span>
+                                            </h3>
+                                            <p className="text-xs text-emerald-300 font-bold uppercase tracking-wider">
+                                                {user.language === 'ru' ? '16 правил • Без исключений' : '16 rules • 0 exceptions'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-emerald-100/80 font-medium line-clamp-2 mb-3">
+                                        {user.language === 'ru' 
+                                            ? 'Признан ЮНЕСКО и Книгой рекордов Гиннесса: ровно 16 правил без единого исключения, учится в 4-5 раз быстрее любого другого языка на планете!'
+                                            : 'UNESCO & Guinness record: exactly 16 rules, 0 exceptions, mastered 4-5x faster than any other language on Earth!'}
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2 pt-2 border-t border-emerald-700/50">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            playSound('click');
+                                            setSelectedHardestLanguageId('eo');
+                                        }}
+                                        className="flex-1 py-2 px-3 bg-emerald-700/80 hover:bg-emerald-600 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow cursor-pointer border border-emerald-400/50 text-center flex items-center justify-center space-x-1"
+                                    >
+                                        <span>📖</span>
+                                        <span>{user.language === 'ru' ? 'Подробнее' : 'Details'}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            playSound('select');
+                                            const eoCourse = COURSES.find(c => c.id === 'eo') || EASIEST_COURSES[0];
+                                            setCurrentCourse(eoCourse);
+                                            localStorage.setItem('duo_course_id_6601', 'eo');
+                                            setScreen(AppScreen.PATH);
+                                        }}
+                                        className="flex-1 py-2 px-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow cursor-pointer text-center flex items-center justify-center space-x-1"
+                                    >
+                                        <span>🚀</span>
+                                        <span>{user.language === 'ru' ? 'Изучать' : 'Learn'}</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* HARDEST CIS & FORMER USSR LANGUAGE HERO SPOTLIGHT CARD */}
+                            <div className="bg-gradient-to-br from-purple-950/80 via-slate-900 to-rose-950/60 border-2 border-purple-500/70 rounded-3xl p-4 sm:p-5 shadow-2xl relative overflow-hidden flex flex-col justify-between">
+                                <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-[11px] font-black uppercase text-purple-300 tracking-wider flex items-center space-x-1.5 truncate">
+                                            <span className="text-sm">🏛️⚡</span>
+                                            <span>{user.language === 'ru' ? 'Самый сложный язык СНГ' : 'Hardest CIS / USSR Language'}</span>
+                                        </span>
+                                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-purple-500/30 text-purple-200 border border-purple-400/50 uppercase shrink-0">
+                                            {cisHardestHeroTab === 'tab' ? 'ГИННЕСС #1' : 'ГОС. ЯЗЫК #1'}
+                                        </span>
+                                    </div>
+
+                                    {/* TOGGLE: TABASARAN VS GEORGIAN */}
+                                    <div className="flex items-center bg-gray-950/70 rounded-xl p-1 border border-purple-500/30 mb-3 text-[10px] font-black">
+                                        <button
+                                            type="button"
+                                            onClick={() => { playSound('click'); setCisHardestHeroTab('tab'); }}
+                                            className={`flex-1 py-1 px-2 rounded-lg transition-all text-center ${cisHardestHeroTab === 'tab' ? 'bg-purple-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+                                        >
+                                            🇷🇺 {user.language === 'ru' ? 'Табасаранский' : 'Tabasaran'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { playSound('click'); setCisHardestHeroTab('ka'); }}
+                                            className={`flex-1 py-1 px-2 rounded-lg transition-all text-center ${cisHardestHeroTab === 'ka' ? 'bg-rose-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+                                        >
+                                            🇬🇪 {user.language === 'ru' ? 'Грузинский' : 'Georgian'}
+                                        </button>
+                                    </div>
+
+                                    {cisHardestHeroTab === 'tab' ? (
+                                        <>
+                                            <div className="flex items-center space-x-3.5 mb-2.5">
+                                                <img 
+                                                    src="https://flagcdn.com/w80/ru.png" 
+                                                    className="w-14 h-10 rounded-xl object-cover shadow-lg border border-purple-400/40 shrink-0" 
+                                                    alt="Tabasaran" 
+                                                />
+                                                <div className="min-w-0 flex-1">
+                                                    <h3 className="text-base sm:text-lg font-black text-white truncate flex items-center gap-1.5">
+                                                        <span>{user.language === 'ru' ? 'Табасаранский' : 'Tabasaran'}</span>
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/30 text-purple-300 border border-purple-400/40 font-bold shrink-0">48+ ПАДЕЖЕЙ</span>
+                                                    </h3>
+                                                    <p className="text-[11px] text-purple-300 font-bold uppercase tracking-wider">
+                                                        {user.language === 'ru' ? 'Книга рекордов Гиннесса' : 'Guinness Record Holder'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <p className="text-xs text-purple-100/80 font-medium line-clamp-2 mb-3">
+                                                {user.language === 'ru' 
+                                                    ? 'Абсолютный мировой рекордсмен на территории экс-СССР: от 48 до 53 падежей существительных, пространственные локативы и эргативный строй!'
+                                                    : 'Absolute Guinness record in former USSR: 48 to 53 noun cases, spatial locatives, and intricate ergative syntax!'}
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="flex items-center space-x-3.5 mb-2.5">
+                                                <img 
+                                                    src="https://flagcdn.com/w80/ge.png" 
+                                                    className="w-14 h-10 rounded-xl object-cover shadow-lg border border-rose-400/40 shrink-0" 
+                                                    alt="Georgian" 
+                                                />
+                                                <div className="min-w-0 flex-1">
+                                                    <h3 className="text-base sm:text-lg font-black text-white truncate flex items-center gap-1.5">
+                                                        <span>{user.language === 'ru' ? 'Грузинский' : 'Georgian'}</span>
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-rose-500/30 text-rose-300 border border-rose-400/40 font-bold shrink-0">№1 ГОС. СНГ</span>
+                                                    </h3>
+                                                    <p className="text-[11px] text-rose-300 font-bold uppercase tracking-wider">
+                                                        {user.language === 'ru' ? 'Полиперсональный глагол' : 'Polypersonal Grammar'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <p className="text-xs text-rose-100/80 font-medium line-clamp-2 mb-3">
+                                                {user.language === 'ru' 
+                                                    ? 'Сложнейший государственный язык стран СНГ: глагол кодирует субъекта, объект и адресата одновременно, а кластеры согласных доходят до 8 букв («гвпртсквни»)!'
+                                                    : 'Most intricate national state language of post-Soviet nations: polypersonal agreement encoding 3 persons in a verb, consonant clusters up to 8 letters!'}
+                                            </p>
+                                        </>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2 pt-2 border-t border-purple-700/50">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            playSound('click');
+                                            setSelectedHardestLanguageId(cisHardestHeroTab);
+                                        }}
+                                        className="flex-1 py-2 px-3 bg-purple-800/80 hover:bg-purple-700 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow cursor-pointer border border-purple-400/50 text-center flex items-center justify-center space-x-1"
+                                    >
+                                        <span>📖</span>
+                                        <span>{user.language === 'ru' ? 'Подробнее' : 'Details'}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            playSound('select');
+                                            const targetId = cisHardestHeroTab;
+                                            const targetCourse = COURSES.find(c => c.id === targetId) || (targetId === 'tab' ? HARDEST_COURSES[0] : CIS_COURSES.find(c => c.id === 'ka')!);
+                                            setCurrentCourse(targetCourse);
+                                            localStorage.setItem('duo_course_id_6601', targetId);
+                                            setScreen(AppScreen.PATH);
+                                        }}
+                                        className="flex-1 py-2 px-3 bg-gradient-to-r from-purple-500 to-rose-500 hover:brightness-110 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow cursor-pointer text-center flex items-center justify-center space-x-1"
+                                    >
+                                        <span>🚀</span>
+                                        <span>{user.language === 'ru' ? 'Изучать' : 'Learn'}</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* COURSES & LANGUAGE REGIONS RELEASE ANNOUNCEMENT BANNER */}
+                    <div className="bg-amber-950/30 border-2 border-amber-500/50 rounded-3xl p-4 md:p-5 mb-6 text-left shadow-xl">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                            <div className="flex items-center space-x-3.5">
+                                <div className="w-11 h-11 rounded-2xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-2xl shrink-0">
+                                    🔒
+                                </div>
+                                <div>
+                                    <h4 className="text-xs sm:text-sm md:text-base font-black text-amber-300 uppercase tracking-wider flex items-center gap-2 flex-wrap">
+                                        <span>{user.language === 'ru' ? 'В разработке • Доступно 1 ноября 2026 г.' : 'In Development • Available Nov 1, 2026'}</span>
+                                        <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-amber-500 text-black uppercase">
+                                            15 {user.language === 'ru' ? 'языков' : 'langs'}
+                                        </span>
+                                    </h4>
+                                    <p className="text-xs text-amber-200/90 font-medium mt-1">
+                                        {user.language === 'ru'
+                                            ? 'Переключение на эти языки и раздел «Письмо» откроются 1 ноября 2026 года'
+                                            : 'Switching to these languages and the "Writing" section will unlock on November 1, 2026'}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    playSound('click');
+                                    setShowLanguageLockModal(true);
+                                }}
+                                className="px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-300 text-xs font-black uppercase tracking-wider whitespace-nowrap cursor-pointer transition-all self-end sm:self-center"
+                            >
+                                {user.language === 'ru' ? 'Смотреть список 🔒' : 'View locked list 🔒'}
+                            </button>
+                        </div>
+                    </div>
 
                     {/* REGION NAVIGATION TABS */}
                     {!courseSearch && (
@@ -7557,6 +8124,12 @@ const getTodayChallenge = () => {
                                 className={`px-4 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider whitespace-nowrap transition-all border-b-4 ${courseRegionTab === 'speaker' ? 'bg-gradient-to-r from-amber-500 to-yellow-500 border-amber-700 text-black shadow-lg shadow-amber-500/20' : 'bg-gray-800 border-gray-900 text-gray-400 hover:bg-gray-700'}`}
                             >
                                 🗣️ {user.language === 'ru' ? 'Для знающих мой язык' : 'For My Language'} ({SPEAKER_LANGUAGES.find(s => s.code === speakerLanguage)?.name || speakerLanguage.toUpperCase()})
+                            </button>
+                            <button 
+                                onClick={() => { playSound('click'); setCourseRegionTab('easiest'); }}
+                                className={`px-4 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider whitespace-nowrap transition-all border-b-4 ${courseRegionTab === 'easiest' ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-green-600 border-emerald-900 text-white shadow-lg shadow-emerald-500/25 ring-2 ring-emerald-400/40' : 'bg-gray-800 border-gray-900 text-gray-400 hover:bg-gray-700'}`}
+                            >
+                                🟢 {t('easiestLanguages')}
                             </button>
                             <button 
                                 onClick={() => { playSound('click'); setCourseRegionTab('hardest'); }}
@@ -7796,6 +8369,79 @@ const getTodayChallenge = () => {
                                 </div>
                             )}
 
+                            {/* SECTION: EASIEST LANGUAGES IN THE WORLD (Самый лёгкий язык в мире) */}
+                            {(courseRegionTab === 'all' || courseRegionTab === 'easiest') && (
+                                <div className="rounded-3xl p-5 md:p-6 bg-gradient-to-br from-emerald-950/50 via-teal-950/30 to-gray-900 border-2 border-emerald-500/50 shadow-2xl relative overflow-hidden">
+                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6">
+                                        <div className="flex items-center space-x-3">
+                                            <span className="text-3xl animate-bounce">🟢</span>
+                                            <div>
+                                                <h3 className="text-xl md:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-teal-200 to-green-400 uppercase tracking-widest flex items-center gap-2">
+                                                    {t('easiestSectionTitle')}
+                                                    <span className="bg-emerald-500 text-slate-950 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-emerald-400/50">TOP</span>
+                                                </h3>
+                                                <p className="text-xs text-emerald-200/80 font-bold mt-0.5">
+                                                    {t('easiestSectionDesc')}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <span className="text-[11px] font-black text-emerald-300 bg-emerald-950/80 px-3 py-1.5 rounded-xl border border-emerald-500/40 uppercase tracking-wider self-start md:self-auto">
+                                            ⚡ {t('extremeSimplicity')}
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                        {ALL_EASIEST_COURSES.map(c => {
+                                            const info = EASIEST_LANGUAGE_INFO[c.id];
+                                            const isSelected = currentCourse.id === c.id;
+                                            return (
+                                                <div 
+                                                    key={c.id} 
+                                                    className={`relative p-4 rounded-2xl border-2 border-b-4 transition-all flex flex-col justify-between shadow-xl group ${isSelected ? 'bg-emerald-950/60 border-emerald-500 ring-2 ring-emerald-500' : 'bg-gray-800/90 border-gray-700/80 hover:bg-gray-750 hover:border-emerald-500/50'}`}
+                                                >
+                                                    <div className="flex items-start justify-between gap-3 mb-2 cursor-pointer" onClick={() => { playSound('select'); setCurrentCourse(c); setScreen(AppScreen.PATH); }}>
+                                                        <div className="flex items-center space-x-3 min-w-0">
+                                                            <img src={`https://flagcdn.com/w80/${c.flagCode}.png`} className="w-12 h-8 rounded-md object-cover shadow-md group-hover:scale-110 transition-transform" alt={c.name} />
+                                                            <div className="flex-1 min-w-0">
+                                                                <h3 className="font-bold text-base text-white truncate">{getLocalizedCourseName(c)}</h3>
+                                                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{c.name}</p>
+                                                            </div>
+                                                        </div>
+                                                        {isSelected && <div className="bg-duo-green rounded-full p-1"><CheckCircleIcon className="w-5 h-5 text-white"/></div>}
+                                                    </div>
+                                                    {info && (
+                                                        <div className="mt-2 pt-2 border-t border-gray-700/60 flex flex-col space-y-2">
+                                                            <div className="flex items-center justify-between text-[10px] font-black">
+                                                                <span className="text-emerald-400 truncate">{info.badge}</span>
+                                                                <span className="text-emerald-300 bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-500/30 shrink-0 ml-1">{info.rank}</span>
+                                                            </div>
+                                                            <p className="text-[10px] text-gray-300 font-medium leading-tight line-clamp-2">
+                                                                {user.language === 'ru' ? info.reasonRu : info.reasonEn}
+                                                            </p>
+                                                            <div className="flex items-center gap-2 pt-1">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => { e.stopPropagation(); playSound('click'); setSelectedHardestLanguageId(c.id); }}
+                                                                    className="flex-1 py-1.5 px-3 bg-emerald-600/80 hover:bg-emerald-500 text-white font-black text-[10px] uppercase tracking-wider rounded-xl transition-all shadow cursor-pointer border border-emerald-400/50 text-center"
+                                                                >
+                                                                    {user.language === 'ru' ? '📖 Подробнее' : '📖 Details'}
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => { e.stopPropagation(); playSound('select'); setCurrentCourse(c); setScreen(AppScreen.PATH); }}
+                                                                    className="py-1.5 px-3 bg-duo-green hover:brightness-110 text-white font-black text-[10px] uppercase tracking-wider rounded-xl transition-all shadow cursor-pointer"
+                                                                >
+                                                                    {user.language === 'ru' ? 'Изучать' : 'Learn'}
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* SECTION: HARDEST LANGUAGES IN THE WORLD */}
                             {(courseRegionTab === 'all' || courseRegionTab === 'hardest') && (
                                 <div className="rounded-3xl p-5 md:p-6 bg-gradient-to-br from-red-950/40 via-orange-950/20 to-gray-900 border-2 border-orange-500/30 shadow-2xl relative overflow-hidden">
@@ -7869,30 +8515,244 @@ const getTodayChallenge = () => {
                                 </div>
                             )}
 
-                            {/* SECTION 1: CIS LANGUAGES */}
+                            {/* SECTION 1: CIS LANGUAGES & QUESTION: САМЫЙ СЛОЖНЫЙ ЯЗЫК СТРАН БЫВШЕГО СНГ / СССР */}
                             {(courseRegionTab === 'all' || courseRegionTab === 'cis') && (
-                                <div>
-                                    <div className="flex items-center space-x-3 mb-4">
-                                        <span className="text-2xl">🏛️</span>
-                                        <h3 className="text-xl font-black text-emerald-400 uppercase tracking-widest">
-                                            {t('cisSectionTitle')}
-                                        </h3>
-                                    </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                        {CIS_COURSES.map(c => (
-                                            <div 
-                                                key={c.id} 
-                                                onClick={() => { playSound('select'); setCurrentCourse(c); setScreen(AppScreen.PATH); }} 
-                                                className={`relative p-4 rounded-2xl border-2 border-b-4 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all flex items-center space-x-4 shadow-lg group ${currentCourse.id === c.id ? 'bg-emerald-950/40 border-emerald-500 ring-2 ring-emerald-500' : 'bg-gray-800 border-gray-700 hover:bg-gray-750'}`}
-                                            >
-                                                <img src={`https://flagcdn.com/w80/${c.flagCode}.png`} className="w-12 h-8 rounded-md object-cover shadow-md group-hover:scale-110 transition-transform" alt={c.name} />
-                                                <div className="flex-1 min-w-0">
-                                                    <h3 className="font-bold text-base text-white truncate">{getLocalizedCourseName(c)}</h3>
-                                                    <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">{c.name}</p>
-                                                </div>
-                                                {currentCourse.id === c.id && <div className="bg-duo-green rounded-full p-1"><CheckCircleIcon className="w-5 h-5 text-white"/></div>}
+                                <div className="space-y-6">
+                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                        <div className="flex items-center space-x-3">
+                                            <span className="text-3xl animate-pulse">🏛️</span>
+                                            <div>
+                                                <h3 className="text-xl md:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 uppercase tracking-widest flex items-center gap-2">
+                                                    {t('cisSectionTitle')}
+                                                    <span className="bg-emerald-500 text-slate-950 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-emerald-400/50">15 ГОСУДАРСТВ</span>
+                                                </h3>
+                                                <p className="text-xs text-emerald-200/80 font-bold mt-0.5">
+                                                    {user.language === 'ru' 
+                                                        ? 'Официальные языки стран СНГ, Закавказья, Центральной Азии и Балтии' 
+                                                        : 'Official languages of CIS nations, Caucasus, Central Asia, and Baltics'}
+                                                </p>
                                             </div>
-                                        ))}
+                                        </div>
+                                        <span className="text-[11px] font-black text-emerald-300 bg-emerald-950/80 px-3 py-1.5 rounded-xl border border-emerald-500/40 uppercase tracking-wider self-start md:self-auto">
+                                            🏛️ ПОСТСОВЕТСКИЕ ЯЗЫКИ
+                                        </span>
+                                    </div>
+
+                                    {/* PROMINENT SPOTLIGHT BANNER: САМЫЙ СЛОЖНЫЙ ЯЗЫК СТРАН БЫВШЕГО СНГ И СССР */}
+                                    <div className="rounded-3xl p-5 md:p-6 bg-gradient-to-br from-purple-950/70 via-slate-900 to-rose-950/60 border-2 border-purple-500/60 shadow-2xl relative overflow-hidden">
+                                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
+                                            <div className="flex items-center space-x-3">
+                                                <span className="text-3xl animate-bounce">⚡</span>
+                                                <div>
+                                                    <h4 className="text-lg md:text-xl font-black text-white flex items-center gap-2 flex-wrap">
+                                                        <span>{user.language === 'ru' ? 'Какой самый сложный язык стран бывшего СНГ и СССР?' : 'What is the hardest language of CIS & former USSR?'}</span>
+                                                        <span className="bg-gradient-to-r from-purple-500 to-rose-500 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow">
+                                                            ОТВЕТ LINGUISTICS
+                                                        </span>
+                                                    </h4>
+                                                    <p className="text-xs text-purple-200/90 font-medium mt-1">
+                                                        {user.language === 'ru'
+                                                            ? 'В лингвистике выделяют два абсолютных рекордсмена: рекордсмен Книги Гиннесса на территории экс-СССР (#1 Табасаранский) и сложнейший государственный язык стран СНГ (#1 Грузинский).'
+                                                            : 'Linguistics highlights two distinct leaders: Guinness world record on former USSR soil (#1 Tabasaran) and most complex national state language (#1 Georgian).'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* DUAL COMPARISON CARDS: TABASARAN (#1 GUINNESS) & GEORGIAN (#1 STATE CIS) */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                            {/* CARD 1: TABASARAN */}
+                                            <div className="bg-gray-900/90 border-2 border-purple-500/50 rounded-2xl p-4 flex flex-col justify-between shadow-xl relative hover:border-purple-400 transition-all">
+                                                <div>
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <span className="text-[10px] font-black text-purple-300 uppercase tracking-wider bg-purple-950/80 px-2 py-0.5 rounded-md border border-purple-500/30">
+                                                            🏆 РЕКОРДСМЕН ГИННЕССА (ЭКС-СССР)
+                                                        </span>
+                                                        <span className="text-[10px] font-black text-amber-400">#1 В МИРЕ</span>
+                                                    </div>
+                                                    <div className="flex items-center space-x-3 mb-2.5">
+                                                        <img src="https://flagcdn.com/w80/ru.png" className="w-12 h-8 rounded-md object-cover shadow border border-purple-400/40" alt="Tabasaran" />
+                                                        <div>
+                                                            <h5 className="font-black text-base text-white">
+                                                                {user.language === 'ru' ? 'Табасаранский язык' : 'Tabasaran Language'}
+                                                            </h5>
+                                                            <p className="text-[11px] text-purple-300 font-bold">
+                                                                {user.language === 'ru' ? 'Дагестан / бывший СССР • 48–53 падежа' : 'Dagestan / former USSR • 48–53 cases'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <p className="text-xs text-gray-300 leading-relaxed mb-3">
+                                                        {user.language === 'ru'
+                                                            ? 'Занесён в Книгу рекордов Гиннесса как язык с наибольшим числом падежей в мире (48–53 падежа). Обладает сложнейшей системой пространственных локативов (движение внутрь, под, над, возле) и эргативным синтаксисом.'
+                                                            : 'Recognized by Guinness World Records as the language with the most noun cases on Earth (48–53). Features intricate spatial locatives and ergative grammar.'}
+                                                    </p>
+                                                </div>
+                                                <div className="flex items-center gap-2 pt-2 border-t border-gray-800">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { playSound('click'); setSelectedHardestLanguageId('tab'); }}
+                                                        className="flex-1 py-2 px-3 bg-purple-800/80 hover:bg-purple-700 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow cursor-pointer border border-purple-400/40 text-center flex items-center justify-center space-x-1"
+                                                    >
+                                                        <span>📖</span>
+                                                        <span>{user.language === 'ru' ? 'Подробнее' : 'Details'}</span>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            playSound('select');
+                                                            const tabCourse = COURSES.find(c => c.id === 'tab') || HARDEST_COURSES[0];
+                                                            setCurrentCourse(tabCourse);
+                                                            localStorage.setItem('duo_course_id_6601', 'tab');
+                                                            setScreen(AppScreen.PATH);
+                                                        }}
+                                                        className="flex-1 py-2 px-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:brightness-110 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow cursor-pointer text-center flex items-center justify-center space-x-1"
+                                                    >
+                                                        <span>🚀</span>
+                                                        <span>{user.language === 'ru' ? 'Изучать' : 'Learn'}</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* CARD 2: GEORGIAN */}
+                                            <div className="bg-gray-900/90 border-2 border-rose-500/50 rounded-2xl p-4 flex flex-col justify-between shadow-xl relative hover:border-rose-400 transition-all">
+                                                <div>
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <span className="text-[10px] font-black text-rose-300 uppercase tracking-wider bg-rose-950/80 px-2 py-0.5 rounded-md border border-rose-500/30">
+                                                            🇬🇪 #1 ГОСУДАРСТВЕННЫЙ ЯЗЫК СНГ
+                                                        </span>
+                                                        <span className="text-[10px] font-black text-rose-400">#1 ГОС. ЭКС-СССР</span>
+                                                    </div>
+                                                    <div className="flex items-center space-x-3 mb-2.5">
+                                                        <img src="https://flagcdn.com/w80/ge.png" className="w-12 h-8 rounded-md object-cover shadow border border-rose-400/40" alt="Georgian" />
+                                                        <div>
+                                                            <h5 className="font-black text-base text-white">
+                                                                {user.language === 'ru' ? 'Грузинский язык (ქართული)' : 'Georgian Language (ქართული)'}
+                                                            </h5>
+                                                            <p className="text-[11px] text-rose-300 font-bold">
+                                                                {user.language === 'ru' ? 'Грузия • Полиперсональное спряжение' : 'Georgia • Polypersonal agreement'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <p className="text-xs text-gray-300 leading-relaxed mb-3">
+                                                        {user.language === 'ru'
+                                                            ? 'Сложнейший государственный язык среди независимых стран бывшего СССР: полиперсональный глагол кодирует субъекта, объект и адресата одновременно (до 3 лиц в одном слове!), а кластеры согласных доходят до 8 букв («гвпртсквни»).'
+                                                            : 'The most intricate national state language among post-Soviet nations: verbs encode subject, direct object, and indirect recipient simultaneously, with consonant clusters up to 8 letters!'}
+                                                    </p>
+                                                </div>
+                                                <div className="flex items-center gap-2 pt-2 border-t border-gray-800">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { playSound('click'); setSelectedHardestLanguageId('ka'); }}
+                                                        className="flex-1 py-2 px-3 bg-rose-800/80 hover:bg-rose-700 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow cursor-pointer border border-rose-400/40 text-center flex items-center justify-center space-x-1"
+                                                    >
+                                                        <span>📖</span>
+                                                        <span>{user.language === 'ru' ? 'Подробнее' : 'Details'}</span>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            playSound('select');
+                                                            const kaCourse = COURSES.find(c => c.id === 'ka') || CIS_COURSES.find(c => c.id === 'ka')!;
+                                                            setCurrentCourse(kaCourse);
+                                                            localStorage.setItem('duo_course_id_6601', 'ka');
+                                                            setScreen(AppScreen.PATH);
+                                                        }}
+                                                        className="flex-1 py-2 px-3 bg-gradient-to-r from-rose-600 to-amber-600 hover:brightness-110 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow cursor-pointer text-center flex items-center justify-center space-x-1"
+                                                    >
+                                                        <span>🚀</span>
+                                                        <span>{user.language === 'ru' ? 'Изучать' : 'Learn'}</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* OTHER CHALLENGING LANGUAGES OF FORMER USSR */}
+                                        <div className="bg-black/40 rounded-2xl p-3 border border-purple-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                                            <div className="flex items-center space-x-2">
+                                                <span className="text-base">📌</span>
+                                                <span className="text-purple-200 font-bold">
+                                                    {user.language === 'ru' ? 'Также уникальные по сложности в экс-СССР:' : 'Also unique in post-Soviet territory:'}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { playSound('click'); setSelectedHardestLanguageId('hy'); }}
+                                                    className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-orange-300 rounded-lg border border-orange-500/40 font-bold text-[11px] flex items-center space-x-1 cursor-pointer"
+                                                >
+                                                    <span>🇦🇲</span>
+                                                    <span>{user.language === 'ru' ? 'Армянский (7 падежей, 405 г.)' : 'Armenian (7 cases, 405 AD)'}</span>
+                                                    <span className="text-[10px] text-gray-400 underline ml-1">📖 Подробнее</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { playSound('click'); setSelectedHardestLanguageId('cv'); }}
+                                                    className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-amber-300 rounded-lg border border-amber-500/40 font-bold text-[11px] flex items-center space-x-1 cursor-pointer"
+                                                >
+                                                    <span>👑</span>
+                                                    <span>{user.language === 'ru' ? 'Чувашский (булгарская ветвь)' : 'Chuvash (Bulgar branch)'}</span>
+                                                    <span className="text-[10px] text-gray-400 underline ml-1">📖 Подробнее</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* FULL GRID OF CIS COURSES WITH BADGES & ACTIONS */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                        {CIS_COURSES.map(c => {
+                                            const isKa = c.id === 'ka';
+                                            const isHy = c.id === 'hy';
+                                            const isSelected = currentCourse.id === c.id;
+                                            return (
+                                                <div 
+                                                    key={c.id} 
+                                                    className={`relative p-4 rounded-2xl border-2 border-b-4 transition-all flex flex-col justify-between shadow-lg group ${isSelected ? 'bg-emerald-950/60 border-emerald-500 ring-2 ring-emerald-500' : 'bg-gray-800/95 border-gray-700 hover:bg-gray-750 hover:border-emerald-500/50'}`}
+                                                >
+                                                    <div className="flex items-start justify-between gap-3 mb-2 cursor-pointer" onClick={() => { playSound('select'); setCurrentCourse(c); localStorage.setItem('duo_course_id_6601', c.id); setScreen(AppScreen.PATH); }}>
+                                                        <div className="flex items-center space-x-3 min-w-0">
+                                                            <img src={`https://flagcdn.com/w80/${c.flagCode}.png`} className="w-12 h-8 rounded-md object-cover shadow-md group-hover:scale-110 transition-transform" alt={c.name} />
+                                                            <div className="flex-1 min-w-0">
+                                                                <h3 className="font-bold text-base text-white truncate">{getLocalizedCourseName(c)}</h3>
+                                                                <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">{c.name}</p>
+                                                            </div>
+                                                        </div>
+                                                        {isSelected && <div className="bg-duo-green rounded-full p-1"><CheckCircleIcon className="w-5 h-5 text-white"/></div>}
+                                                    </div>
+
+                                                    {/* Badges and action buttons */}
+                                                    <div className="mt-2 pt-2 border-t border-gray-700/60 flex flex-col space-y-2">
+                                                        <div className="flex items-center justify-between text-[10px] font-black">
+                                                            {isKa ? (
+                                                                <span className="text-rose-400">🇬🇪 #1 Сложнейший гос. язык</span>
+                                                            ) : isHy ? (
+                                                                <span className="text-orange-400">🇦🇲 Алфавит 405 г. • 7 падежей</span>
+                                                            ) : (
+                                                                <span className="text-gray-400">🏛️ Курс DuoWindo6601</span>
+                                                            )}
+                                                            {isKa && <span className="text-rose-300 bg-rose-950/80 px-1.5 py-0.5 rounded border border-rose-500/30">#1 СНГ</span>}
+                                                            {isHy && <span className="text-orange-300 bg-orange-950/80 px-1.5 py-0.5 rounded border border-orange-500/30">Кавказ</span>}
+                                                        </div>
+
+                                                        <div className="flex items-center gap-2 pt-1">
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => { e.stopPropagation(); playSound('click'); setSelectedHardestLanguageId(c.id); }}
+                                                                className="flex-1 py-1.5 px-2 bg-gray-700/80 hover:bg-gray-650 text-white font-black text-[10px] uppercase tracking-wider rounded-xl transition-all shadow cursor-pointer border border-gray-600 text-center"
+                                                            >
+                                                                {user.language === 'ru' ? '📖 Подробнее' : '📖 Details'}
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => { e.stopPropagation(); playSound('select'); setCurrentCourse(c); localStorage.setItem('duo_course_id_6601', c.id); setScreen(AppScreen.PATH); }}
+                                                                className="py-1.5 px-3 bg-duo-green hover:brightness-110 text-white font-black text-[10px] uppercase tracking-wider rounded-xl transition-all shadow cursor-pointer"
+                                                            >
+                                                                {user.language === 'ru' ? 'Изучать' : 'Learn'}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}
@@ -8336,173 +9196,17 @@ const getTodayChallenge = () => {
             </div>
         )}
 
-        {/* TRANSLATOR OVERLAY */}
+        {/* TRANSLATOR SCREEN DUOWINDO6601 WITH COUNTRY SWITCHER & OFFLINE DICTIONARIES */}
         {screen === AppScreen.TRANSLATOR && (
-            <div className="fixed inset-0 z-[100] bg-duo-dark overflow-y-auto">
-                <div className="p-4 md:p-10 max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-5">
-                    <button onClick={() => { playSound('click'); setScreen(AppScreen.PRACTICE); }} className="mb-6 text-gray-400 hover:text-white flex items-center font-bold transition-colors">
-                        <CloseIcon className="w-8 h-8 mr-2"/> {t('back')}
-                    </button>
-                    
-                    <div className="flex items-center justify-between mb-6">
-                        <div className="flex items-center space-x-4">
-                            <div className="p-3 bg-duo-blue/20 rounded-2xl border border-duo-blue/40">
-                                <BookIcon className="w-8 h-8 text-duo-blue" />
-                            </div>
-                            <div>
-                                <h2 className="text-3xl font-black text-white">{t('translator')}</h2>
-                                <p className="text-xs text-gray-400 font-bold">{t('aiTrans')}</p>
-                            </div>
-                        </div>
-                        <div className="text-2xl animate-bounce">🦉</div>
-                    </div>
-
-                    <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 shadow-xl space-y-6 relative">
-                        {/* TARGET LANGUAGE SELECTOR */}
-                        <div>
-                            <label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-2">
-                                {user.language === 'ru' ? 'Язык перевода:' : 'Target Language:'}
-                            </label>
-                            <div className="flex flex-wrap gap-2">
-                                {[
-                                    { id: 'ru', name: 'Русский', flag: 'ru' },
-                                    { id: 'en', name: 'English', flag: 'gb' },
-                                    { id: 'de', name: 'Deutsch', flag: 'de' },
-                                    { id: 'fr', name: 'Français', flag: 'fr' },
-                                    { id: 'es', name: 'Español', flag: 'es' },
-                                    { id: 'ja', name: '日本語', flag: 'jp' },
-                                    { id: 'zh', name: '中文', flag: 'cn' },
-                                    { id: 'ar', name: 'العربية', flag: 'sa' },
-                                ].map(lang => {
-                                    const isSelected = transTarget.id === lang.id || (transTarget.name === lang.name);
-                                    return (
-                                        <button
-                                            key={lang.id}
-                                            onClick={() => {
-                                                playSound('select');
-                                                const matchCourse = COURSES.find(c => c.id === lang.id) || {
-                                                    id: lang.id,
-                                                    name: lang.name,
-                                                    localName: lang.name,
-                                                    flagCode: lang.flag,
-                                                    themeColor: 'bg-duo-blue',
-                                                    mascotVariant: 'owl'
-                                                } as any;
-                                                setTransTarget(matchCourse);
-                                            }}
-                                            className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center space-x-2 border-b-2 transition-all cursor-pointer ${
-                                                isSelected 
-                                                    ? 'bg-duo-blue text-white border-duo-blueDark shadow-md scale-105' 
-                                                    : 'bg-gray-800 text-gray-400 border-gray-700 hover:bg-gray-750 hover:text-white'
-                                            }`}
-                                        >
-                                            <img src={`https://flagcdn.com/w40/${lang.flag}.png`} className="w-5 h-3.5 rounded-sm object-cover" alt={lang.name}/>
-                                            <span>{lang.name}</span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* INPUT AREA */}
-                        <div className="relative">
-                            <textarea 
-                                value={translatorInput} 
-                                onChange={(e) => setTranslatorInput(e.target.value)} 
-                                placeholder={user.language === 'ru' ? "Введите текст для перевода..." : "Type text here to translate..."} 
-                                className="w-full h-32 bg-gray-800 border-2 border-gray-700 rounded-2xl p-4 text-base md:text-lg font-bold text-white focus:border-duo-blue focus:outline-none resize-none placeholder-gray-500"
-                            />
-                            {translatorInput && (
-                                <button 
-                                    onClick={() => setTranslatorInput("")} 
-                                    className="absolute top-3 right-3 p-1.5 bg-gray-700/80 hover:bg-gray-600 rounded-lg text-gray-300 hover:text-white text-xs font-bold transition-all"
-                                    title="Очистить"
-                                >
-                                    ✕
-                                </button>
-                            )}
-                        </div>
-
-                        {/* SAMPLE PRESETS */}
-                        <div>
-                            <p className="text-[11px] font-bold text-gray-400 mb-2">
-                                {user.language === 'ru' ? 'Быстрые фразы:' : 'Quick phrases:'}
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                                {[
-                                    user.language === 'ru' ? 'Привет, как твои дела?' : 'Hello, how are you?',
-                                    user.language === 'ru' ? 'Спасибо большое за помощь!' : 'Thank you very much for your help!',
-                                    user.language === 'ru' ? 'Где находится ближайший музей?' : 'Where is the nearest museum?',
-                                    user.language === 'ru' ? 'Сколько это стоит?' : 'How much does this cost?'
-                                ].map((phrase, idx) => (
-                                    <button 
-                                        key={idx}
-                                        onClick={() => {
-                                            playSound('click');
-                                            setTranslatorInput(phrase);
-                                        }}
-                                        className="px-2.5 py-1 bg-gray-800/80 hover:bg-gray-700 text-gray-300 text-[11px] font-bold rounded-lg border border-gray-700 transition-colors"
-                                    >
-                                        "{phrase}"
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* ACTION BUTTON */}
-                        <div className="flex justify-center pt-2">
-                            <button 
-                                onClick={() => handleTranslator()} 
-                                disabled={loading || !translatorInput.trim()} 
-                                className={`px-10 py-4 rounded-2xl font-black text-white uppercase tracking-widest transition-all shadow-lg text-sm md:text-base flex items-center space-x-2 ${
-                                    loading || !translatorInput.trim() 
-                                        ? 'bg-gray-700 cursor-not-allowed opacity-60' 
-                                        : 'bg-duo-green hover:brightness-110 border-b-4 border-duo-greenDark active:border-b-0 active:translate-y-1'
-                                }`}
-                            >
-                                <span>{loading ? '⏳' : '⚡'}</span>
-                                <span>{loading ? (user.language === 'ru' ? "Перевод..." : "Translating...") : (user.language === 'ru' ? "Перевести" : "Translate")}</span>
-                            </button>
-                        </div>
-
-                        {/* OUTPUT RESULT */}
-                        {translatorOutput && (
-                            <div className="bg-gray-800/90 border-2 border-duo-blue/40 rounded-2xl p-5 relative animate-in fade-in slide-in-from-bottom-2 shadow-xl space-y-3">
-                                <div className="flex items-center justify-between border-b border-gray-700/60 pb-2">
-                                    <span className="text-[11px] font-black uppercase tracking-wider text-duo-blue flex items-center space-x-1.5">
-                                        <span>✨</span>
-                                        <span>{user.language === 'ru' ? 'Результат' : 'Translation Result'} ({transTarget.name || transTarget.localName})</span>
-                                    </span>
-                                    <div className="flex items-center space-x-2">
-                                        <button 
-                                            onClick={() => {
-                                                navigator.clipboard?.writeText(translatorOutput);
-                                                playSound('success');
-                                                setToast(user.language === 'ru' ? "Скопировано в буфер!" : "Copied to clipboard!");
-                                            }}
-                                            className="px-2.5 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-xs font-bold transition-all flex items-center space-x-1"
-                                            title="Скопировать"
-                                        >
-                                            <span>📋</span>
-                                            <span>{user.language === 'ru' ? 'Копировать' : 'Copy'}</span>
-                                        </button>
-                                        <button 
-                                            onClick={() => speakText(translatorOutput, transTarget.id, false, user.preferredVoice, user.voiceProvider)} 
-                                            className="p-2 bg-duo-blue/20 hover:bg-duo-blue/40 text-duo-blue rounded-xl transition-transform hover:scale-110 active:scale-95"
-                                            title="Озвучить"
-                                        >
-                                            <VolumeIcon className="w-5 h-5" />
-                                        </button>
-                                    </div>
-                                </div>
-                                <p className="text-xl font-black text-white pr-4 leading-relaxed font-din select-text">
-                                    {translatorOutput}
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
+            <TranslatorScreen
+              userLanguage={user.language}
+              onBack={() => { playSound('click'); setScreen(AppScreen.PATH); }}
+              playSound={playSound}
+              setToast={(msg) => setToast(msg)}
+              speakText={speakText}
+              preferredVoice={user.preferredVoice}
+              voiceProvider={user.voiceProvider}
+            />
         )}
 
         {/* --- VIDEO CALL SCREEN DUOWINDO6601 --- */}
@@ -9354,33 +10058,77 @@ const getTodayChallenge = () => {
               ) : currentCourse.id === 'math' ? (
                   <div className="w-full max-w-md flex flex-col items-center px-4 relative">
                       {/* MATH BANNER */}
-                      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 w-full p-6 rounded-3xl border-b-8 border-indigo-900 mb-6 flex justify-between items-center shadow-2xl transition-transform hover:scale-[1.01]">
+                      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700 w-full p-6 rounded-3xl border-b-8 border-indigo-900 mb-6 flex justify-between items-center shadow-2xl transition-transform hover:scale-[1.01]">
                           <div>
                               <div className="flex items-center space-x-2 mb-1">
-                                  <span className="text-xs font-black uppercase tracking-widest text-blue-200 bg-black/30 px-2.5 py-0.5 rounded-full">
-                                      {user.language === 'ru' ? 'Не язык • Курс математики' : 'Not a Language • Math Course'}
+                                  <span className="text-[11px] font-black uppercase tracking-widest text-amber-300 bg-black/40 px-3 py-1 rounded-full border border-amber-400/30">
+                                      {user.language === 'ru' ? 'Курс не является языком • Точная наука & Навыки' : 'Not a Language • Science & Skills Course'}
                                   </span>
                               </div>
                               <h2 className="text-2xl font-black text-white">{user.language === 'ru' ? 'Математика' : 'Mathematics'}</h2>
-                              <p className="text-xs text-blue-100 font-bold mt-0.5">
-                                  {user.language === 'ru' ? `${mathGrade} класс • ${mathTopic === 'arithmetic' ? 'Арифметика' : 'Алгебра'}` : `Grade ${mathGrade} • ${mathTopic === 'arithmetic' ? 'Arithmetic' : 'Algebra'}`}
+                              <p className="text-xs text-blue-100 font-bold mt-1">
+                                  {user.language === 'ru' 
+                                      ? `${mathGrade} класс • ${
+                                          mathTopic === 'arithmetic' ? '🔢 Арифметика' :
+                                          mathTopic === 'algebra' ? '📐 Алгебра' :
+                                          mathTopic === 'geometry' ? '📏 Геометрия' : '📈 Тригонометрия и Анализ'
+                                        }` 
+                                      : `Grade ${mathGrade} • ${mathTopic}`}
                               </p>
                           </div>
                           <span className="text-5xl drop-shadow-md">Σ</span>
                       </div>
 
-                      {/* GRADE SELECTOR: КЛАСС 2-8 ДОСТУП РАЗДЕЛ */}
-                      <div className="w-full bg-gray-900/80 border border-gray-800 p-3 rounded-2xl mb-4 shadow-inner">
-                          <div className="flex items-center justify-between mb-2 px-1">
+                      {/* GRADE SELECTOR: КЛАСС 1-11 ДОСТУП РАЗДЕЛ */}
+                      <div className="w-full bg-gray-900/80 border border-gray-800 p-3.5 rounded-2xl mb-4 shadow-inner">
+                          <div className="flex items-center justify-between mb-2.5 px-1">
                               <span className="text-xs font-black uppercase tracking-wider text-gray-300">
-                                  {user.language === 'ru' ? 'Класс 2-8 (доступ к разделам):' : 'Grade 2-8 selection:'}
+                                  {user.language === 'ru' ? 'Класс (доступ к разделам 1–11):' : 'Grade selection (1–11):'}
                               </span>
-                              <span className="text-[10px] font-black text-blue-400 bg-blue-950/80 px-2 py-0.5 rounded border border-blue-500/30">
+                              <span className="text-xs font-black text-blue-300 bg-blue-950/90 px-2.5 py-0.5 rounded-lg border border-blue-500/40 shadow">
                                   {mathGrade} {user.language === 'ru' ? 'класс' : 'grade'}
                               </span>
                           </div>
+
+                          {/* Quick Grade Brackets */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-2.5">
+                              {[
+                                  { label: '1–4 кл. (Начальная)', startGrade: 2 },
+                                  { label: '5–6 кл. (Математика)', startGrade: 5 },
+                                  { label: '7–9 кл. (Алгебра/Геом)', startGrade: 7 },
+                                  { label: '10–11 кл. (Старшая/ЕГЭ) 🎓', startGrade: 10 }
+                              ].map(bracket => {
+                                  const isActiveBracket = (
+                                      (bracket.startGrade === 2 && mathGrade <= 4) ||
+                                      (bracket.startGrade === 5 && (mathGrade === 5 || mathGrade === 6)) ||
+                                      (bracket.startGrade === 7 && (mathGrade >= 7 && mathGrade <= 9)) ||
+                                      (bracket.startGrade === 10 && mathGrade >= 10)
+                                  );
+                                  return (
+                                      <button
+                                          key={bracket.label}
+                                          type="button"
+                                          onClick={() => {
+                                              playSound('click');
+                                              setMathGrade(bracket.startGrade);
+                                              localStorage.setItem('duo_math_grade_6601', String(bracket.startGrade));
+                                              setToast(user.language === 'ru' ? `Переход в раздел: ${bracket.label}` : `Selected ${bracket.label}`);
+                                          }}
+                                          className={`py-1.5 px-2 rounded-xl text-[10px] font-black tracking-wide transition-all cursor-pointer ${
+                                              isActiveBracket
+                                                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md border border-blue-400'
+                                                  : 'bg-gray-800/90 text-gray-400 hover:text-white hover:bg-gray-700/80 border border-transparent'
+                                          }`}
+                                      >
+                                          {bracket.label}
+                                      </button>
+                                  );
+                              })}
+                          </div>
+
+                          {/* Individual Grade Selector Chips (1 to 11) */}
                           <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-                              {[2, 3, 4, 5, 6, 7, 8].map(gradeNum => {
+                              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(gradeNum => {
                                   const isSel = mathGrade === gradeNum;
                                   return (
                                       <button
@@ -9398,15 +10146,15 @@ const getTodayChallenge = () => {
                                                   : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
                                           }`}
                                       >
-                                          {gradeNum} {user.language === 'ru' ? 'класс' : 'gr'}
+                                          {gradeNum} {user.language === 'ru' ? 'кл.' : 'gr'}
                                       </button>
                                   );
                               })}
                           </div>
                       </div>
 
-                      {/* TOPIC SELECTOR: ТЕМЫ АРИФМЕТИКА И АЛГЕБРА */}
-                      <div className="w-full bg-gray-900/80 border border-gray-800 p-2 rounded-2xl mb-6 flex gap-2">
+                      {/* TOPIC SELECTOR: 4 ТЕМЫ (Арифметика, Алгебра, Геометрия, Анализ) */}
+                      <div className="w-full bg-gray-900/80 border border-gray-800 p-2 rounded-2xl mb-6 grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                           <button
                               type="button"
                               onClick={() => {
@@ -9414,7 +10162,7 @@ const getTodayChallenge = () => {
                                   setMathTopic('arithmetic');
                                   localStorage.setItem('duo_math_topic_6601', 'arithmetic');
                               }}
-                              className={`flex-1 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                              className={`py-2 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all flex items-center justify-center gap-1 cursor-pointer ${
                                   mathTopic === 'arithmetic'
                                       ? 'bg-blue-600 text-white shadow-md border-b-4 border-blue-800'
                                       : 'bg-gray-800 text-gray-400 hover:text-white'
@@ -9430,7 +10178,7 @@ const getTodayChallenge = () => {
                                   setMathTopic('algebra');
                                   localStorage.setItem('duo_math_topic_6601', 'algebra');
                               }}
-                              className={`flex-1 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                              className={`py-2 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all flex items-center justify-center gap-1 cursor-pointer ${
                                   mathTopic === 'algebra'
                                       ? 'bg-indigo-600 text-white shadow-md border-b-4 border-indigo-800'
                                       : 'bg-gray-800 text-gray-400 hover:text-white'
@@ -9439,16 +10187,53 @@ const getTodayChallenge = () => {
                               <span>📐</span>
                               <span>{user.language === 'ru' ? 'Алгебра' : 'Algebra'}</span>
                           </button>
+                          <button
+                              type="button"
+                              onClick={() => {
+                                  playSound('click');
+                                  setMathTopic('geometry');
+                                  localStorage.setItem('duo_math_topic_6601', 'geometry');
+                              }}
+                              className={`py-2 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                                  mathTopic === 'geometry'
+                                      ? 'bg-emerald-600 text-white shadow-md border-b-4 border-emerald-800'
+                                      : 'bg-gray-800 text-gray-400 hover:text-white'
+                              }`}
+                          >
+                              <span>📏</span>
+                              <span>{user.language === 'ru' ? 'Геометрия' : 'Geometry'}</span>
+                          </button>
+                          <button
+                              type="button"
+                              onClick={() => {
+                                  playSound('click');
+                                  setMathTopic('calculus');
+                                  localStorage.setItem('duo_math_topic_6601', 'calculus');
+                              }}
+                              className={`py-2 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                                  mathTopic === 'calculus'
+                                      ? 'bg-purple-600 text-white shadow-md border-b-4 border-purple-800'
+                                      : 'bg-gray-800 text-gray-400 hover:text-white'
+                              }`}
+                          >
+                              <span>📈</span>
+                              <span>{user.language === 'ru' ? 'Анализ' : 'Calculus'}</span>
+                          </button>
                       </div>
 
                       {/* ACTIVE MATH TOPIC & GRADE CARD */}
                       <div className="w-full bg-gray-800/90 border border-blue-500/30 p-4 rounded-2xl mb-6 shadow-md text-left">
-                          <div className="flex items-center space-x-2 mb-1">
-                              <span className="bg-blue-500 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase">
-                                  {mathGrade} {user.language === 'ru' ? 'класс' : 'Grade'} • {mathTopic === 'arithmetic' ? (user.language === 'ru' ? 'Арифметика' : 'Arithmetic') : (user.language === 'ru' ? 'Алгебра' : 'Algebra')}
+                          <div className="flex items-center space-x-2 mb-1.5">
+                              <span className="bg-blue-500 text-white text-[10px] font-black px-2.5 py-0.5 rounded uppercase tracking-wider">
+                                  {mathGrade} {user.language === 'ru' ? 'класс' : 'Grade'} • {
+                                      mathTopic === 'arithmetic' ? '🔢 Арифметика' :
+                                      mathTopic === 'algebra' ? '📐 Алгебра' :
+                                      mathTopic === 'geometry' ? '📏 Геометрия' : '📈 Тригонометрия и Анализ'
+                                  }
                               </span>
                           </div>
                           <p className="text-xs text-gray-300 font-bold leading-relaxed">
+                              {mathTopic === 'arithmetic' && mathGrade === 1 && (user.language === 'ru' ? 'Сложение и вычитание в пределах 20, прямое и обратное считывание.' : 'Addition and subtraction within 20.')}
                               {mathTopic === 'arithmetic' && mathGrade === 2 && (user.language === 'ru' ? 'Сложение и вычитание в пределах 100, умножение на 2 и 3, состав числа.' : 'Addition and subtraction within 100, basic multiplication.')}
                               {mathTopic === 'arithmetic' && mathGrade === 3 && (user.language === 'ru' ? 'Таблица умножения и деления до 100, скобки и порядок действий.' : 'Multiplication & division table to 100, order of operations.')}
                               {mathTopic === 'arithmetic' && mathGrade === 4 && (user.language === 'ru' ? 'Многозначные числа, умножение столбиком, деление с остатком, простые дроби.' : 'Multi-digit operations, long division, basic fractions.')}
@@ -9456,6 +10241,10 @@ const getTodayChallenge = () => {
                               {mathTopic === 'arithmetic' && mathGrade === 6 && (user.language === 'ru' ? 'Отрицательные числа, модуль числа, пропорции, НОД и НОК.' : 'Negative numbers, absolute values, proportions, GCD and LCM.')}
                               {mathTopic === 'arithmetic' && mathGrade === 7 && (user.language === 'ru' ? 'Рациональные числа, стандартный вид числа, степени с целым показателем.' : 'Rational numbers, scientific notation, integer exponents.')}
                               {mathTopic === 'arithmetic' && mathGrade === 8 && (user.language === 'ru' ? 'Арифметический квадратный корень √x, свойства корней, иррациональные числа.' : 'Square roots √x, radical properties and real numbers.')}
+                              {mathTopic === 'arithmetic' && mathGrade === 9 && (user.language === 'ru' ? 'Кубические корни ∛x, вычисление корней n-й степени, действительные числа.' : 'Cube roots, roots of nth degree, real number operations.')}
+                              {mathTopic === 'arithmetic' && (mathGrade === 10 || mathGrade === 11) && (user.language === 'ru' ? 'Свойства степеней с рациональным показателем, вычисления с экспонентами и приближенными значениями.' : 'Exponents with rational powers and precision arithmetic.')}
+
+                              {mathTopic === 'algebra' && mathGrade === 1 && (user.language === 'ru' ? 'Простейшие числовые равенства с неизвестным ? + a = b.' : 'Basic equations with missing value ? + a = b.')}
                               {mathTopic === 'algebra' && mathGrade === 2 && (user.language === 'ru' ? 'Числовые равенства и базовые уравнения вида x + a = b.' : 'Number equalities and simple x + a = b equations.')}
                               {mathTopic === 'algebra' && mathGrade === 3 && (user.language === 'ru' ? 'Уравнения с умножением и делением: a · x = b, x : a = b.' : 'Multiplication and division equations: a · x = b.')}
                               {mathTopic === 'algebra' && mathGrade === 4 && (user.language === 'ru' ? 'Составные уравнения со скобками: (x + a) · b = c.' : 'Compound equations with brackets: (x + a) · b = c.')}
@@ -9463,6 +10252,12 @@ const getTodayChallenge = () => {
                               {mathTopic === 'algebra' && mathGrade === 6 && (user.language === 'ru' ? 'Линейные уравнения с переносом слагаемых через знак равенства: 4x - 8 = 2x + 6.' : 'Linear equations with terms moved across equals sign.')}
                               {mathTopic === 'algebra' && mathGrade === 7 && (user.language === 'ru' ? 'Одночлены и многочлены, формулы сокращенного умножения (a+b)², графики y = kx + b.' : 'Polynomials, binomial squares (a+b)², linear functions.')}
                               {mathTopic === 'algebra' && mathGrade === 8 && (user.language === 'ru' ? 'Квадратные уравнения ax² + bx + c = 0, дискриминант D, теорема Виета и неравенства.' : 'Quadratic equations ax² + bx + c = 0, discriminant and Vieta.')}
+                              {mathTopic === 'algebra' && mathGrade === 9 && (user.language === 'ru' ? 'Квадратичная функция, системы уравнений, арифметическая и геометрическая прогрессии.' : 'Quadratic functions, systems of equations, progressions.')}
+                              {mathTopic === 'algebra' && mathGrade === 10 && (user.language === 'ru' ? 'Показательные уравнения 3ˣ⁺¹ = 27, логарифмы, свойства функций.' : 'Exponential equations, logarithms, function properties.')}
+                              {mathTopic === 'algebra' && mathGrade === 11 && (user.language === 'ru' ? 'Логарифмические уравнения log_a(f(x)) = b, комплексная подготовка к ЕГЭ.' : 'Logarithmic equations and high-school algebra prep.')}
+
+                              {mathTopic === 'geometry' && (user.language === 'ru' ? 'Периметры, площади фигур, теорема Пифагора, свойства треугольников, окружностей и стереометрия объёмов.' : 'Perimeters, areas, Pythagorean theorem, spatial geometry and volumes.')}
+                              {mathTopic === 'calculus' && (user.language === 'ru' ? 'Тригонометрические функции (sin, cos, tg), логарифмы, производные f\'(x), первообразные и интегралы.' : 'Trigonometric functions, logarithms, derivatives f\'(x), anti-derivatives and integrals.')}
                           </p>
                       </div>
 
@@ -9504,10 +10299,10 @@ const getTodayChallenge = () => {
                           <button 
                               onClick={() => startMathTraining(mathGrade, mathTopic)} 
                               className="w-28 h-28 rounded-full bg-blue-600 border-b-8 border-blue-800 active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center shadow-2xl hover:brightness-110 group cursor-pointer"
-                              title={user.language === 'ru' ? `Начать урок: ${mathTopic === 'arithmetic' ? 'Арифметика' : 'Алгебра'}` : 'Start Math Lesson'}
+                              title={user.language === 'ru' ? `Начать урок: ${mathTopic}` : 'Start Math Lesson'}
                           >
                               <span className="text-3xl font-black text-white group-hover:scale-110 transition-transform">
-                                  {mathTopic === 'arithmetic' ? '🔢' : '📐'}
+                                  {mathTopic === 'arithmetic' ? '🔢' : mathTopic === 'algebra' ? '📐' : mathTopic === 'geometry' ? '📏' : '📈'}
                               </span>
                           </button>
 
@@ -9534,6 +10329,28 @@ const getTodayChallenge = () => {
                   </div>
               ) : (
                   <>
+                  {/* NOTIFICATION PROMPT BANNER FOR PC & MOBILE */}
+                  <div className="w-full max-w-md">
+                    <NotificationPromptBanner 
+                      user={user} 
+                      setUser={setUser} 
+                      setToast={setToast} 
+                      playSound={playSound} 
+                    />
+                  </div>
+
+                  {/* STREAK SAVER COUNTDOWN TIMER */}
+                  <div className="w-full max-w-md">
+                    <StreakSaverCountdown 
+                      user={user} 
+                      setUser={setUser} 
+                      onStartLesson={() => startTraining('translation')} 
+                      onOpenShop={() => setScreen(AppScreen.SHOP)} 
+                      playSound={playSound} 
+                      setToast={setToast} 
+                    />
+                  </div>
+
                   {/* LANGUAGE COURSE PATH (РУССКИЙ, ENGLISH, DE, FR, ES, JA, ZH, AR, ETC.) */}
                   <div className={`${currentCourse.themeColor} w-full max-w-md p-8 rounded-[2.5rem] border-b-8 ${currentCourse.themeBorder} mb-6 flex justify-between items-center shadow-2xl transition-transform hover:scale-[1.01]`}>
                       <div>
@@ -10561,6 +11378,40 @@ const getTodayChallenge = () => {
                   </div>
                 )}
 
+                {/* LEADERBOARD RELEASE & RESTRICTION ANNOUNCEMENT BANNER */}
+                <div className="p-4 rounded-2xl bg-amber-950/30 border-2 border-amber-500/50 mb-5 text-left shadow-xl">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-xl shrink-0">
+                        🔒
+                      </div>
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-black text-amber-300 uppercase tracking-wider flex items-center gap-2 flex-wrap">
+                          <span>{user.language === 'ru' ? 'В разработке • Доступно 1 ноября 2026 г.' : 'In Development • Available Nov 1, 2026'}</span>
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500 text-black uppercase">
+                            1 ноября 2026 г.
+                          </span>
+                        </h4>
+                        <p className="text-[11px] text-amber-200/90 font-medium mt-0.5">
+                          {user.language === 'ru'
+                            ? 'Переключение на эти языки и раздел «Письмо» откроются 1 ноября 2026 года'
+                            : 'Switching to these languages and the "Writing" section will unlock on November 1, 2026'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playSound('click');
+                        setShowLanguageLockModal(true);
+                      }}
+                      className="px-3.5 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-300 text-xs font-black uppercase tracking-wider whitespace-nowrap cursor-pointer transition-all self-end sm:self-center"
+                    >
+                      {user.language === 'ru' ? 'Подробнее ↗' : 'Details ↗'}
+                    </button>
+                  </div>
+                </div>
+
                 {/* Rating / Leaderboard Name Translator Bar */}
                 <div className="bg-duo-card border-2 border-purple-500/50 rounded-2xl p-4 mb-6 shadow-xl">
                   <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
@@ -11455,6 +12306,13 @@ const getTodayChallenge = () => {
                 </span>
               </div>
 
+              {/* PWA APPLICATION & SECURITY UPDATE SECTION (FOR PC & MOBILE) */}
+              <PwaUpdateSecuritySection 
+                systemInfo={detectSystemCompatibility()} 
+                onOpenSystemChecker={() => setShowSystemInfoModal(true)} 
+                lang={user.language} 
+              />
+
               <div className="bg-duo-card border-2 border-amber-500/80 rounded-[2.5rem] p-6 md:p-10 shadow-2xl space-y-6">
                 <div className="flex items-start space-x-4">
                   <div className="bg-amber-500/20 p-4 rounded-2xl border border-amber-500/50 text-4xl shrink-0">
@@ -12277,6 +13135,25 @@ const getTodayChallenge = () => {
                   </span>
                   <span className="text-emerald-400 font-mono font-black">{Math.round(loadingProgress)}%</span>
                 </div>
+                
+                <div className="pt-2 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playSound('click');
+                      const ex = getFallbackExercise(currentCourse.id, currentExercise?.type || 'translation', currentCourse.localName, user.language);
+                      setAvailableTokens((ex.wordBank || []).map(w => ({ id: crypto.randomUUID(), text: w })));
+                      setSelectedWordIds([]);
+                      setCurrentExercise(ex);
+                      setLessonLoading(false);
+                      setLoading(false);
+                    }}
+                    className="px-5 py-2.5 rounded-2xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 hover:border-emerald-400 font-black text-xs uppercase tracking-wider transition-all shadow-lg active:scale-95 cursor-pointer flex items-center space-x-2"
+                  >
+                    <span>⚡</span>
+                    <span>{user.language === 'ru' ? 'Начать без ожидания' : 'Start without waiting'}</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -12549,6 +13426,7 @@ const getTodayChallenge = () => {
                     onSpeak={() => speakText(currentExercise.drawingData!.character, currentCourse.id, false, user.preferredVoice, user.voiceProvider)}
                     showTrace={showTrace}
                     setShowTrace={setShowTrace}
+                    initialBrushSize={user.handwritingBrushSize || 12}
                  />
              ) : 
              currentExercise.type === 'ishihara' && currentExercise.ishiharaData ? (
@@ -12626,13 +13504,52 @@ const getTodayChallenge = () => {
                  </div>
              ) : 
              currentExercise.type === 'illusion' && currentExercise.illusionData ? (
-                 <div className="flex-1 flex flex-col items-center justify-center min-h-0">
-                    <h2 className="text-2xl md:text-3xl font-bold mb-6 md:mb-10 text-center tracking-tight">Какое слово было произнесено?</h2>
-                    <button onClick={() => speakText(currentExercise.illusionData!.soundText, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} className="w-32 h-32 md:w-48 md:h-48 rounded-[2rem] md:rounded-[3rem] bg-indigo-600 border-b-8 border-indigo-800 shadow-2xl flex items-center justify-center mb-10 md:mb-16 hover:brightness-110 active:translate-y-2 active:border-b-0 transition-all group"><VolumeIcon className="w-16 h-16 md:w-24 md:h-24 text-white group-hover:scale-110 transition-transform" /></button>
-                    <div className="grid grid-cols-2 gap-4 md:gap-6 w-full max-w-lg px-4">
-                        <button disabled={feedback.status !== 'idle'} onClick={() => checkIllusionAnswer('A')} className="bg-duo-card border-2 border-b-4 border-gray-700 p-4 md:p-8 rounded-3xl font-bold text-xl md:text-2xl hover:bg-gray-700 active:border-b-0 active:translate-y-1 transition-all">{currentExercise.illusionData.optionA}</button>
-                        <button disabled={feedback.status !== 'idle'} onClick={() => checkIllusionAnswer('B')} className="bg-duo-card border-2 border-b-4 border-gray-700 p-4 md:p-8 rounded-3xl font-bold text-xl md:text-2xl hover:bg-gray-700 active:border-b-0 active:translate-y-1 transition-all">{currentExercise.illusionData.optionB}</button>
+                 <div className="flex-1 flex flex-col items-center justify-center min-h-0 w-full max-w-xl mx-auto px-4 py-4 animate-in fade-in duration-300">
+                    <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-xs font-black uppercase tracking-wider mb-4 shadow-sm">
+                      <span className="text-base">👂</span>
+                      <span>{t('illusion')}</span>
+                      <span className="opacity-50">•</span>
+                      <span>{t('realOrNot')}</span>
                     </div>
+
+                    <h2 className="text-2xl md:text-3xl font-black mb-6 md:mb-8 text-center tracking-tight text-white">
+                      {user.language === 'ru' ? 'Какое слово было произнесено?' : 'Which word was pronounced?'}
+                    </h2>
+
+                    <button 
+                      type="button"
+                      onClick={() => speakText(currentExercise.illusionData!.soundText, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} 
+                      className="w-32 h-32 md:w-44 md:h-44 rounded-[2.5rem] bg-indigo-600 border-b-8 border-indigo-800 shadow-2xl flex flex-col items-center justify-center mb-8 md:mb-12 hover:brightness-110 active:translate-y-2 active:border-b-2 transition-all group cursor-pointer focus:outline-none"
+                      title={user.language === 'ru' ? 'Слушать еще раз' : 'Listen again'}
+                    >
+                      <VolumeIcon className="w-16 h-16 md:w-20 md:h-20 text-white group-hover:scale-110 transition-transform" />
+                      <span className="text-[11px] font-black uppercase tracking-widest text-indigo-200 mt-2">
+                        {user.language === 'ru' ? 'Слушать' : 'Listen'}
+                      </span>
+                    </button>
+
+                    <div className="grid grid-cols-2 gap-4 md:gap-6 w-full max-w-lg px-2">
+                        <button 
+                          type="button"
+                          disabled={feedback.status !== 'idle'} 
+                          onClick={() => checkIllusionAnswer('A')} 
+                          className="bg-duo-card border-2 border-b-6 border-gray-700 hover:border-indigo-500 hover:bg-gray-800/90 active:border-b-2 active:translate-y-1 p-5 md:p-8 rounded-3xl font-black text-xl md:text-2xl text-white transition-all shadow-xl flex items-center justify-center text-center cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {currentExercise.illusionData.optionA}
+                        </button>
+                        <button 
+                          type="button"
+                          disabled={feedback.status !== 'idle'} 
+                          onClick={() => checkIllusionAnswer('B')} 
+                          className="bg-duo-card border-2 border-b-6 border-gray-700 hover:border-indigo-500 hover:bg-gray-800/90 active:border-b-2 active:translate-y-1 p-5 md:p-8 rounded-3xl font-black text-xl md:text-2xl text-white transition-all shadow-xl flex items-center justify-center text-center cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {currentExercise.illusionData.optionB}
+                        </button>
+                    </div>
+
+                    <p className="text-xs text-gray-400 font-bold mt-6 text-center">
+                      💡 {user.language === 'ru' ? 'Прислушайтесь к долготе гласных, мягкости или удвоенным согласным' : 'Listen closely to vowel length, softness, or doubled consonants'}
+                    </p>
                  </div>
              ) : currentExercise.type === 'roleplay' && currentExercise.roleplayData ? (
                  <div className="flex-1 flex flex-col relative overflow-hidden min-h-0">
@@ -13099,6 +14016,15 @@ const getTodayChallenge = () => {
         onClose={() => setShowChessAutoTranslatorModal(false)}
         userLanguage={user.language}
       />
+
+      {/* FULL SCREEN ACCESS RESTRICTION MODAL FOR US-EAST1.RUN.APP (NOVEMBER 1, 2026 DEPRECATION) */}
+      {isDomainAccessBlocked && (
+        <DomainAccessBlockedModal
+          onSimModeChange={setDomainSimModeState}
+          currentSimMode={domainSimMode}
+          userLanguage={user.language}
+        />
+      )}
 
       {/* OFFLINE INDICATOR */}
       <OfflineIndicator isRu={user.language === 'ru'} />

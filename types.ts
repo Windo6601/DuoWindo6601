@@ -174,7 +174,9 @@ export interface UserProgress {
   language: 'ru' | 'en' | 'de' | 'fr' | 'es' | 'ja' | 'zh' | 'ar';
   country: string;
   preferredVoice?: string;
-  voiceProvider?: 'fish' | 'gemini' | 'google' | 'yandex' | 'system' | 'sapi53';
+  voiceProvider?: 'fish' | 'fish-drama-3' | 'gemini' | 'google' | 'yandex' | 'system' | 'sapi53';
+  notificationTime?: string;
+  fishModel?: string;
   autoTranslateFeedback?: boolean;
   nightMode?: boolean;
   streakFreezeCount?: number;
@@ -212,7 +214,12 @@ export interface UserProgress {
   chessSoundEffects?: boolean;
   chessPieceTheme?: 'graphical' | 'unicode';
   handwritingStats?: any;
+  handwritingBrushSize?: number;
+  brushSize?: number;
+  brushColor?: string;
   learnedPoems?: string[];
+  mathGrade?: number;
+  mathTopic?: 'arithmetic' | 'algebra' | 'geometry' | 'calculus';
   isBetaTester?: boolean;
   betaTestedCourses?: string[];
 }

@@ -256,34 +256,34 @@ export const BetaModal: React.FC<BetaModalProps> = ({
                 <option value="zs">🇨🇳 中文</option>
                 <option value="ar">🇸🇦 العربية</option>
               </optgroup>
-              <optgroup label="🔒 Заблокированные языки мира (10) — до 1 ноября 2026:">
-                <option value="pt">🔒 Português (Португальский)</option>
-                <option value="it">🔒 Italiano (Итальянский)</option>
-                <option value="tr">🔒 Türkçe (Турецкий)</option>
-                <option value="ko">🔒 한국어 (Корейский)</option>
-                <option value="hi">🔒 हिन्दी (Хинди)</option>
-                <option value="pl">🔒 Polski (Польский)</option>
-                <option value="id">🔒 Bahasa Indonesia</option>
-                <option value="bn">🔒 বাংলা (Бенгальский)</option>
-                <option value="th">🔒 ไทย (Тайский)</option>
-                <option value="vi">🔒 Tiếng Việt (Вьетнамский)</option>
+              <optgroup label="✨ Дополнительные языки мира — Полностью доступны:">
+                <option value="pt">Português (Португальский)</option>
+                <option value="it">Italiano (Итальянский)</option>
+                <option value="tr">Türkçe (Турецкий)</option>
+                <option value="ko">한국어 (Корейский)</option>
+                <option value="hi">हिन्दी (Хинди)</option>
+                <option value="pl">Polski (Польский)</option>
+                <option value="id">Bahasa Indonesia</option>
+                <option value="bn">বাংলা (Бенгальский)</option>
+                <option value="th">ไทย (Тайский)</option>
+                <option value="vi">Tiếng Việt (Вьетнамский)</option>
               </optgroup>
-              <optgroup label="🔒 Раздел Письмо Будут доступ 1 ноября 2026 год:">
-                <option value="kk">🔒 Казахстан (Қазақша) — Казахстан (казахский) 🇰🇿</option>
-                <option value="uz">🔒 Узбекистан (Oʻzbekcha) — Узбекистан (узбекский) 🇺🇿</option>
-                <option value="hy">🔒 Армения (Հայերեն) — Армения (армянский) 🇦🇲</option>
-                <option value="ka">🔒 Грузия (ქართული) — Грузия (грузинский) 🇬🇪</option>
-                <option value="az">🔒 Азербайджан (Azərbaycan) — Азербайджан (азербайджанский) 🇦🇿</option>
+              <optgroup label="✨ Языки СНГ — Раздел Письмо и уроки полностью доступны:">
+                <option value="kk">Казахстан (Қазақша) — (казахский) 🇰🇿</option>
+                <option value="uz">Узбекистан (Oʻzbekcha) — (узбекский) 🇺🇿</option>
+                <option value="hy">Армения (Հայերեն) — (армянский) 🇦🇲</option>
+                <option value="ka">Грузия (ქართული) — (грузинский) 🇬🇪</option>
+                <option value="az">Азербайджан (Azərbaycan) — (азербайджанский) 🇦🇿</option>
               </optgroup>
-              <optgroup label="🔒 Бета Курс Язык — Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год:">
-                <option value="eo">🔒 Эсперанто (Esperanto) — v0.9.4 Beta</option>
-                <option value="la">🔒 Латынь (Lingua Latina) — v0.8.2 Beta</option>
-                <option value="sv">🔒 Шведский (Svenska) — v0.9.1 Beta</option>
-                <option value="no">🔒 Норвежский (Norsk) — v0.9.0 Beta</option>
-                <option value="tt">🔒 Татарский (Татар теле) — v0.9.5 Beta</option>
-                <option value="hv">🔒 Высокий валирийский (Valyrio) — v0.8.0 Beta</option>
-                <option value="tlh">🔒 Клингонский (tlhIngan Hol) — v0.7.3 Beta (Шрифт Klingon Font)</option>
-                <option value="yi">🔒 Идиш (ייִдиш) — v0.9.2 Beta</option>
+              <optgroup label="🎉 Бета Курс Язык — Сняты все ограничения (Раздел Письмо полностью открыт):">
+                <option value="eo">Эсперанто (Esperanto) — v1.0 Официальный</option>
+                <option value="la">Латынь (Lingua Latina) — v0.8.2 Beta</option>
+                <option value="sv">Шведский (Svenska) — v0.9.1 Beta</option>
+                <option value="no">Норвежский (Norsk) — v0.9.0 Beta</option>
+                <option value="tt">Татарский (Татар теле) — v0.9.5 Beta</option>
+                <option value="hv">Высокий валирийский (Valyrio) — v0.8.0 Beta</option>
+                <option value="tlh">Клингонский (tlhIngan Hol) — v0.7.3 Beta (Шрифт Klingon Font)</option>
+                <option value="yi">Идиш (ייִдиш) — v0.9.2 Beta</option>
               </optgroup>
             </select>
 
@@ -703,22 +703,22 @@ export const BetaModal: React.FC<BetaModalProps> = ({
             </div>
           </div>
 
-          {/* Dedicated Section: Бета Курс Язык — Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год */}
-          <div className="p-4 bg-gradient-to-br from-purple-950/40 via-stone-950/60 to-black/80 border-2 border-purple-500/50 rounded-2xl space-y-3 shadow-xl">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-2 border-b border-purple-500/30">
+          {/* Dedicated Section: Бета Курс Язык — Снятие бета-ограничений */}
+          <div className="p-4 bg-gradient-to-br from-emerald-950/40 via-purple-950/40 to-black/80 border-2 border-emerald-500/50 rounded-2xl space-y-3 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-2 border-b border-emerald-500/30">
               <div className="flex items-center space-x-2">
-                <span className="text-xl">🧪</span>
-                <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-purple-200">
-                  Бета Курс Язык: Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год
+                <span className="text-xl">🎉</span>
+                <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-emerald-200">
+                  Бета Курс Язык: Снятие бета-ограничений выполнено!
                 </span>
               </div>
-              <span className="text-[10px] font-black text-amber-300 bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 rounded-full shrink-0">
-                🔒 До 1 ноября 2026 г.
+              <span className="text-[10px] font-black text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 px-2.5 py-0.5 rounded-full shrink-0">
+                🎉 Раздел Письмо и Уроки Открыты
               </span>
             </div>
 
-            <p className="text-[11px] text-gray-300 font-medium">
-              Для бета-курсов доступно изучение слов, грамматики и озвучка, а интерактивный раздел написания букв и прописей находится на стадии калибровки до 1 ноября 2026 года.
+            <p className="text-[11px] text-gray-200 font-medium leading-relaxed">
+              Все бета-ограничения успешно сняты! Для всех курсов и языков мира доступно изучение слов, грамматики, озвучка и интерактивный раздел написания букв и прописей.
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
