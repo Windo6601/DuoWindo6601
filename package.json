@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build && node -e \"import('fs').then(fs => fs.cpSync('dist', 'build', { recursive: true }))\"",
+    "build": "python3 scripts/generate_android_apk.py && vite build && node -e \"import('fs').then(fs => fs.cpSync('dist', 'build', { recursive: true }))\"",
     "preview": "vite preview",
     "start": "node server.ts",
     "lint": "tsc --noEmit"

@@ -860,9 +860,9 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
     return allCourses.filter(c => c.isBeta || ['eo', 'la', 'sv', 'no', 'tt', 'hv', 'tlh', 'yi'].includes(c.id));
   }, [allCourses]);
 
-  const isNonLanguage = currentCourse.id === 'chess' || currentCourse.id === 'math' || currentCourse.id === 'music' || currentCourse.flagCode === 'chess' || currentCourse.flagCode === 'math' || currentCourse.flagCode === 'music';
+  const isNonLanguage = ['chess', 'math', 'music', 'coding', 'art'].includes(currentCourse.id) || ['chess', 'math', 'music', 'coding', 'art'].includes(currentCourse.flagCode);
 
-  if (isNonLanguage && lettersSectionTab !== 'illusion' && lettersSectionTab !== 'audio') {
+  if (isNonLanguage) {
     return (
       <div className={`min-h-screen w-full ${isLightMode ? 'bg-[#F7F9FA] text-slate-900' : 'bg-[#131F24] text-white'} flex flex-col items-center justify-center p-4 sm:p-6 font-din relative`}>
         <div className={`max-w-md w-full rounded-3xl p-6 sm:p-8 border-2 shadow-2xl text-center space-y-5 ${isLightMode ? 'bg-white border-slate-300' : 'bg-[#182329] border-gray-700'}`}>

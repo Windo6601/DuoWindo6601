@@ -39,6 +39,29 @@ app.get('/api/server-info', (_req, res) => {
   });
 });
 
+// Direct binary Android APK download endpoint with exact MIME type and headers
+app.get(['/api/download-apk', '/downloads/app-debug.apk', '/app-debug.apk'], (_req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const candidates = [
+    path.resolve(process.cwd(), 'public/downloads/app-debug.apk'),
+    path.resolve(process.cwd(), 'public/app-debug.apk'),
+    path.resolve(__dirname, 'public/downloads/app-debug.apk'),
+    path.resolve(__dirname, 'public/app-debug.apk'),
+  ];
+  const found = candidates.find(c => fs.existsSync(c));
+  if (found) {
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+    res.setHeader('Content-Disposition', 'attachment; filename="app-debug.apk"');
+    res.setHeader('Cache-Control', 'no-cache');
+    const stat = fs.statSync(found);
+    res.setHeader('Content-Length', stat.size);
+    const stream = fs.createReadStream(found);
+    stream.pipe(res);
+  } else {
+    res.status(404).json({ error: 'app-debug.apk not found. Please build it first.' });
+  }
+});
+
 // ============================================================================
 // SERVER-SIDE GEMINI API ENDPOINTS (Never exposes API key to browser)
 // ============================================================================

@@ -144,6 +144,11 @@ struct ContentView: View {
         name: 'UIKit и AppKit',
         role: 'Классические императивные UI',
         details: 'UIKit применяется для сложных и кастомных интерфейсов на iOS, а AppKit — для нативных оконных интерфейсов на macOS.'
+      },
+      {
+        name: 'Формат пакета: .ipa (Apple / iOS не для APK)',
+        role: 'Сборка и публикация в Apple',
+        details: 'В экосистеме Apple приложения компилируются в пакет .ipa и распространяются через App Store или TestFlight. Файлы APK созданы исключительно для Android и на устройствах Apple не запускаются.'
       }
     ],
     itemsEn: [
@@ -166,6 +171,11 @@ struct ContentView: View {
         name: 'UIKit & AppKit',
         role: 'Imperative UI Frameworks',
         details: 'UIKit handles intricate custom iOS interfaces; AppKit handles classic macOS desktop interfaces.'
+      },
+      {
+        name: 'Package Format: .ipa (Apple / iOS is not for APK)',
+        role: 'Apple Packaging & Distribution',
+        details: 'Apple apps are packaged into .ipa archives for the App Store and TestFlight. The .apk format is strictly for Android and is not supported on Apple devices.'
       }
     ]
   },

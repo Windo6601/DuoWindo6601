@@ -528,7 +528,7 @@ const SPECIAL_COURSES: Course[] = [
   { id: 'math', name: 'Mathematics', localName: 'Математика (Курс не является языком • Точные науки)', flagCode: 'math', themeColor: 'bg-duo-blue', themeBorder: 'border-duo-blueDark', mascotVariant: 'math' },
   { id: 'music', name: 'Music', localName: 'Музыка (Курс не является языком • Ноты и ритм)', flagCode: 'music', themeColor: 'bg-pink-500', themeBorder: 'border-pink-700', mascotVariant: 'music' },
   { id: 'chess', name: 'Chess', localName: 'Шахматы (Курс не является языком • Навык/Игра)', flagCode: 'chess', themeColor: 'bg-slate-600', themeBorder: 'border-slate-800', mascotVariant: 'chess' },
-  { id: 'coding', name: 'Programming', localName: 'Программирование (Lua, Swift, Kotlin, APK • Языки и мобильная разработка)', flagCode: 'coding', themeColor: 'bg-indigo-600', themeBorder: 'border-indigo-800', mascotVariant: 'default' },
+  { id: 'coding', name: 'Programming', localName: 'Программирование (Курс не является языком • Навык/Игра)', flagCode: 'coding', themeColor: 'bg-indigo-600', themeBorder: 'border-indigo-800', mascotVariant: 'default' },
   { id: 'art', name: 'Art', localName: 'Рисование и Каллиграфия (Курс не является языком • Творчество)', flagCode: 'art', themeColor: 'bg-amber-600', themeBorder: 'border-amber-800', mascotVariant: 'default' },
 ];
 
@@ -4210,8 +4210,8 @@ const getTodayChallenge = () => {
       return 'Music';
     }
     if (c.id === 'coding') {
-      if (lang === 'ru') return 'Программирование (Курс является языком программирования • Алгоритмы)';
-      return 'Programming (Course is a programming language • Algorithms)';
+      if (lang === 'ru') return 'Программирование (Курс не является языком • Навык/Игра)';
+      return 'Programming (Course is not a language • Skill/Game)';
     }
     if (c.id === 'art') {
       if (lang === 'ru') return 'Рисование и Каллиграфия (Курс не является языком • Творчество)';
@@ -6602,15 +6602,15 @@ const getTodayChallenge = () => {
   };
 
   const isSpecialNonLanguage = (courseId: string) => {
-    return courseId === 'math' || courseId === 'music' || courseId === 'chess';
+    return courseId === 'math' || courseId === 'music' || courseId === 'chess' || courseId === 'coding' || courseId === 'art';
   };
 
   const handleNavigation = (s: AppScreen) => { 
     if (s === AppScreen.ALPHABET && isSpecialNonLanguage(currentCourse.id)) {
       playSound('wrong');
       setToast(user.language === 'ru' 
-        ? `🔒 Раздел «Письма» доступен только для языковых курсов. В курсе «${currentCourse.localName}» (Предметы & Игры) нет алфавита.`
-        : `🔒 The Letters section is only accessible for language courses. Non-language courses do not have letters.`
+        ? `🔒 Раздел «Письма» доступен только для языковых курсов. Курс «${currentCourse.localName}» относится к разделу «Предметы & Игры» (не языковой курс). В данном предмете нет алфавита или букв.`
+        : `🔒 The Letters section is only available for language courses. The course "${currentCourse.name}" belongs to "Subjects & Games" (non-language course). There is no alphabet or letters in this subject.`
       );
       setLettersTabRequest({ tab: 'letters', nonce: Date.now() });
       setScreen(AppScreen.ALPHABET);

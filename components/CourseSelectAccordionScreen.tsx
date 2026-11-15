@@ -108,23 +108,23 @@ export const CourseSelectAccordionScreen: React.FC<CourseSelectAccordionScreenPr
     };
   };
 
-  // Programming course as a non-language discipline: "Курс не язык является языком программирования • Алгоритмы"
+  // Programming course as a non-language discipline: "Курс «Программирование (Курс не является языком • Навык/Игра)» относится к разделу «Предметы & Игры» (не языковой курс). В данном предмете нет алфавита или букв."
   const programmingCourseObj: Course = useMemo(() => {
     const existing = allCourses.find(c => c.id === 'coding');
     if (existing) {
       return {
         ...existing,
         localName: userLanguage === 'ru' 
-          ? 'Программирование (Lua · Swift iOS/macOS · Kotlin Android · Сборка APK)'
-          : 'Programming (Lua · Swift iOS/macOS · Kotlin Android · APK Build)'
+          ? 'Программирование (Курс не является языком • Навык/Игра)'
+          : 'Programming (Non-language course • Skill/Game)'
       };
     }
     return {
       id: 'coding',
       name: 'Programming',
       localName: userLanguage === 'ru' 
-        ? 'Программирование (Lua · Swift iOS/macOS · Kotlin Android · Сборка APK)'
-        : 'Programming (Lua · Swift iOS/macOS · Kotlin Android · APK Build)',
+        ? 'Программирование (Курс не является языком • Навык/Игра)'
+        : 'Programming (Non-language course • Skill/Game)',
       flagCode: 'coding',
       themeColor: 'bg-indigo-600',
       themeBorder: 'border-indigo-800',
@@ -363,7 +363,7 @@ export const CourseSelectAccordionScreen: React.FC<CourseSelectAccordionScreenPr
                                 <div className="flex items-center space-x-1.5 flex-wrap">
                                   <h4 className="font-black text-sm text-white truncate">
                                     {isCoding 
-                                      ? (userLanguage === 'ru' ? 'Программирование' : 'Programming')
+                                      ? (userLanguage === 'ru' ? 'Программирование (Курс не является языком • Навык/Игра)' : 'Programming (Non-language course • Skill/Game)')
                                       : (course.localName || course.name)}
                                   </h4>
                                   {isCoding && (
@@ -374,7 +374,7 @@ export const CourseSelectAccordionScreen: React.FC<CourseSelectAccordionScreenPr
                                 </div>
                                 <p className="text-[11px] text-gray-400 font-bold truncate">
                                   {isCoding 
-                                    ? (userLanguage === 'ru' ? 'Курс не язык является языком программирования • Алгоритмы' : 'Non-language course: Programming language • Algorithms')
+                                    ? (userLanguage === 'ru' ? 'Предметы & Игры (не языковой курс) • Без алфавита и букв' : 'Subjects & Games (non-language) • No alphabet or letters')
                                     : course.name}
                                 </p>
                               </div>
@@ -395,8 +395,8 @@ export const CourseSelectAccordionScreen: React.FC<CourseSelectAccordionScreenPr
                     <div className="space-y-2.5">
                       <div className="text-[11px] text-amber-300/90 font-bold px-1">
                         {userLanguage === 'ru' 
-                          ? '💡 Неязыковые предметы DuoWindo6601: Математика, Музыка, Шахматы и Рисование!' 
-                          : '💡 Non-language disciplines in DuoWindo6601: Math, Music, Chess, and Art!'}
+                          ? '💡 Неязыковые предметы DuoWindo6601: Программирование, Математика, Музыка, Шахматы и Рисование!' 
+                          : '💡 Non-language disciplines in DuoWindo6601: Programming, Math, Music, Chess, and Art!'}
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         {NON_LANGUAGE_COURSES.map(item => {
