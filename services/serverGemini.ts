@@ -154,7 +154,7 @@ export function getServerGeminiKey(overrideKey?: string): string {
     process.env.GEMINI_API_KEY ||
     process.env.API_KEY ||
     process.env.VITE_GEMINI_API_KEY ||
-    ''
+    'AQ.Ab8RN6IQIn-mUHgR1BxMRDNo1Ylta9NTdBqZQ2dzG1VBmbxdbg'
   ).trim();
 }
 

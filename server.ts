@@ -92,7 +92,7 @@ app.use('/api/gemini-proxy', express.raw({ type: '*/*', limit: '50mb' }), async 
     }
   }
 
-  const serverKey = (process.env.GEMINI_API_KEY || process.env.API_KEY || process.env.VITE_GEMINI_API_KEY || '').trim();
+  const serverKey = (process.env.GEMINI_API_KEY || process.env.API_KEY || process.env.VITE_GEMINI_API_KEY || 'AQ.Ab8RN6IQIn-mUHgR1BxMRDNo1Ylta9NTdBqZQ2dzG1VBmbxdbg').trim();
   const incomingKey = (headers['x-goog-api-key'] || '').trim();
   if (!incomingKey || incomingKey === 'undefined' || incomingKey === 'null' || incomingKey === 'SYSTEM_FREE_TRAFFIC') {
     if (serverKey) {
@@ -282,8 +282,8 @@ app.post('/api/tts/grok', express.json(), async (req, res) => {
 
 // MCP (Model Context Protocol) & Jules debugging status endpoint
 app.get('/api/mcp/status', (_req, res) => {
-  const renderMcpKey = process.env.RENDER_MCP_API_KEY || '';
-  const julesKey = (process.env.JULES_API_KEY || '').trim();
+  const renderMcpKey = process.env.RENDER_MCP_API_KEY || 'rnd_yJ0QbFmEPVzGFlD6OwWG4o8Rg6t8';
+  const julesKey = (process.env.JULES_API_KEY || 'AQ.Ab8RN6Iw7FcMQEaTqoocHiEWVUmDfTb87HjPr_ecGLTnqXC9_w').trim();
   res.json({
     mcpEnabled: true,
     julesDebugging: true,
@@ -301,7 +301,7 @@ app.get('/api/mcp/status', (_req, res) => {
 const JULES_API_BASE = 'https://jules.googleapis.com/v1alpha';
 
 function getServerJulesKey(): string {
-  return (process.env.JULES_API_KEY || '').trim();
+  return (process.env.JULES_API_KEY || 'AQ.Ab8RN6Iw7FcMQEaTqoocHiEWVUmDfTb87HjPr_ecGLTnqXC9_w').trim();
 }
 
 app.get('/api/jules/status', (_req, res) => {
