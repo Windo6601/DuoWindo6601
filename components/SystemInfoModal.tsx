@@ -41,7 +41,7 @@ export const SystemInfoModal: React.FC<SystemInfoModalProps> = ({
             </div>
             <div>
               <h3 className="font-black text-xl tracking-wide uppercase">
-                {lang === 'ru' ? 'Информация о системе' : 'System Compatibility Info'}
+                {(lang !== 'en') ? 'Информация о системе' : 'System Compatibility Info'}
               </h3>
               <p className="text-xs text-blue-400 font-bold uppercase tracking-wider">
                 DuoWindo6601 System Checker
@@ -64,7 +64,7 @@ export const SystemInfoModal: React.FC<SystemInfoModalProps> = ({
         }`}>
           <div className="flex items-center justify-between flex-wrap gap-2">
             <span className="text-xs font-black uppercase tracking-wider opacity-80">
-              {lang === 'ru' ? 'Текущий статус' : 'Current Status'}
+              {(lang !== 'en') ? 'Текущий статус' : 'Current Status'}
             </span>
             <span className={`text-xs font-black px-2.5 py-1 rounded-full uppercase tracking-wider ${
               isXpOrVista 
@@ -78,16 +78,16 @@ export const SystemInfoModal: React.FC<SystemInfoModalProps> = ({
                       : 'bg-emerald-500 text-black'
             }`}>
               {isXpOrVista 
-                ? (lang === 'ru' ? 'Снято с поддержки (XP / Vista)' : 'Support Terminated')
+                ? ((lang !== 'en') ? 'Снято с поддержки (XP / Vista)' : 'Support Terminated')
                 : isOldIOS
-                  ? (lang === 'ru' ? 'Старый iOS / iPad (< 14.0) — Не получится' : 'Legacy iOS / iPad (<14.0)')
+                  ? ((lang !== 'en') ? 'Старый iOS / iPad (< 14.0) — Не получится' : 'Legacy iOS / iPad (<14.0)')
                   : isOldAndroid
-                    ? (lang === 'ru' ? 'Старый Android (4.4 - 7.1) — Не получится' : 'Legacy Android (< 8.0)')
+                    ? ((lang !== 'en') ? 'Старый Android (4.4 - 7.1) — Не получится' : 'Legacy Android (< 8.0)')
                     : isOldBrowser
-                      ? (lang === 'ru' ? 'Устаревший браузер' : 'Outdated Browser')
+                      ? ((lang !== 'en') ? 'Устаревший браузер' : 'Outdated Browser')
                       : isOldMacLinux
-                        ? (lang === 'ru' ? 'Старый Mac / Linux' : 'Legacy Mac / Linux')
-                        : (lang === 'ru' ? 'Новый Систем: Поддерживается' : 'Modern System: Fully Supported')}
+                        ? ((lang !== 'en') ? 'Старый Mac / Linux' : 'Legacy Mac / Linux')
+                        : ((lang !== 'en') ? 'Новый Систем: Поддерживается' : 'Modern System: Fully Supported')}
             </span>
           </div>
 
@@ -106,7 +106,7 @@ export const SystemInfoModal: React.FC<SystemInfoModalProps> = ({
             <h4 className="font-black uppercase tracking-wider flex items-center gap-1.5 text-xs text-white">
               <span>{isModern ? '📲' : '🛑'}</span>
               <span>
-                {lang === 'ru' 
+                {(lang !== 'en') 
                   ? 'Обновление PWA и Безопасность DuoWindo6601' 
                   : 'DuoWindo6601 PWA & Security Update Status'}
               </span>
@@ -115,8 +115,8 @@ export const SystemInfoModal: React.FC<SystemInfoModalProps> = ({
               isModern ? 'bg-emerald-500 text-black' : 'bg-red-600 text-white'
             }`}>
               {isModern 
-                ? (lang === 'ru' ? '✅ Новый Систем: OK' : '✅ Modern System: OK') 
-                : (lang === 'ru' ? '🛑 Старые Системы: Не получится' : '🛑 Old Systems: Unsupported')}
+                ? ((lang !== 'en') ? '✅ Новый Систем: OK' : '✅ Modern System: OK') 
+                : ((lang !== 'en') ? '🛑 Старые Системы: Не получится' : '🛑 Old Systems: Unsupported')}
             </span>
           </div>
           <p className="text-[11px] leading-relaxed font-semibold">
@@ -127,13 +127,13 @@ export const SystemInfoModal: React.FC<SystemInfoModalProps> = ({
         {/* System Specs Table */}
         <div className="bg-gray-800/60 border border-gray-700/80 rounded-2xl p-4 space-y-3 text-xs">
           <h4 className="font-black uppercase tracking-wider text-duo-blue text-xs">
-            {lang === 'ru' ? 'Параметры окружения (DuoWindo6601 System Checker)' : 'Environment Details'}
+            {(lang !== 'en') ? 'Параметры окружения (DuoWindo6601 System Checker)' : 'Environment Details'}
           </h4>
 
           <div className="grid grid-cols-2 gap-3 pt-1">
             <div className="bg-black/40 p-3 rounded-xl border border-gray-700">
               <span className="text-gray-400 block font-bold text-[10px] uppercase">
-                {lang === 'ru' ? 'Операционная система:' : 'Operating System:'}
+                {(lang !== 'en') ? 'Операционная система:' : 'Operating System:'}
               </span>
               <span className={`font-black text-sm block truncate mt-0.5 ${
                 isXpOrVista || isOldAndroid || isOldIOS ? 'text-red-400' : 'text-white'
@@ -144,7 +144,7 @@ export const SystemInfoModal: React.FC<SystemInfoModalProps> = ({
 
             <div className="bg-black/40 p-3 rounded-xl border border-gray-700">
               <span className="text-gray-400 block font-bold text-[10px] uppercase">
-                {lang === 'ru' ? 'Веб-браузер:' : 'Web Browser:'}
+                {(lang !== 'en') ? 'Веб-браузер:' : 'Web Browser:'}
               </span>
               <span className={`font-black text-sm block truncate mt-0.5 ${isOldBrowser ? 'text-amber-400' : 'text-white'}`}>
                 {systemInfo.browserName} {systemInfo.browserVersion > 0 && `v${systemInfo.browserVersion}`}
@@ -157,12 +157,12 @@ export const SystemInfoModal: React.FC<SystemInfoModalProps> = ({
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="font-black text-xs uppercase tracking-wider text-gray-300">
-              {lang === 'ru' 
+              {(lang !== 'en') 
                 ? 'Матрица совместимости: Старые Системы и Новый Системы' 
                 : 'Compatibility Matrix: Old vs Modern Systems'}
             </h4>
             <span className="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-500/40 px-2 py-0.5 rounded-full font-bold uppercase">
-              {lang === 'ru' ? 'Включая iOS / iPad' : 'Includes iOS / iPad'}
+              {(lang !== 'en') ? 'Включая iOS / iPad' : 'Includes iOS / iPad'}
             </span>
           </div>
 
@@ -218,10 +218,10 @@ export const SystemInfoModal: React.FC<SystemInfoModalProps> = ({
         <div className="bg-gradient-to-r from-blue-950/60 to-purple-950/60 border border-blue-500/30 p-4 rounded-2xl space-y-2 text-xs">
           <h4 className="font-black uppercase tracking-wider text-blue-300 flex items-center gap-1.5">
             <span>🗣️</span>
-            <span>{lang === 'ru' ? 'Архитектура речевых движков и браузеров' : 'Speech Engine & Browser Architecture'}</span>
+            <span>{(lang !== 'en') ? 'Архитектура речевых движков и браузеров' : 'Speech Engine & Browser Architecture'}</span>
           </h4>
           <p className="text-gray-300 text-[11px] leading-relaxed">
-            {lang === 'ru'
+            {(lang !== 'en')
               ? 'Прекращена поддержка устаревшего Microsoft Speech API 4.0, а также браузера Mypal 78.0.3 XP, OneCore API и Windows XP / Windows Server 2003. Осуществлен переход на Microsoft Speech API (SAPI) 5.3 в сочетании с современными Windows AI APIs и Web Speech API на мобильных устройствах iOS, iPad и Android.'
               : 'Support ended for legacy Microsoft Speech API 4.0, Mypal 78.0.3 XP browser, OneCore API, and Windows XP / Windows Server 2003. Upgraded to Microsoft Speech API (SAPI) 5.3 alongside modern on-device Windows AI speech recognition APIs and Web Speech API on iOS, iPad and Android.'}
           </p>
@@ -232,15 +232,15 @@ export const SystemInfoModal: React.FC<SystemInfoModalProps> = ({
           <div className="flex items-center justify-between">
             <h4 className="font-black text-xs uppercase tracking-wider text-duo-blue flex items-center gap-1.5">
               <span>🧪</span>
-              <span>{lang === 'ru' ? 'Симулятор DuoWindo6601 System Checker' : 'Compatibility Simulation Tester'}</span>
+              <span>{(lang !== 'en') ? 'Симулятор DuoWindo6601 System Checker' : 'Compatibility Simulation Tester'}</span>
             </h4>
             <span className="text-[10px] text-gray-400 font-bold">
-              {simMode === 'real' ? (lang === 'ru' ? 'Реальное устройство' : 'Real device') : `Режим: ${simMode}`}
+              {simMode === 'real' ? ((lang !== 'en') ? 'Реальное устройство' : 'Real device') : `Режим: ${simMode}`}
             </span>
           </div>
 
           <p className="text-xs text-gray-300 font-medium">
-            {lang === 'ru'
+            {(lang !== 'en')
               ? 'Проверьте реакцию DuoWindo6601 на Старые Системы (не получится) и Новый Систем (включая iOS / iPad):'
               : 'Test DuoWindo6601 reaction on Old Systems (unsupported) and Modern Systems (including iOS / iPad):'}
           </p>
@@ -258,7 +258,7 @@ export const SystemInfoModal: React.FC<SystemInfoModalProps> = ({
               <span>🛑</span>
               <div className="flex-1 min-w-0">
                 <span className="block truncate font-black">Windows XP / Vista</span>
-                <span className="text-[10px] opacity-75 block">{lang === 'ru' ? '🛑 Старая (Не получится)' : '🛑 Old OS'}</span>
+                <span className="text-[10px] opacity-75 block">{(lang !== 'en') ? '🛑 Старая (Не получится)' : '🛑 Old OS'}</span>
               </div>
             </button>
 
@@ -274,7 +274,7 @@ export const SystemInfoModal: React.FC<SystemInfoModalProps> = ({
               <span>✅</span>
               <div className="flex-1 min-w-0">
                 <span className="block truncate font-black">Windows 7/8/10/11</span>
-                <span className="text-[10px] opacity-75 block">{lang === 'ru' ? '✅ Новый Систем' : '✅ Modern Win'}</span>
+                <span className="text-[10px] opacity-75 block">{(lang !== 'en') ? '✅ Новый Систем' : '✅ Modern Win'}</span>
               </div>
             </button>
 
@@ -289,8 +289,8 @@ export const SystemInfoModal: React.FC<SystemInfoModalProps> = ({
             >
               <span>📱</span>
               <div className="flex-1 min-w-0">
-                <span className="block truncate font-black">{lang === 'ru' ? 'Старый iOS / iPad (<14)' : 'Old iOS / iPad (<14)'}</span>
-                <span className="text-[10px] opacity-75 block">{lang === 'ru' ? '🛑 Старая (Не получится)' : '🛑 Legacy iOS / iPad'}</span>
+                <span className="block truncate font-black">{(lang !== 'en') ? 'Старый iOS / iPad (<14)' : 'Old iOS / iPad (<14)'}</span>
+                <span className="text-[10px] opacity-75 block">{(lang !== 'en') ? '🛑 Старая (Не получится)' : '🛑 Legacy iOS / iPad'}</span>
               </div>
             </button>
 
@@ -305,8 +305,8 @@ export const SystemInfoModal: React.FC<SystemInfoModalProps> = ({
             >
               <span>🍏</span>
               <div className="flex-1 min-w-0">
-                <span className="block truncate font-black">{lang === 'ru' ? 'Новый iOS / iPad (15-18+)' : 'New iOS / iPad (15-18+)'}</span>
-                <span className="text-[10px] opacity-75 block">{lang === 'ru' ? '✅ Новый Систем' : '✅ Modern iOS/iPad'}</span>
+                <span className="block truncate font-black">{(lang !== 'en') ? 'Новый iOS / iPad (15-18+)' : 'New iOS / iPad (15-18+)'}</span>
+                <span className="text-[10px] opacity-75 block">{(lang !== 'en') ? '✅ Новый Систем' : '✅ Modern iOS/iPad'}</span>
               </div>
             </button>
 
@@ -321,8 +321,8 @@ export const SystemInfoModal: React.FC<SystemInfoModalProps> = ({
             >
               <span>🤖</span>
               <div className="flex-1 min-w-0">
-                <span className="block truncate font-black">{lang === 'ru' ? 'Старый Android (4-7)' : 'Old Android (4-7)'}</span>
-                <span className="text-[10px] opacity-75 block">{lang === 'ru' ? '🛑 Старая (Не получится)' : '🛑 Old Android'}</span>
+                <span className="block truncate font-black">{(lang !== 'en') ? 'Старый Android (4-7)' : 'Old Android (4-7)'}</span>
+                <span className="text-[10px] opacity-75 block">{(lang !== 'en') ? '🛑 Старая (Не получится)' : '🛑 Old Android'}</span>
               </div>
             </button>
 
@@ -337,8 +337,8 @@ export const SystemInfoModal: React.FC<SystemInfoModalProps> = ({
             >
               <span>📱</span>
               <div className="flex-1 min-w-0">
-                <span className="block truncate font-black">{lang === 'ru' ? 'Новый Android (8-15)' : 'New Android (8-15)'}</span>
-                <span className="text-[10px] opacity-75 block">{lang === 'ru' ? '✅ Новый Систем' : '✅ Modern Android'}</span>
+                <span className="block truncate font-black">{(lang !== 'en') ? 'Новый Android (8-15)' : 'New Android (8-15)'}</span>
+                <span className="text-[10px] opacity-75 block">{(lang !== 'en') ? '✅ Новый Систем' : '✅ Modern Android'}</span>
               </div>
             </button>
 
@@ -353,8 +353,8 @@ export const SystemInfoModal: React.FC<SystemInfoModalProps> = ({
             >
               <span>💻</span>
               <div className="flex-1 min-w-0">
-                <span className="block truncate font-black">{lang === 'ru' ? 'Старый MacOS/Linux' : 'Old MacOS/Linux'}</span>
-                <span className="text-[10px] opacity-75 block">{lang === 'ru' ? '⚠️ Старая система' : '⚠️ Old MacOS/Linux'}</span>
+                <span className="block truncate font-black">{(lang !== 'en') ? 'Старый MacOS/Linux' : 'Old MacOS/Linux'}</span>
+                <span className="text-[10px] opacity-75 block">{(lang !== 'en') ? '⚠️ Старая система' : '⚠️ Old MacOS/Linux'}</span>
               </div>
             </button>
 
@@ -369,8 +369,8 @@ export const SystemInfoModal: React.FC<SystemInfoModalProps> = ({
             >
               <span>🍏</span>
               <div className="flex-1 min-w-0">
-                <span className="block truncate font-black">{lang === 'ru' ? 'Новый MacOS/Linux' : 'New MacOS/Linux'}</span>
-                <span className="text-[10px] opacity-75 block">{lang === 'ru' ? '✅ Новый Систем' : '✅ Modern Mac/Linux'}</span>
+                <span className="block truncate font-black">{(lang !== 'en') ? 'Новый MacOS/Linux' : 'New MacOS/Linux'}</span>
+                <span className="text-[10px] opacity-75 block">{(lang !== 'en') ? '✅ Новый Систем' : '✅ Modern Mac/Linux'}</span>
               </div>
             </button>
 
@@ -385,8 +385,8 @@ export const SystemInfoModal: React.FC<SystemInfoModalProps> = ({
             >
               <span>🌐</span>
               <div className="flex-1 min-w-0">
-                <span className="block truncate font-black">{lang === 'ru' ? 'Старый Браузер (IE/Legacy)' : 'Old Browser (IE/Legacy)'}</span>
-                <span className="text-[10px] opacity-75 block">{lang === 'ru' ? '🛑 Старая (Не получится)' : '🛑 Browser Check'}</span>
+                <span className="block truncate font-black">{(lang !== 'en') ? 'Старый Браузер (IE/Legacy)' : 'Old Browser (IE/Legacy)'}</span>
+                <span className="text-[10px] opacity-75 block">{(lang !== 'en') ? '🛑 Старая (Не получится)' : '🛑 Browser Check'}</span>
               </div>
             </button>
 
@@ -401,8 +401,8 @@ export const SystemInfoModal: React.FC<SystemInfoModalProps> = ({
             >
               <span>🔄</span>
               <div className="flex-1 min-w-0">
-                <span className="block truncate font-black">{lang === 'ru' ? 'Реальное Устройство' : 'Real Device'}</span>
-                <span className="text-[10px] opacity-75 block">{lang === 'ru' ? 'Автодетекция' : 'Auto Detect'}</span>
+                <span className="block truncate font-black">{(lang !== 'en') ? 'Реальное Устройство' : 'Real Device'}</span>
+                <span className="text-[10px] opacity-75 block">{(lang !== 'en') ? 'Автодетекция' : 'Auto Detect'}</span>
               </div>
             </button>
           </div>
@@ -414,7 +414,7 @@ export const SystemInfoModal: React.FC<SystemInfoModalProps> = ({
             onClick={onClose}
             className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-duo-blue hover:bg-duo-blue/90 text-white font-black text-sm uppercase tracking-wider shadow-lg transition-all active:scale-95 cursor-pointer"
           >
-            {lang === 'ru' ? 'Закрыть' : 'Close'}
+            {(lang !== 'en') ? 'Закрыть' : 'Close'}
           </button>
         </div>
 

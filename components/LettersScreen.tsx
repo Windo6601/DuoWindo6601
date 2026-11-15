@@ -21,6 +21,10 @@ import {
   isWritingSectionLocked
 } from '../services/languageLockService';
 import { LanguageLockModal } from './LanguageLockModal';
+import { LetterWordsLearning } from './LetterWordsLearning';
+import { SoundIllusionLab } from './SoundIllusionLab';
+import { AudioWhatHeardQuiz } from './AudioWhatHeardQuiz';
+import { stopActiveIllusion } from '../services/soundIllusionService';
 
 interface LettersScreenProps {
   currentCourse: Course;
@@ -32,6 +36,8 @@ interface LettersScreenProps {
   onBackToPath?: () => void;
   onSwitchCourse?: (course: Course) => void;
   allCourses?: Course[];
+  initialSectionTab?: 'letters' | 'words' | 'illusion' | 'audio';
+  initialTabNonce?: number;
 }
 
 type LetterExerciseType = 'trace' | 'select_sound' | 'listen_choice' | 'match_pairs' | 'hard_word';
@@ -59,11 +65,16 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
   isLightMode = false,
   onBackToPath,
   onSwitchCourse,
-  allCourses = []
+  allCourses = [],
+  initialSectionTab,
+  initialTabNonce = 0
 }) => {
   const [selectedCategoryIdx, setSelectedCategoryIdx] = useState<number>(0);
   const [selectedLetter, setSelectedLetter] = useState<AlphabetItem | null>(null);
+  const [alphabetViewMode, setAlphabetViewMode] = useState<'letters' | 'words'>('letters');
+  const [lettersSectionTab, setLettersSectionTab] = useState<'letters' | 'words' | 'illusion' | 'audio'>(initialSectionTab || 'letters');
   const [activeLesson, setActiveLesson] = useState<boolean>(false);
+  const [lessonCompleted, setLessonCompleted] = useState<boolean>(false);
   const [lessonQueue, setLessonQueue] = useState<LetterExercise[]>([]);
   const [currentExerciseIdx, setCurrentExerciseIdx] = useState<number>(0);
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
@@ -101,7 +112,55 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
     setSelectedCategoryIdx(0);
     setSelectedLetter(null);
     setActiveLesson(false);
+    setLessonCompleted(false);
+    stopActiveIllusion();
   }, [currentCourse.id]);
+
+  useEffect(() => {
+    if (initialSectionTab && initialTabNonce > 0) {
+      if (initialSectionTab !== 'illusion') {
+        stopActiveIllusion();
+      }
+      setActiveLesson(false);
+      setLessonCompleted(false);
+      setSelectedLetter(null);
+      setLettersSectionTab(initialSectionTab);
+      if (initialSectionTab === 'words') {
+        setAlphabetViewMode('words');
+      } else if (initialSectionTab === 'letters') {
+        setAlphabetViewMode('letters');
+      }
+    }
+  }, [initialSectionTab, initialTabNonce]);
+
+  useEffect(() => {
+    return () => {
+      stopActiveIllusion();
+    };
+  }, []);
+
+  const difficultyLevel: 'easy' | 'hard' = user.difficultyLevel === 'hard' ? 'hard' : 'easy';
+
+  const handleSwitchDifficulty = (level: 'easy' | 'hard') => {
+    playSound('select');
+    const updatedUser: UserProgress = { ...user, difficultyLevel: level };
+    setUser(updatedUser);
+    if (onSaveProgress) onSaveProgress(updatedUser);
+  };
+
+  const handleSelectSectionTab = (tab: 'letters' | 'words' | 'illusion' | 'audio') => {
+    playSound('click');
+    if (tab !== 'illusion') {
+      stopActiveIllusion();
+    }
+    setLettersSectionTab(tab);
+    setSelectedLetter(null);
+    if (tab === 'words') {
+      setAlphabetViewMode('words');
+    } else if (tab === 'letters') {
+      setAlphabetViewMode('letters');
+    }
+  };
 
   // Localized Course Name Helper
   const getCourseDisplayName = (c: Course) => {
@@ -177,8 +236,8 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
         });
       });
       const unifiedCategory: AlphabetCategory = {
-        title: user.language === 'ru' ? '🌟 Все символы и особенности' : '🌟 All Symbols & Features',
-        description: user.language === 'ru' ? `Полный набор букв, диакритики и знаков (${allItemsMap.size})` : `Full character set & features (${allItemsMap.size})`,
+        title: user.language !== 'en' ? '🌟 Все символы и особенности' : '🌟 All Symbols & Features',
+        description: user.language !== 'en' ? `Полный набор букв, диакритики и знаков (${allItemsMap.size})` : `Full character set & features (${allItemsMap.size})`,
         script: rawCats[0]?.script || 'latin',
         items: Array.from(allItemsMap.values())
       };
@@ -263,6 +322,95 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
     const exercises: LetterExercise[] = [];
 
     const currentLang = user.language || 'ru';
+    const wordPool = currentLetters.filter(l => l.word && l.word.trim());
+
+    if (alphabetViewMode === 'words' && !specificChar && wordPool.length >= 2) {
+      const shuffledWords = [...wordPool].sort(() => 0.5 - Math.random());
+      const wordExercises: LetterExercise[] = [];
+
+      // 1. Select word by translation / hint
+      const w1 = shuffledWords[0];
+      const w1Distractors = wordPool.filter(w => w.word !== w1.word).sort(() => 0.5 - Math.random()).slice(0, 3);
+      const w1Options = [
+        { id: 'opt_w1_0', text: w1.word!, isCorrect: true },
+        ...w1Distractors.map((d, i) => ({ id: `opt_w1_d_${i}`, text: d.word!, isCorrect: false }))
+      ].sort(() => 0.5 - Math.random());
+
+      wordExercises.push({
+        id: 'ex_word_select_1',
+        type: 'select_sound',
+        title: currentLang !== 'en'
+          ? `Выберите слово для «${w1.translation || w1.sound || w1.char}»`
+          : `Select the word for "${w1.translation || w1.sound || w1.char}"`,
+        targetChar: w1.word,
+        targetSound: w1.translation || w1.sound,
+        options: w1Options
+      });
+
+      // 2. Listen and choose the spoken word
+      const w2 = shuffledWords[1 % shuffledWords.length];
+      const w2Distractors = wordPool.filter(w => w.word !== w2.word).sort(() => 0.5 - Math.random()).slice(0, 3);
+      const w2Options = [
+        { id: 'opt_w2_0', text: w2.word!, isCorrect: true },
+        ...w2Distractors.map((d, i) => ({ id: `opt_w2_d_${i}`, text: d.word!, isCorrect: false }))
+      ].sort(() => 0.5 - Math.random());
+
+      wordExercises.push({
+        id: 'ex_word_listen_2',
+        type: 'listen_choice',
+        title: currentLang !== 'en' ? 'Что вы услышали? (Слово)' : 'What word did you hear?',
+        targetChar: w2.word,
+        targetSound: w2.translation || w2.sound,
+        options: w2Options
+      });
+
+      // 3. Match words and translations/letters
+      const pairWords = shuffledWords.slice(0, 4);
+      if (pairWords.length >= 2) {
+        wordExercises.push({
+          id: 'ex_word_pairs_3',
+          type: 'match_pairs',
+          title: currentLang !== 'en' ? 'Сопоставьте слова и значения' : 'Match words and meanings',
+          pairs: pairWords.map(p => ({
+            id: p.word!,
+            target: p.word!,
+            roman: p.translation || `${p.char} (${p.sound || p.translit || p.name})`
+          }))
+        });
+      }
+
+      // 4. Hard word choice
+      const w3 = shuffledWords[2 % shuffledWords.length];
+      const w3Distractors = wordPool.filter(w => w.word !== w3.word).sort(() => 0.5 - Math.random()).slice(0, 3);
+      const w3Options = [
+        { id: 'opt_w3_0', text: w3.word!, isCorrect: true },
+        ...w3Distractors.map((d, i) => ({ id: `opt_w3_d_${i}`, text: d.word!, isCorrect: false }))
+      ].sort(() => 0.5 - Math.random());
+
+      wordExercises.push({
+        id: 'ex_word_hard_4',
+        type: 'hard_word',
+        isHard: true,
+        title: currentLang !== 'en'
+          ? `Найдите слово с буквы «${w3.char}»: ${w3.translation || w3.sound || ''}`
+          : `Find the word starting with "${w3.char}": ${w3.translation || w3.sound || ''}`,
+        targetChar: w3.word,
+        targetSound: w3.translation || w3.sound,
+        options: w3Options
+      });
+
+      setLessonQueue(wordExercises);
+      setCurrentExerciseIdx(0);
+      setSelectedOptionId(null);
+      setFeedbackStatus('idle');
+      setHasTraced(false);
+      setMatchedPairIds([]);
+      setSelectedPairLeft(null);
+      setSelectedPairRight(null);
+      setLessonCompleted(false);
+      setActiveLesson(true);
+      return;
+    }
 
     const locTrace: Record<string, string> = {
       ru: 'Обведите символ',
@@ -333,7 +481,8 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
 
     // 2. Select the correct character for sound
     const soundItem = shuffled[1 % shuffled.length] || targetCharItem;
-    const soundDistractors = currentLetters.filter(l => l.char !== soundItem.char).slice(0, 3);
+    const distractorSlice = difficultyLevel === 'hard' ? 4 : 2;
+    const soundDistractors = currentLetters.filter(l => l.char !== soundItem.char).slice(0, distractorSlice);
     const soundOptions = [
       { id: 'opt_s_1', text: soundItem.char, sound: soundItem.sound, isCorrect: true },
       ...soundDistractors.map((d, i) => ({ id: `opt_s_dist_${i}`, text: d.char, sound: d.sound, isCorrect: false }))
@@ -350,7 +499,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
 
     // 3. What do you hear?
     const listenItem = shuffled[2 % shuffled.length] || targetCharItem;
-    const listenDistractors = currentLetters.filter(l => l.char !== listenItem.char).slice(0, 3);
+    const listenDistractors = currentLetters.filter(l => l.char !== listenItem.char).slice(0, distractorSlice);
     const listenOptions = [
       { id: 'opt_l_1', text: listenItem.char, isCorrect: true },
       ...listenDistractors.map((d, i) => ({ id: `opt_l_dist_${i}`, text: d.char, isCorrect: false }))
@@ -366,7 +515,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
     });
 
     // 4. Tap the matching pairs
-    const pairItems = shuffled.slice(0, 4);
+    const pairItems = shuffled.slice(0, difficultyLevel === 'hard' ? 5 : 3);
     if (pairItems.length >= 2) {
       exercises.push({
         id: 'ex_pairs_4',
@@ -380,7 +529,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
       });
     }
 
-    // 5. HARD EXERCISE
+    // 5. HARD EXERCISE (Included on Hard level, plus extra challenge in hard mode)
     const hardItem = shuffled[3 % shuffled.length] || targetCharItem;
     const testWord = hardItem.word ? hardItem.word.split(' ')[0] : (hardItem.char + (currentLetters[1]?.char || ''));
     const testTranslit = hardItem.translit 
@@ -400,21 +549,44 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
       return [word + '·', '·' + word, word + '°'];
     };
     
-    const variations = genVariations(testWord);
-    const hardOptions = [
-      { id: 'opt_h_1', text: testWord, isCorrect: true },
-      ...variations.map((v, i) => ({ id: `opt_h_dist_${i}`, text: v, isCorrect: false }))
-    ].sort(() => 0.5 - Math.random());
+    if (difficultyLevel === 'hard') {
+      const variations = genVariations(testWord);
+      const hardOptions = [
+        { id: 'opt_h_1', text: testWord, isCorrect: true },
+        ...variations.map((v, i) => ({ id: `opt_h_dist_${i}`, text: v, isCorrect: false }))
+      ].sort(() => 0.5 - Math.random());
 
-    exercises.push({
-      id: 'ex_hard_5',
-      type: 'hard_word',
-      isHard: true,
-      title: `${locHardWords[currentLang] || locHardWords['ru']} "${testTranslit}"`,
-      targetChar: testWord,
-      targetSound: testTranslit,
-      options: hardOptions
-    });
+      exercises.push({
+        id: 'ex_hard_5',
+        type: 'hard_word',
+        isHard: true,
+        title: `${locHardWords[currentLang] || locHardWords['ru']} "${testTranslit}"`,
+        targetChar: testWord,
+        targetSound: testTranslit,
+        options: hardOptions
+      });
+
+      const hardItem2 = shuffled[4 % shuffled.length] || targetCharItem;
+      const testWord2 = hardItem2.word ? hardItem2.word.split(' ')[0] : (hardItem2.char + (currentLetters[2]?.char || ''));
+      const testTranslit2 = hardItem2.translit
+        ? hardItem2.translit.toLowerCase()
+        : (hardItem2.sound || hardItem2.name || hardItem2.char);
+      const variations2 = genVariations(testWord2);
+      const hardOptions2 = [
+        { id: 'opt_h2_1', text: testWord2, isCorrect: true },
+        ...variations2.map((v, i) => ({ id: `opt_h2_dist_${i}`, text: v, isCorrect: false }))
+      ].sort(() => 0.5 - Math.random());
+
+      exercises.push({
+        id: 'ex_hard_6',
+        type: 'hard_word',
+        isHard: true,
+        title: `${locHardWords[currentLang] || locHardWords['ru']} "${testTranslit2}"`,
+        targetChar: testWord2,
+        targetSound: testTranslit2,
+        options: hardOptions2
+      });
+    }
 
     setLessonQueue(exercises);
     setCurrentExerciseIdx(0);
@@ -424,6 +596,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
     setMatchedPairIds([]);
     setSelectedPairLeft(null);
     setSelectedPairRight(null);
+    setLessonCompleted(false);
     setActiveLesson(true);
   };
 
@@ -609,7 +782,11 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
       // Lesson Complete!
       playSound('success');
       triggerHapticFeedback('success');
-      setActiveLesson(false);
+      const completionBonus = difficultyLevel === 'hard' ? 40 : 25;
+      const updatedUser = { ...user, xp: user.xp + completionBonus };
+      setUser(updatedUser);
+      if (onSaveProgress) onSaveProgress(updatedUser);
+      setLessonCompleted(true);
       setSelectedLetter(null);
     }
   };
@@ -685,7 +862,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
 
   const isNonLanguage = currentCourse.id === 'chess' || currentCourse.id === 'math' || currentCourse.id === 'music' || currentCourse.flagCode === 'chess' || currentCourse.flagCode === 'math' || currentCourse.flagCode === 'music';
 
-  if (isNonLanguage) {
+  if (isNonLanguage && lettersSectionTab !== 'illusion' && lettersSectionTab !== 'audio') {
     return (
       <div className={`min-h-screen w-full ${isLightMode ? 'bg-[#F7F9FA] text-slate-900' : 'bg-[#131F24] text-white'} flex flex-col items-center justify-center p-4 sm:p-6 font-din relative`}>
         <div className={`max-w-md w-full rounded-3xl p-6 sm:p-8 border-2 shadow-2xl text-center space-y-5 ${isLightMode ? 'bg-white border-slate-300' : 'bg-[#182329] border-gray-700'}`}>
@@ -695,13 +872,13 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
           
           <div>
             <span className="text-[11px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
-              {user.language === 'ru' ? 'Раздел недоступен' : 'Section unavailable'}
+              {user.language !== 'en' ? 'Раздел недоступен' : 'Section unavailable'}
             </span>
             <h2 className="text-2xl font-black mt-3">
-              {user.language === 'ru' ? 'Раздел «Письма» доступен только для языковых курсов' : 'Letters section is only available for language courses'}
+              {user.language !== 'en' ? 'Раздел «Письма» доступен только для языковых курсов' : 'Letters section is only available for language courses'}
             </h2>
             <p className="text-xs sm:text-sm text-gray-400 font-medium mt-2 leading-relaxed">
-              {user.language === 'ru'
+              {user.language !== 'en'
                 ? `Курс «${currentCourse.localName || currentCourse.name}» относится к разделу «Предметы & Игры» (не языковой курс). В данном предмете нет алфавита или букв.`
                 : `The course "${currentCourse.name}" is a special subject/game (non-language). Letters and alphabets are only available for language courses.`}
             </p>
@@ -715,7 +892,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
               }}
               className="w-full py-3.5 px-4 bg-duo-green hover:bg-duo-greenDark text-white font-black text-xs uppercase tracking-wider rounded-2xl border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all shadow-lg cursor-pointer"
             >
-              🌍 {user.language === 'ru' ? 'Выбрать языковой курс' : 'Choose a language course'}
+              🌍 {user.language !== 'en' ? 'Выбрать языковой курс' : 'Choose a language course'}
             </button>
             {onBackToPath && (
               <button
@@ -725,7 +902,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                 }}
                 className="w-full py-3 px-4 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold text-xs uppercase tracking-wider rounded-2xl border border-gray-700 transition-all cursor-pointer"
               >
-                ← {user.language === 'ru' ? 'Вернуться к урокам курса' : 'Back to course lessons'}
+                ← {user.language !== 'en' ? 'Вернуться к урокам курса' : 'Back to course lessons'}
               </button>
             )}
           </div>
@@ -739,7 +916,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                 <div className="flex items-center space-x-2">
                   <AlphabetIcon className="w-6 h-6 text-duo-blue" />
                   <h3 className="text-xl font-black text-white">
-                    {user.language === 'ru' ? 'Выберите язык курса' : 'Choose Course Language'}
+                    {user.language !== 'en' ? 'Выберите язык курса' : 'Choose Course Language'}
                   </h3>
                 </div>
                 <button
@@ -761,7 +938,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                     courseCategoryTab === 'cis' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-400 hover:text-white'
                   }`}
                 >
-                  🏛️ {user.language === 'ru' ? 'СНГ' : 'CIS'}
+                  🏛️ {user.language !== 'en' ? 'СНГ' : 'CIS'}
                 </button>
                 <button
                   onClick={() => {
@@ -772,7 +949,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                     courseCategoryTab === 'russia' ? 'bg-rose-600 text-white shadow-md' : 'text-gray-400 hover:text-white'
                   }`}
                 >
-                  🇷🇺 {user.language === 'ru' ? 'РФ' : 'Russia'}
+                  🇷🇺 {user.language !== 'en' ? 'РФ' : 'Russia'}
                 </button>
                 <button
                   onClick={() => {
@@ -783,7 +960,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                     courseCategoryTab === 'world' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-white'
                   }`}
                 >
-                  🌍 {user.language === 'ru' ? 'Мир' : 'World'}
+                  🌍 {user.language !== 'en' ? 'Мир' : 'World'}
                 </button>
                 <button
                   onClick={() => {
@@ -794,7 +971,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                     courseCategoryTab === 'easiest' ? 'bg-amber-500 text-black shadow-md font-bold' : 'text-gray-400 hover:text-white'
                   }`}
                 >
-                  🏆 {user.language === 'ru' ? 'Лёгкие' : 'Easy'}
+                  🏆 {user.language !== 'en' ? 'Лёгкие' : 'Easy'}
                 </button>
                 <button
                   onClick={() => {
@@ -805,7 +982,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                     courseCategoryTab === 'hardest' ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-md' : 'text-gray-400 hover:text-white'
                   }`}
                 >
-                  🔥 {user.language === 'ru' ? 'Сложные' : 'Hard'}
+                  🔥 {user.language !== 'en' ? 'Сложные' : 'Hard'}
                 </button>
                 <button
                   onClick={() => {
@@ -816,7 +993,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                     courseCategoryTab === 'beta' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md ring-1 ring-purple-400/50' : 'text-gray-400 hover:text-white'
                   }`}
                 >
-                  🧪 {user.language === 'ru' ? 'Бета' : 'Beta'}
+                  🧪 {user.language !== 'en' ? 'Бета' : 'Beta'}
                 </button>
               </div>
 
@@ -857,7 +1034,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                         </div>
                       </div>
                       <span className="text-xs bg-duo-green/20 text-duo-green font-black px-2.5 py-1 rounded-lg">
-                        {user.language === 'ru' ? 'Выбрать' : 'Select'}
+                        {user.language !== 'en' ? 'Выбрать' : 'Select'}
                       </span>
                     </button>
                   );
@@ -874,9 +1051,133 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
     <div className={`min-h-screen w-full ${isLightMode ? 'bg-[#F7F9FA] text-slate-900' : 'bg-[#131F24] text-white'} selection:bg-duo-blue/30 pb-28 md:pb-12 transition-colors`}>
       
       {/* ========================================================================= */}
-      {/* 1. INTERACTIVE LETTERS LESSON MODE (Screenshots 2, 3, 4, 5, 6)             */}
+      {/* 1. LESSON COMPLETE CELEBRATION SCREEN (With Post-Lesson Modes)            */}
       {/* ========================================================================= */}
-      {activeLesson && currentExercise ? (
+      {activeLesson && lessonCompleted ? (
+        <div className="max-w-2xl mx-auto min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 animate-in fade-in zoom-in-95 duration-200">
+          <div className={`w-full rounded-3xl p-6 sm:p-8 border-2 shadow-2xl space-y-6 text-center ${isLightMode ? 'bg-white border-slate-300' : 'bg-[#182329] border-emerald-500/50'}`}>
+            <div className="flex flex-col items-center space-y-3">
+              <div className="w-20 h-20 rounded-3xl bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center text-4xl shadow-lg">
+                🏆
+              </div>
+              <div className="flex items-center gap-2 flex-wrap justify-center">
+                <span className="px-3 py-1 rounded-full bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow">
+                  +{difficultyLevel === 'hard' ? 40 : 25} XP
+                </span>
+                <span className={`px-3 py-1 rounded-full font-black text-xs uppercase tracking-wider shadow ${
+                  difficultyLevel === 'hard'
+                    ? 'bg-gradient-to-r from-red-600 to-amber-500 text-white'
+                    : 'bg-emerald-500 text-slate-950'
+                }`}>
+                  {difficultyLevel === 'hard'
+                    ? (user.language !== 'en' ? '🔥 Сложный уровень' : '🔥 Hard Level')
+                    : (user.language !== 'en' ? '🌱 Лёгкий уровень' : '🌱 Easy Level')}
+                </span>
+              </div>
+              <h2 className={`text-2xl sm:text-3xl font-black ${isLightMode ? 'text-slate-900' : 'text-white'}`}>
+                {user.language !== 'en' ? 'Урок завершён!' : 'Lesson Complete!'}
+              </h2>
+              <p className={`text-xs sm:text-sm font-bold ${isLightMode ? 'text-slate-600' : 'text-gray-300'}`}>
+                {user.language !== 'en'
+                  ? 'Выберите следующий шаг после окончания урока:'
+                  : 'Choose your next practice step after finishing the lesson:'}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 text-left">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveLesson(false);
+                  setLessonCompleted(false);
+                  handleSelectSectionTab('words');
+                }}
+                className="w-full p-4 rounded-2xl bg-emerald-600/20 hover:bg-emerald-600/30 border-2 border-emerald-500/60 flex items-center justify-between gap-3 transition-all cursor-pointer active:scale-[0.99]"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-2xl shrink-0">📖</span>
+                  <div className="min-w-0">
+                    <div className={`font-black text-sm ${isLightMode ? 'text-emerald-900' : 'text-emerald-300'}`}>
+                      {user.language !== 'en' ? 'Слово (не буква на слово)' : 'Words (Full Words, Beyond Letters)'}
+                    </div>
+                    <div className={`text-xs font-medium ${isLightMode ? 'text-slate-600' : 'text-gray-300'}`}>
+                      {user.language !== 'en' ? 'Изучайте целые слова курса и собирайте их по буквам' : 'Master full authentic words and letter assembly'}
+                    </div>
+                  </div>
+                </div>
+                <span className="text-emerald-400 font-black text-sm shrink-0">→</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveLesson(false);
+                  setLessonCompleted(false);
+                  handleSelectSectionTab('illusion');
+                }}
+                className="w-full p-4 rounded-2xl bg-purple-600/20 hover:bg-purple-600/30 border-2 border-purple-500/60 flex items-center justify-between gap-3 transition-all cursor-pointer active:scale-[0.99]"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-2xl shrink-0">🌀</span>
+                  <div className="min-w-0">
+                    <div className={`font-black text-sm ${isLightMode ? 'text-purple-900' : 'text-purple-300'}`}>
+                      {user.language !== 'en' ? 'Звуковая Иллюзия: ЧТО РЕАЛЬНО, А ЧТО НЕТ?' : 'Sound Illusion: WHAT IS REAL & WHAT IS NOT?'}
+                    </div>
+                    <div className={`text-xs font-medium ${isLightMode ? 'text-slate-600' : 'text-gray-300'}`}>
+                      {user.language !== 'en' ? 'Психоакустика: что слышит мозг против звуковой волны' : 'Psychoacoustics lab and acoustic reality quiz'}
+                    </div>
+                  </div>
+                </div>
+                <span className="text-purple-400 font-black text-sm shrink-0">→</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveLesson(false);
+                  setLessonCompleted(false);
+                  handleSelectSectionTab('audio');
+                }}
+                className="w-full p-4 rounded-2xl bg-sky-600/20 hover:bg-sky-600/30 border-2 border-sky-500/60 flex items-center justify-between gap-3 transition-all cursor-pointer active:scale-[0.99]"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-2xl shrink-0">🎧</span>
+                  <div className="min-w-0">
+                    <div className={`font-black text-sm ${isLightMode ? 'text-sky-900' : 'text-sky-300'}`}>
+                      {user.language !== 'en' ? 'Аудио: ЧТО ВЫ УСЛЫШАЛИ?' : 'Audio: WHAT DID YOU HEAR?'}
+                    </div>
+                    <div className={`text-xs font-medium ${isLightMode ? 'text-slate-600' : 'text-gray-300'}`}>
+                      {user.language !== 'en' ? 'Тренировка восприятия речи на слух с замедлением 0.75x' : 'Listening discrimination practice with 0.75x playback'}
+                    </div>
+                  </div>
+                </div>
+                <span className="text-sky-400 font-black text-sm shrink-0">→</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => startLetterLesson()}
+                className="py-3.5 px-4 bg-gray-800 hover:bg-gray-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl border-b-4 border-gray-950 active:border-b-0 active:translate-y-1 transition-all cursor-pointer"
+              >
+                {user.language !== 'en' ? 'Повторить урок' : 'Practice Again'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  playSound('click');
+                  setActiveLesson(false);
+                  setLessonCompleted(false);
+                }}
+                className="py-3.5 px-4 bg-[#58CC02] hover:brightness-110 text-white font-black text-xs uppercase tracking-wider rounded-2xl border-b-4 border-[#46A302] active:border-b-0 active:translate-y-1 transition-all shadow-lg cursor-pointer"
+              >
+                {user.language !== 'en' ? 'ПРОДОЛЖИТЬ' : 'CONTINUE'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : activeLesson && currentExercise ? (
         <div className="max-w-2xl mx-auto min-h-screen flex flex-col justify-between p-4 sm:p-6 animate-in fade-in zoom-in-95 duration-200">
           
           {/* Top Bar: Close, Skip, Progress, Energy, Hearts */}
@@ -888,7 +1189,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                   setActiveLesson(false);
                 }}
                 className="p-2 text-gray-400 hover:text-white rounded-full hover:bg-white/10 transition-colors cursor-pointer"
-                title={user.language === 'ru' ? 'Выйти' : 'Quit'}
+                title={user.language !== 'en' ? 'Выйти' : 'Quit'}
               >
                 <CloseIcon className="w-6 h-6" />
               </button>
@@ -896,10 +1197,10 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                 type="button"
                 onClick={handleSkipExercise}
                 className="px-2.5 py-1 bg-gray-800/90 hover:bg-gray-700 text-gray-300 hover:text-white border border-gray-700 rounded-xl font-black text-xs uppercase tracking-wider flex items-center space-x-1 cursor-pointer transition-all active:scale-95 shadow-sm"
-                title={user.language === 'ru' ? 'Пропустить упражнение' : 'Skip exercise'}
+                title={user.language !== 'en' ? 'Пропустить упражнение' : 'Skip exercise'}
               >
                 <span>⏭️</span>
-                <span className="hidden sm:inline">{user.language === 'ru' ? 'Пропустить' : 'Skip'}</span>
+                <span className="hidden sm:inline">{user.language !== 'en' ? 'Пропустить' : 'Skip'}</span>
               </button>
             </div>
 
@@ -931,7 +1232,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
             {currentExercise.isHard && (
               <div className="flex items-center space-x-2 text-duo-red font-black text-xs uppercase tracking-widest mb-3 animate-bounce">
                 <DumbbellIcon className="w-5 h-5" />
-                <span>{user.language === 'ru' ? 'Сложное упражнение' : 'Hard Exercise'}</span>
+                <span>{user.language !== 'en' ? 'Сложное упражнение' : 'Hard Exercise'}</span>
               </div>
             )}
 
@@ -1048,7 +1349,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                 </div>
 
                 <p className="text-xs text-gray-400 font-bold mt-2">
-                  {user.language === 'ru' ? 'Проведите пальцем или мышкой по контуру буквы' : 'Trace along the character outline'}
+                  {user.language !== 'en' ? 'Проведите пальцем или мышкой по контуру буквы' : 'Trace along the character outline'}
                 </p>
               </div>
             )}
@@ -1069,7 +1370,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                         setSelectedOptionId(opt.id);
                         speakText(opt.text, currentCourse.id, false, user.preferredVoice, user.voiceProvider);
                       }}
-                      className={`h-36 sm:h-44 rounded-3xl flex items-center justify-center font-black text-4xl sm:text-5xl transition-all border-b-4 active:border-b-2 active:translate-y-0.5 cursor-pointer ${getScriptFontClass(currentCourse.id)} ${
+                      className={`h-36 sm:h-44 rounded-3xl flex items-center justify-center font-black px-3 text-center break-words ${opt.text.length > 3 ? 'text-xl sm:text-2xl' : 'text-4xl sm:text-5xl'} transition-all border-b-4 active:border-b-2 active:translate-y-0.5 cursor-pointer ${getScriptFontClass(currentCourse.id)} ${
                         isSelected
                           ? 'bg-[#182329] border-duo-blue ring-4 ring-duo-blue/30 text-duo-blue'
                           : 'bg-[#182329] border-gray-800 hover:border-gray-700 text-white hover:bg-[#1E2B33]'
@@ -1107,7 +1408,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                           triggerHapticFeedback('light');
                           setSelectedOptionId(opt.id);
                         }}
-                        className={`h-28 sm:h-32 rounded-3xl flex items-center justify-center font-black text-3xl sm:text-4xl transition-all border-b-4 active:border-b-2 active:translate-y-0.5 cursor-pointer ${
+                        className={`h-28 sm:h-32 rounded-3xl flex items-center justify-center font-black px-3 text-center break-words ${opt.text.length > 3 ? 'text-xl sm:text-2xl' : 'text-3xl sm:text-4xl'} transition-all border-b-4 active:border-b-2 active:translate-y-0.5 cursor-pointer ${
                           isSelected
                             ? 'bg-[#182329] border-duo-blue ring-4 ring-duo-blue/30 text-duo-blue'
                             : 'bg-[#182329] border-gray-800 hover:border-gray-700 text-white hover:bg-[#1E2B33]'
@@ -1126,7 +1427,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                   }}
                   className="text-xs font-black text-gray-500 hover:text-gray-300 uppercase tracking-widest mt-2 cursor-pointer"
                 >
-                  {user.language === 'ru' ? 'СЕЙЧАС НЕ МОГУ СЛУШАТЬ' : "CAN'T LISTEN NOW"}
+                  {user.language !== 'en' ? 'СЕЙЧАС НЕ МОГУ СЛУШАТЬ' : "CAN'T LISTEN NOW"}
                 </button>
               </div>
             )}
@@ -1228,10 +1529,10 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                   type="button"
                   onClick={handleSkipExercise}
                   className="px-5 py-4 rounded-2xl font-black text-xs md:text-sm uppercase tracking-wider border-2 border-gray-700 bg-gray-800/90 hover:bg-gray-700 hover:border-gray-500 text-gray-300 hover:text-white transition-all active:translate-y-1 shadow-md cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
-                  title={user.language === 'ru' ? 'Пропустить упражнение' : 'Skip exercise'}
+                  title={user.language !== 'en' ? 'Пропустить упражнение' : 'Skip exercise'}
                 >
                   <span>⏭️</span>
-                  <span>{user.language === 'ru' ? 'ПРОПУСТИТЬ' : 'SKIP'}</span>
+                  <span>{user.language !== 'en' ? 'ПРОПУСТИТЬ' : 'SKIP'}</span>
                 </button>
                 <button
                   disabled={
@@ -1248,7 +1549,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                       : 'bg-gray-800 text-gray-500 border-gray-900 cursor-not-allowed'
                   }`}
                 >
-                  {user.language === 'ru' ? 'ПРОВЕРИТЬ' : 'CHECK'}
+                  {user.language !== 'en' ? 'ПРОВЕРИТЬ' : 'CHECK'}
                 </button>
               </div>
             ) : (
@@ -1264,12 +1565,12 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                   <div>
                     <h4 className={`font-black text-lg ${feedbackStatus === 'correct' ? 'text-[#58CC02]' : 'text-red-400'}`}>
                       {feedbackStatus === 'correct' 
-                        ? (user.language === 'ru' ? 'Отлично!' : 'Nicely done!') 
-                        : (user.language === 'ru' ? 'Неправильно' : 'Incorrect')}
+                        ? (user.language !== 'en' ? 'Отлично!' : 'Nicely done!') 
+                        : (user.language !== 'en' ? 'Неправильно' : 'Incorrect')}
                     </h4>
                     {feedbackStatus === 'wrong' && currentExercise.targetChar && (
                       <p className="text-xs text-gray-300 font-bold">
-                        {user.language === 'ru' ? 'Правильный ответ: ' : 'Correct answer: '}
+                        {user.language !== 'en' ? 'Правильный ответ: ' : 'Correct answer: '}
                         <span className="text-white font-black">{currentExercise.targetChar}</span>
                       </p>
                     )}
@@ -1282,7 +1583,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                     feedbackStatus === 'correct' ? 'bg-[#58CC02] border-[#46A302]' : 'bg-red-500 border-red-700'
                   }`}
                 >
-                  {user.language === 'ru' ? 'ПРОДОЛЖИТЬ' : 'CONTINUE'}
+                  {user.language !== 'en' ? 'ПРОДОЛЖИТЬ' : 'CONTINUE'}
                 </button>
               </div>
             )}
@@ -1313,51 +1614,37 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
             </button>
 
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-white mb-2">
-              {user.language === 'ru' 
+              {user.language !== 'en' 
                 ? `Учим ${getCourseDisplayName(currentCourse)}!` 
                 : `Let’s learn ${getCourseDisplayName(currentCourse)}!`}
             </h1>
             
             <p className="text-sm sm:text-base font-bold text-gray-400 max-w-lg">
-              {user.language === 'ru'
+              {user.language !== 'en'
                 ? `Познакомьтесь с письменностью языка ${getCourseDisplayName(currentCourse)}`
                 : `Get to know the ${getCourseDisplayName(currentCourse)} writing system`}
             </p>
 
-            {/* Writing Restriction Notice Banner */}
-            {isWritingLocked ? (
-              <div className="w-full max-w-lg mt-4 p-4 rounded-3xl bg-rose-950/40 border-2 border-rose-500/50 shadow-xl text-center space-y-2 animate-in fade-in">
-                <div className="flex items-center justify-center space-x-2 text-rose-300 font-black text-xs sm:text-sm uppercase tracking-wider">
-                  <span>🔒</span>
-                  <span>Раздел Письмо Будут доступ 1 ноября 2026 год</span>
+            {/* Writing Section Unlocked Banner (1 ноября 2026 г.) */}
+            {betaLockInfo ? (
+              <div className="w-full max-w-lg mt-4 p-4 rounded-3xl bg-emerald-950/40 border-2 border-emerald-500/50 shadow-xl text-center space-y-2 animate-in fade-in">
+                <div className="flex items-center justify-center space-x-2 text-emerald-300 font-black text-xs sm:text-sm uppercase tracking-wider">
+                  <span>🎉</span>
+                  <span>1 ноября 2026 г. • Раздел «Письмо» открыт!</span>
                 </div>
-                <div className="text-xs font-bold text-gray-300">
-                  🔒 {currentCourse.localName || currentCourse.name} — в разработке • Доступно 1 ноября 2026 г.
+                <div className="text-xs font-bold text-gray-200">
+                  ✨ {currentCourse.localName || currentCourse.name} — официально доступно с 1 ноября 2026 г.
                 </div>
                 <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
-                  <span className="px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[11px] font-black uppercase">
-                    🔒 1 нояб. 2026
+                  <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[11px] font-black uppercase">
+                    ✅ 1 нояб. 2026 • Открыто
                   </span>
-                  <span className="text-amber-400 font-mono text-xs font-bold">
-                    Доступно через {daysUntilUnlock} {daysUntilUnlock === 1 ? 'день' : daysUntilUnlock < 5 ? 'дня' : 'дней'}
+                  <span className="text-emerald-400 font-mono text-xs font-bold">
+                    Тренировки и прописи активны
                   </span>
-                </div>
-              </div>
-            ) : isBetaRestricted && betaLockInfo ? (
-              <div className="w-full max-w-md mt-4 p-4 rounded-3xl bg-amber-950/40 border-2 border-amber-500/50 shadow-xl text-center space-y-2 animate-in fade-in">
-                <div className="flex items-center justify-center space-x-2 text-amber-300 font-black text-xs sm:text-sm uppercase tracking-wider">
-                  <span>🔒</span>
-                  <span>В разработке • Доступно 1 ноября 2026 г.</span>
-                </div>
-                <div className="flex items-center justify-center flex-wrap gap-2 text-xs font-bold text-gray-300">
-                  <span className="text-white font-black">{currentCourse.localName || currentCourse.name}</span>
-                  <span className="font-mono text-purple-300 bg-purple-900/60 border border-purple-500/40 px-2 py-0.5 rounded-full font-bold">
-                    {betaLockInfo.version}
-                  </span>
-                  <span className="text-amber-400 font-mono">Доступно через {daysUntilUnlock} дн.</span>
                 </div>
                 {currentCourse.id === 'tlh' && (
-                  <div className="pt-2 flex items-center justify-center gap-2 text-xs text-emerald-300 font-bold border-t border-amber-500/20">
+                  <div className="pt-2 flex items-center justify-center gap-2 text-xs text-emerald-300 font-bold border-t border-emerald-500/20">
                     <span className="font-klingon text-lg">tlhIngan Hol</span>
                     <span className="text-[11px] text-gray-300">• Шрифт Klingon Font подключен (fontomania.ru/17807-klingon.html)</span>
                   </div>
@@ -1365,44 +1652,135 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
               </div>
             ) : null}
 
-            {/* Prominent "LEARN THE LETTERS" Button (Screenshot 1) */}
-            <div className="w-full max-w-md mt-6">
+            {/* Difficulty Switcher: Лёгкий уровень / Сложный уровень */}
+            <div className={`w-full max-w-md mt-5 p-1.5 rounded-2xl border grid grid-cols-2 gap-1.5 shadow-md ${isLightMode ? 'bg-slate-200/90 border-slate-300' : 'bg-[#182329] border-gray-700/80'}`}>
               <button
-                onClick={() => startLetterLesson()}
-                className={`w-full py-4 px-8 active:border-b-0 active:translate-y-1 text-white font-black text-sm uppercase tracking-widest rounded-2xl border-b-4 shadow-xl flex items-center justify-center space-x-3 transition-all cursor-pointer group ${
-                  isWritingLocked
-                    ? 'bg-rose-700 hover:bg-rose-600 border-rose-900'
-                    : isBetaRestricted
-                    ? 'bg-amber-600 hover:bg-amber-500 border-amber-800'
-                    : 'bg-duo-blue hover:bg-[#1899D6] border-[#1899D6]'
+                type="button"
+                onClick={() => handleSwitchDifficulty('easy')}
+                className={`py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  difficultyLevel === 'easy'
+                    ? 'bg-emerald-500 text-slate-950 shadow-md border-b-2 border-emerald-700'
+                    : isLightMode ? 'text-slate-700 hover:bg-white/80' : 'text-gray-300 hover:text-white hover:bg-white/5'
                 }`}
               >
-                {isWritingLocked ? (
-                  <>
-                    <span>🔒</span>
-                    <span>{user.language === 'ru' ? 'РАЗДЕЛ ПИСЬМО (ДО 1 НОЯБРЯ 2026)' : 'LETTERS LOCKED (UNTIL NOV 1, 2026)'}</span>
-                  </>
-                ) : isBetaRestricted ? (
-                  <>
-                    <span>🔒</span>
-                    <span>{user.language === 'ru' ? 'ОГРАНИЧЕНИЕ ПИСЬМА (ДО 1 НОЯ 2026)' : 'WRITING RESTRICTED (UNTIL NOV 1 2026)'}</span>
-                  </>
-                ) : (
-                  <>
-                    <SparklesIcon className="w-5 h-5 group-hover:rotate-12 transition-transform" />
-                    <span>{user.language === 'ru' ? 'УЧИТЬ БУКВЫ' : 'LEARN THE LETTERS'}</span>
-                  </>
-                )}
+                <span>🌱</span>
+                <span>{user.language !== 'en' ? 'Лёгкий уровень' : 'Easy Level'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSwitchDifficulty('hard')}
+                className={`py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  difficultyLevel === 'hard'
+                    ? 'bg-gradient-to-r from-red-600 to-amber-500 text-white shadow-md border-b-2 border-red-800'
+                    : isLightMode ? 'text-slate-700 hover:bg-white/80' : 'text-gray-300 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <span>🔥</span>
+                <span>{user.language !== 'en' ? 'Сложный уровень (+40 XP)' : 'Hard Level (+40 XP)'}</span>
               </button>
             </div>
 
-            {/* Quick Arabic Font Switcher Pill Bar (Only shown for Arabic course) */}
-            {currentCourse.id === 'ar' && (
+            {/* 4-Tab Section Switcher for Раздел «Буквы» */}
+            <div className={`w-full mt-6 p-1.5 rounded-2xl border grid grid-cols-2 lg:grid-cols-4 gap-1.5 shadow-lg ${isLightMode ? 'bg-slate-200/90 border-slate-300' : 'bg-[#182329] border-gray-700/80'}`}>
+              <button
+                type="button"
+                onClick={() => handleSelectSectionTab('letters')}
+                className={`py-2.5 px-3 rounded-xl font-black text-[11px] sm:text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  lettersSectionTab === 'letters'
+                    ? 'bg-duo-blue text-white shadow-md border-b-2 border-[#1899D6]'
+                    : isLightMode ? 'text-slate-700 hover:bg-white/80' : 'text-gray-300 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <span>🔤</span>
+                <span>{user.language !== 'en' ? 'Буквы' : 'Letters'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSelectSectionTab('words')}
+                className={`py-2.5 px-3 rounded-xl font-black text-[11px] sm:text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  lettersSectionTab === 'words'
+                    ? 'bg-emerald-600 text-white shadow-md border-b-2 border-emerald-800'
+                    : isLightMode ? 'text-slate-700 hover:bg-white/80' : 'text-gray-300 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <span>📖</span>
+                <span>{user.language !== 'en' ? 'Слово (не буква на слово)' : 'Words (Full Words)'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSelectSectionTab('illusion')}
+                className={`py-2.5 px-3 rounded-xl font-black text-[11px] sm:text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  lettersSectionTab === 'illusion'
+                    ? 'bg-purple-600 text-white shadow-md border-b-2 border-purple-900'
+                    : isLightMode ? 'text-slate-700 hover:bg-white/80' : 'text-gray-300 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <span>🌀</span>
+                <span className="truncate">{user.language !== 'en' ? 'Звуковая Иллюзия: ЧТО РЕАЛЬНО, А ЧТО НЕТ?' : 'Sound Illusion: Real or Not?'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSelectSectionTab('audio')}
+                className={`py-2.5 px-3 rounded-xl font-black text-[11px] sm:text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  lettersSectionTab === 'audio'
+                    ? 'bg-sky-600 text-white shadow-md border-b-2 border-sky-900'
+                    : isLightMode ? 'text-slate-700 hover:bg-white/80' : 'text-gray-300 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <span>🎧</span>
+                <span className="truncate">{user.language !== 'en' ? 'Аудио: Что ВЫ УСЛЫШАЛИ?' : 'Audio: What Did You Hear?'}</span>
+              </button>
+            </div>
+
+            {/* Prominent "LEARN THE LETTERS / WORDS" Button (Shown on Letters & Words tabs) */}
+            {(lettersSectionTab === 'letters' || lettersSectionTab === 'words') && (
+              <div className="w-full max-w-md mt-5">
+                <button
+                  onClick={() => startLetterLesson()}
+                  className={`w-full py-4 px-8 active:border-b-0 active:translate-y-1 text-white font-black text-sm uppercase tracking-widest rounded-2xl border-b-4 shadow-xl flex items-center justify-center space-x-3 transition-all cursor-pointer group ${
+                    isWritingLocked
+                      ? 'bg-rose-700 hover:bg-rose-600 border-rose-900'
+                      : isBetaRestricted
+                      ? 'bg-amber-600 hover:bg-amber-500 border-amber-800'
+                      : lettersSectionTab === 'words'
+                      ? 'bg-emerald-600 hover:bg-emerald-500 border-emerald-800'
+                      : 'bg-duo-blue hover:bg-[#1899D6] border-[#1899D6]'
+                  }`}
+                >
+                  {isWritingLocked ? (
+                    <>
+                      <span>🔒</span>
+                      <span>{user.language !== 'en' ? 'РАЗДЕЛ ПИСЬМО (ДО 1 НОЯБРЯ 2026)' : 'LETTERS LOCKED (UNTIL NOV 1, 2026)'}</span>
+                    </>
+                  ) : isBetaRestricted ? (
+                    <>
+                      <span>🔒</span>
+                      <span>{user.language !== 'en' ? 'ОГРАНИЧЕНИЕ ПИСЬМА (ДО 1 НОЯ 2026)' : 'WRITING RESTRICTED (UNTIL NOV 1 2026)'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <SparklesIcon className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                      <span>
+                        {lettersSectionTab === 'words' || alphabetViewMode === 'words'
+                          ? (user.language !== 'en' ? 'УЧИТЬ СЛОВА (НЕ БУКВА НА СЛОВО)' : 'LEARN THE WORDS')
+                          : (user.language !== 'en' ? 'УЧИТЬ БУКВЫ' : 'LEARN THE LETTERS')}
+                      </span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* Quick Arabic Font Switcher Pill Bar (Only shown for Arabic course on letters tab) */}
+            {currentCourse.id === 'ar' && lettersSectionTab === 'letters' && (
               <div className="w-full max-w-md mt-4 p-3 bg-[#182329] border border-emerald-500/40 rounded-2xl flex flex-col items-center gap-2 shadow-lg">
                 <div className="flex items-center justify-between w-full px-1 text-xs font-bold text-emerald-300">
                   <span className="flex items-center gap-1.5">
                     <span>🇦🇪</span>
-                    <span>{user.language === 'ru' ? 'Шрифт курса Арабского:' : 'Arabic Font:'}</span>
+                    <span>{user.language !== 'en' ? 'Шрифт курса Арабского:' : 'Arabic Font:'}</span>
                   </span>
                   <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-mono px-2 py-0.5 rounded-full border border-emerald-500/30">
                     {user.arabicFontFamily === 'cairo' ? 'Cairo' : user.arabicFontFamily === 'noto' ? 'Noto Sans' : 'Duo Rounded'}
@@ -1445,82 +1823,118 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
             )}
           </div>
 
-          {/* Category Tabs (if language has multiple scripts or alphabet sections) */}
-          {alphabetCategories.length > 1 && (
-            <div className="flex items-center justify-center flex-wrap gap-2 mb-8">
-              {alphabetCategories.map((cat, idx) => (
-                <button
-                  key={cat.title}
-                  onClick={() => {
-                    playSound('click');
-                    setSelectedCategoryIdx(idx);
-                  }}
-                  className={`px-5 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider transition-all border-b-4 cursor-pointer ${
-                    selectedCategoryIdx === idx
-                      ? 'bg-duo-blue text-white border-duo-blueDark shadow-lg scale-105'
-                      : 'bg-gray-800 text-gray-400 border-gray-900 hover:bg-gray-700'
-                  }`}
-                >
-                  {cat.title}
-                </button>
-              ))}
-            </div>
+          {lettersSectionTab === 'words' && (
+            <LetterWordsLearning
+              currentCourse={currentCourse}
+              user={user}
+              setUser={setUser}
+              onSaveProgress={onSaveProgress}
+              speakText={speakText}
+              isLightMode={isLightMode}
+            />
           )}
 
-          {/* Letter Cards Grid (Screenshot 1: 4 columns mobile, 6-8 desktop) */}
-          <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5 sm:gap-3.5 mb-12">
-            {currentLetters.map((item, idx) => {
-              const mastery = getLetterMastery(item.char);
-              const isSelected = selectedLetter?.char === item.char;
-
-              return (
-                <div
-                  key={`${item.char}_${idx}`}
-                  onClick={() => {
-                    setSelectedLetter(item);
-                    handlePlayLetterAudio(item.char);
-                  }}
-                  className={`group relative rounded-2xl p-2 sm:p-3 flex flex-col items-center justify-between transition-all duration-200 cursor-pointer select-none border-2 active:scale-95 ${
-                    isSelected
-                      ? 'bg-[#182329] border-[#FFC800] ring-2 ring-[#FFC800]/50 shadow-lg -translate-y-1'
-                      : 'bg-[#182329] border-[#2B3840] hover:border-gray-600 hover:bg-[#1E2B33]'
-                  }`}
-                >
-                  {/* Letter Character Display */}
-                  <div className="my-1 flex flex-col items-center">
-                    <span className={`text-xl sm:text-2xl font-black transition-colors ${getScriptFontClass(currentCourse.id)} ${
-                      isSelected ? 'text-[#FFC800]' : 'text-white group-hover:text-duo-blue'
-                    }`}>
-                      {formatLetterDisplay(item.char)}
-                    </span>
-                    
-                    {/* Romanization / Sound transcription */}
-                    <span className={`text-[11px] sm:text-xs font-bold mt-0.5 tracking-tight ${
-                      isSelected ? 'text-[#FFC800]/80' : 'text-[#77909D]'
-                    }`}>
-                      {item.translit || item.sound || item.name}
-                    </span>
-                  </div>
-
-                  {/* Mastery Progress Bar (Screenshot 1) */}
-                  <div className="w-full bg-[#37464F] h-1.5 rounded-full overflow-hidden mt-1.5">
-                    <div
-                      className="bg-[#FFC800] h-full rounded-full transition-all duration-500"
-                      style={{ width: `${mastery}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* DUAL ARABIC NUMERALS CONVERTER (0-99) & HANDBOOK FOR ARABIC COURSE */}
-          {currentCourse.id === 'ar' && (
-            <ArabicNumeralsConverter 
-              speakText={speakText} 
-              preferredVoice={user.preferredVoice} 
-              voiceProvider={user.voiceProvider} 
+          {lettersSectionTab === 'illusion' && (
+            <SoundIllusionLab
+              user={user}
+              setUser={setUser}
+              onSaveProgress={onSaveProgress}
+              speakText={speakText}
+              isLightMode={isLightMode}
             />
+          )}
+
+          {lettersSectionTab === 'audio' && (
+            <AudioWhatHeardQuiz
+              currentCourse={currentCourse}
+              user={user}
+              setUser={setUser}
+              onSaveProgress={onSaveProgress}
+              speakText={speakText}
+              isLightMode={isLightMode}
+            />
+          )}
+
+          {lettersSectionTab === 'letters' && (
+            <>
+              {/* Category Tabs (if language has multiple scripts or alphabet sections) */}
+              {alphabetCategories.length > 1 && (
+                <div className="flex items-center justify-center flex-wrap gap-2 mb-8">
+                  {alphabetCategories.map((cat, idx) => (
+                    <button
+                      key={cat.title}
+                      onClick={() => {
+                        playSound('click');
+                        setSelectedCategoryIdx(idx);
+                      }}
+                      className={`px-5 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider transition-all border-b-4 cursor-pointer ${
+                        selectedCategoryIdx === idx
+                          ? 'bg-duo-blue text-white border-duo-blueDark shadow-lg scale-105'
+                          : 'bg-gray-800 text-gray-400 border-gray-900 hover:bg-gray-700'
+                      }`}
+                    >
+                      {cat.title}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Letter Cards Grid (Screenshot 1: 4 columns mobile, 6-8 desktop) */}
+              <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5 sm:gap-3.5 mb-12">
+                {currentLetters.map((item, idx) => {
+                  const mastery = getLetterMastery(item.char);
+                  const isSelected = selectedLetter?.char === item.char;
+
+                  return (
+                    <div
+                      key={`${item.char}_${idx}`}
+                      onClick={() => {
+                        setSelectedLetter(item);
+                        handlePlayLetterAudio(item.char);
+                      }}
+                      className={`group relative rounded-2xl p-2 sm:p-3 flex flex-col items-center justify-between transition-all duration-200 cursor-pointer select-none border-2 active:scale-95 ${
+                        isSelected
+                          ? 'bg-[#182329] border-[#FFC800] ring-2 ring-[#FFC800]/50 shadow-lg -translate-y-1'
+                          : 'bg-[#182329] border-[#2B3840] hover:border-gray-600 hover:bg-[#1E2B33]'
+                      }`}
+                    >
+                      {/* Letter Character Display */}
+                      <div className="my-1 flex flex-col items-center">
+                        <span className={`text-xl sm:text-2xl font-black transition-colors ${getScriptFontClass(currentCourse.id)} ${
+                          isSelected ? 'text-[#FFC800]' : 'text-white group-hover:text-duo-blue'
+                        }`}>
+                          {formatLetterDisplay(item.char)}
+                        </span>
+                        
+                        {/* Romanization / Sound transcription */}
+                        <span className={`text-[11px] sm:text-xs font-bold mt-0.5 tracking-tight ${
+                          isSelected ? 'text-[#FFC800]/80' : 'text-[#77909D]'
+                        }`}>
+                          {item.translit || item.sound || item.name}
+                        </span>
+                      </div>
+
+                      {/* Mastery Progress Bar (Screenshot 1) */}
+                      <div className="w-full bg-[#37464F] h-1.5 rounded-full overflow-hidden mt-1.5">
+                        <div
+                          className="bg-[#FFC800] h-full rounded-full transition-all duration-500"
+                          style={{ width: `${mastery}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* DUAL ARABIC NUMERALS CONVERTER (0-99) & HANDBOOK FOR ARABIC COURSE */}
+              {currentCourse.id === 'ar' && (
+                <ArabicNumeralsConverter 
+                  speakText={speakText} 
+                  preferredVoice={user.preferredVoice} 
+                  voiceProvider={user.voiceProvider} 
+                />
+              )}
+            </>
           )}
 
           {/* Letter Detail Bottom Sheet / Modal */}
@@ -1536,7 +1950,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                       {formatLetterDisplay(selectedLetter.char)}
                     </h3>
                     <p className="text-xs font-bold text-gray-400">
-                      {user.language === 'ru' ? 'Звук: ' : 'Sound: '}
+                      {user.language !== 'en' ? 'Звук: ' : 'Sound: '}
                       <span className="text-duo-blue">{selectedLetter.sound || selectedLetter.name}</span>
                       {selectedLetter.translit && ` • ${selectedLetter.translit}`}
                     </p>
@@ -1556,7 +1970,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                 <div className="bg-[#182329] border border-gray-800 rounded-2xl p-3 mb-4 flex items-center justify-between">
                   <div>
                     <span className="text-xs font-bold text-gray-400 block uppercase">
-                      {user.language === 'ru' ? 'Пример слова' : 'Example Word'}
+                      {user.language !== 'en' ? 'Пример слова' : 'Example Word'}
                     </span>
                     <span className="text-base font-black text-duo-green">{selectedLetter.word}</span>
                     {selectedLetter.translation && (
@@ -1579,7 +1993,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                   className="py-3.5 bg-gray-800 hover:bg-gray-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl border-b-4 border-gray-900 flex items-center justify-center space-x-2 transition-all cursor-pointer"
                 >
                   <VolumeIcon className="w-5 h-5" />
-                  <span>{user.language === 'ru' ? 'Слушать' : 'Listen'}</span>
+                  <span>{user.language !== 'en' ? 'Слушать' : 'Listen'}</span>
                 </button>
 
                 <button
@@ -1587,7 +2001,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                   className="py-3.5 bg-duo-blue hover:bg-[#1899D6] text-white font-black text-xs uppercase tracking-wider rounded-2xl border-b-4 border-[#1899D6] flex items-center justify-center space-x-2 transition-all cursor-pointer shadow-lg"
                 >
                   <PenIcon className="w-5 h-5" />
-                  <span>{user.language === 'ru' ? 'Тренировать' : 'Practice'}</span>
+                  <span>{user.language !== 'en' ? 'Тренировать' : 'Practice'}</span>
                 </button>
               </div>
             </div>
@@ -1602,7 +2016,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                   <div className="flex items-center space-x-2">
                     <AlphabetIcon className="w-6 h-6 text-duo-blue" />
                     <h3 className="text-xl font-black text-white">
-                      {user.language === 'ru' ? 'Выберите язык курса' : 'Choose Course Language'}
+                      {user.language !== 'en' ? 'Выберите язык курса' : 'Choose Course Language'}
                     </h3>
                   </div>
                   <button
@@ -1624,7 +2038,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                       courseCategoryTab === 'cis' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-400 hover:text-white'
                     }`}
                   >
-                    🏛️ {user.language === 'ru' ? 'Страны СНГ' : 'CIS'}
+                    🏛️ {user.language !== 'en' ? 'Страны СНГ' : 'CIS'}
                   </button>
                   <button
                     onClick={() => {
@@ -1635,7 +2049,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                       courseCategoryTab === 'russia' ? 'bg-rose-600 text-white shadow-md' : 'text-gray-400 hover:text-white'
                     }`}
                   >
-                    🇷🇺 {user.language === 'ru' ? 'Регионы РФ' : 'Russia'}
+                    🇷🇺 {user.language !== 'en' ? 'Регионы РФ' : 'Russia'}
                   </button>
                   <button
                     onClick={() => {
@@ -1646,7 +2060,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                       courseCategoryTab === 'world' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-white'
                     }`}
                   >
-                    🌍 {user.language === 'ru' ? 'Языки мира' : 'World'}
+                    🌍 {user.language !== 'en' ? 'Языки мира' : 'World'}
                   </button>
                   <button
                     onClick={() => {
@@ -1657,7 +2071,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                       courseCategoryTab === 'easiest' ? 'bg-amber-500 text-black shadow-md font-bold' : 'text-gray-400 hover:text-white'
                     }`}
                   >
-                    🏆 {user.language === 'ru' ? 'Лёгкие' : 'Easiest'}
+                    🏆 {user.language !== 'en' ? 'Лёгкие' : 'Easiest'}
                   </button>
                   <button
                     onClick={() => {
@@ -1668,7 +2082,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                       courseCategoryTab === 'hardest' ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-md' : 'text-gray-400 hover:text-white'
                     }`}
                   >
-                    🔥 {user.language === 'ru' ? 'Сложнейшие' : 'Hardest'}
+                    🔥 {user.language !== 'en' ? 'Сложнейшие' : 'Hardest'}
                   </button>
                   <button
                     onClick={() => {
@@ -1679,7 +2093,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                       courseCategoryTab === 'beta' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md ring-1 ring-purple-400/50' : 'text-gray-400 hover:text-white'
                     }`}
                   >
-                    🧪 {user.language === 'ru' ? 'Бета' : 'Beta'}
+                    🧪 {user.language !== 'en' ? 'Бета' : 'Beta'}
                   </button>
                 </div>
 
@@ -1730,15 +2144,10 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                             <span className="text-xs text-gray-400 font-bold block truncate">
                               {c.name}
                             </span>
-                            {isWritingSectionLocked(c.id) ? (
-                              <div className="mt-1 text-[10px] text-rose-300 font-black bg-rose-500/20 border border-rose-500/40 px-2 py-0.5 rounded-md flex items-center gap-1">
-                                <span>🔒</span>
-                                <span className="truncate">Раздел Письмо Будут доступ 1 ноября 2026 год • 🔒 1 нояб.</span>
-                              </div>
-                            ) : isBeta ? (
-                              <div className="mt-1 text-[9px] text-amber-300 font-bold bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-md flex items-center gap-1">
-                                <span>🔒</span>
-                                <span className="truncate">В разработке • Доступно 1 ноября 2026 г.</span>
+                            {c.isBeta || ['kk', 'uz', 'hy', 'ka', 'az'].includes(c.id) ? (
+                              <div className="mt-1 text-[10px] text-emerald-300 font-black bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                <span>✅</span>
+                                <span className="truncate">Раздел «Письмо» открыт (1 ноября 2026 г.)</span>
                               </div>
                             ) : null}
                             {c.id === 'tlh' && (

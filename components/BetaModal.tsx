@@ -219,7 +219,7 @@ export const BetaModal: React.FC<BetaModalProps> = ({
             <div className="flex items-center justify-between">
               <label className="text-xs font-black text-purple-300 uppercase tracking-wider flex items-center gap-2">
                 <span>🗣️</span>
-                <span>{user.language === 'ru' ? 'Курсы для тех, кто говорит по:' : 'Courses for those who speak:'}</span>
+                <span>{user.language !== 'en' ? 'Курсы для тех, кто говорит по:' : 'Courses for those who speak:'}</span>
               </label>
               <span className="text-[10px] text-gray-400 font-mono">
                 {speakerFilteredCatalog.length} направлений
@@ -238,7 +238,7 @@ export const BetaModal: React.FC<BetaModalProps> = ({
                 }
                 playSound('click');
                 setSelectedSpeakerLang(code);
-                const mappedLang = code === 'zs' ? 'zh' : (['ru', 'en', 'de', 'fr', 'es', 'ja', 'zh', 'ar'].includes(code) ? code : 'en');
+                const mappedLang = code === 'zs' ? 'zh' : code;
                 setUser(prev => ({
                   ...prev,
                   language: mappedLang as any
@@ -604,41 +604,39 @@ export const BetaModal: React.FC<BetaModalProps> = ({
                   key={item.code}
                   type="button"
                   onClick={() => {
-                    playSound('wrong');
-                    if (onOpenLanguageLockModal) {
-                      onOpenLanguageLockModal(item.code);
-                    } else if (onAttemptSwitchLanguage) {
+                    playSound('select');
+                    if (onAttemptSwitchLanguage) {
                       onAttemptSwitchLanguage(item.code);
                     }
                   }}
-                  className="p-2.5 rounded-xl border border-amber-500/30 bg-black/40 hover:bg-amber-950/40 text-gray-200 hover:text-amber-200 transition-all text-xs flex items-center justify-between cursor-pointer group text-left"
+                  className="p-2.5 rounded-xl border border-emerald-500/30 bg-black/40 hover:bg-emerald-950/40 text-gray-200 hover:text-emerald-200 transition-all text-xs flex items-center justify-between cursor-pointer group text-left"
                 >
                   <div className="flex items-center space-x-2 truncate">
                     <span className="text-base select-none shrink-0">{item.flagEmoji}</span>
                     <div className="truncate">
-                      <div className="font-bold text-[11px] text-white group-hover:text-amber-200 truncate">
+                      <div className="font-bold text-[11px] text-white group-hover:text-emerald-200 truncate">
                         {item.nameRu}
                       </div>
-                      <div className="text-[9px] text-amber-300/80 font-medium truncate">
+                      <div className="text-[9px] text-emerald-300/80 font-medium truncate">
                         {item.nativeName}
                       </div>
                     </div>
                   </div>
-                  <span className="text-xs text-amber-400 shrink-0 ml-1">🔒</span>
+                  <span className="text-xs text-emerald-400 shrink-0 ml-1">✅</span>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Locked CIS Countries List & Letters Section (5) */}
-          <div className="p-3 bg-gradient-to-r from-amber-950/30 to-purple-950/30 border border-amber-500/40 rounded-2xl">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2 pb-1.5 border-b border-amber-500/20">
-              <span className="text-[11px] font-black uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+          {/* CIS Countries List & Letters Section (5) */}
+          <div className="p-3 bg-gradient-to-r from-emerald-950/30 to-teal-950/30 border border-emerald-500/40 rounded-2xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2 pb-1.5 border-b border-emerald-500/20">
+              <span className="text-[11px] font-black uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
                 <span>🌍</span>
-                <span>Заблокированные языки мира</span>
+                <span>Языки мира и стран СНГ (5)</span>
               </span>
-              <span className="text-[10px] font-black text-amber-300 bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 rounded-md self-start sm:self-auto">
-                Раздел Письмо Будут доступ 1 ноября 2026 год
+              <span className="text-[10px] font-black text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 rounded-md self-start sm:self-auto">
+                ✅ Раздел «Письмо» открыт (1 ноября 2026 г.)
               </span>
             </div>
 
@@ -648,27 +646,25 @@ export const BetaModal: React.FC<BetaModalProps> = ({
                   key={item.code}
                   type="button"
                   onClick={() => {
-                    playSound('wrong');
-                    if (onOpenLanguageLockModal) {
-                      onOpenLanguageLockModal(item.code);
-                    } else if (onAttemptSwitchLanguage) {
+                    playSound('select');
+                    if (onAttemptSwitchLanguage) {
                       onAttemptSwitchLanguage(item.code);
                     }
                   }}
-                  className="w-full p-2.5 rounded-xl border border-amber-500/30 bg-black/50 hover:bg-amber-950/50 text-gray-200 hover:text-amber-200 transition-all text-xs flex items-center justify-between cursor-pointer group text-left"
+                  className="w-full p-2.5 rounded-xl border border-emerald-500/30 bg-black/50 hover:bg-emerald-950/50 text-gray-200 hover:text-emerald-200 transition-all text-xs flex items-center justify-between cursor-pointer group text-left"
                 >
                   <div className="flex items-center space-x-2.5 truncate">
                     <span className="text-base select-none shrink-0">{item.flagEmoji}</span>
                     <div className="truncate">
-                      <div className="font-bold text-[11px] text-amber-100 group-hover:text-white truncate">
-                        🔒 {item.fullLabelRu || `${item.nameRu} — (${item.nativeName})`}
+                      <div className="font-bold text-[11px] text-emerald-100 group-hover:text-white truncate">
+                        ✨ {item.fullLabelRu || `${item.nameRu} — (${item.nativeName})`}
                       </div>
                       <div className="text-[9px] text-gray-400 font-medium">
-                        Раздел Письмо Будут доступ 1 ноября 2026 год
+                        ✅ Раздел «Письмо» открыт 1 ноября 2026 год
                       </div>
                     </div>
                   </div>
-                  <span className="text-xs text-amber-400 shrink-0 ml-1">🔒</span>
+                  <span className="text-xs text-emerald-400 shrink-0 ml-1">✅</span>
                 </button>
               ))}
             </div>

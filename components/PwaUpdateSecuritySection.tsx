@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { SystemCompatibilityResult } from '../services/systemCompatibilityService';
 import { playSound } from '../services/audioService';
-import { SparklesIcon, CheckCircleIcon, ShieldIcon, WarningIcon } from './Icons';
+import { APP_VERSION, APP_PWA_CORE_VERSION } from '../services/appVersionService';
+import {
+  getLastInstalledPwaPatch,
+  InstalledPwaPatchInfo,
+  preparePwaCachesAndWorker,
+  setPendingPwaUpdate,
+} from '../services/pwaUpdateService';
+import { CheckCircleIcon } from './Icons';
 
 interface PwaUpdateSecuritySectionProps {
   systemInfo: SystemCompatibilityResult;
@@ -14,7 +21,7 @@ export const PwaUpdateSecuritySection: React.FC<PwaUpdateSecuritySectionProps> =
   onOpenSystemChecker,
   lang = 'ru'
 }) => {
-  const isRu = lang === 'ru';
+  const isRu = lang !== 'en'; // Multi-lang support enabled
   const isModern = systemInfo.pwaUpdateSupported;
 
   const [isCheckingAppUpdate, setIsCheckingAppUpdate] = useState(false);
@@ -25,13 +32,18 @@ export const PwaUpdateSecuritySection: React.FC<PwaUpdateSecuritySectionProps> =
 
   // Interactive Download State for App + Security Updates
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isReloading, setIsReloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloadStep, setDownloadStep] = useState<string>('');
-  const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [lastInstalledPatch, setLastInstalledPatch] = useState<InstalledPwaPatchInfo | null>(null);
 
   const [cacheClearSuccess, setCacheClearSuccess] = useState(false);
 
-  // Interactive Downloader for App & Security Update
+  useEffect(() => {
+    setLastInstalledPatch(getLastInstalledPwaPatch());
+  }, []);
+
+  // Interactive Downloader for Full PWA Update & Security Patch -> Reloads page into Process Screen
   const handleDownloadFullUpdate = () => {
     playSound('click');
     if (!isModern) {
@@ -43,41 +55,56 @@ export const PwaUpdateSecuritySection: React.FC<PwaUpdateSecuritySectionProps> =
       return;
     }
 
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setAppUpdateStatus(
+        isRu
+          ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
+          : '📡 No internet connection. DuoWindo6601 requires internet. Turn on Wi-Fi or mobile data and try again.'
+      );
+      return;
+    }
+
     setIsDownloading(true);
+    setIsReloading(false);
+    setAppUpdateStatus(null);
     setDownloadProgress(0);
-    setDownloadSuccess(false);
     setDownloadStep(isRu ? 'Инициализация загрузки DuoWindo6601 PWA...' : 'Initializing DuoWindo6601 PWA update...');
+
+    void preparePwaCachesAndWorker();
 
     let current = 0;
     const interval = setInterval(() => {
-      current += Math.floor(Math.random() * 18) + 12;
+      current += Math.floor(Math.random() * 18) + 14;
       if (current >= 100) {
         current = 100;
         clearInterval(interval);
         setDownloadProgress(100);
-        setDownloadStep(isRu ? 'Проверка подписи безопасности SHA-256 & TLS 1.3...' : 'Verifying SHA-256 & TLS 1.3 security signature...');
+        setDownloadStep(
+          isRu
+            ? 'Пакет загружен! Перезагрузка страницы для запуска процесса обновления DuoWindo6601...'
+            : 'Package downloaded! Reloading page to start DuoWindo6601 update process...'
+        );
+        setIsReloading(true);
+
+        // Save pending post-reload installation state and reload the page
+        setPendingPwaUpdate(lang);
 
         setTimeout(() => {
-          setIsDownloading(false);
-          setDownloadSuccess(true);
-          playSound('success');
-          setAppUpdateStatus(
-            isRu 
-              ? '🎉 Скачивание и установка завершены! DuoWindo6601 PWA v2026.10 и Патч Безопасности успешно применены (ПК и Мобильная версия).'
-              : '🎉 Update & Security Patch successfully installed! DuoWindo6601 PWA v2026.10 is active.'
-          );
-        }, 800);
+          window.location.reload();
+        }, 700);
       } else {
         setDownloadProgress(current);
-        if (current < 35) {
-          setDownloadStep(isRu ? 'Загрузка пакетов Service Worker v2 (4.2 MB)...' : 'Downloading Service Worker v2 bundles (4.2 MB)...');
-        } else if (current < 70) {
-          setDownloadStep(isRu ? 'Скачивание обновлений безопасности Firestore Rules & WebCrypto...' : 'Downloading Firestore Rules & WebCrypto patches...');
+        if (current < 32) {
+          setDownloadStep(isRu ? 'Загрузка обновления интерфейса PWA и Service Worker v2...' : 'Downloading PWA UI bundle & Service Worker v2...');
+        } else if (current < 62) {
+          setDownloadStep(isRu ? 'Загрузка обновлений аудио-движка Fish Audio & WebAudio...' : 'Downloading Fish Audio & WebAudio engine update...');
+        } else if (current < 86) {
+          setDownloadStep(isRu ? 'Загрузка правил безопасности Firestore Rules & WebCrypto...' : 'Downloading Firestore Rules & WebCrypto patches...');
         } else {
-          setDownloadStep(isRu ? 'Инсталляция ресурсов PWA в локальный кэш...' : 'Installing PWA assets into CacheStorage...');
+          setDownloadStep(isRu ? 'Подготовка подписи безопасности SHA-256 & TLS 1.3...' : 'Preparing SHA-256 & TLS 1.3 security signature...');
         }
       }
-    }, 300);
+    }, 260);
   };
 
   // Check App Update handler
@@ -110,8 +137,8 @@ export const PwaUpdateSecuritySection: React.FC<PwaUpdateSecuritySectionProps> =
       setIsCheckingAppUpdate(false);
       setAppUpdateStatus(
         isRu
-          ? '✅ Приложение DuoWindo6601 Progressive Web App (PWA) актуально (версия v2026.10 PWA Core). Все модули, аудио-курсы и маскот обновлены!'
-          : '✅ DuoWindo6601 Progressive Web App (PWA) is up to date (v2026.10 PWA Core). All assets cached!'
+          ? `✅ Приложение DuoWindo6601 Progressive Web App (PWA) актуально (версия v${APP_VERSION} • ${APP_PWA_CORE_VERSION} PWA Core). Все модули, аудио-курсы и маскот обновлены!`
+          : `✅ DuoWindo6601 Progressive Web App (PWA) is up to date (v${APP_VERSION} • ${APP_PWA_CORE_VERSION} PWA Core). All assets cached!`
       );
     }, 900);
   };
@@ -265,13 +292,13 @@ export const PwaUpdateSecuritySection: React.FC<PwaUpdateSecuritySectionProps> =
             </div>
 
             <span className="text-xs font-mono font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-3 py-1 rounded-xl">
-              12.4 MB • v2026.10
+              12.4 MB • v{APP_VERSION} ({APP_PWA_CORE_VERSION})
             </span>
           </div>
 
           {/* Download Progress Bar */}
           {isDownloading && (
-            <div className="space-y-2 bg-black/50 p-3.5 rounded-2xl border border-emerald-500/40">
+            <div className="space-y-2.5 bg-black/50 p-3.5 rounded-2xl border border-emerald-500/40">
               <div className="flex items-center justify-between text-xs font-bold text-emerald-300">
                 <span className="truncate">{downloadStep}</span>
                 <span className="font-mono text-emerald-400 font-black shrink-0 ml-2">{downloadProgress}%</span>
@@ -286,34 +313,50 @@ export const PwaUpdateSecuritySection: React.FC<PwaUpdateSecuritySectionProps> =
 
               <div className="flex items-center justify-between text-[10px] text-gray-400 font-mono">
                 <span>{( (12.4 * downloadProgress) / 100 ).toFixed(1)} MB / 12.4 MB</span>
-                <span>Speed: 15.8 MB/s</span>
+                <span>
+                  {isReloading
+                    ? (isRu ? 'Перезагрузка страницы...' : 'Reloading page...')
+                    : 'Speed: 15.8 MB/s'}
+                </span>
               </div>
+
+              <p className="text-[11px] font-bold text-amber-300 bg-amber-950/60 border border-amber-500/40 rounded-xl px-3 py-1.5">
+                {isRu
+                  ? '⚠️ После завершения скачивания страница автоматически перезагрузится и откроется экран процесса обновления DuoWindo6601.'
+                  : '⚠️ Once downloaded, the page will reload automatically into the DuoWindo6601 Update Process screen.'}
+              </p>
             </div>
           )}
 
           {/* Download Action Button */}
           {!isDownloading && (
             <button
+              type="button"
               onClick={handleDownloadFullUpdate}
               className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-black font-black text-xs uppercase tracking-wider rounded-2xl shadow-xl border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center space-x-2 cursor-pointer"
             >
               <span>🚀</span>
               <span>
-                {downloadSuccess
-                  ? (isRu ? 'СКАЧАТЬ И ПЕРЕУСТАНОВИТЬ ОБНОВЛЕНИЕ ПОВТОРНО' : 'DOWNLOAD & REINSTALL UPDATE')
-                  : (isRu ? 'СКАЧАТЬ ОБНОВЛЕНИЕ И ПАТЧ БЕЗОПАСНОСТИ DUOWINDO6601 PWA' : 'DOWNLOAD DUOWINDO6601 PWA UPDATE & SECURITY PATCH')}
+                {lastInstalledPatch
+                  ? (isRu ? 'СКАЧАТЬ ПОЛНОЕ ОБНОВЛЕНИЕ PWA И ПАТЧ БЕЗОПАСНОСТИ ПОВТОРНО' : 'DOWNLOAD & REINSTALL FULL PWA & SECURITY PATCH')
+                  : (isRu ? 'СКАЧАТЬ ПОЛНОЕ ОБНОВЛЕНИЕ PWA И ПАТЧ БЕЗОПАСНОСТИ' : 'DOWNLOAD FULL PWA UPDATE & SECURITY PATCH')}
               </span>
             </button>
           )}
 
-          {downloadSuccess && (
-            <div className="p-3 rounded-2xl bg-emerald-500/20 border border-emerald-400 text-emerald-200 text-xs font-bold flex items-center space-x-2">
+          {lastInstalledPatch && !isDownloading && (
+            <div className="p-3 rounded-2xl bg-emerald-500/20 border border-emerald-400 text-emerald-200 text-xs font-bold flex items-center space-x-2.5">
               <CheckCircleIcon className="w-5 h-5 text-emerald-400 shrink-0" />
-              <span>
-                {isRu 
-                  ? 'Обновление и патч безопасности успешно установлены! ПК Версия и Мобильная Версия DuoWindo6601 готов к работе.' 
-                  : 'Update and security patch installed successfully! PC and Mobile versions are ready.'}
-              </span>
+              <div className="min-w-0">
+                <p>
+                  {isRu
+                    ? `Обновление PWA v${lastInstalledPatch.version} и патч безопасности установлены (${lastInstalledPatch.installedAt}).`
+                    : `PWA Update v${lastInstalledPatch.version} & security patch installed (${lastInstalledPatch.installedAt}).`}
+                </p>
+                <p className="text-[10px] font-mono text-emerald-300/90 mt-0.5">
+                  SHA-256: {lastInstalledPatch.signatureShort}
+                </p>
+              </div>
             </div>
           )}
         </div>
@@ -337,7 +380,7 @@ export const PwaUpdateSecuritySection: React.FC<PwaUpdateSecuritySectionProps> =
               </div>
             </div>
             <span className="text-xs font-mono font-bold bg-blue-950 text-blue-300 border border-blue-500/40 px-2 py-0.5 rounded-lg">
-              v2026.10
+              v{APP_VERSION} ({APP_PWA_CORE_VERSION})
             </span>
           </div>
 

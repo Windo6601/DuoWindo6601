@@ -268,16 +268,19 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     }
   };
 
+  const safeCharacter = String(character || 'A').trim() || 'A';
+  const safeInstruction = String(instruction || `Нарисуйте символ: ${safeCharacter}`);
+
   const matchingData = ALPHABET_HANDWRITING_ITEMS.find(
-    l => l.char.toUpperCase() === character.toUpperCase() || 
-         l.name.toUpperCase() === character.toUpperCase() || 
-         l.id.toLowerCase().includes(character.toLowerCase())
+    l => String(l.char || '').toUpperCase() === safeCharacter.toUpperCase() || 
+         String(l.name || '').toUpperCase() === safeCharacter.toUpperCase() || 
+         String(l.id || '').toLowerCase().includes(safeCharacter.toLowerCase())
   );
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center relative overflow-hidden touch-none select-none min-h-0 w-full max-w-sm mx-auto px-2">
       <h2 className="text-xs md:text-sm font-bold mb-2 text-center tracking-tight text-gray-300 uppercase">
-        {instruction}
+        {safeInstruction}
       </h2>
 
       <div
@@ -343,11 +346,11 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
           <span
             style={{ fontSize: Math.min(size.width, size.height) * 0.48, lineHeight: 1 }}
             className={`text-gray-900 font-bold select-none whitespace-nowrap text-center leading-none ${
-              /[\u0600-\u06FF]/.test(character) ? 'font-arabic' : /[\u0590-\u05FF]/.test(character) ? 'font-hebrew' : 'font-sans'
+              /[\u0600-\u06FF]/.test(safeCharacter) ? 'font-arabic' : /[\u0590-\u05FF]/.test(safeCharacter) ? 'font-hebrew' : 'font-sans'
             }`}
-            dir={/[\u0600-\u06FF\u0590-\u05FF]/.test(character) ? 'rtl' : 'ltr'}
+            dir={/[\u0600-\u06FF\u0590-\u05FF]/.test(safeCharacter) ? 'rtl' : 'ltr'}
           >
-            {character}
+            {safeCharacter}
           </span>
         </div>
 

@@ -33,7 +33,7 @@ export const StreakSaverCountdown: React.FC<StreakSaverCountdownProps> = ({
 
   // Personalized username fallback (e.g. "Тимур!")
   const userName = user.name || 'Тимур';
-  const isRu = user.language === 'ru';
+  const isRu = user.language !== 'en';
 
   const todayISO = new Date().toISOString().split('T')[0];
   const isCompletedToday = user.dailyChallengeCompletedDate === todayISO || user.lastActiveDate === todayISO;

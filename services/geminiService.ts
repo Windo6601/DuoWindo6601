@@ -1,5 +1,4 @@
 
-import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { Exercise, AdventureScenario, RoleplayMessage } from "../types";
 import { playKlingonSpeech } from "./klingonSpeechService";
 import { 
@@ -16,17 +15,71 @@ import {
   getDevApiKeyDetails,
   getGeminiKeyPriority
 } from "./aiLimitManager";
+import { getAdminFishConfig, resolveAllowedFishModel } from "./fishAudioConfig";
+import { getRandomProgrammingFallbackExercise } from "./programmingCurriculum";
 
-export const MODEL_FREE = "gemini-3.8-flash";
+export enum Type {
+  STRING = "STRING",
+  NUMBER = "NUMBER",
+  INTEGER = "INTEGER",
+  BOOLEAN = "BOOLEAN",
+  ARRAY = "ARRAY",
+  OBJECT = "OBJECT",
+}
+
+export enum Modality {
+  TEXT = "TEXT",
+  IMAGE = "IMAGE",
+  AUDIO = "AUDIO",
+}
+
+export const MODEL_FREE = "gemini-4-hydrogen";
 export const MODEL_PRO = "gemini-4-argon";
-const TTS_MODEL = "gemini-3.8-flash-lite-tts";
+export const TTS_MODEL = "gemini-3.8-flash-lite-tts";
+export const LIVE_MODEL = "gemini-3.8-live";
+
+const extractJsonSafe = <T = any>(rawText: string, fallback?: T): T => {
+  if (!rawText || typeof rawText !== 'string') {
+    return (fallback !== undefined ? fallback : {}) as T;
+  }
+  const stripped = rawText
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+  try {
+    return JSON.parse(stripped) as T;
+  } catch {
+    const objStart = stripped.indexOf('{');
+    const objEnd = stripped.lastIndexOf('}');
+    if (objStart !== -1 && objEnd > objStart) {
+      try {
+        return JSON.parse(stripped.slice(objStart, objEnd + 1)) as T;
+      } catch {}
+    }
+    const arrStart = stripped.indexOf('[');
+    const arrEnd = stripped.lastIndexOf(']');
+    if (arrStart !== -1 && arrEnd > arrStart) {
+      try {
+        return JSON.parse(stripped.slice(arrStart, arrEnd + 1)) as T;
+      } catch {}
+    }
+    return (fallback !== undefined ? fallback : {}) as T;
+  }
+};
+
+const sanitizeSubjectName = (subject: string): string => {
+  return String(subject || '')
+    .replace(/\([^)]*(не является языком|является языком программирования|not a language|programming language)[^)]*\)/gi, '')
+    .trim() || String(subject || '');
+};
 
 const sanitizeKey = (k: string): string => {
   if (!k) return '';
   return k.replace(/\s+/g, '');
 };
 
-export const DEFAULT_FALLBACK_GEMINI_KEY = (typeof process !== 'undefined' && (process.env?.GEMINI_API_KEY || process.env?.API_KEY)) || (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_GEMINI_API_KEY) || '';
+export const DEFAULT_FALLBACK_GEMINI_KEY = '';
 
 export interface ActiveApiKeyInfo {
   source: 'admin' | 'dev' | 'custom' | 'system' | 'none';
@@ -41,7 +94,6 @@ export const getActiveApiKeyInfo = (): ActiveApiKeyInfo => {
   const adminDetails = getAdminApiKeyDetails();
   const devDetails = getDevApiKeyDetails();
   const customDetails = getCustomApiKeyDetails();
-  const systemKey = (typeof process !== 'undefined' && (process.env?.GEMINI_API_KEY || process.env?.RENDER_MCP_API_KEY || process.env?.API_KEY)) || DEFAULT_FALLBACK_GEMINI_KEY;
 
   if (priority === 'admin' && adminDetails.isSet && adminDetails.enabled) {
     return { source: 'admin', sourceLabel: 'Администратор (Admin Key)', isSet: true, type: adminDetails.type, maskedKey: adminDetails.maskedKey };
@@ -51,9 +103,6 @@ export const getActiveApiKeyInfo = (): ActiveApiKeyInfo => {
   }
   if (priority === 'custom' && customDetails.isCustom && !isCustomApiKeySkipped()) {
     return { source: 'custom', sourceLabel: 'Пользовательский ключ', isSet: true, type: customDetails.type, maskedKey: customDetails.maskedKey };
-  }
-  if (priority === 'system' && systemKey) {
-    return { source: 'system', sourceLabel: 'Системный ключ (DuoWindo6601)', isSet: true, type: 'free', maskedKey: systemKey.length > 8 ? `${systemKey.substring(0, 6)}••••${systemKey.substring(systemKey.length - 4)}` : '••••••••' };
   }
 
   // Auto resolution:
@@ -66,11 +115,8 @@ export const getActiveApiKeyInfo = (): ActiveApiKeyInfo => {
   if (customDetails.isCustom && !isCustomApiKeySkipped()) {
     return { source: 'custom', sourceLabel: 'Пользовательский ключ', isSet: true, type: customDetails.type, maskedKey: customDetails.maskedKey };
   }
-  if (systemKey) {
-    return { source: 'system', sourceLabel: 'Системный ключ (DuoWindo6601)', isSet: true, type: 'free', maskedKey: systemKey.length > 8 ? `${systemKey.substring(0, 6)}••••${systemKey.substring(systemKey.length - 4)}` : '••••••••' };
-  }
 
-  return { source: 'none', sourceLabel: 'Не настроен (Бесплатный Cloud Proxy)', isSet: false, type: 'free', maskedKey: 'Не указан' };
+  return { source: 'system', sourceLabel: 'Серверный DuoWindo6601 AI Engine', isSet: true, type: 'free', maskedKey: 'Server-Managed Key' };
 };
 
 export const getApiKey = (): string => {
@@ -105,37 +151,266 @@ export const getApiKey = (): string => {
       console.warn("Error resolving Gemini API key:", e);
     }
   }
-  const key = (typeof process !== 'undefined' && (process.env?.GEMINI_API_KEY || process.env?.RENDER_MCP_API_KEY || process.env?.API_KEY)) || DEFAULT_FALLBACK_GEMINI_KEY;
-  return sanitizeKey(key) || DEFAULT_FALLBACK_GEMINI_KEY;
+  return '';
 };
 
+export interface ServerGeminiCandidate {
+  content?: {
+    parts?: Array<{
+      text?: string;
+      inlineData?: {
+        mimeType: string;
+        data: string;
+      };
+    }>;
+    role?: string;
+  };
+  finishReason?: string;
+}
+
+export interface ServerGeminiResponse {
+  ok?: boolean;
+  text?: string;
+  data?: any;
+  candidates?: ServerGeminiCandidate[];
+  usageMetadata?: any;
+  error?: { message?: string; status?: number; code?: string };
+}
+
 /**
- * Returns the server-side proxy URL if running in a web environment.
- * Routing requests through the Cloud Run container (located in the United States)
- * completely eliminates the "User location is not supported for the API use" error
- * for users in geo-restricted regions.
+ * Executes a Gemini request via the backend proxy endpoint /api/gemini/generate.
+ * Keeps all API keys and SDK instances securely on the server.
  */
-export const getGeminiBaseUrl = (): string => {
-  if (typeof window !== 'undefined' && window.location) {
-    const origin = window.location.origin;
-    if (origin && origin !== 'null' && (origin.startsWith('http://') || origin.startsWith('https://'))) {
-      return `${origin}/api/gemini-proxy`;
-    }
-    return '/api/gemini-proxy';
+export async function callServerGemini(params: {
+  model?: string;
+  contents?: any;
+  prompt?: string;
+  config?: any;
+  systemInstruction?: string;
+  customKey?: string;
+}): Promise<ServerGeminiResponse> {
+  const customKey = (params.customKey && params.customKey.trim()) ? params.customKey.trim() : getApiKey();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (customKey && customKey !== 'SYSTEM_FREE_TRAFFIC' && !customKey.includes('••••')) {
+    headers['x-goog-api-key'] = customKey;
   }
-  return 'http://localhost:3000/api/gemini-proxy';
-};
+
+  const res = await fetch('/api/gemini/generate', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model: params.model,
+      contents: params.contents,
+      prompt: params.prompt,
+      config: params.config,
+      systemInstruction: params.systemInstruction,
+    }),
+  });
+
+  const body = await res.json().catch(() => ({}));
+
+  if (!res.ok || body.error) {
+    const errorMsg = body.error?.message || `Gemini server request failed with status ${res.status}`;
+    const err: any = new Error(errorMsg);
+    err.status = res.status;
+    err.code = body.error?.code;
+    throw err;
+  }
+
+  const candidateText = body.candidates?.[0]?.content?.parts?.[0]?.text;
+  const resolvedText = body.text ?? candidateText ?? '';
+
+  return {
+    ...body,
+    text: resolvedText,
+  };
+}
 
 /**
- * Factory to create a GoogleGenAI client configured with proxy and current API key.
+ * Server-Sent Events (SSE) streaming helper via /api/gemini/stream.
  */
-export const createGenAiClient = (customKey?: string): GoogleGenAI => {
-  const key = (customKey && customKey.trim()) ? customKey.trim() : getApiKey();
-  const baseUrl = getGeminiBaseUrl();
-  return new GoogleGenAI({
-    apiKey: key,
-    httpOptions: baseUrl ? { baseUrl } : undefined,
+export async function* generateContentStream(params: {
+  model?: string;
+  contents?: any;
+  prompt?: string;
+  config?: any;
+  systemInstruction?: string;
+  customKey?: string;
+}): AsyncGenerator<{ text: string }, void, unknown> {
+  const customKey = (params.customKey && params.customKey.trim()) ? params.customKey.trim() : getApiKey();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (customKey && customKey !== 'SYSTEM_FREE_TRAFFIC' && !customKey.includes('••••')) {
+    headers['x-goog-api-key'] = customKey;
+  }
+
+  const res = await fetch('/api/gemini/stream', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(params),
   });
+
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error?.message || `Stream request failed: ${res.status}`);
+  }
+
+  if (!res.body) {
+    throw new Error('ReadableStream not supported in this browser');
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith(':')) continue;
+        if (trimmed === 'data: [DONE]') return;
+        if (trimmed.startsWith('data: ')) {
+          try {
+            const parsed = JSON.parse(trimmed.slice(6));
+            if (parsed.error) throw new Error(parsed.error);
+            if (parsed.text) {
+              yield { text: parsed.text };
+            }
+          } catch (e: any) {
+            if (e?.message && e.message !== 'Unexpected end of JSON input') {
+              throw e;
+            }
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+export interface LiveApiConnection {
+  sendAudioChunk: (base64Pcm16k: string) => void;
+  sendTextMessage: (text: string) => void;
+  close: () => void;
+}
+
+/**
+ * Establishes a bidirectional WebSocket connection to the server's Live API bridge (/api/gemini/live).
+ */
+export function connectLiveApi(options: {
+  systemInstruction?: string;
+  onAudioData?: (base64Pcm24k: string) => void;
+  onTextData?: (text: string) => void;
+  onError?: (error: any) => void;
+  onClose?: () => void;
+  onOpen?: () => void;
+}): LiveApiConnection {
+  const protocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = typeof window !== 'undefined' && window.location.host ? window.location.host : 'localhost:3000';
+  const wsUrl = `${protocol}//${host}/api/gemini/live`;
+  const socket = new WebSocket(wsUrl);
+
+  socket.onopen = () => {
+    socket.send(JSON.stringify({
+      type: 'setup',
+      systemInstruction: options.systemInstruction,
+    }));
+    options.onOpen?.();
+  };
+
+  socket.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+      const audioData = msg.audio || (msg.type === 'audio' ? msg.data : undefined);
+      if (audioData) {
+        options.onAudioData?.(audioData);
+      } else if (msg.type === 'text' && msg.text) {
+        options.onTextData?.(msg.text);
+      } else if (msg.text) {
+        options.onTextData?.(msg.text);
+      } else if (msg.type === 'error' || msg.error) {
+        options.onError?.(new Error(msg.message || msg.error || 'Live API error'));
+      }
+    } catch (e) {
+      options.onError?.(e);
+    }
+  };
+
+  socket.onerror = (e) => {
+    options.onError?.(e);
+  };
+
+  socket.onclose = () => {
+    options.onClose?.();
+  };
+
+  return {
+    sendAudioChunk: (base64Pcm16k: string) => {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: 'audio', audio: base64Pcm16k, data: base64Pcm16k }));
+      }
+    },
+    sendTextMessage: (text: string) => {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: 'text', text }));
+      }
+    },
+    close: () => {
+      try {
+        socket.close();
+      } catch {}
+    },
+  };
+}
+
+/**
+ * Returns a server-backed Gemini client that routes all calls through /api/gemini/generate.
+ * Fully compatible with existing component code.
+ */
+export const createGenAiClient = (customKey?: string) => {
+  return {
+    models: {
+      generateContent: async (params: {
+        model?: string;
+        contents?: any;
+        config?: any;
+        systemInstruction?: string;
+      }): Promise<ServerGeminiResponse> => {
+        return callServerGemini({ ...params, customKey });
+      },
+      generateContentStream: async function* (params: {
+        model?: string;
+        contents?: any;
+        config?: any;
+        systemInstruction?: string;
+      }) {
+        yield* generateContentStream({ ...params, customKey });
+      },
+    },
+    chats: {
+      create: (params: any) => ({
+        sendMessage: async (msg: any) => {
+          return callServerGemini({
+            model: params?.model,
+            contents: msg,
+            config: params?.config,
+            systemInstruction: params?.config?.systemInstruction,
+            customKey,
+          });
+        },
+      }),
+    },
+  };
 };
 
 const TOPICS = ['приветствия', 'еда', 'семья', 'путешествия', 'хобби', 'магазины', 'работа', 'погода', 'числа'];
@@ -263,7 +538,7 @@ export class GeminiRateLimiterQueue {
       const { apiCallTask, resolve, reject } = task;
 
       try {
-        const result = await fetchGeminiWithRetry(apiCallTask);
+        const result = await apiCallTask();
         resolve(result);
       } catch (error) {
         reject(error);
@@ -294,7 +569,7 @@ export const geminiRateLimiter = new GeminiRateLimiterQueue(60);
  * Вспомогательная обертка таймаута для предотвращения зависания загрузки уроков.
  * Автоматически сбрасывает длинные вызовы и переключает на автономное упражнение.
  */
-export const fetchWithTimeout = <T>(promise: Promise<T>, ms: number = 3200): Promise<T> => {
+export const fetchWithTimeout = <T>(promise: Promise<T>, ms: number = 25000): Promise<T> => {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
       reject(new Error(`API request timed out after ${ms}ms`));
@@ -360,6 +635,89 @@ async function decodeAudioData(
   return buffer;
 }
 
+export interface WavConversionOptions {
+  numChannels: number;
+  sampleRate: number;
+  bitsPerSample: number;
+}
+
+export function parseMimeType(mimeType: string): WavConversionOptions {
+  const [fileType, ...params] = (mimeType || '').split(';').map(s => s.trim());
+  const [_, format] = (fileType || '').split('/');
+
+  const options: Partial<WavConversionOptions> = {
+    numChannels: 1,
+    sampleRate: 24000,
+    bitsPerSample: 16
+  };
+
+  if (format && format.startsWith('L')) {
+    const bits = parseInt(format.slice(1), 10);
+    if (!isNaN(bits)) {
+      options.bitsPerSample = bits;
+    }
+  }
+
+  for (const param of params) {
+    const [key, value] = param.split('=').map(s => s.trim());
+    if (key === 'rate') {
+      const rate = parseInt(value, 10);
+      if (!isNaN(rate)) {
+        options.sampleRate = rate;
+      }
+    }
+  }
+
+  return options as WavConversionOptions;
+}
+
+export function createWavHeader(dataLength: number, options: WavConversionOptions): Uint8Array {
+  const {
+    numChannels = 1,
+    sampleRate = 24000,
+    bitsPerSample = 16,
+  } = options || {};
+
+  const byteRate = (sampleRate * numChannels * bitsPerSample) / 8;
+  const blockAlign = (numChannels * bitsPerSample) / 8;
+  const buffer = new Uint8Array(44);
+  const view = new DataView(buffer.buffer);
+
+  const writeString = (offset: number, str: string) => {
+    for (let i = 0; i < str.length; i++) {
+      view.setUint8(offset + i, str.charCodeAt(i));
+    }
+  };
+
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + dataLength, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitsPerSample, true);
+  writeString(36, 'data');
+  view.setUint32(40, dataLength, true);
+
+  return buffer;
+}
+
+export function convertToWav(rawData: Uint8Array | string, mimeType: string = 'audio/pcm;rate=24000'): Uint8Array {
+  const options = parseMimeType(mimeType);
+  const rawBytes = typeof rawData === 'string'
+    ? Uint8Array.from(atob(rawData), c => c.charCodeAt(0))
+    : rawData;
+  const header = createWavHeader(rawBytes.length, options);
+  const wav = new Uint8Array(header.length + rawBytes.length);
+  wav.set(header, 0);
+  wav.set(rawBytes, header.length);
+  return wav;
+}
+
 let audioContext: AudioContext | null = null;
 
 const playWav = async (base64Audio: string) => {
@@ -393,6 +751,11 @@ const resolveSpeechLanguage = (text: string, lang: string): string => {
   const englishWords = ['hello', 'hi', 'welcome', 'thank', 'thanks', 'good', 'morning', 'afternoon', 'evening', 'night', 'how', 'are', 'you', 'what', 'where', 'when', 'why', 'who', 'yes', 'no', 'apple', 'banana', 'cat', 'dog', 'house', 'water', 'book', 'friend', 'school', 'computer'];
   const hasEnglishWord = englishWords.some(w => new RegExp(`\\b${w}\\b`, 'i').test(lower));
 
+  // Non-language courses should resolve to Russian or English based on content
+  if (lang === 'math' || lang === 'chess' || lang === 'music' || lang === 'coding' || lang === 'art') {
+    return /[\u0400-\u04FF]/.test(clean) ? 'ru' : 'en';
+  }
+
   // If text contains English words or pure English ASCII when lang is 'ru' or empty, switch to 'en'
   if ((lang === 'ru' || lang === 'be' || lang === 'uk' || lang === 'cv' || lang === 'tt' || !lang) && (hasEnglishWord || /^[a-zA-Z0-9\s.,!?'"\-]+$/.test(clean))) {
     return 'en';
@@ -402,11 +765,14 @@ const resolveSpeechLanguage = (text: string, lang: string): string => {
   if (/[\u0400-\u04FF]/.test(clean)) {
     if (lang === 'uk') return 'uk';
     if (lang === 'be') return 'be';
+    if (lang === 'kk') return 'kk';
     return 'ru';
   }
 
   // Arabic
   if (/[\u0600-\u06FF]/.test(clean)) return 'ar';
+  // Hebrew
+  if (/[\u0590-\u05FF]/.test(clean)) return 'he';
   // CJK
   if (/[\u4e00-\u9fa5]/.test(clean)) return 'zh';
   if (/[\u3040-\u30ff]/.test(clean)) return 'ja';
@@ -439,7 +805,10 @@ const fallbackSpeak = (text: string, lang: string = 'en', slow: boolean = false,
         'zh': 'zh-CN', 'ko': 'ko-KR', 'it': 'it-IT', 'pt': 'pt-BR', 'ru': 'ru-RU',
         'be': 'ru-RU', 'uk': 'uk-UA', 'et': 'et-EE', 'lv': 'lv-LV', 'lt': 'lt-LT', 'tr': 'tr-TR',
         'ar': 'ar-SA', 'hu': 'hu-HU', 'fi': 'fi-FI', 'is': 'is-IS', 'pl': 'pl-PL', 'eu': 'eu-ES',
-        'nv': 'en-US', 'tab': 'ru-RU'
+        'nv': 'en-US', 'tab': 'ru-RU', 'cv': 'ru-RU', 'tt': 'ru-RU', 'kk': 'kk-KZ', 'uz': 'uz-UZ',
+        'ky': 'ky-KG', 'az': 'az-AZ', 'hy': 'hy-AM', 'ka': 'ka-GE', 'he': 'he-IL', 'yi': 'he-IL',
+        'hi': 'hi-IN', 'sv': 'sv-SE', 'no': 'nb-NO', 'eo': 'eo', 'id': 'id-ID', 'ro': 'ro-RO',
+        'mo': 'ro-RO', 'nl': 'nl-NL', 'cs': 'cs-CZ', 'el': 'el-GR', 'vi': 'vi-VN', 'th': 'th-TH'
       };
       
       // Default lang
@@ -536,19 +905,66 @@ export const speakWithGrokAudio = async (text: string, lang: string = 'ru', slow
   await audio.play();
 };
 
-export const speakWithFishAudio = async (text: string, lang: string = 'ru', slow: boolean = false, model: string = 's2.1-pro-free'): Promise<void> => {
+export const getSelectedFishModel = (): string => {
+  try {
+    if (typeof window !== 'undefined') {
+      const raw = localStorage.getItem('duo_user_progress_6601');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const requested =
+          parsed?.fishModel && typeof parsed.fishModel === 'string'
+            ? parsed.fishModel
+            : parsed?.voiceProvider === 'fish-drama-3'
+              ? 'drama-3'
+              : 's2.1-pro-free';
+        return resolveAllowedFishModel(requested, parsed);
+      }
+    }
+  } catch {}
+  return 's2.1-pro-free';
+};
+
+export const speakWithFishAudio = async (
+  text: string,
+  lang: string = 'ru',
+  slow: boolean = false,
+  model: string = 's2.1-pro-free',
+  referenceId?: string
+): Promise<void> => {
   if (!text) return;
-  const cacheKey = `fish_${text}_${slow}_${model}`;
+  let storedUser: any = null;
+  try {
+    if (typeof window !== 'undefined') {
+      const raw = localStorage.getItem('duo_user_progress_6601');
+      if (raw) storedUser = JSON.parse(raw);
+    }
+  } catch {}
+
+  const adminFishCfg = getAdminFishConfig();
+  const effectiveModel = resolveAllowedFishModel(model || getSelectedFishModel() || 's2.1-pro-free', storedUser);
+  const effectiveReferenceId = referenceId || adminFishCfg.defaultReferenceId || undefined;
+  const cacheKey = `fish_${text}_${slow}_${effectiveModel}_${effectiveReferenceId || ''}`;
 
   let arrayBuffer = fishAudioCache.get(cacheKey);
 
   if (!arrayBuffer) {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    if (adminFishCfg.customApiKey && adminFishCfg.customApiKey.startsWith('sk-fish-')) {
+      headers['x-fish-api-key'] = adminFishCfg.customApiKey;
+    }
+
     const res = await fetch('/api/tts/fish', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ text, format: 'mp3', lang, model })
+      headers,
+      body: JSON.stringify({
+        text,
+        format: 'mp3',
+        lang,
+        model: effectiveModel,
+        ...(effectiveReferenceId ? { reference_id: effectiveReferenceId } : {})
+      })
     });
 
     if (!res.ok) {
@@ -607,7 +1023,8 @@ export const speakText = async (
 
   if (provider === 'fish' || provider === 'fish-drama-3') {
     try {
-      await speakWithFishAudio(cleanText, effectiveLang, slow, provider === 'fish-drama-3' ? 'drama-3' : 's2.1-pro-free');
+      const fishModelToUse = provider === 'fish-drama-3' ? 'drama-3' : getSelectedFishModel();
+      await speakWithFishAudio(cleanText, effectiveLang, slow, fishModelToUse);
       return;
     } catch (e) {
       console.warn("Fish Audio TTS failed, falling back to Gemini / System:", e);
@@ -628,37 +1045,66 @@ export const speakText = async (
       return;
   }
 
-  const cacheKey = `${cleanText}_${effectiveLang}_${slow}_${voiceName}`;
+  const normalizedVoice = (!voiceName || voiceName === 'Fola') ? 'Kore' : voiceName;
+  const cacheKey = `${cleanText}_${effectiveLang}_${slow}_${normalizedVoice}`;
   if (audioCache.has(cacheKey)) return playWav(audioCache.get(cacheKey)!);
 
   try {
-    const base64Audio = await callGeminiWithRetry(async () => {
-      const ai = createGenAiClient();
-      const response = await ai.models.generateContent({
-        model: TTS_MODEL,
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: cleanText }],
-          },
-        ],
-        config: {
-          responseModalities: ["AUDIO"],
-          speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName || "Kore" } },
-          },
-        },
-      });
-      return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    }, 2);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
+    const customKey = getApiKey();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (customKey && customKey !== 'SYSTEM_FREE_TRAFFIC' && !customKey.includes('••••')) {
+      headers['x-goog-api-key'] = customKey;
+    }
 
-    if (base64Audio) {
-      audioCache.set(cacheKey, base64Audio);
-      return playWav(base64Audio);
-    } else throw new Error("No audio data");
+    const res = await fetch('/api/gemini/tts', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ text: cleanText, voiceName: normalizedVoice }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      const rawData = data?.audioBase64 || '';
+      const mimeType = data?.mimeType || 'audio/pcm;rate=24000';
+      if (rawData) {
+        if (mimeType.includes('mpeg') || mimeType.includes('mp3') || mimeType.includes('ogg')) {
+          const audioUrl = `data:${mimeType};base64,${rawData}`;
+          const audio = new Audio(audioUrl);
+          if (slow) audio.playbackRate = 0.75;
+          await audio.play();
+          return;
+        }
+        let finalBase64 = rawData;
+        if (!mimeType.includes('wav') && !rawData.startsWith('UklGR')) {
+          const wavBytes = convertToWav(rawData, mimeType);
+          let binary = '';
+          const len = wavBytes.byteLength;
+          for (let i = 0; i < len; i++) {
+            binary += String.fromCharCode(wavBytes[i]);
+          }
+          finalBase64 = btoa(binary);
+        }
+        audioCache.set(cacheKey, finalBase64);
+        return playWav(finalBase64);
+      }
+    }
+    throw new Error(`Gemini TTS status ${res.status}`);
   } catch (error) {
-    console.warn("TTS failed, using fallback:", error);
-    fallbackSpeak(cleanText, lang, slow, 'system');
+    const fishLangs = new Set(['en', 'ru', 'de', 'fr', 'es', 'ja', 'zh', 'ko', 'ar', 'pt', 'it', 'tr']);
+    if (fishLangs.has(effectiveLang)) {
+      try {
+        await speakWithFishAudio(cleanText, effectiveLang, slow, 's2.1-pro-free');
+        return;
+      } catch (fishErr) {
+        console.warn("Fish Audio fallback failed, using Web Speech:", fishErr);
+      }
+    }
+    console.warn("TTS failed, using system speech fallback:", error);
+    fallbackSpeak(cleanText, effectiveLang, slow, 'system');
   }
 };
 
@@ -827,7 +1273,18 @@ if (typeof window !== 'undefined') {
   }, 1000);
 }
 
-export const getFallbackExercise = (subjectId: string, type: Exercise['type'], subjectName: string, userLanguage: string = 'ru'): Exercise => {
+export const getFallbackExercise = (
+  subjectId: string,
+  type: Exercise['type'],
+  subjectName: string,
+  userLanguage: string = 'ru',
+  customTopic?: string,
+  difficultyLevel: 'easy' | 'hard' = 'easy'
+): Exercise => {
+    if (subjectId === 'coding') {
+      return getRandomProgrammingFallbackExercise(customTopic || subjectName, difficultyLevel);
+    }
+
     // 1. Try local cache first!
     const cached = getCachedExercise(subjectId, type);
     if (cached) {
@@ -975,26 +1432,123 @@ export const getFallbackExercise = (subjectId: string, type: Exercise['type'], s
       eo: [
         { orig: "Saluton! Kiel vi fartas?", trans: "Привет! Как ваши дела?", bank: ["Привет!", "Как", "ваши", "дела?", "Хорошо", "Спасибо"] },
         { orig: "Mi lernas Esperanton — la plej facilan lingvon en la mondo", trans: "Я изучаю эсперанто — самый лёгкий язык в мире", bank: ["Я", "изучаю", "эсперанто", "—", "самый", "лёгкий", "язык", "в", "мире"] },
-        { orig: "Esperanto estas mirinde facila kaj logika lingvo", trans: "Эсперанто — удивительно лёгкий и логичный язык", bank: ["Эсперанто", "—", "удивительно", "лёгкий", "и", "логичный", "язык"] },
         { orig: "Dankon al vi pro via granda helpo!", trans: "Большое спасибо вам за помощь!", bank: ["Большое", "спасибо", "вам", "за", "помощь!", "друг"] },
         { orig: "La hundo kuras en la bela ĝardeno", trans: "Собака бежит в красивом саду", bank: ["Собака", "бежит", "в", "красивом", "саду", "кот"] },
         { orig: "Bonan tagon, mia kara amiko!", trans: "Добрый день, мой дорогой друг!", bank: ["Добрый", "день,", "мой", "дорогой", "друг!", "Привет"] }
       ],
       id: [
         { orig: "Halo! Apa kabar?", trans: "Привет! Как дела?", bank: ["Привет!", "Как", "дела?", "Хорошо", "Спасибо"] },
-        { orig: "Saya belajar bahasa Indonesia, bahasa yang sangat mudah", trans: "Я изучаю индонезийский язык, очень простой язык", bank: ["Я", "изучаю", "индонезийский", "язык,", "очень", "простой", "язык"] },
+        { orig: "Saya belajar bahasa Indonesia", trans: "Я изучаю индонезийский язык", bank: ["Я", "изучаю", "индонезийский", "язык", "мы"] },
         { orig: "Terima kasih banyak atas bantuannya", trans: "Большое спасибо за помощь", bank: ["Большое", "спасибо", "за", "помощь", "пожалуйста"] },
         { orig: "Selamat pagi dan selamat belajar!", trans: "Доброе утро и приятной учёбы!", bank: ["Доброе", "утро", "и", "приятной", "учёбы!", "день"] },
         { orig: "Kucing makan ikan di rumah", trans: "Кот ест рыбу дома", bank: ["Кот", "ест", "рыбу", "дома", "собака"] }
+      ],
+      en: [
+        { orig: "The cat sleeps on the sofa", trans: "Кошка спит на диване", bank: ["Кошка", "спит", "на", "диване", "собака", "кровать"] },
+        { orig: "I drink warm tea every morning", trans: "Я пью тёплый чай каждое утро", bank: ["Я", "пью", "тёплый", "чай", "каждое", "утро", "кофе"] },
+        { orig: "She reads an interesting book", trans: "Она читает интересную книгу", bank: ["Она", "читает", "интересную", "книгу", "он", "пишет"] },
+        { orig: "Good morning, how are you today?", trans: "Доброе утро, как твои дела сегодня?", bank: ["Доброе", "утро,", "как", "твои", "дела", "сегодня?"] }
+      ],
+      ru: [
+        { orig: "Привет! Как у тебя дела сегодня?", trans: "Hello! How are you doing today?", bank: ["Hello!", "How", "are", "you", "doing", "today?", "well"] },
+        { orig: "Я люблю читать интересные книги", trans: "I love reading interesting books", bank: ["I", "love", "reading", "interesting", "books", "write"] },
+        { orig: "Сегодня на улице тёплая погода", trans: "The weather is warm outside today", bank: ["The", "weather", "is", "warm", "outside", "today", "cold"] }
+      ],
+      es: [
+        { orig: "Hola, ¿cómo estás hoy?", trans: "Привет, как ты сегодня?", bank: ["Привет,", "как", "ты", "сегодня?", "хорошо", "он"] },
+        { orig: "El perro corre en el parque", trans: "Собака бегает в парке", bank: ["Собака", "бегает", "в", "парке", "кошка", "дом"] },
+        { orig: "Yo bebo café caliente por la mañana", trans: "Я пью горячий кофе по утрам", bank: ["Я", "пью", "горячий", "кофе", "по", "утрам", "чай"] },
+        { orig: "Muchas gracias por tu ayuda, amigo", trans: "Большое спасибо за помощь, друг", bank: ["Большое", "спасибо", "за", "помощь,", "друг", "пока"] }
+      ],
+      de: [
+        { orig: "Guten Tag, wie geht es Ihnen?", trans: "Добрый день, как ваши дела?", bank: ["Добрый", "день,", "как", "ваши", "дела?", "вечер"] },
+        { orig: "Ich lerne gerne Deutsch", trans: "Я с удовольствием учу немецкий", bank: ["Я", "с", "удовольствием", "учу", "немецкий", "он"] },
+        { orig: "Das Haus ist sehr groß und schön", trans: "Дом очень большой и красивый", bank: ["Дом", "очень", "большой", "и", "красивый", "сад"] },
+        { orig: "Wir trinken morgens frischen Tee", trans: "Мы пьём свежий чай по утрам", bank: ["Мы", "пьём", "свежий", "чай", "по", "утрам"] }
+      ],
+      fr: [
+        { orig: "Bonjour, comment allez-vous aujourd'hui?", trans: "Здравствуйте, как ваши дела сегодня?", bank: ["Здравствуйте,", "как", "ваши", "дела", "сегодня?", "привет"] },
+        { orig: "J'aime la musique et les voyages", trans: "Я люблю музыку и путешествия", bank: ["Я", "люблю", "музыку", "и", "путешествия", "книги"] },
+        { orig: "Le chat dort dans le jardin", trans: "Кошка спит в саду", bank: ["Кошка", "спит", "в", "саду", "доме", "собака"] }
+      ],
+      it: [
+        { orig: "Ciao, come stai oggi?", trans: "Привет, как ты сегодня?", bank: ["Привет,", "как", "ты", "сегодня?", "отлично", "друг"] },
+        { orig: "Bevo un caffè caldo ogni mattina", trans: "Я пью горячий кофе каждое утро", bank: ["Я", "пью", "горячий", "кофе", "каждое", "утро"] },
+        { orig: "Questa città è molto bella", trans: "Этот город очень красивый", bank: ["Этот", "город", "очень", "красивый", "большой"] }
+      ],
+      pt: [
+        { orig: "Olá, tudo bem com você?", trans: "Привет, у тебя всё хорошо?", bank: ["Привет,", "у", "тебя", "всё", "хорошо?", "спасибо"] },
+        { orig: "Eu gosto de aprender novos idiomas", trans: "Мне нравится учить новые языки", bank: ["Мне", "нравится", "учить", "новые", "языки", "книги"] },
+        { orig: "O sol brilha no céu azul", trans: "Солнце светит на голубом небе", bank: ["Солнце", "светит", "на", "голубом", "небе"] }
+      ],
+      tr: [
+        { orig: "Merhaba, bugün nasılsın?", trans: "Привет, как ты сегодня?", bank: ["Привет,", "как", "ты", "сегодня?", "хорошо"] },
+        { orig: "Ben her sabah taze çay içerim", trans: "Я пью свежий чай каждое утро", bank: ["Я", "пью", "свежий", "чай", "каждое", "утро"] },
+        { orig: "Türkçe öğrenmek çok ilginç", trans: "Учить турецкий очень интересно", bank: ["Учить", "турецкий", "очень", "интересно", "сложно"] }
+      ],
+      ar: [
+        { orig: "مرحبا، كيف حالك اليوم؟", trans: "Привет, как твои дела сегодня?", bank: ["Привет,", "как", "твои", "дела", "сегодня?", "хорошо"] },
+        { orig: "أحب قراءة الكتب في الصباح", trans: "Я люблю читать книги по утрам", bank: ["Я", "люблю", "читать", "книги", "по", "утрам"] },
+        { orig: "هذا بيت جميل وكبير", trans: "Это красивый и большой дом", bank: ["Это", "красивый", "и", "большой", "дом", "сад"] }
+      ],
+      zh: [
+        { orig: "你好，很高兴认识你", trans: "Привет, очень приятно познакомиться", bank: ["Привет,", "очень", "приятно", "познакомиться", "друг"] },
+        { orig: "我想喝一杯热茶", trans: "Я хочу выпить чашку горячего чая", bank: ["Я", "хочу", "выпить", "чашку", "горячего", "чая"] },
+        { orig: "今天天气真好", trans: "Сегодня прекрасная погода", bank: ["Сегодня", "прекрасная", "погода", "солнце"] }
+      ],
+      ja: [
+        { orig: "こんにちは、元気ですか？", trans: "Привет, как твои дела?", bank: ["Привет,", "как", "твои", "дела?", "спасибо"] },
+        { orig: "私は毎日日本語を勉強しています", trans: "Я каждый день изучаю японский язык", bank: ["Я", "каждый", "день", "изучаю", "японский", "язык"] },
+        { orig: "猫は部屋で眠っています", trans: "Кошка спит в комнате", bank: ["Кошка", "спит", "в", "комнате", "собака"] }
+      ],
+      ko: [
+        { orig: "안녕하세요, 오늘 기분이 어때요?", trans: "Здравствуйте, как ваше настроение сегодня?", bank: ["Здравствуйте,", "как", "ваше", "настроение", "сегодня?"] },
+        { orig: "저는 한국어를 열심히 배웁니다", trans: "Я усердно учу корейский язык", bank: ["Я", "усердно", "учу", "корейский", "язык"] },
+        { orig: "날씨가 아주 맑고 따뜻해요", trans: "Погода очень ясная и тёплая", bank: ["Погода", "очень", "ясная", "и", "тёплая"] }
+      ],
+      uk: [
+        { orig: "Привіт! Як твої справи сьогодні?", trans: "Привет! Как твои дела сегодня?", bank: ["Привет!", "Как", "твои", "дела", "сегодня?"] },
+        { orig: "Я люблю читати цікаві книжки", trans: "Я люблю читать интересные книги", bank: ["Я", "люблю", "читать", "интересные", "книги"] }
+      ],
+      be: [
+        { orig: "Прывітанне! Як твае справы?", trans: "Привет! Как твои дела?", bank: ["Привет!", "Как", "твои", "дела?", "хорошо"] },
+        { orig: "Я вывучаю родную мову", trans: "Я изучаю родной язык", bank: ["Я", "изучаю", "родной", "язык", "школу"] }
+      ],
+      kk: [
+        { orig: "Сәлем! Қалың қалай?", trans: "Привет! Как дела?", bank: ["Привет!", "Как", "дела?", "хорошо", "друг"] },
+        { orig: "Мен қазақ тілін үйреніп жүрмін", trans: "Я изучаю казахский язык", bank: ["Я", "изучаю", "казахский", "язык", "мы"] }
+      ],
+      uz: [
+        { orig: "Salom! Ishlaringiz qalay?", trans: "Привет! Как ваши дела?", bank: ["Привет!", "Как", "ваши", "дела?", "отлично"] },
+        { orig: "Men o'zbek tilini o'rganyapman", trans: "Я изучаю узбекский язык", bank: ["Я", "изучаю", "узбекский", "язык", "мы"] }
+      ],
+      chess: [
+        { orig: "Как называется одновременное нападение на две фигуры соперника?", trans: "Вилка", bank: ["Вилка", "Связка", "Рокировка", "Пат"] },
+        { orig: "Какая фигура может перепрыгивать через другие фигуры?", trans: "Конь", bank: ["Конь", "Слон", "Ладья", "Ферзь"] }
+      ],
+      coding: [
+        { orig: "Какая структура данных работает по принципу LIFO (последним пришёл — первым вышел)?", trans: "Стек", bank: ["Стек", "Очередь", "Массив", "Граф"] },
+        { orig: "Какой протокол используется для защищённого веб-соединения?", trans: "HTTPS", bank: ["HTTPS", "FTP", "SMTP", "UDP"] }
+      ],
+      art: [
+        { orig: "Какие три цвета являются основными в живописи?", trans: "Красный, жёлтый, синий", bank: ["Красный,", "жёлтый,", "синий", "Зелёный"] },
+        { orig: "Как называется техника письма по сырой штукатурке?", trans: "Фреска", bank: ["Фреска", "Акварель", "Гравюра", "Пастель"] }
       ]
     };
 
-    if (hardestFallbacks[subjectId]) {
-      const list = hardestFallbacks[subjectId];
+    const effectiveBankKey = subjectId in hardestFallbacks
+      ? subjectId
+      : subjectId.startsWith('rf-')
+        ? (subjectId.includes('chuvash') ? 'cv' : 'ru')
+        : '';
+
+    if (effectiveBankKey && hardestFallbacks[effectiveBankKey]) {
+      const list = hardestFallbacks[effectiveBankKey];
       const item = list[Math.floor(Math.random() * list.length)];
+      const safeType = (type === 'listening' || type === 'speech') ? type : 'translation';
       return {
         id: crypto.randomUUID(),
-        type: 'translation',
+        type: safeType,
         originalSentence: item.orig,
         targetTranslation: item.trans,
         wordBank: [...item.bank].sort(() => Math.random() - 0.5),
@@ -1004,12 +1558,12 @@ export const getFallbackExercise = (subjectId: string, type: Exercise['type'], s
 
     if (subjectId.startsWith('rf-')) {
         return {
-            id: crypto.randomUUID(), type: 'translation', originalSentence: `Это регион РФ: ${subjectName}?`,
+            id: crypto.randomUUID(), type: 'translation', originalSentence: `Это регион РФ: ${sanitizeSubjectName(subjectName)}?`,
             targetTranslation: "Да", wordBank: ["Да", "Нет", "Возможно", "Не знаю"], isFallback: true
         };
     }
 
-    // Dynamic procedural sentence builder to prevent repetitive sentences!
+    // Dynamic procedural sentence builder (for 'en'/'ru'/unknown only if not covered above)
     const procSubjects = [
       { en: "I", ru: "Я" },
       { en: "She", ru: "Она" },
@@ -1026,20 +1580,14 @@ export const getFallbackExercise = (subjectId: string, type: Exercise['type'], s
     const procActions = [
       { en: "reads an interesting book", ru: "читает интересную книгу" },
       { en: "travels to new cities", ru: "путешествует в новые города" },
-      { en: "drinks hot coffee", ru: "пьет горячий кофе" },
+      { en: "drinks hot coffee", ru: "пьёт горячий кофе" },
       { en: "listens to quiet music", ru: "слушает тихую музыку" },
       { en: "cooks a tasty dinner", ru: "готовит вкусный ужин" },
       { en: "buys fresh fruits", ru: "покупает свежие фрукты" },
       { en: "walks in the green park", ru: "гуляет в зеленом парке" },
       { en: "plays guitar", ru: "играет на гитаре" },
       { en: "writes a long letter", ru: "пишет длинное письмо" },
-      { en: "watches a funny comedy", ru: "смотрит веселую комедию" },
-      { en: "learns foreign languages", ru: "учит иностранные языки" },
-      { en: "opens a large window", ru: "открывает большое окно" },
-      { en: "sings a popular song", ru: "поет популярную песню" },
-      { en: "finds a lost key", ru: "находит потерянный ключ" },
-      { en: "drives a clean blue car", ru: "водит синюю чистую машину" },
-      { en: "enjoys the sunny weather", ru: "наслаждается солнечной погодой" }
+      { en: "watches a funny comedy", ru: "смотрит веселую комедию" }
     ];
 
     const procModifiers = [
@@ -1048,7 +1596,6 @@ export const getFallbackExercise = (subjectId: string, type: Exercise['type'], s
       { en: "in winter", ru: "зимой" },
       { en: "after work", ru: "после работы" },
       { en: "on weekends", ru: "по выходным" },
-      { en: "with great joy", ru: "с большим удовольствием" },
       { en: "today", ru: "сегодня" },
       { en: "in the evening", ru: "вечером" }
     ];
@@ -1057,16 +1604,15 @@ export const getFallbackExercise = (subjectId: string, type: Exercise['type'], s
     const act = procActions[Math.floor(Math.random() * procActions.length)];
     const mod = procModifiers[Math.floor(Math.random() * procModifiers.length)];
 
-    const isEngTarget = subjectId === 'en';
-    const orig = isEngTarget 
-      ? `${subj.en} ${act.en} ${mod.en}`
-      : `${subj.ru} ${act.ru} ${mod.ru}`;
-    const target = isEngTarget
-      ? `${subj.ru} ${act.ru} ${mod.ru}`
-      : `${subj.en} ${act.en} ${mod.en}`;
+    const isEngUi = userLanguage === 'en';
+    const isRuTarget = subjectId === 'ru';
+    const orig = isRuTarget ? `${subj.ru} ${act.ru} ${mod.ru}` : `${subj.en} ${act.en} ${mod.en}`;
+    const target = isRuTarget ? `${subj.en} ${act.en} ${mod.en}` : (isEngUi ? `${subj.en} ${act.en} ${mod.en}` : `${subj.ru} ${act.ru} ${mod.ru}`);
 
-    const rawTokens = target.split(' ');
-    const distractorsPool = ["быстро", "медленно", "высоко", "красиво", "дома", "вчера", "завтра", "очень", "друзья", "машина"];
+    const rawTokens = target.split(' ').filter(Boolean);
+    const distractorsPool = isRuTarget || isEngUi
+      ? ["quickly", "slowly", "yesterday", "tomorrow", "happy", "home"]
+      : ["быстро", "медленно", "дома", "вчера", "завтра", "очень", "друзья"];
     const extraDistractors = distractorsPool.filter(d => !rawTokens.includes(d)).slice(0, 3);
     const wordBank = [...rawTokens, ...extraDistractors].sort(() => Math.random() - 0.5);
 
@@ -1075,24 +1621,44 @@ export const getFallbackExercise = (subjectId: string, type: Exercise['type'], s
         type: type || 'translation', 
         originalSentence: orig, 
         targetTranslation: target,
-        wordBank: wordBank, 
+        wordBank, 
         isFallback: true
     };
+};
+
+export const OFFLINE_INTERNET_REQUIRED_MESSAGE =
+  'Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова';
+
+const isNetworkDisconnectError = (err: unknown): boolean => {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return true;
+  const msg = String((err as any)?.message || err || '').toLowerCase();
+  return (
+    msg.includes('failed to fetch') ||
+    msg.includes('networkerror') ||
+    msg.includes('load failed') ||
+    msg.includes('err_internet_disconnected') ||
+    msg.includes('network request failed')
+  );
 };
 
 export const generateExercise = async (
     targetSubject: string, subjectId: string, isLanguage: boolean = true,
     type: Exercise['type'] = 'translation', isPro: boolean = false, customTopic?: string,
-    userLanguage: string = 'ru'
+    userLanguage: string = 'ru',
+    difficultyLevel: 'easy' | 'hard' = 'easy'
 ): Promise<Exercise> => {
-  // Fast offline return when physically offline
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
-    return getFallbackExercise(subjectId, type, targetSubject, userLanguage);
+    throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
   }
 
+  const cleanTargetSubject = sanitizeSubjectName(targetSubject);
   const model = isPro ? MODEL_PRO : MODEL_FREE;
   const topic = (customTopic && customTopic.trim()) ? customTopic : TOPICS[Math.floor(Math.random() * TOPICS.length)];
   const nonce = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+
+  const difficultyInstruction = difficultyLevel === 'hard'
+    ? 'УРОВЕНЬ СЛОЖНОСТИ: СЛОЖНЫЙ УРОВЕНЬ (Hard B2–C1). Используй более длинные, содержательные и грамматически богатые предложения (8–14 слов), продвинутую лексику, сложные времена/обороты и тонкие, близкие по форме слова-дистракторы.'
+    : 'УРОВЕНЬ СЛОЖНОСТИ: ЛЁГКИЙ УРОВЕНЬ (Easy A1). Используй короткие, простые и понятные начинающим фразы (3–5 слов), базовую повседневную лексику и простые слова-дистракторы.';
 
   const speakerLangNames: Record<string, string> = {
     ru: 'русский язык (Russian)',
@@ -1112,39 +1678,89 @@ export const generateExercise = async (
   };
   const translationLangName = speakerLangNames[userLanguage] || 'русский язык (Russian)';
 
-  const isChuvash = subjectId === 'cv' || subjectId === 'rf-chuvash' || targetSubject.toLowerCase().includes('чуваш') || targetSubject.toLowerCase().includes('chuvash');
+  const isChuvash = subjectId === 'cv' || subjectId === 'rf-chuvash' || cleanTargetSubject.toLowerCase().includes('чуваш') || cleanTargetSubject.toLowerCase().includes('chuvash');
 
   let prompt = '';
   if (isChuvash) {
     prompt = `Ты создаешь упражнение для курса ЧУВАШСКОГО ЯЗЫКА (Чӑвашла / Chuvash language).
+${difficultyInstruction}
 Упражнение должно быть ИСКЛЮЧИТЕЛЬНО на ЧУВАШСКОМ и ${translationLangName} языках.
 Тема урока: ${topic}. Тип упражнения: "${type}".
 Обязательно используй настоящие чувашские буквы: Ӑ, Ӗ, Ҫ, Ӳ (например: ырӑ кун, салам, тавах, эпӗ, эсир, вӗренетӗп, юлташ, ҫӗршыв, шкул, кӗнеке, пурнӑҫ, апат, ҫӑкӑр, шыв).
 
-Структура JSON:
-- originalSentence: фраза на чувашском языке ИЛИ на языке перевода (${translationLangName}).
-- targetTranslation: правильный перевод на ${translationLangName} (если оригинал на чувашском) ИЛИ на чувашский (если оригинал на ${translationLangName}).
-- wordBank: массив отдельных слов для составления targetTranslation плюс 3-4 похожих слова-дистрактора на том же языке.
+Строгая структура JSON:
+- originalSentence: фраза СТРОГО на чувашском языке (Чӑвашла).
+- targetTranslation: правильный перевод СТРОГО на ${translationLangName}.
+- wordBank: массив отдельных слов из targetTranslation плюс 3-4 похожих слова-дистрактора на ${translationLangName}.
 Код уникальности: ${nonce}.`;
   } else if (subjectId === 'math') {
     prompt = `Сгенерируй случайное математическое задание для школьного курса "Математика (1–11 классы)".
-Разделы на выбор:
-1) 🔢 Арифметика (числа, дроби, проценты, пропорции - 1–6 классы)
-2) 📐 Алгебра (уравнения, неравенства, степени, корни, функции - 7–9 классы)
-3) 🎓 10–11 Класс (логарифмы, тригонометрия, производные, начала анализа, задачи ЕГЭ - 10–11 классы)
-
-Оригинал ("originalSentence") — математическое выражение или условие задачи на языке ${translationLangName} (например: "🎓 [10–11 класс • Логарифмы] Чему равен log₂(32)?").
+${difficultyLevel === 'hard'
+  ? 'УРОВЕНЬ СЛОЖНОСТИ: СЛОЖНЫЙ (Hard • 8–11 классы, олимпиадные задачи, логарифмы, тригонометрия, степени, квадратные уравнения, производные).'
+  : 'УРОВЕНЬ СЛОЖНОСТИ: ЛЁГКИЙ (Easy • 1–5 классы, простая арифметика, устный счёт, простые дроби и базовые уравнения).'}
+Оригинал ("originalSentence") — математическое выражение или условие задачи на языке ${translationLangName}.
 Перевод ("targetTranslation") — правильный числовой ответ или формула.
 "wordBank" — массив, содержащий правильный ответ и 3 разумных числовых дистрактора.
 Код уникальности: ${nonce}.`;
+  } else if (subjectId === 'music') {
+    prompt = `Сгенерируй обучающее задание по МУЗЫКЕ (нотная грамота, сольфеджио, теория музыки, интервалы, аккорды, длительности, музыкальные инструменты, композиторы) для обучающегося на языке ${translationLangName}.
+${difficultyInstruction}
+Оригинал ("originalSentence") — вопрос или задача по музыке на языке ${translationLangName}.
+Перевод ("targetTranslation") — правильный ответ на языке ${translationLangName}.
+"wordBank" — массив из 4 вариантов (правильный ответ и 3 правдоподобных дистрактора).
+Код уникальности: ${nonce}.`;
+  } else if (subjectId === 'chess') {
+    prompt = `Сгенерируй обучающее задание по ШАХМАТАМ (тактика, дебюты, шахматные правила, ценность фигур, термины, матовые конструкции) для обучающегося на языке ${translationLangName}.
+${difficultyInstruction}
+Оригинал ("originalSentence") — шахматная задача или вопрос на языке ${translationLangName}.
+Перевод ("targetTranslation") — правильный ответ на языке ${translationLangName}.
+"wordBank" — массив из 4 вариантов (правильный ответ и 3 дистрактора).
+Код уникальности: ${nonce}.`;
+  } else if (subjectId === 'coding') {
+    const codingFocus = (customTopic && customTopic.trim())
+      ? customTopic
+      : 'Lua (скрипты для игр, расширение приложений, легковесный код), Swift и экосистема Apple (iOS/macOS, Objective-C, Xcode только на Mac, SwiftUI, UIKit, AppKit), Android (Kotlin, Java, C++ через Android NDK, Android Studio, Gradle, Jetpack Compose, XML, Flutter на Dart, React Native на JS), 5 этапов создания приложения (.aab), и сборка APK (build.gradle.kts, app-debug.apk, KeyStore .jks, ./gradlew assembleDebug / assembleRelease, Windows gradlew, конструктор Andromo)';
+    prompt = `Сгенерируй УНИКАЛЬНОЕ обучающее задание по ПРОГРАММИРОВАНИЮ И РАЗРАБОТКЕ ПРИЛОЖЕНИЙ на языке ${translationLangName}.
+${difficultyInstruction}
+Фокус темы: ${codingFocus}.
+Обязательно опирайся на реальные инструменты стека: Lua, Swift, Xcode, SwiftUI, UIKit, AppKit, Objective-C, Kotlin, Java, C++ Android NDK, Android Studio, Gradle, Jetpack Compose, XML, Flutter (Dart), React Native, Android App Bundle (.aab), build.gradle.kts, app-debug.apk, KeyStore (.jks), ./gradlew assembleDebug / assembleRelease, конструкторы вроде Andromo.
+Строгая структура JSON:
+- originalSentence: чёткий технический вопрос или мини-задача по выбранной теме на ${translationLangName}.
+- targetTranslation: краткий точный правильный ответ (1–4 слова) на ${translationLangName} или название инструмента/команды.
+- wordBank: массив слов из правильного ответа (или 1-4 токена) + 3 правдоподобных дистрактора из того же стека технологий.
+Код уникальности: ${nonce}.`;
+  } else if (subjectId === 'art') {
+    prompt = `Сгенерируй обучающее задание по предмету "${cleanTargetSubject}" на языке ${translationLangName}.
+${difficultyInstruction}
+Оригинал ("originalSentence") — вопрос или задача по предмету на языке ${translationLangName}.
+Перевод ("targetTranslation") — краткий правильный ответ (1–3 слова) на языке ${translationLangName}.
+"wordBank" — массив из слов правильного ответа и 3 дистракторов.
+Код уникальности: ${nonce}.`;
   } else if (isLanguage) {
-    prompt = `Сгенерируй СЛУЧАЙНОЕ, УНИКАЛЬНОЕ И РАЗНООБРАЗНОЕ упражнение типа "${type}" для изучения языка: "${targetSubject}". Тема: ${topic}.
-Язык изучаемого предмета: ${targetSubject}.
-Язык интерфейса/перевода обучающегося (Speaker UI language): ${translationLangName}.
-ОБЯЗАТЕЛЬНО: Поле "targetTranslation" должно быть написано на языке пользователя (${translationLangName}), а "originalSentence" — на изучаемом языке (${targetSubject}) или наоборот!
-Составь новое предложение, избегай банальных и повторяющихся фраз. Код уникальности: ${nonce}.`;
+    const isSameLang = subjectId === userLanguage;
+    prompt = isSameLang
+      ? `Сгенерируй УНИКАЛЬНОЕ упражнение типа "${type}" на языке "${cleanTargetSubject}" (код: ${subjectId}). Тема: ${topic}.
+${difficultyInstruction}
+Поскольку изучаемый язык совпадает с языком интерфейса (${translationLangName}):
+- "originalSentence": естественное предложение на языке ${cleanTargetSubject}.
+- "targetTranslation": синонимичная перефразировка или точное объяснение смысла предложения на ${translationLangName} (без английских вставок!).
+- "wordBank": массив отдельных слов для составления "targetTranslation" + 3-4 дистрактора.
+Код уникальности: ${nonce}.`
+      : `Сгенерируй СЛУЧАЙНОЕ, УНИКАЛЬНОЕ И РАЗНООБРАЗНОЕ упражнение типа "${type}" для изучения языка: "${cleanTargetSubject}" (код курса: ${subjectId}). Тема: ${topic}.
+${difficultyInstruction}
+Язык изучаемого предмета: ${cleanTargetSubject}.
+Язык интерфейса/перевода обучающегося: ${translationLangName}.
+СТРОГОЕ ПРАВИЛО НАПРАВЛЕНИЯ:
+- Поле "originalSentence" ДОЛЖНО быть написано ТОЛЬКО на изучаемом языке (${cleanTargetSubject}). Ни в коем случае не пиши его на ${translationLangName} и не добавляй перевод в скобках!
+- Поле "targetTranslation" ДОЛЖНО быть точным переводом, написанным ТОЛЬКО на языке пользователя (${translationLangName}).
+- Поле "wordBank" ДОЛЖНО содержать ВСЕ слова из "targetTranslation" + 3-4 правдоподобных слова-дистрактора на языке пользователя (${translationLangName}).
+НЕ меняй языки местами! Код уникальности: ${nonce}.`;
   } else {
-    prompt = `Сгенерируй новую УНИКАЛЬНУЮ задачу для предмета "${targetSubject}" на языке интерфейса пользователя (${translationLangName}). Код уникальности: ${nonce}.`;
+    prompt = `Сгенерируй новую УНИКАЛЬНУЮ задачу для предмета "${cleanTargetSubject}" на языке интерфейса пользователя (${translationLangName}). ${difficultyInstruction}
+- originalSentence: вопрос/задача на ${translationLangName}.
+- targetTranslation: правильный ответ на ${translationLangName}.
+- wordBank: массив из правильного ответа и 3 дистракторов.
+Код уникальности: ${nonce}.`;
   }
 
   try {
@@ -1167,17 +1783,40 @@ export const generateExercise = async (
           }
         }
       });
-      return JSON.parse(response.text || '{}');
-    }), 3200);
-    const exercise: Exercise = { id: crypto.randomUUID(), ...data, type: type };
-    // Save to session tracking
+      return extractJsonSafe<any>(response.text || '{}', {});
+    }), 20000);
+
+    const orig = String(data?.originalSentence || '').trim();
+    const trans = String(data?.targetTranslation || '').trim();
+    if (!orig || !trans) {
+      throw new Error('Malformed exercise payload');
+    }
+
+    let bank: string[] = Array.isArray(data?.wordBank)
+      ? data.wordBank.map((w: any) => String(w || '').trim()).filter(Boolean)
+      : [];
+    if (bank.length === 0) {
+      bank = trans.split(/\s+/).filter(Boolean);
+    }
+
+    const exercise: Exercise = {
+      id: crypto.randomUUID(),
+      originalSentence: orig,
+      targetTranslation: trans,
+      wordBank: bank,
+      hints: data?.hints,
+      type: type,
+      difficultyLevel
+    };
     shownExerciseSentences.add(exercise.originalSentence);
-    // Automatically save to local offline cache!
     saveLessonToCache(subjectId, exercise);
     return exercise;
   } catch (error) {
-    console.warn("API exercise generation failed/timed out, smoothly returning offline exercise:", error);
-    return getFallbackExercise(subjectId, type, targetSubject, userLanguage);
+    if (isNetworkDisconnectError(error)) {
+      throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+    }
+    console.warn("API exercise generation failed/timed out, returning backup exercise:", error);
+    return { ...getFallbackExercise(subjectId, type, cleanTargetSubject, userLanguage, customTopic, difficultyLevel), difficultyLevel };
   }
 };
 
@@ -1203,20 +1842,21 @@ export const checkAnswerWithAI = async (
       (normCorrect.includes(normUser) && normUser.length >= 3);
     return { 
       isCorrect: isClose, 
-      feedback: isClose ? "Правильно (офлайн)!" : `Офлайн-режим: правильный ответ — «${correctAnswer}»`, 
-      isFallback: true 
+      feedback: isClose ? "Правильно!" : `Правильный ответ: ${correctAnswer}`, 
+      isFallback: false 
     };
   }
 
   try {
-    const result = await callGeminiWithRetry(async () => {
+    const cleanSubject = sanitizeSubjectName(subject);
+    const result = await fetchWithTimeout(callGeminiWithRetry(async () => {
       const ai = createGenAiClient();
       const response = await ai.models.generateContent({
         model: isMax ? MODEL_PRO : MODEL_FREE,
-        contents: `I am learning ${subject}. 
-        The correct answer is: "${correctAnswer}".
+        contents: `I am studying "${cleanSubject}". 
+        The target correct answer is: "${correctAnswer}".
         My answer was: "${userAnswer}".
-        Is my answer correct? (Allow small typos).
+        Is my answer correct or mathematically/semantically equivalent? (Allow small typos, spacing, or formatting differences).
         Return JSON: { "isCorrect": boolean, "feedback": string (in Russian or English) }`,
         config: {
           responseMimeType: "application/json",
@@ -1230,15 +1870,22 @@ export const checkAnswerWithAI = async (
           }
         }
       });
-      return JSON.parse(response.text || '{}');
-    });
-    return result;
+      return extractJsonSafe<any>(response.text || '{}', {});
+    }), 15000);
+    if (typeof result?.isCorrect === 'boolean') {
+      return {
+        isCorrect: result.isCorrect,
+        feedback: String(result.feedback || (result.isCorrect ? "Верно!" : `Правильный ответ: ${correctAnswer}`)),
+        isFallback: false
+      };
+    }
+    throw new Error('Invalid check JSON');
   } catch (e) {
-    const isCorrect = normUser === normCorrect;
+    const isCorrect = normUser === normCorrect || (normCorrect.includes(normUser) && normUser.length >= 3);
     return { 
         isCorrect, 
-        feedback: isCorrect ? "Правильно" : `Офлайн режим: Правильный ответ - ${correctAnswer}`, 
-        isFallback: true 
+        feedback: isCorrect ? "Правильно!" : `Правильный ответ: ${correctAnswer}`, 
+        isFallback: false 
     };
   }
 };
@@ -1405,9 +2052,8 @@ export const getMistakeExplanation = async (
     exerciseType?: string,
     isOffline: boolean = false
 ): Promise<string> => {
-    // 1. Instant offline fallback if offline or no network
     if (isOffline || (typeof navigator !== 'undefined' && !navigator.onLine)) {
-        return generateLocalMistakeExplanation(original, userAnswer, correctAnswer, userLanguage, isCorrectAnswer, exerciseType);
+        throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
     }
 
     try {
@@ -1439,7 +2085,7 @@ Do not be overly technical, be supportive.`;
             });
             if (response.text?.trim()) return response.text.trim();
         } catch (e1) {
-            console.warn("MODEL_PRO explanation failed, trying fallback model...", e1);
+            console.warn("MODEL_PRO explanation failed, trying primary server model...", e1);
             const response = await ai.models.generateContent({
                 model: MODEL_FREE,
                 contents: prompt
@@ -1447,7 +2093,11 @@ Do not be overly technical, be supportive.`;
             if (response.text?.trim()) return response.text.trim();
         }
     } catch (err) {
-        console.warn("Gemini explanation offline fallback:", err);
+        if (isNetworkDisconnectError(err)) {
+            throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+        }
+        console.warn("Gemini explanation error:", err);
+        throw err;
     }
 
     return generateLocalMistakeExplanation(original, userAnswer, correctAnswer, userLanguage, isCorrectAnswer, exerciseType);
@@ -1497,18 +2147,29 @@ export const translateText = async (text: string, targetLang: string, sourceLang
     });
     return response.text?.trim() || "Error translating.";
   } catch (e) {
+    if (isNetworkDisconnectError(e)) {
+      throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+    }
     const cleaned = text.trim().toLowerCase().replace(/[.,!?;:]/g, '');
     if (CIS_OFFLINE_DICTIONARY[cleaned] && CIS_OFFLINE_DICTIONARY[cleaned][targetLang]) {
       return CIS_OFFLINE_DICTIONARY[cleaned][targetLang];
     }
-    return `[Офлайн] ${text}`;
+    return text;
   }
 }
 
-export const startRoleplay = async (subject: string, subjectId: string): Promise<Exercise> => {
-    const isArabic = subjectId === 'ar' || subject.toLowerCase().includes('араб') || subject.toLowerCase().includes('arabic');
-    const isChuvash = subjectId === 'cv' || subjectId === 'rf-chuvash' || subject.toLowerCase().includes('чуваш') || subject.toLowerCase().includes('chuvash');
-    
+export const startRoleplay = async (subject: string, subjectId: string, userLanguage: string = 'ru'): Promise<Exercise> => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+    }
+
+    const cleanSubject = sanitizeSubjectName(subject);
+    const sId = (subjectId || '').toLowerCase();
+    const isNonLang = ['math', 'music', 'chess', 'coding', 'art'].includes(sId) || /матем|музык|шахмат|программ|рисован|каллиграф/i.test(subject);
+    const isRuUi = userLanguage === 'ru' || userLanguage === 'Russian';
+    const isArabic = sId === 'ar' || cleanSubject.toLowerCase().includes('араб') || cleanSubject.toLowerCase().includes('arabic');
+    const isChuvash = sId === 'cv' || sId === 'rf-chuvash' || cleanSubject.toLowerCase().includes('чуваш') || cleanSubject.toLowerCase().includes('chuvash');
+
     const chuvashScenarios = [
         "Саламлашу тата паллашу (Знакомство и приветствие)",
         "Шкулта тата кӗнекесар библиотекара (В школе и библиотеке)",
@@ -1522,72 +2183,125 @@ export const startRoleplay = async (subject: string, subjectId: string): Promise
         "في السوق والتبضع (В магазине и на рынке)",
         "السفر في المطار (Путешествие и аэропорт)"
     ];
-    
+
     const scenario = isChuvash
         ? chuvashScenarios[Math.floor(Math.random() * chuvashScenarios.length)]
-        : isArabic 
+        : isArabic
             ? arabicScenarios[Math.floor(Math.random() * arabicScenarios.length)]
-            : "Ordering coffee";
+            : isNonLang
+                ? `${cleanSubject}: ${isRuUi ? 'Практический разбор темы' : 'Interactive Practice'}`
+                : `${cleanSubject}: Everyday Conversation`;
 
     try {
         const firstMessage = await fetchWithTimeout(callGeminiWithRetry(async () => {
             const ai = createGenAiClient();
-            const prompt = isChuvash
-                ? `Ты дружелюбный собеседник на ЧУВАШСКОМ ЯЗЫКЕ (Чӑвашла). Тема: "${scenario}". Поприветствуй собеседника на правильном чувашском языке (с буквами Ӑ, Ӗ, Ҫ, Ӳ), в скобках можно краткий перевод на русский. 1-2 коротких предложения. НИКАКОГО АНГЛИЙСКОГО!`
-                : isArabic 
-                    ? `You are an AI Arabic conversation partner in a roleplay. Scenario: "${scenario}". Greet the student in warm natural Arabic (with Russian/English translation in parentheses). When mentioning numbers or prices, display dual numerals: Western/European digits on the left and Eastern Arabic digits on the right (e.g. 1 / ١, 5 / ٥, 10 / ١٠). Do not replace modern European digits. Keep it 1-2 short sentences.`
-                    : `Act as a friendly local who speaks ${subject}. Scenario: ${scenario}. Start the conversation.`;
-            
+            const prompt = isNonLang
+                ? `You are a friendly ${cleanSubject} tutor in an interactive dialogue. Communicate in ${isRuUi ? 'Russian' : 'English'}. Start with an engaging warm greeting and 1 interesting question or mini-challenge about ${cleanSubject}. Keep it 1-2 sentences.`
+                : isChuvash
+                    ? `Ты дружелюбный собеседник на ЧУВАШСКОМ ЯЗЫКЕ (Чӑвашла). Тема: "${scenario}". Поприветствуй собеседника на правильном чувашском языке (с буквами Ӑ, Ӗ, Ҫ, Ӳ), в скобках можно краткий перевод на русский. 1-2 коротких предложения. НИКАКОГО АНГЛИЙСКОГО!`
+                    : isArabic
+                        ? `You are an AI Arabic conversation partner in a roleplay. Scenario: "${scenario}". Greet the student in warm natural Arabic (with Russian/English translation in parentheses). When mentioning numbers or prices, display dual numerals: Western/European digits on the left and Eastern Arabic digits on the right (e.g. 1 / ١, 5 / ٥, 10 / ١٠). Do not replace modern European digits. Keep it 1-2 short sentences.`
+                        : `Act as a friendly native tutor who speaks ${cleanSubject} (course code: ${subjectId}). Start a natural conversation STRICTLY in ${cleanSubject} on a realistic everyday topic (do NOT use generic placeholder phrases like "ready to order a coffee?" or "Welcome to conversation practice"). Keep it 1-2 short sentences and invite the student to reply in ${cleanSubject}.`;
+
             const response = await ai.models.generateContent({ model: MODEL_FREE, contents: prompt });
-            return response.text?.trim() || (isChuvash ? "Ырӑ кун! Салам, юлташӑм. Эсир мӗнле пурӑнатӑр? (Добрый день! Привет, мой друг. Как поживаешь?)" : isArabic ? "مرحباً بك! أهلاً وسهلاً. كيف يمكنني مساعدتك اليوم؟ (1 / ١)" : "Hello!");
-        }), 3200);
+            const text = response.text?.trim();
+            if (!text) {
+                throw new Error('Empty Gemini response');
+            }
+            return text;
+        }), 20000);
         return {
             id: crypto.randomUUID(), type: 'roleplay', originalSentence: scenario, targetTranslation: "", wordBank: [],
             roleplayData: { topic: scenario, messages: [{ role: 'model', text: firstMessage }], userTurn: true }
         };
     } catch (e) {
-        return {
-            id: 'fallback-rp', type: 'roleplay', originalSentence: isChuvash ? "Чӑвашла калаҫу" : isArabic ? "ممارسة اللغة العربية" : "Offline Practice", targetTranslation: "", wordBank: [], isFallback: true,
-            roleplayData: { 
-                topic: scenario, 
-                messages: [{ role: 'model', text: isChuvash ? "Ырӑ кун! Салам, юлташӑм. Эпӗ чӑваш чӗлхи вӗрентекенӗ. (Добрый день! Привет, друг. Я учитель чувашского языка.)" : isArabic ? "مرحباً بك! أهلاً وسهلاً في درس المحادثة العربية (1 / ١)." : "Hello! Welcome to conversation practice." }], 
-                userTurn: true 
-            }
-        };
+        if (isNetworkDisconnectError(e)) {
+            throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+        }
+        throw e;
     }
 };
 
-export const replyToRoleplay = async (history: RoleplayMessage[], userMessageText: string, subject: string, isMax: boolean): Promise<RoleplayMessage> => {
-    const isArabic = subject.toLowerCase().includes('араб') || subject.toLowerCase().includes('arabic');
-    const isChuvash = subject.toLowerCase().includes('чуваш') || subject.toLowerCase().includes('chuvash');
+export const replyToRoleplay = async (
+    history: RoleplayMessage[],
+    userMessageText: string,
+    subject: string,
+    isMax: boolean,
+    userLanguage: string = 'ru',
+    subjectId: string = ''
+): Promise<RoleplayMessage> => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+    }
+    const cleanSubject = sanitizeSubjectName(subject);
+    const sId = (subjectId || '').toLowerCase();
+    const isNonLang = ['math', 'music', 'chess', 'coding', 'art'].includes(sId) || /матем|музык|шахмат|программ|рисован|каллиграф/i.test(subject);
+    const isRuUi = userLanguage === 'ru' || userLanguage === 'Russian';
+    const isArabic = sId === 'ar' || cleanSubject.toLowerCase().includes('араб') || cleanSubject.toLowerCase().includes('arabic');
+    const isChuvash = sId === 'cv' || sId === 'rf-chuvash' || cleanSubject.toLowerCase().includes('чуваш') || cleanSubject.toLowerCase().includes('chuvash');
+
     try {
          const data = await fetchWithTimeout(callGeminiWithRetry(async () => {
              const ai = createGenAiClient();
              const context = history.map(m => `${m.role}: ${m.text}`).join('\n');
-             const prompt = `${context}\nUser: ${userMessageText}
-             ${isChuvash 
-               ? 'You are a warm friendly Chuvash language tutor from Cheboksary. Reply in natural authentic Chuvash (Чӑвашла) using letters Ӑ, Ӗ, Ҫ, Ӳ with brief Russian translation in parentheses. NEVER USE ENGLISH.'
-               : isArabic 
-                 ? 'You are a friendly Arabic language tutor. Reply in clear natural Arabic with RTL formatting. If numbers, prices or counts are mentioned, use dual Arabic numerals: European/Western digits on the left and Eastern Arabic digits on the right (e.g. 1 / ١, 5 / ٥, 10 / ١٠). Do not break modern digits. If user made a mistake in Arabic, provide a brief correction.' 
-                 : 'Reply naturally in ' + subject + '.'}`;
+             const roleInstruction = isNonLang
+               ? `You are a warm, knowledgeable ${cleanSubject} tutor. Respond directly to what the user said in ${isRuUi ? 'Russian' : 'English'} with a helpful insight and a follow-up question.`
+               : isChuvash
+                 ? 'You are a warm friendly Chuvash language tutor from Cheboksary. Reply in natural authentic Chuvash (Чӑвашла) using letters Ӑ, Ӗ, Ҫ, Ӳ with brief Russian translation in parentheses. NEVER USE ENGLISH.'
+                 : isArabic
+                   ? 'You are a friendly Arabic language tutor. Reply in clear natural Arabic with RTL formatting. If numbers, prices or counts are mentioned, use dual Arabic numerals: European/Western digits on the left and Eastern Arabic digits on the right (e.g. 1 / ١, 5 / ٥, 10 / ١٠). Do not break modern digits. If user made a mistake in Arabic, provide a brief correction.'
+                   : `You are a native tutor in ${cleanSubject}. Reply naturally, warmly, and directly to what the user just said STRICTLY in ${cleanSubject}. Never use generic canned placeholders. If the user made a grammar or vocabulary mistake, give a friendly concise correction.`;
 
-             const response = await ai.models.generateContent({
-                 model: isMax ? MODEL_PRO : MODEL_FREE,
-                 contents: prompt,
-                 config: {
-                     responseMimeType: "application/json",
-                     responseSchema: {
-                         type: Type.OBJECT,
-                         properties: { text: { type: Type.STRING }, correction: { type: Type.STRING } },
-                         required: ["text"]
+             const prompt = `${context}\nUser: ${userMessageText}\n${roleInstruction}\nReturn valid JSON: { "text": "...", "correction": "..." }`;
+
+             let response;
+             try {
+                 response = await ai.models.generateContent({
+                     model: isMax ? MODEL_PRO : MODEL_FREE,
+                     contents: prompt,
+                     config: {
+                         responseMimeType: "application/json",
+                         responseSchema: {
+                             type: Type.OBJECT,
+                             properties: { text: { type: Type.STRING }, correction: { type: Type.STRING } },
+                             required: ["text"]
+                         }
                      }
+                 });
+             } catch (primaryErr) {
+                 if (isMax) {
+                     response = await ai.models.generateContent({
+                         model: MODEL_FREE,
+                         contents: prompt,
+                         config: {
+                             responseMimeType: "application/json",
+                             responseSchema: {
+                                 type: Type.OBJECT,
+                                 properties: { text: { type: Type.STRING }, correction: { type: Type.STRING } },
+                                 required: ["text"]
+                             }
+                         }
+                     });
+                 } else {
+                     throw primaryErr;
                  }
-             });
-             return JSON.parse(response.text || '{}');
-         }), 3500);
-         return { role: 'model', text: data.text || (isArabic ? "أهلاً بك! هذا رائع." : "I see."), correction: data.correction };
+             }
+             const raw = (response.text || '').trim();
+             const parsed = extractJsonSafe<any>(raw, null);
+             if (parsed && typeof parsed.text === 'string' && parsed.text.trim()) {
+                 return parsed;
+             }
+             return { text: raw };
+         }), 20000);
+         if (!data?.text) {
+             throw new Error('Empty Gemini roleplay response');
+         }
+         return { role: 'model', text: data.text, correction: data.correction };
     } catch (e) {
-        return { role: 'model', text: isArabic ? "مرحباً بك! شكراً لك." : "Offline reply.", isFallback: true };
+        if (isNetworkDisconnectError(e)) {
+            throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+        }
+        throw e;
     }
 };
 
@@ -1650,25 +2364,102 @@ const MINIMAL_PAIRS_BANK: Record<string, Array<{ wordA: string; wordB: string; d
         { wordA: "плод", wordB: "плот", diffRu: "«плод» (фрукт/результат) и «плот» (деревянный настил на воде) — парные по глухости-звонкости звуки.", diffEn: "«плод» (fruit) vs «плот» (raft) — voiced/voiceless pair." },
         { wordA: "мел", wordB: "мель", diffRu: "«мел» (твердый звук «л») против «мель» (мягкий звук «ль»).", diffEn: "«мел» (chalk, hard 'l') vs «мель» (shoal, soft 'l')." },
         { wordA: "быть", wordB: "бить", diffRu: "«быть» (твердый губной «б» и звук «ы») против «бить» (мягкий «б'» и гласный «и»).", diffEn: "«быть» (to be, hard 'b') vs «бить» (to hit, soft 'b')." }
+    ],
+    pt: [
+        { wordA: "avô", wordB: "avó", diffRu: "avô [дедушка] (закрытое «ô» /o/) против avó [бабушка] (открытое «ó» /ɔ/).", diffEn: "avô [grandfather] (closed /o/) vs avó [grandmother] (open /ɔ/)." },
+        { wordA: "pão", wordB: "pau", diffRu: "pão [хлеб] (носовой дифтонг «ão») против pau [палка] (чистый дифтонг «au»).", diffEn: "pão [bread] (nasal /ɐ̃w̃/) vs pau [stick] (oral /aw/)." },
+        { wordA: "sede", wordB: "cede", diffRu: "sede [жажда/штаб] и cede [уступает] — тонкое различие закрытого/открытого гласного и ударения.", diffEn: "sede [thirst] vs cede [yields]." }
+    ],
+    tr: [
+        { wordA: "kar", wordB: "kâr", diffRu: "kar [снег] (краткое твердое «k») против kâr [прибыль] (смягчённое «k» и долгий гласный).", diffEn: "kar [snow] vs kâr [profit] (palatalized 'k')." },
+        { wordA: "on", wordB: "ön", diffRu: "on [десять] (гласный заднего ряда «o») против ön [перед] (огубленный передний «ö»).", diffEn: "on [ten] ('o') vs ön [front] ('ö')." },
+        { wordA: "kız", wordB: "kıs", diffRu: "kız [девочка] (звонкое «z») против kıs [укороти] (глухое «s»).", diffEn: "kız [girl] ('z') vs kıs [shorten] ('s')." }
+    ],
+    ar: [
+        { wordA: "كلب", wordB: "قلب", diffRu: "كلب [собака] (мягкое «ك» /k/) против قلب [сердце] (глубокий увулярный «ق» /q/).", diffEn: "كلب [dog] (/k/) vs قلب [heart] (uvular /q/)." },
+        { wordA: "تين", wordB: "طين", diffRu: "تين [инжир] (обычный «ت» /t/) против طين [глина] (эмфатический «ط» /tˤ/).", diffEn: "تين [fig] (plain /t/) vs طين [clay] (emphatic /tˤ/)." },
+        { wordA: "سيف", wordB: "صيف", diffRu: "سيف [меч] (обычный «س» /s/) против صيف [лето] (эмфатический «ص» /sˤ/).", diffEn: "سيف [sword] (/s/) vs صيف [summer] (/sˤ/)." }
+    ],
+    zh: [
+        { wordA: "妈 (mā)", wordB: "马 (mǎ)", diffRu: "mā [мама] (1-й ровный высокий тон) против mǎ [лошадь] (3-й нисходяще-восходящий тон).", diffEn: "mā [mother] (1st tone) vs mǎ [horse] (3rd tone)." },
+        { wordA: "买 (mǎi)", wordB: "卖 (mài)", diffRu: "mǎi [покупать] (3-й тон) против mài [продавать] (4-й резкий падающий тон).", diffEn: "mǎi [buy] (3rd tone) vs mài [sell] (4th tone)." },
+        { wordA: "是 (shì)", wordB: "十 (shí)", diffRu: "shì [быть] (4-й падающий тон) против shí [десять] (2-й восходящий тон).", diffEn: "shì [be] (4th tone) vs shí [ten] (2nd tone)." }
+    ],
+    ja: [
+        { wordA: "おばさん", wordB: "おばあさん", diffRu: "おばさん [тётя] (краткий гласный «а») против おばあさん [бабушка] (долгий гласный «аа»).", diffEn: "obasan [aunt] (short vowel) vs obaasan [grandmother] (long vowel)." },
+        { wordA: "きて", wordB: "きって", diffRu: "きて [приходи] (одиночный «t») против きって [почтовая марка] (удвоенный смычный «tt» с паузой).", diffEn: "kite [come] vs kitte [stamp] (geminate 'tt')." },
+        { wordA: "はし", wordB: "はしご", diffRu: "はし [палочки/мост] (высота тона) против はしご [лестница] (добавочный слог).", diffEn: "hashi [chopsticks/bridge] vs hashigo [ladder]." }
+    ],
+    ko: [
+        { wordA: "불", wordB: "뿔", diffRu: "불 [огонь] (простой «ㅂ») против 뿔 [рог] (напряжённый удвоенный «ㅃ»).", diffEn: "불 [fire] (plain ㅂ) vs 뿔 [horn] (tense ㅃ)." },
+        { wordA: "달", wordB: "탈", diffRu: "달 [луна] (простой «ㄷ») против 탈 [маска] (придыхательный «ㅌ»).", diffEn: "달 [moon] (plain ㄷ) vs 탈 [mask] (aspirated ㅌ)." },
+        { wordA: "방", wordB: "빵", diffRu: "방 [комната] (простой «ㅂ») против 빵 [хлеб] (напряжённый «ㅃ»).", diffEn: "방 [room] (ㅂ) vs 빵 [bread] (ㅃ)." }
+    ],
+    cv: [
+        { wordA: "ҫӑкӑр", wordB: "сакӑр", diffRu: "ҫӑкӑр [хлеб] (мягкий шипящий «ҫ» /ɕ/) против сакӑр [восемь] (твёрдый «с» /s/).", diffEn: "ҫӑкӑр [bread] ('ҫ') vs сакӑр [eight] ('с')." },
+        { wordA: "кӳрӗ", wordB: "курӗ", diffRu: "кӳрӗ [сосед] (передний гласный «ӳ» /y/) против курӗ [увидит] (задний «у» /u/).", diffEn: "кӳрӗ [neighbor] ('ӳ') vs курӗ [will see] ('у')." },
+        { wordA: "тӑр", wordB: "тур", diffRu: "тӑр [стой] (редуцированный «ӑ») против тур [бог/ветка] (полный «у»).", diffEn: "тӑр [stand] ('ӑ') vs тур ('у')." }
+    ],
+    uk: [
+        { wordA: "кіт", wordB: "кит", diffRu: "кіт [кот] (мягкий «і») против кит [кит] (глубокий передне-средний «и»).", diffEn: "кіт [cat] (/i/) vs кит [whale] (/ɪ/)." },
+        { wordA: "синій", wordB: "сильний", diffRu: "синій [синий] против сильний [сильный] — разница в согласном «л».", diffEn: "синій [blue] vs сильний [strong]." }
+    ],
+    kk: [
+        { wordA: "қала", wordB: "қалы", diffRu: "қала [город] (конечный «а») против қалы [ковёр] (конечный «ы»).", diffEn: "қала [city] vs қалы [carpet]." },
+        { wordA: "көз", wordB: "сөз", diffRu: "көз [глаз] (начальный «к») против сөз [слово] (начальный «с»).", diffEn: "көз [eye] vs сөз [word]." }
+    ],
+    pl: [
+        { wordA: "kura", wordB: "góra", diffRu: "kura [курица] (глухой «k») против góra [гора] (звонкий «g», «ó» звучит как /u/).", diffEn: "kura [hen] ('k') vs góra [mountain] ('g')." },
+        { wordA: "proszę", wordB: "prosie", diffRu: "proszę [пожалуйста] (носовой «ę» / шипящая «sz») против prosie [поросёнок].", diffEn: "proszę [please] vs prosie [piglet]." }
+    ],
+    hu: [
+        { wordA: "kor", wordB: "kór", diffRu: "kor [возраст] (краткий «o») против kór [болезнь] (долгий «ó»).", diffEn: "kor [age] (short 'o') vs kór [disease] (long 'ó')." },
+        { wordA: "örül", wordB: "őrül", diffRu: "örül [радуется] (краткий «ö») против őrül [сходит с ума] (долгий «ő»).", diffEn: "örül (short 'ö') vs őrül (long 'ő')." }
+    ],
+    fi: [
+        { wordA: "tuli", wordB: "tuuli", diffRu: "tuli [огонь] (краткий «u») против tuuli [ветер] (долгий «uu»).", diffEn: "tuli [fire] (short 'u') vs tuuli [wind] (long 'uu')." },
+        { wordA: "tapa", wordB: "tappa", diffRu: "tapa [привычка] (одиночный «p») против tappa [убить] (долгий «pp»).", diffEn: "tapa [habit] ('p') vs tappa ('pp')." }
+    ],
+    he: [
+        { wordA: "קר", wordB: "כר", diffRu: "קר [холодный] и כר [подушка] — исторически разная артикуляция «ק» и «כ».", diffEn: "קר [cold] vs כר [pillow]." }
+    ],
+    hi: [
+        { wordA: "पल", wordB: "फल", diffRu: "पल [мгновение] (непридыхательный «प» /p/) против फल [фрукт] (придыхательный «फ» /pʰ/).", diffEn: "पल [moment] (unaspirated /p/) vs फल [fruit] (aspirated /pʰ/)." }
     ]
 };
 
 const getCuratedIllusion = (subject: string, subjectId: string): { soundText: string; optionA: string; optionB: string; correctOption: 'A' | 'B'; explanation: string } => {
     const sId = (subjectId || '').toLowerCase();
-    const sName = (subject || '').toLowerCase();
-    
-    let langKey = 'en';
-    if (sId.includes('eo') || sName.includes('esperanto') || sName.includes('эсперанто')) langKey = 'eo';
+    const sName = sanitizeSubjectName(subject).toLowerCase();
+
+    let langKey = '';
+    if (MINIMAL_PAIRS_BANK[sId]) langKey = sId;
+    else if (sId === 'rf-chuvash' || sId === 'cv' || sName.includes('чуваш') || sName.includes('chuvash')) langKey = 'cv';
+    else if (sId.includes('eo') || sName.includes('esperanto') || sName.includes('эсперанто')) langKey = 'eo';
     else if (sId.includes('id') || sName.includes('indones') || sName.includes('индонез')) langKey = 'id';
     else if (sId.includes('es') || sName.includes('span') || sName.includes('испан')) langKey = 'es';
     else if (sId.includes('it') || sName.includes('ital') || sName.includes('италь')) langKey = 'it';
     else if (sId.includes('de') || sName.includes('german') || sName.includes('немец')) langKey = 'de';
     else if (sId.includes('fr') || sName.includes('french') || sName.includes('франц')) langKey = 'fr';
-    else if (sId.includes('ru') || sName.includes('russ') || sName.includes('рус')) langKey = 'ru';
+    else if (sId.includes('pt') || sName.includes('portug') || sName.includes('португ')) langKey = 'pt';
+    else if (sId.includes('tr') || sName.includes('turk') || sName.includes('турец')) langKey = 'tr';
+    else if (sId.includes('ar') || sName.includes('arab') || sName.includes('араб')) langKey = 'ar';
+    else if (sId.includes('zh') || sName.includes('chin') || sName.includes('китай')) langKey = 'zh';
+    else if (sId.includes('ja') || sName.includes('japan') || sName.includes('япон')) langKey = 'ja';
+    else if (sId.includes('ko') || sName.includes('korea') || sName.includes('корей')) langKey = 'ko';
+    else if (sId.includes('uk') || sName.includes('ukrain') || sName.includes('украин')) langKey = 'uk';
+    else if (sId.includes('kk') || sName.includes('kazakh') || sName.includes('казах')) langKey = 'kk';
+    else if (sId.includes('pl') || sName.includes('polish') || sName.includes('польск')) langKey = 'pl';
+    else if (sId.includes('hu') || sName.includes('hungar') || sName.includes('венгер')) langKey = 'hu';
+    else if (sId.includes('fi') || sName.includes('finn') || sName.includes('финск')) langKey = 'fi';
+    else if (sId.includes('he') || sName.includes('hebrew') || sName.includes('иврит')) langKey = 'he';
+    else if (sId.includes('hi') || sName.includes('hindi') || sName.includes('хинди')) langKey = 'hi';
+    else if (sId.includes('ru') || sId.startsWith('rf-') || sName.includes('russ') || sName.includes('русск')) langKey = 'ru';
+    else langKey = 'en';
 
-    const pairs = MINIMAL_PAIRS_BANK[langKey] || MINIMAL_PAIRS_BANK.es;
+    const pairs = MINIMAL_PAIRS_BANK[langKey] || MINIMAL_PAIRS_BANK.en;
     const item = pairs[Math.floor(Math.random() * pairs.length)];
-    
+
     const chooseA = Math.random() < 0.5;
     const swapOptions = Math.random() < 0.5;
 
@@ -1687,15 +2478,16 @@ const getCuratedIllusion = (subject: string, subjectId: string): { soundText: st
 };
 
 export const generateIllusion = async (subject: string, subjectId: string): Promise<Exercise> => {
+    const cleanSubject = sanitizeSubjectName(subject);
     try {
         const data = await fetchWithTimeout(callGeminiWithRetry(async () => {
             const ai = createGenAiClient();
             const response = await ai.models.generateContent({
                 model: MODEL_FREE,
-                contents: `Generate a challenging Minimal Pair auditory discrimination exercise for a student learning ${subject} (code: ${subjectId}).
+                contents: `Generate a challenging Minimal Pair auditory discrimination exercise for a student learning ${cleanSubject} (code: ${subjectId}).
 IMPORTANT RULES:
 - NEVER use dummy, placeholder, or generic words like "Test", "Toast", "Sample", or "Hello".
-- Provide two real, authentic words in ${subject} that sound very similar (minimal pair, e.g. vowel length, single vs double consonant, or subtle phoneme contrast).
+- Provide two real, authentic words in ${cleanSubject} that sound very similar (minimal pair, e.g. vowel length, single vs double consonant, or subtle phoneme contrast).
 - Choose one of them as 'soundText' (which the audio will pronounce).
 - Set 'optionA' and 'optionB' to the two words.
 - Set 'correctOption' to "A" or "B" depending on which one matches 'soundText'.
@@ -1710,41 +2502,40 @@ Return valid JSON.`,
                     }
                 }
             });
-            return JSON.parse(response.text || '{}');
-        }), 4500);
+            return extractJsonSafe<any>(response.text || '', {});
+        }), 12000);
 
-        // Sanity check: strictly prevent any placeholder or dummy "Test"/"Toast" words
         const badWordRegex = /^(test|toast|sample|hello|dummy)$/i;
-        if (!data || !data.soundText || badWordRegex.test(data.soundText) || badWordRegex.test(data.optionA) || badWordRegex.test(data.optionB)) {
-            const curated = getCuratedIllusion(subject, subjectId);
+        if (!data || !data.soundText || !data.optionA || !data.optionB || badWordRegex.test(String(data.soundText)) || badWordRegex.test(String(data.optionA)) || badWordRegex.test(String(data.optionB))) {
+            const curated = getCuratedIllusion(cleanSubject, subjectId);
             return { id: crypto.randomUUID(), type: 'illusion', originalSentence: "Sound Illusion", targetTranslation: "", wordBank: [], illusionData: curated };
         }
 
         const validCorrect: 'A' | 'B' = (data.correctOption === 'B' || data.correctOption === 'b') ? 'B' : 'A';
-        return { 
-            id: crypto.randomUUID(), 
-            type: 'illusion', 
-            originalSentence: "Sound Illusion", 
-            targetTranslation: "", 
-            wordBank: [], 
+        return {
+            id: crypto.randomUUID(),
+            type: 'illusion',
+            originalSentence: "Sound Illusion",
+            targetTranslation: "",
+            wordBank: [],
             illusionData: {
-                soundText: data.soundText,
-                optionA: data.optionA,
-                optionB: data.optionB,
+                soundText: String(data.soundText),
+                optionA: String(data.optionA),
+                optionB: String(data.optionB),
                 correctOption: validCorrect,
-                explanation: data.explanation || "Обратите внимание на тонкие различия в произношении звуков."
-            } 
+                explanation: String(data.explanation || "Обратите внимание на тонкие различия в произношении звуков.")
+            }
         };
     } catch (e) {
-        const curated = getCuratedIllusion(subject, subjectId);
-        return { 
-            id: crypto.randomUUID(), 
-            type: 'illusion', 
-            originalSentence: "Sound Illusion", 
-            targetTranslation: "", 
-            wordBank: [], 
-            isFallback: true, 
-            illusionData: curated 
+        const curated = getCuratedIllusion(cleanSubject, subjectId);
+        return {
+            id: crypto.randomUUID(),
+            type: 'illusion',
+            originalSentence: "Sound Illusion",
+            targetTranslation: "",
+            wordBank: [],
+            isFallback: true,
+            illusionData: curated
         };
     }
 };
@@ -1755,12 +2546,40 @@ export const getFallbackCharForLanguage = (subjectId: string): string => {
     const chars = ['ĉ', 'ĝ', 'ĥ', 'ĵ', 'ŝ', 'ŭ', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'R', 'S', 'T', 'U', 'V', 'Z'];
     return chars[Math.floor(Math.random() * chars.length)];
   }
-  if (sId === 'id') {
+  if (sId === 'id' || sId === 'la' || sId === 'hv' || sId === 'nl') {
     const chars = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+    return chars[Math.floor(Math.random() * chars.length)];
+  }
+  if (sId === 'tlh') {
+    const chars = ['Q', 'q', 'D', 'H', 'j', 'l', 'm', 'n', 'p', 'r', 'S', 't', 'v', 'w', 'y'];
     return chars[Math.floor(Math.random() * chars.length)];
   }
   if (sId === 'es') {
     const chars = ['Ñ', 'Á', 'É', 'Í', 'Ó', 'Ú', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'L', 'M', 'N', 'O', 'P', 'R', 'S', 'T', 'U', 'V', 'Z'];
+    return chars[Math.floor(Math.random() * chars.length)];
+  }
+  if (sId === 'pt') {
+    const chars = ['Ã', 'Õ', 'Ç', 'Á', 'É', 'Ó', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'L', 'M', 'N', 'O', 'P', 'R', 'S', 'T', 'U', 'V', 'Z'];
+    return chars[Math.floor(Math.random() * chars.length)];
+  }
+  if (sId === 'tr') {
+    const chars = ['Ç', 'Ğ', 'İ', 'Ö', 'Ş', 'Ü', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'O', 'P', 'R', 'S', 'T', 'U', 'V', 'Y', 'Z'];
+    return chars[Math.floor(Math.random() * chars.length)];
+  }
+  if (sId === 'pl') {
+    const chars = ['Ą', 'Ć', 'Ę', 'Ł', 'Ń', 'Ó', 'Ś', 'Ź', 'Ż', 'A', 'B', 'C', 'D', 'E', 'K', 'L', 'M', 'N', 'O', 'P', 'R', 'S', 'T', 'W', 'Z'];
+    return chars[Math.floor(Math.random() * chars.length)];
+  }
+  if (sId === 'hu') {
+    const chars = ['Á', 'É', 'Í', 'Ó', 'Ö', 'Ő', 'Ú', 'Ü', 'Ű', 'A', 'B', 'C', 'D', 'E', 'G', 'K', 'L', 'M', 'N', 'S', 'T', 'V', 'Z'];
+    return chars[Math.floor(Math.random() * chars.length)];
+  }
+  if (sId === 'fi' || sId === 'sv' || sId === 'no') {
+    const chars = ['Ä', 'Ö', 'Å', 'Ø', 'Æ', 'A', 'B', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'R', 'S', 'T', 'U', 'V', 'Y'];
+    return chars[Math.floor(Math.random() * chars.length)];
+  }
+  if (sId === 'is') {
+    const chars = ['Þ', 'Ð', 'Æ', 'Ö', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ý', 'A', 'B', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'O', 'R', 'S', 'T'];
     return chars[Math.floor(Math.random() * chars.length)];
   }
   if (sId === 'it') {
@@ -1779,7 +2598,15 @@ export const getFallbackCharForLanguage = (subjectId: string): string => {
     const chars = ['Ӑ', 'Ӗ', 'Ҫ', 'Ӳ', 'А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж', 'З', 'И', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ', 'Э', 'Ю', 'Я'];
     return chars[Math.floor(Math.random() * chars.length)];
   }
-  if (sId === 'ru' || sId === 'be' || sId === 'uk' || sId.startsWith('rf-')) {
+  if (sId === 'kk') {
+    const chars = ['Ә', 'Ғ', 'Қ', 'Ң', 'Ө', 'Ұ', 'Ү', 'Һ', 'І', 'А', 'Б', 'Д', 'Е', 'Ж', 'К', 'Л', 'М', 'Н', 'О', 'Р', 'С', 'Т'];
+    return chars[Math.floor(Math.random() * chars.length)];
+  }
+  if (sId === 'uk') {
+    const chars = ['Є', 'І', 'Ї', 'Ґ', 'А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж', 'З', 'И', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У'];
+    return chars[Math.floor(Math.random() * chars.length)];
+  }
+  if (sId === 'ru' || sId === 'be' || sId === 'uz' || sId.startsWith('rf-')) {
     const chars = ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж', 'З', 'И', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ', 'Э', 'Ю', 'Я'];
     return chars[Math.floor(Math.random() * chars.length)];
   }
@@ -1787,17 +2614,25 @@ export const getFallbackCharForLanguage = (subjectId: string): string => {
   if (sId === 'ja') return ['あ', 'い', 'う', 'え', 'お', 'か', 'き', 'く', 'け', 'こ', 'さ', 'し', 'す', 'せ', 'そ'][Math.floor(Math.random() * 15)];
   if (sId === 'ko') return ['ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅅ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'][Math.floor(Math.random() * 14)];
   if (sId === 'ar') return ['ا', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي'][Math.floor(Math.random() * 28)];
-  if (sId === 'he') return ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 'י', 'כ', 'ל', 'מ', 'נ', 'ס', 'ע', 'פ', 'צ', 'ק', 'ר', 'ש', 'ת'][Math.floor(Math.random() * 22)];
+  if (sId === 'he' || sId === 'yi') return ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 'י', 'כ', 'ל', 'מ', 'נ', 'ס', 'ע', 'פ', 'צ', 'ק', 'ר', 'ש', 'ת'][Math.floor(Math.random() * 22)];
+  if (sId === 'el') return ['Α', 'Β', 'Γ', 'Δ', 'Ε', 'Ζ', 'Η', 'Θ', 'Ι', 'Κ', 'Λ', 'Μ', 'Ν', 'Ξ', 'Ο', 'Π', 'Ρ', 'Σ', 'Τ', 'Υ', 'Φ', 'Χ', 'Ψ', 'Ω'][Math.floor(Math.random() * 24)];
+  if (sId === 'hi') return ['अ', 'आ', 'इ', 'ई', 'उ', 'ऊ', 'क', 'ख', 'ग', 'घ', 'च', 'ज', 'त', 'द', 'न', 'प', 'ब', 'म', 'र', 'ल', 'स', 'ह'][Math.floor(Math.random() * 22)];
+  if (sId === 'th') return ['ก', 'ข', 'ค', 'ง', 'จ', 'ช', 'ด', 'ต', 'น', 'บ', 'ป', 'ม', 'ย', 'ร', 'ล', 'ว', 'ส', 'ห', 'อ'][Math.floor(Math.random() * 19)];
+  if (sId === 'math') return ['∑', 'π', '∞', 'Δ', '√', '∫', '≈', '≠'][Math.floor(Math.random() * 8)];
+  if (sId === 'music') return ['𝄞', '♪', '♫', '♩', '♭', '♯'][Math.floor(Math.random() * 6)];
+  if (sId === 'chess') return ['♔', '♕', '♖', '♗', '♘', '♙'][Math.floor(Math.random() * 6)];
 
   const latinChars = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
   return latinChars[Math.floor(Math.random() * latinChars.length)];
 };
 
 export const generateDrawing = async (subject: string, subjectId: string, specificChar?: string, userLanguage: string = 'ru'): Promise<Exercise> => {
+    const cleanSubject = sanitizeSubjectName(subject);
+    const isRuUi = userLanguage === 'ru' || userLanguage === 'Russian';
     try {
-        const prompt = specificChar 
-            ? `Generate a writing challenge for the character "${specificChar}" in ${subject}. Return JSON.`
-            : `Generate a writing challenge for a random letter or character in ${subject}. NEVER output generic test strings like "Test A" or "Test". Return JSON with "character" and "instruction".`;
+        const prompt = specificChar
+            ? `Generate a writing challenge for the character "${specificChar}" in ${cleanSubject}. Give the instruction in ${isRuUi ? 'Russian' : 'English'}. Return JSON.`
+            : `Generate a writing challenge for a random letter or character authentic to ${cleanSubject} (code: ${subjectId}). NEVER output generic test strings like "Test A" or "Test". Return JSON with "character" (single letter/symbol in ${cleanSubject}) and "instruction" (in ${isRuUi ? 'Russian' : 'English'}).`;
 
         const data = await fetchWithTimeout(callGeminiWithRetry(async () => {
             const ai = createGenAiClient();
@@ -1813,39 +2648,41 @@ export const generateDrawing = async (subject: string, subjectId: string, specif
                     }
                 }
             });
-            return JSON.parse(response.text || '{}');
-        }), 3200);
-        
-        // Force the character if specificChar was requested (in case AI hallucinates)
-        if (specificChar) data.character = specificChar;
+            return extractJsonSafe<any>(response.text || '', {});
+        }), 10000);
 
-        // Strip any dummy "Test A" or "Test" hallucination
-        if (!data.character || /^test(\s*a)?$/i.test(data.character.trim())) {
-            data.character = getFallbackCharForLanguage(subjectId);
-            data.instruction = (userLanguage === 'ru' || subjectId === 'ru') ? `Нарисуйте символ: ${data.character}` : `Draw the character: ${data.character}`;
+        let character = specificChar ? String(specificChar) : String(data?.character || '').trim();
+        let instruction = String(data?.instruction || '').trim();
+
+        if (!character || /^test(\s*a)?$/i.test(character)) {
+            character = getFallbackCharForLanguage(subjectId);
+            instruction = isRuUi ? `Нарисуйте символ: ${character}` : `Draw the character: ${character}`;
+        }
+        if (!instruction) {
+            instruction = isRuUi ? `Нарисуйте символ: ${character}` : `Draw the character: ${character}`;
         }
 
-        return { id: crypto.randomUUID(), type: 'drawing', originalSentence: "Draw", targetTranslation: "", wordBank: [], drawingData: data };
+        return { id: crypto.randomUUID(), type: 'drawing', originalSentence: "Draw", targetTranslation: "", wordBank: [], drawingData: { character, instruction } };
     } catch (e) {
         const fallbackChar = specificChar || getFallbackCharForLanguage(subjectId);
-        return { 
-            id: 'fb-dr', 
-            type: 'drawing', 
-            originalSentence: "Draw", 
-            targetTranslation: "", 
-            wordBank: [], 
-            isFallback: true, 
-            drawingData: { 
-                character: fallbackChar, 
-                instruction: `Нарисуйте символ: ${fallbackChar}` 
-            } 
+        return {
+            id: 'fb-dr',
+            type: 'drawing',
+            originalSentence: "Draw",
+            targetTranslation: "",
+            wordBank: [],
+            isFallback: true,
+            drawingData: {
+                character: fallbackChar,
+                instruction: isRuUi ? `Нарисуйте символ: ${fallbackChar}` : `Draw the character: ${fallbackChar}`
+            }
         };
     }
 };
 
 export const checkDrawing = async (base64Image: string, targetCharacter: string): Promise<{ isCorrect: boolean; feedback: string; isFallback?: boolean }> => {
     try {
-        const result = await callGeminiWithRetry(async () => {
+        const result = await fetchWithTimeout(callGeminiWithRetry(async () => {
             const ai = createGenAiClient();
             const response = await ai.models.generateContent({
                 model: MODEL_FREE,
@@ -1864,8 +2701,12 @@ export const checkDrawing = async (base64Image: string, targetCharacter: string)
                     }
                 }
             });
-            return JSON.parse(response.text || '{"isCorrect":false}');
-        });
+            const parsed = extractJsonSafe(response.text || '', { isCorrect: false, feedback: '' });
+            return {
+                isCorrect: Boolean(parsed?.isCorrect),
+                feedback: String(parsed?.feedback || (parsed?.isCorrect ? `Отлично! Символ "${targetCharacter}" нарисован верно.` : `Попробуйте нарисовать "${targetCharacter}" ещё раз.`))
+            };
+        }), 12000);
         return result;
     } catch (e) {
         return { isCorrect: true, feedback: `Отличная работа! Символ "${targetCharacter}" нарисован.`, isFallback: true };
@@ -1916,10 +2757,14 @@ export const generateIshihara = async (subjectId: string): Promise<Exercise> => 
 
 // --- CHESS SERVICES ---
 
-export const generateReading = async (subject: string, subjectId: string): Promise<Exercise> => {
+export const generateReading = async (subject: string, subjectId: string, userLanguage: string = 'ru'): Promise<Exercise> => {
     const mode = Math.random() > 0.5 ? 'fill-blanks' : 'write';
     const topic = TOPICS[Math.floor(Math.random() * TOPICS.length)];
-    const isRf = subjectId.startsWith('rf-') || subjectId === 'cv' || subject.toLowerCase().includes('республик') || subject.toLowerCase().includes('чуваш') || subject.toLowerCase().includes('татар') || subject.toLowerCase().includes('башкир');
+    const cleanSubject = sanitizeSubjectName(subject);
+    const sId = (subjectId || '').toLowerCase();
+    const isRuUi = userLanguage === 'ru' || userLanguage === 'Russian';
+    const isNonLang = ['math', 'music', 'chess', 'coding', 'art'].includes(sId) || /матем|музык|шахмат|программ|рисован|каллиграф/i.test(subject);
+    const isRf = sId.startsWith('rf-') || sId === 'cv' || subject.toLowerCase().includes('республик') || subject.toLowerCase().includes('чуваш') || subject.toLowerCase().includes('татар') || subject.toLowerCase().includes('башкир');
 
     try {
         const ai = createGenAiClient();
@@ -1927,25 +2772,28 @@ export const generateReading = async (subject: string, subjectId: string): Promi
         let schema: any = {};
 
         if (mode === 'fill-blanks') {
-            prompt = isRf
-                ? `Создай короткое упражнение на чтение для курса "${subject}" на тему: "${topic}".
-                Напиши короткий текст (3-5 предложений) на русском или родном языке региона.
-                Выдели 3-5 ключевых слов для пропусков ("___").
+            prompt = isNonLang
+                ? `Создай короткое упражнение на чтение с пропусками по предмету "${cleanSubject}" (тема: "${topic}") на языке: ${isRuUi ? 'Русский' : 'English'}.
+                Напиши 2-4 предложения с пропусками "___".
+                Верни JSON: title, text (с "___"), blanks ([{ id: "b1", word: "..." }]), wordBank (правильные слова + дистракторы).`
+                : isRf
+                ? `Создай короткое упражнение на чтение для курса "${cleanSubject}" на тему: "${topic}".
+                Напиши короткий текст (3-5 предложений) на целевом языке или языке региона.
+                Выдели 3-4 ключевых слова для пропусков ("___").
                 Верни JSON:
                 - title: Короткий заголовок.
                 - text: Текст, где пропущенные слова заменены на "___".
                 - blanks: Массив объектов { id: "b1", word: "правильноеСлово" }.
                 - wordBank: Массив строк, включающий правильные слова и 3-4 похожих дистрактора.
                 КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО ИСПОЛЬЗОВАТЬ АНГЛИЙСКИЙ ЯЗЫК!`
-                : `Generate a short reading exercise in ${subject} about ${topic}.
-                Create a short text (3-5 sentences).
-                Identify 3-5 key words to be "blanks".
+                : `Generate a short reading exercise STRICTLY in ${cleanSubject} (code: ${subjectId}) about ${topic}.
+                Create a short text (3-5 sentences) in ${cleanSubject}.
+                Identify 3-4 key words to be replaced with exact placeholder "___".
                 Return JSON with:
-                - title: A short title.
-                - text: The text with blanks replaced by "___".
-                - blanks: An array of objects { id: "b1", word: "correctWord" }.
-                - wordBank: An array of strings including the correct words and 3-4 distractors.
-                `;
+                - title: A short title in ${cleanSubject}.
+                - text: The text with blanks replaced by exact "___" markers.
+                - blanks: An array of objects { id: "b1", word: "correctWord" } matching the count of "___".
+                - wordBank: An array of strings in ${cleanSubject} including all correct blank words plus 3 distractors.`;
             schema = {
                 type: Type.OBJECT,
                 properties: {
@@ -1957,19 +2805,21 @@ export const generateReading = async (subject: string, subjectId: string): Promi
                 required: ["title", "text", "blanks", "wordBank"]
             };
         } else {
-            prompt = isRf
-                ? `Создай творческое задание по письму для курса "${subject}" на тему: "${topic}".
+            prompt = isNonLang
+                ? `Создай творческое письменное задание по предмету "${cleanSubject}" (тема: "${topic}") на языке: ${isRuUi ? 'Русский' : 'English'}.
+                Верни JSON: title, text (короткий контекст 1-2 предложения), prompt (конкретное задание для ответа).`
+                : isRf
+                ? `Создай творческое задание по письму для курса "${cleanSubject}" на тему: "${topic}".
                 Верни JSON:
                 - title: Короткий заголовок.
-                - text: Вводный текст или контекст (1-2 предложения на русском/национальном языке).
+                - text: Вводный текст или контекст (1-2 предложения на целевом языке).
                 - prompt: Конкретное задание для пользователя (например, "Опишите природу родного края", "Напишите письмо другу").
                 КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО ИСПОЛЬЗОВАТЬ АНГЛИЙСКИЙ ЯЗЫК!`
-                : `Generate a creative writing prompt in ${subject} about ${topic}.
+                : `Generate a creative writing prompt in ${cleanSubject} (code: ${subjectId}) about ${topic}.
                 Return JSON with:
-                - title: A short title.
-                - text: A story starter or context (1-2 sentences).
-                - prompt: A specific instruction for what the user should write (e.g., "Finish the story", "Describe the character").
-                `;
+                - title: A short title in ${cleanSubject}.
+                - text: A story starter or context (1-2 sentences in ${cleanSubject}).
+                - prompt: A specific instruction (in ${isRuUi ? 'Russian' : 'English'}) explaining what the student should write in ${cleanSubject}.`;
             schema = {
                 type: Type.OBJECT,
                 properties: {
@@ -1981,7 +2831,7 @@ export const generateReading = async (subject: string, subjectId: string): Promi
             };
         }
 
-        const response = await callGeminiWithRetry(async () => {
+        const response = await fetchWithTimeout(callGeminiWithRetry(async () => {
              return ai.models.generateContent({
                 model: MODEL_FREE,
                 contents: prompt,
@@ -1990,64 +2840,102 @@ export const generateReading = async (subject: string, subjectId: string): Promi
                     responseSchema: schema
                 }
             });
-        });
-        const data = JSON.parse(response.text || '{}');
+        }), 15000);
+        const data = extractJsonSafe<any>(response.text || '', {});
 
-        let fullText = data.text;
-        if (mode === 'fill-blanks' && data.blanks) {
-            // Replace ___ with correct words sequentially
-            // We assume the number of ___ matches blanks length
-            data.blanks.forEach((b: any) => {
-                fullText = fullText.replace("___", b.word);
+        if (!data || typeof data.text !== 'string' || !data.text.trim()) {
+            throw new Error('Invalid reading response');
+        }
+        if (mode === 'fill-blanks') {
+            const blanksArr = Array.isArray(data.blanks) ? data.blanks.filter((b: any) => b && b.word) : [];
+            const markersCount = (data.text.match(/___/g) || []).length;
+            if (blanksArr.length === 0 || markersCount === 0) {
+                throw new Error('Invalid fill-blanks reading structure');
+            }
+            let fullText = data.text;
+            blanksArr.forEach((b: any) => {
+                fullText = fullText.replace("___", String(b?.word || ''));
             });
+            const normalizedBlanks = blanksArr.slice(0, markersCount).map((b: any, i: number) => ({
+                id: String(b?.id || `b${i + 1}`),
+                word: String(b?.word || '')
+            }));
+            const bank = Array.isArray(data.wordBank) && data.wordBank.length > 0
+                ? data.wordBank.map((w: any) => String(w || '')).filter(Boolean)
+                : normalizedBlanks.map((b: any) => b.word);
+
+            return {
+                id: crypto.randomUUID(),
+                type: 'reading',
+                originalSentence: String(data.title || cleanSubject),
+                targetTranslation: fullText,
+                wordBank: bank,
+                readingData: {
+                    title: String(data.title || cleanSubject),
+                    text: data.text,
+                    mode: 'fill-blanks',
+                    blanks: normalizedBlanks
+                }
+            };
         }
 
         return {
             id: crypto.randomUUID(),
             type: 'reading',
-            originalSentence: data.title,
-            targetTranslation: fullText, // Full text for checking
-            wordBank: data.wordBank || [],
+            originalSentence: String(data.title || cleanSubject),
+            targetTranslation: data.text,
+            wordBank: [],
             readingData: {
-                title: data.title,
+                title: String(data.title || cleanSubject),
                 text: data.text,
-                mode: mode,
-                blanks: data.blanks,
-                prompt: data.prompt
+                mode: 'write',
+                prompt: String(data.prompt || (isRuUi ? `Напишите короткий ответ на ${cleanSubject}` : `Write a short response in ${cleanSubject}`))
             }
         };
 
     } catch (e) {
-        const isChuvash = subjectId === 'cv' || subjectId === 'rf-chuvash' || subject.toLowerCase().includes('чуваш') || subject.toLowerCase().includes('chuvash');
-        if (isChuvash) {
-            return {
-                id: 'fallback-reading-cv',
-                type: 'reading',
-                originalSentence: "Чӑвашла вулав",
-                targetTranslation: "Эпӗ паян шкула каятӑп тата кӗнеке вулатӑп.",
-                wordBank: ["шкула", "кӗнеке", "паян", "ҫӑкӑр", "юлташ"],
-                isFallback: true,
-                readingData: {
-                    title: "Шкулти пурнӑҫ",
-                    text: "Эпӗ паян ___ каятӑп тата ___ вулатӑп.",
-                    mode: 'fill-blanks',
-                    blanks: [{ id: 'b1', word: 'шкула' }, { id: 'b2', word: 'кӗнеке' }]
-                }
-            };
-        }
-        // Fallback
+        const readingFallbacks: Record<string, { title: string; text: string; full: string; blanks: string[]; distractors: string[] }> = {
+            cv: { title: "Шкулти пурнӑҫ", text: "Эпӗ паян ___ каятӑп тата ___ вулатӑп.", full: "Эпӗ паян шкула каятӑп тата кӗнеке вулатӑп.", blanks: ['шкула', 'кӗнеке'], distractors: ['паян', 'ҫӑкӑр', 'юлташ'] },
+            es: { title: "Un día soleado", text: "Hoy ___ un café y leo un ___ interesante.", full: "Hoy tomo un café y leo un libro interesante.", blanks: ['tomo', 'libro'], distractors: ['agua', 'perro', 'casa'] },
+            de: { title: "Mein Morgen", text: "Am Morgen trinke ich ___ und lese die ___.", full: "Am Morgen trinke ich Kaffee und lese die Zeitung.", blanks: ['Kaffee', 'Zeitung'], distractors: ['Wasser', 'Haus', 'Apfel'] },
+            fr: { title: "Le matin", text: "Le matin, je mange du ___ et je bois du ___.", full: "Le matin, je mange du pain et je bois du thé.", blanks: ['pain', 'thé'], distractors: ['chat', 'livre', 'soleil'] },
+            it: { title: "In piazza", text: "Oggi vado al ___ per comprare un ___ fresco.", full: "Oggi vado al mercato per comprare un pane fresco.", blanks: ['mercato', 'pane'], distractors: ['mare', 'treno', 'casa'] },
+            pt: { title: "Café da manhã", text: "Eu gosto de tomar ___ e comer ___ pela manhã.", full: "Eu gosto de tomar café e comer pão pela manhã.", blanks: ['café', 'pão'], distractors: ['livro', 'gato', 'água'] },
+            tr: { title: "Sabah Kahvaltısı", text: "Sabah sıcak ___ içiyorum ve taze ___ yiyorum.", full: "Sabah sıcak çay içiyorum ve taze ekmek yiyorum.", blanks: ['çay', 'ekmek'], distractors: ['su', 'kitap', 'ev'] },
+            ar: { title: "في الصباح", text: "في الصباح أشرب ___ وأقرأ ___.", full: "في الصباح أشرب القهوة وأقرأ الكتاب.", blanks: ['القهوة', 'الكتاب'], distractors: ['الماء', 'البحر', 'البيت'] },
+            zh: { title: "早晨", text: "我早上喝___，然后去___。", full: "我早上喝茶，然后去学校。", blanks: ['茶', '学校'], distractors: ['书', '猫', '水'] },
+            ja: { title: "朝の習慣", text: "私は朝、___を飲んで___を読みます。", full: "私は朝、お茶を飲んで本を読みます。", blanks: ['お茶', '本'], distractors: ['水', '猫', '駅'] },
+            ko: { title: "아침 시간", text: "아침에 따뜻한 ___를 마시고 ___을 읽어요.", full: "아침에 따뜻한 차를 마시고 책을 읽어요.", blanks: ['차', '책'], distractors: ['물', '집', '친구'] },
+            uk: { title: "Ранкова прогулянка", text: "Сьогодні я п'ю гарячий ___ та читаю цікаву ___.", full: "Сьогодні я п'ю гарячий чай та читаю цікаву книгу.", blanks: ['чай', 'книгу'], distractors: ['вікно', 'стіл', 'вода'] },
+            kk: { title: "Таңғы уақыт", text: "Мен таңертең ___ ішіп, қызықты ___ оқимын.", full: "Мен таңертең шай ішіп, қызықты кітап оқимын.", blanks: ['шай', 'кітап'], distractors: ['су', 'үй', 'нан'] },
+            eo: { title: "Bona mateno", text: "Hodiaŭ mi trinkas ___ kaj legas bonan ___.", full: "Hodiaŭ mi trinkas teon kaj legas bonan libron.", blanks: ['teon', 'libron'], distractors: ['panon', 'katon', 'akvon'] },
+            id: { title: "Pagi Hari", text: "Pagi ini saya minum ___ dan membaca ___.", full: "Pagi ini saya minum teh dan membaca buku.", blanks: ['teh', 'buku'], distractors: ['air', 'rumah', 'roti'] },
+            ru: { title: "Утренняя привычка", text: "Утром я люблю пить тёплый ___ и читать интересную ___.", full: "Утром я люблю пить тёплый чай и читать интересную книгу.", blanks: ['чай', 'книгу'], distractors: ['окно', 'стол', 'море'] },
+            en: { title: "Morning Routine", text: "In the morning I drink warm ___ and read a good ___.", full: "In the morning I drink warm tea and read a good book.", blanks: ['tea', 'book'], distractors: ['apple', 'window', 'chair'] },
+            math: { title: "Геометрия", text: "Сумма углов треугольника равна ___ градусам, а площадь квадрата — квадрату его ___.", full: "Сумма углов треугольника равна 180 градусам, а площадь квадрата — квадрату его стороны.", blanks: ['180', 'стороны'], distractors: ['90', 'радиуса', '360'] },
+            chess: { title: "Шахматная стратегия", text: "В дебюте важно занять ___ и защитить своего ___ рокировкой.", full: "В дебюте важно занять центр и защитить своего короля рокировкой.", blanks: ['центр', 'короля'], distractors: ['ферзя', 'фланг', 'пешку'] },
+            music: { title: "Теория музыки", text: "Скрипичный ключ указывает на ноту ___, а мажорное трезвучие звучит ___.", full: "Скрипичный ключ указывает на ноту соль, а мажорное трезвучие звучит светло.", blanks: ['соль', 'светло'], distractors: ['фа', 'грустно', 'до'] },
+            coding: { title: "Основы кода", text: "Цикл позволяет повторять блок ___, а условие проверяет истинность ___.", full: "Цикл позволяет повторять блок кода, а условие проверяет истинность выражения.", blanks: ['кода', 'выражения'], distractors: ['класса', 'окна', 'числа'] },
+            art: { title: "Основы живописи", text: "Смешивание синего и жёлтого даёт ___ цвет, а светлые блики создают ___.", full: "Смешивание синего и жёлтого даёт зелёный цвет, а светлые блики создают объём.", blanks: ['зелёный', 'объём'], distractors: ['красный', 'угол', 'линию'] }
+        };
+
+        const isChuvash = sId === 'cv' || sId === 'rf-chuvash' || subject.toLowerCase().includes('чуваш');
+        const key = isChuvash ? 'cv' : (readingFallbacks[sId] ? sId : (sId.startsWith('rf-') ? 'ru' : 'en'));
+        const fb = readingFallbacks[key] || readingFallbacks.en;
+        const wordBank = [...fb.blanks, ...fb.distractors].sort(() => Math.random() - 0.5);
+
         return {
-            id: 'fallback-reading',
+            id: `fallback-reading-${key}`,
             type: 'reading',
-            originalSentence: "Reading Practice",
-            targetTranslation: "",
-            wordBank: ["apple", "banana", "orange"],
+            originalSentence: fb.title,
+            targetTranslation: fb.full,
+            wordBank,
             isFallback: true,
             readingData: {
-                title: "My Fruit",
-                text: "I like to eat ___ and ___.",
+                title: fb.title,
+                text: fb.text,
                 mode: 'fill-blanks',
-                blanks: [{ id: 'b1', word: 'apple' }, { id: 'b2', word: 'banana' }]
+                blanks: fb.blanks.map((word, idx) => ({ id: `b${idx + 1}`, word }))
             }
         };
     }
@@ -2112,6 +3000,43 @@ export const getChessChatReply = async (fen: string, history: string[], chatHist
     return response.text?.trim() || "Your turn!";
   } catch (e) {
     return "Thinking...";
+  }
+};
+
+export const getChessTutorialHint = async (
+  fen: string,
+  history: string[],
+  lang: string = 'ru',
+  scenarioMessage?: string
+): Promise<string> => {
+  try {
+    const ai = createGenAiClient();
+    const isRu = lang === 'ru';
+    const prompt = `You are DuoWindo6601 Chess Coach (Owl Mascot).
+Current Board FEN: ${fen}
+Move History: ${history.slice(-5).join(', ') || 'Game start'}
+Current Tutorial Scenario/Instruction: ${scenarioMessage || 'Tutorial scenario'}
+
+Provide a specific, tactical next-move suggestion for White in ${isRu ? 'Russian' : 'English'}.
+Specify an exact piece, target square, or move (e.g. "Походите конем на f3 (Nf3), чтобы занять центр и развить фигуру.").
+Keep it encouraging, concise (1-2 sentences, max 25 words).`;
+
+    const response = await callGeminiWithRetry(async () => {
+      return ai.models.generateContent({
+        model: MODEL_FREE,
+        contents: prompt
+      });
+    });
+
+    const text = response.text?.trim();
+    if (text) return text;
+    return isRu
+      ? '💡 Подсказка: Развивайте фигуры в центре (e4 / d4 / Nf3) и готовьте рокировку!'
+      : '💡 Hint: Develop your central pieces (e4 / d4 / Nf3) and prepare to castle!';
+  } catch (e) {
+    return lang === 'ru'
+      ? '💡 Подсказка: Сделайте ход пешкой в центр или выведите коня на f3!'
+      : '💡 Hint: Control the center with a pawn or develop your knight to f3!';
   }
 };
 
@@ -2244,18 +3169,15 @@ export const generateInterviewQuestion = async (topic: string = "general program
 export const getInterviewHint = async (question: string): Promise<string> => {
     try {
         const ai = createGenAiClient();
-        const response = await callGeminiWithRetry(async () => {
+        const response = await fetchWithTimeout(callGeminiWithRetry(async () => {
             return ai.models.generateContent({
-                model: MODEL_PRO,
-                contents: `Provide a structured "cheat sheet" answer for this interview question: "${question}".
-                Format it with bullet points. Keep it concise, ready to read during a call.
-                Explain key concepts clearly.
-                Return text suitable for display.`
+                model: MODEL_FREE,
+                contents: `Provide a brief, helpful "cheat sheet" reply idea (2-3 short bullet points, concise enough to glance at during a call) for this prompt: "${question}".`
             });
-        });
-        return response.text?.trim() || "Hint unavailable.";
+        }), 10000);
+        return response.text?.trim() || "• Ответьте коротко и по сути\n• Используйте знакомые слова";
     } catch (e) {
-        return "Network error. No hint.";
+        return "• Ответьте простыми фразами по теме\n• Поделитесь примером из жизни";
     }
 };
 
@@ -2263,24 +3185,50 @@ export const generateVideoCallRoleplayResponse = async (
     topic: string,
     history: RoleplayMessage[],
     userText: string,
-    language: string
+    language: string,
+    userLanguage: string = 'ru'
 ): Promise<{ text: string; correction?: string }> => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+    }
+    const cleanLanguage = sanitizeSubjectName(language);
+    const isNonLang = /матем|музык|шахмат|программ|рисован|каллиграф|math|music|chess|programming|art/i.test(language);
+    const isRuUi = userLanguage === 'ru' || userLanguage === 'Russian';
+    const targetSpeakLang = isNonLang ? (isRuUi ? 'Russian' : 'English') : cleanLanguage;
+
     try {
         const ai = createGenAiClient();
-        const context = history.map(m => `${m.role === 'user' ? 'User' : 'DuoWindo6601'}: ${m.text}`).join('\n');
-        const isArabic = language.toLowerCase().includes('араб') || language.toLowerCase().includes('arabic');
-        const prompt = `You are DuoWindo6601, an AI language tutor in a LIVE interactive Video Call with a student learning ${language}. 
+        const context = history.slice(-6).map(m => `${m.role === 'user' ? 'User' : 'DuoWindo6601'}: ${m.text}`).join('\n');
+        const isArabic = !isNonLang && (cleanLanguage.toLowerCase().includes('араб') || cleanLanguage.toLowerCase().includes('arabic'));
+        const isInitialGreeting = userText === '__START_VIDEO_CALL__';
+        const prompt = isInitialGreeting
+          ? (isNonLang
+              ? `You are DuoWindo6601, an AI tutor starting a LIVE interactive Video Call about "${cleanLanguage}". Topic: "${topic}".
+Greet the student warmly in ${targetSpeakLang} (1-2 short sentences) and ask an engaging opening question about "${cleanLanguage}".
+Return JSON with { "text": "..." }`
+              : `You are DuoWindo6601, an AI language tutor starting a LIVE interactive Video Call with a student learning ${targetSpeakLang}.
+Topic: "${topic}".
+Greet the student naturally and warmly STRICTLY in ${targetSpeakLang} (1-2 sentences max) and ask an engaging opening question about "${topic}". Do not use generic canned English templates if studying another language.
+Return JSON with { "text": "..." }`)
+          : (isNonLang
+              ? `You are DuoWindo6601, an AI tutor in a LIVE Video Call teaching "${cleanLanguage}".
+Topic: "${topic}".
+Recent conversation:
+${context}
+User said during video call: "${userText}"
+Reply naturally, warmly, and concisely in ${targetSpeakLang} (1-2 short sentences). Return JSON with { "text": "...", "correction": "..." }`
+              : `You are DuoWindo6601, an AI language tutor in a LIVE interactive Video Call with a student learning ${targetSpeakLang}. 
 Current topic/scenario: "${topic}".
 Recent conversation:
 ${context}
 User said during video call: "${userText}"
 
-Reply naturally, warmly, and concisely as DuoWindo6601 (1-2 sentences max for spoken video call).
+Reply naturally, warmly, and concisely as DuoWindo6601 STRICTLY in ${targetSpeakLang} (1-2 sentences max for spoken video call). Do not use generic canned placeholders.
 ${isArabic ? 'For Arabic language practice: when mentioning numbers, prices, or time, show dual numerals with European/Western digits on the left and Eastern Arabic digits on the right (e.g. 1 / ١, 5 / ٥, 10 / ١٠). Do not remove modern European digits.' : ''}
 If user made a language/grammar mistake, provide a very brief friendly correction.
-Return JSON with { "text": "...", "correction": "..." }`;
+Return JSON with { "text": "...", "correction": "..." }`);
 
-        const response = await callGeminiWithRetry(async () => {
+        const response = await fetchWithTimeout(callGeminiWithRetry(async () => {
             return ai.models.generateContent({
                 model: MODEL_FREE,
                 contents: prompt,
@@ -2296,68 +3244,91 @@ Return JSON with { "text": "...", "correction": "..." }`;
                     }
                 }
             });
-        });
-        const data = JSON.parse(response.text || '{}');
-        return { text: data.text || "That sounds great! Tell me more.", correction: data.correction };
+        }), 20000);
+        const raw = (response.text || '').trim();
+        const data = extractJsonSafe<any>(raw, null);
+        if (data && typeof data.text === 'string' && data.text.trim()) {
+            return { text: data.text, correction: data.correction };
+        }
+        if (raw) {
+            return { text: raw };
+        }
+        throw new Error('Empty Gemini video call response');
     } catch (e) {
-        return { text: "That sounds interesting! What else would you like to discuss?" };
+        if (isNetworkDisconnectError(e)) {
+            throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+        }
+        throw e;
     }
 };
 
 /**
- * Ping function to test real connection to Gemini API.
+ * Direct ping function to test connection to Gemini API on the server.
  */
 export const pingGeminiApi = async (customKeyToTest?: string): Promise<{ ok: boolean; message: string; latencyMs?: number }> => {
-  const isSkipped = isCustomApiKeySkipped();
-  const apiKey = (customKeyToTest && customKeyToTest.trim()) ? customKeyToTest.trim() : getApiKey();
-  if (!apiKey && !isSkipped) {
-    return { ok: false, message: "API Key не найден" };
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return {
+      ok: false,
+      message: OFFLINE_INTERNET_REQUIRED_MESSAGE,
+      latencyMs: 0,
+    };
   }
+
+  const customKey = (customKeyToTest && customKeyToTest.trim()) ? customKeyToTest.trim() : getApiKey();
   const startTime = Date.now();
+
   try {
-    const ai = createGenAiClient(apiKey || 'SYSTEM_FREE_TRAFFIC');
-    const response = await callGeminiWithRetry(async () => {
-      return ai.models.generateContent({
-        model: MODEL_FREE,
-        contents: "Reply with the single word: 'ONLINE'",
-      });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const headers: Record<string, string> = {};
+    if (customKey && customKey !== 'SYSTEM_FREE_TRAFFIC' && !customKey.includes('••••')) {
+      headers['x-goog-api-key'] = customKey;
+    }
+
+    const res = await fetch('/api/gemini/ping', {
+      method: 'GET',
+      headers,
+      signal: controller.signal,
     });
-    const latencyMs = Date.now() - startTime;
-    if (response && response.text) {
-      return { 
-        ok: true, 
-        message: isSkipped 
-          ? "DuoWindo6601 Бесплатный трафик Онлайн! (Cloud Proxy активен)" 
-          : "Gemini API Онлайн и работает (US Cloud Proxy активен)!", 
-        latencyMs 
+    clearTimeout(timeoutId);
+
+    const data = await res.json().catch(() => ({}));
+    const latencyMs = typeof data.latencyMs === 'number' ? data.latencyMs : (Date.now() - startTime);
+
+    if (res.ok && data.ok) {
+      return {
+        ok: true,
+        message: data.message || 'Gemini API Онлайн и работает (Без VPN и с VPN)!',
+        latencyMs,
       };
     }
-    return { 
-      ok: true, 
-      message: isSkipped ? "DuoWindo6601 Бесплатный трафик активен!" : "Gemini API Онлайн!", 
-      latencyMs 
+
+    return {
+      ok: false,
+      message: data.message || data.error?.message || `Ошибка сервера Gemini (${res.status})`,
+      latencyMs,
     };
   } catch (err: any) {
     const latencyMs = Date.now() - startTime;
-    console.error("pingGeminiApi error:", err);
-    // If user has skipped the custom key, the free system proxy traffic is active
-    if (isSkipped) {
-      return { 
-        ok: true, 
-        message: "DuoWindo6601 Бесплатный трафик активен (Cloud Proxy)", 
-        latencyMs 
+    if (isNetworkDisconnectError(err)) {
+      return {
+        ok: false,
+        message: OFFLINE_INTERNET_REQUIRED_MESSAGE,
+        latencyMs,
       };
     }
-    const msg = err?.message || String(err);
-    if (msg.includes("location is not supported") || msg.includes("User location")) {
-      return { ok: false, message: "Региональное ограничение Google (User location is not supported)", latencyMs };
+    const msg = String(err?.message || err || '');
+    if (err?.name === 'AbortError' || msg.includes('TIMEOUT')) {
+      return {
+        ok: false,
+        message: 'Превышено время ожидания ответа от сервера (таймаут 12 сек.)',
+        latencyMs,
+      };
     }
-    if (msg.includes("API_KEY_INVALID") || msg.includes("403") || msg.includes("API key not valid")) {
-      return { ok: false, message: "Невалидный API ключ (403)", latencyMs };
-    }
-    if (msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("quota")) {
-      return { ok: false, message: "Превышен лимит API ключа (429/Quota)", latencyMs };
-    }
-    return { ok: false, message: msg.length > 60 ? msg.slice(0, 60) + "..." : msg, latencyMs };
+    return {
+      ok: false,
+      message: msg.length > 70 ? msg.slice(0, 70) + '...' : (msg || 'Сервер Gemini недоступен'),
+      latencyMs,
+    };
   }
 };

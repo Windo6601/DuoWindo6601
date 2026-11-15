@@ -14,14 +14,19 @@ import {
   McpConfig
 } from '../services/aiLimitManager';
 import { getActiveApiKeyInfo, pingGeminiApi } from '../services/geminiService';
+import { getJulesApiStatus, listJulesSources, JulesStatusResponse } from '../services/julesService';
 import { db, auth } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore';
+import { GoogleRecaptcha } from './GoogleRecaptcha';
 
 interface AdminGeminiKeyManagerProps {
   isUnlocked: boolean;
   currentUserEmail?: string;
   role?: string;
   isAdmin?: boolean;
+  hasInsufficientRights?: boolean;
+  isTokenAuditDenied?: boolean;
+  accessDeniedReason?: string;
   playSound?: (type: string) => void;
   setToast?: (toast: any) => void;
 }
@@ -33,6 +38,9 @@ export const AdminGeminiKeyManager: React.FC<AdminGeminiKeyManagerProps> = ({
   currentUserEmail = '',
   role,
   isAdmin,
+  hasInsufficientRights = false,
+  isTokenAuditDenied = false,
+  accessDeniedReason,
   playSound,
   setToast
 }) => {
@@ -40,7 +48,7 @@ export const AdminGeminiKeyManager: React.FC<AdminGeminiKeyManagerProps> = ({
   const authenticatedEmail = (auth.currentUser?.email || currentUserEmail || '').toLowerCase();
   const isOwnerEmail = AUTHORIZED_OWNERS.some(owner => authenticatedEmail.includes(owner.toLowerCase()));
   const hasAdminOrOwnerRole = role === 'admin' || role === 'owner' || isAdmin === true || isOwnerEmail;
-  const isAuthorized = isUnlocked && hasAdminOrOwnerRole;
+  const isAuthorized = isUnlocked && hasAdminOrOwnerRole && !hasInsufficientRights && !isTokenAuditDenied;
 
   // Helper to uniformly dispatch toast messages
   const triggerToast = (toastData: string | { message: string; type?: 'success' | 'error' | 'info'; icon?: string }) => {
@@ -87,6 +95,11 @@ export const AdminGeminiKeyManager: React.FC<AdminGeminiKeyManagerProps> = ({
   const [showMcpKey, setShowMcpKey] = useState<boolean>(false);
   const [mcpTesting, setMcpTesting] = useState<boolean>(false);
   const [mcpTestResult, setMcpTestResult] = useState<{ ok: boolean; message: string; latencyMs?: number } | null>(null);
+  const [julesApiStatus, setJulesApiStatus] = useState<JulesStatusResponse | null>(null);
+  const [julesApiChecking, setJulesApiChecking] = useState<boolean>(false);
+  const [julesApiMessage, setJulesApiMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const [recaptchaError, setRecaptchaError] = useState<string | null>(null);
 
   // Listen for storage events across tabs
   useEffect(() => {
@@ -113,6 +126,14 @@ export const AdminGeminiKeyManager: React.FC<AdminGeminiKeyManagerProps> = ({
 
   // Save Admin API Key handler
   const handleSaveAdminKey = async () => {
+    setRecaptchaError(null);
+    if (!recaptchaToken) {
+      setRecaptchaError('Подтвердите капчу Google reCAPTCHA («Я не робот») перед сохранением ключа Администратора');
+      playSound?.('wrong');
+      triggerToast({ message: 'Требуется капча Google reCAPTCHA перед сохранением ключа', type: 'error', icon: '⚠️' });
+      return;
+    }
+
     playSound?.('success');
     const trimmed = adminKeyInput.trim();
     saveAdminApiKey(trimmed, adminKeyType, adminKeyEnabled);
@@ -145,6 +166,14 @@ export const AdminGeminiKeyManager: React.FC<AdminGeminiKeyManagerProps> = ({
   // Test Admin Key
   const handleTestAdminKey = async () => {
     playSound?.('click');
+    setRecaptchaError(null);
+    if (!recaptchaToken) {
+      setRecaptchaError('Подтвердите капчу Google reCAPTCHA («Я не робот») перед тестированием ключа Администратора');
+      playSound?.('wrong');
+      triggerToast({ message: 'Требуется капча Google reCAPTCHA перед тестированием ключа', type: 'error', icon: '⚠️' });
+      return;
+    }
+
     const keyToTest = adminKeyInput.trim() || adminKeyDetails.key;
     if (!keyToTest) {
       triggerToast({ message: 'Сначала введите Gemini API Key Администратора', type: 'error', icon: '⚠️' });
@@ -152,15 +181,21 @@ export const AdminGeminiKeyManager: React.FC<AdminGeminiKeyManagerProps> = ({
     }
     setAdminTesting(true);
     setAdminTestResult(null);
-    const res = await pingGeminiApi(keyToTest);
-    setAdminTesting(false);
-    setAdminTestResult(res);
-    if (res.ok) {
-      playSound?.('lesson_complete');
-      triggerToast({ message: `Ключ Администратора валиден (${res.latencyMs} мс)`, type: 'success', icon: '✅' });
-    } else {
-      playSound?.('wrong');
-      triggerToast({ message: `Ошибка ключа Администратора: ${res.message}`, type: 'error', icon: '❌' });
+    try {
+      const res = await pingGeminiApi(keyToTest);
+      setAdminTestResult(res);
+      if (res.ok) {
+        playSound?.('lesson_complete');
+        triggerToast({ message: `Ключ Администратора валиден (${res.latencyMs || 0} мс)`, type: 'success', icon: '✅' });
+      } else {
+        playSound?.('wrong');
+        triggerToast({ message: `Ошибка ключа Администратора: ${res.message}`, type: 'error', icon: '❌' });
+      }
+    } catch (e: any) {
+      setAdminTestResult({ ok: false, message: e?.message || 'Сбой проверки ключа' });
+      triggerToast({ message: 'Сбой проверки соединения с API', type: 'error', icon: '❌' });
+    } finally {
+      setAdminTesting(false);
     }
   };
 
@@ -191,6 +226,14 @@ export const AdminGeminiKeyManager: React.FC<AdminGeminiKeyManagerProps> = ({
 
   // Save Developer API Key handler
   const handleSaveDevKey = async () => {
+    setRecaptchaError(null);
+    if (!recaptchaToken) {
+      setRecaptchaError('Подтвердите капчу Google reCAPTCHA («Я не робот») перед сохранением ключа Разработчика');
+      playSound?.('wrong');
+      triggerToast({ message: 'Требуется капча Google reCAPTCHA перед сохранением ключа', type: 'error', icon: '⚠️' });
+      return;
+    }
+
     playSound?.('success');
     const trimmed = devKeyInput.trim();
     saveDevApiKey(trimmed, devKeyType, devKeyEnabled);
@@ -222,6 +265,14 @@ export const AdminGeminiKeyManager: React.FC<AdminGeminiKeyManagerProps> = ({
   // Test Developer Key
   const handleTestDevKey = async () => {
     playSound?.('click');
+    setRecaptchaError(null);
+    if (!recaptchaToken) {
+      setRecaptchaError('Подтвердите капчу Google reCAPTCHA («Я не робот») перед тестированием ключа Разработчика');
+      playSound?.('wrong');
+      triggerToast({ message: 'Требуется капча Google reCAPTCHA перед тестированием ключа', type: 'error', icon: '⚠️' });
+      return;
+    }
+
     const keyToTest = devKeyInput.trim() || devKeyDetails.key;
     if (!keyToTest) {
       triggerToast({ message: 'Сначала введите Gemini API Key Разработчика', type: 'error', icon: '⚠️' });
@@ -229,15 +280,21 @@ export const AdminGeminiKeyManager: React.FC<AdminGeminiKeyManagerProps> = ({
     }
     setDevTesting(true);
     setDevTestResult(null);
-    const res = await pingGeminiApi(keyToTest);
-    setDevTesting(false);
-    setDevTestResult(res);
-    if (res.ok) {
-      playSound?.('lesson_complete');
-      triggerToast({ message: `Ключ Разработчика валиден (${res.latencyMs} мс)`, type: 'success', icon: '✅' });
-    } else {
-      playSound?.('wrong');
-      triggerToast({ message: `Ошибка ключа Разработчика: ${res.message}`, type: 'error', icon: '❌' });
+    try {
+      const res = await pingGeminiApi(keyToTest);
+      setDevTestResult(res);
+      if (res.ok) {
+        playSound?.('lesson_complete');
+        triggerToast({ message: `Ключ Разработчика валиден (${res.latencyMs || 0} мс)`, type: 'success', icon: '✅' });
+      } else {
+        playSound?.('wrong');
+        triggerToast({ message: `Ошибка ключа Разработчика: ${res.message}`, type: 'error', icon: '❌' });
+      }
+    } catch (e: any) {
+      setDevTestResult({ ok: false, message: e?.message || 'Сбой проверки ключа' });
+      triggerToast({ message: 'Сбой проверки соединения с API', type: 'error', icon: '❌' });
+    } finally {
+      setDevTesting(false);
     }
   };
 
@@ -349,6 +406,41 @@ export const AdminGeminiKeyManager: React.FC<AdminGeminiKeyManagerProps> = ({
     }
   };
 
+  // Test Server-Side Google Jules API (/api/jules/*)
+  const handleCheckJulesApi = async () => {
+    playSound?.('click');
+    setJulesApiChecking(true);
+    setJulesApiMessage(null);
+    try {
+      const status = await getJulesApiStatus();
+      setJulesApiStatus(status);
+      if (!status.configured) {
+        setJulesApiMessage({
+          ok: false,
+          text: 'Переменная JULES_API_KEY не задана на сервере. Добавьте её в настройки окружения сервера (не в клиентский код, чтобы ключ не был отключён системой защиты).'
+        });
+        playSound?.('wrong');
+        return;
+      }
+      const sourcesData = await listJulesSources();
+      const count = sourcesData?.sources?.length ?? 0;
+      setJulesApiMessage({
+        ok: true,
+        text: `Google Jules API подключен через серверный прокси (${status.maskedKey || 'Server Env'}). Доступно источников: ${count}.`
+      });
+      playSound?.('lesson_complete');
+      triggerToast({ message: `Google Jules API активен (${count} источников)`, type: 'success', icon: '🤖' });
+    } catch (e: any) {
+      setJulesApiMessage({
+        ok: false,
+        text: `Ошибка прокси Google Jules API: ${e?.message || 'Проверьте серверную переменную JULES_API_KEY'}`
+      });
+      playSound?.('wrong');
+    } finally {
+      setJulesApiChecking(false);
+    }
+  };
+
   // Reset MCP Key to Default
   const handleResetMcpKey = () => {
     playSound?.('click');
@@ -364,54 +456,109 @@ export const AdminGeminiKeyManager: React.FC<AdminGeminiKeyManagerProps> = ({
   // Run full latency diagnostics
   const handleRunFullDiagnostics = async () => {
     playSound?.('click');
+    setRecaptchaError(null);
+    if (!recaptchaToken) {
+      setRecaptchaError('Подтвердите капчу Google reCAPTCHA («Я не робот») перед запуском диагностики всех ключей');
+      playSound?.('wrong');
+      triggerToast({ message: 'Требуется капча Google reCAPTCHA перед диагностикой', type: 'error', icon: '⚠️' });
+      return;
+    }
+
     setBatchTesting(true);
     setBatchTestReport(null);
 
-    const report: {
-      active?: { ok: boolean; message: string; latencyMs?: number };
-      admin?: { ok: boolean; message: string; latencyMs?: number };
-      dev?: { ok: boolean; message: string; latencyMs?: number };
-    } = {};
+    try {
+      const report: {
+        active?: { ok: boolean; message: string; latencyMs?: number };
+        admin?: { ok: boolean; message: string; latencyMs?: number };
+        dev?: { ok: boolean; message: string; latencyMs?: number };
+      } = {};
 
-    const activeRes = await pingGeminiApi();
-    report.active = activeRes;
+      const activeRes = await pingGeminiApi();
+      report.active = activeRes;
 
-    if (adminKeyDetails.isSet) {
-      const adminRes = await pingGeminiApi(adminKeyDetails.key);
-      report.admin = adminRes;
+      if (adminKeyDetails.isSet) {
+        const adminRes = await pingGeminiApi(adminKeyDetails.key);
+        report.admin = adminRes;
+      }
+
+      if (devKeyDetails.isSet) {
+        const devRes = await pingGeminiApi(devKeyDetails.key);
+        report.dev = devRes;
+      }
+
+      setBatchTestReport(report);
+      setActiveKeyInfo(getActiveApiKeyInfo());
+      playSound?.('lesson_complete');
+      triggerToast({
+        message: 'Диагностика Gemini API ключей завершена!',
+        type: 'success',
+        icon: '⚡'
+      });
+    } catch (e) {
+      triggerToast({
+        message: 'Ошибка при проведении диагностики ключей',
+        type: 'error',
+        icon: '❌'
+      });
+    } finally {
+      setBatchTesting(false);
     }
-
-    if (devKeyDetails.isSet) {
-      const devRes = await pingGeminiApi(devKeyDetails.key);
-      report.dev = devRes;
-    }
-
-    setBatchTesting(false);
-    setBatchTestReport(report);
-    setActiveKeyInfo(getActiveApiKeyInfo());
-    playSound?.('lesson_complete');
-    triggerToast({
-      message: 'Диагностика Gemini API ключей завершена!',
-      type: 'success',
-      icon: '⚡'
-    });
   };
 
-  // Security Check Fallback if locked
+  // Security Check Fallback if locked or insufficient rights
   if (!isAuthorized) {
     return (
-      <div className="bg-gradient-to-br from-gray-900 via-rose-950/40 to-gray-900 border-2 border-rose-500/40 rounded-3xl p-8 text-center space-y-4 shadow-2xl">
-        <div className="w-16 h-16 rounded-3xl bg-rose-500/20 text-rose-400 border border-rose-500/50 flex items-center justify-center text-3xl mx-auto shadow-inner">
-          🔒
+      <div className="bg-gradient-to-br from-red-950/90 via-gray-900 to-red-950/80 border-2 border-red-500 rounded-3xl p-6 sm:p-8 text-left shadow-2xl space-y-4 animate-in fade-in">
+        <div className="flex items-center space-x-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-red-600/30 border border-red-500 flex items-center justify-center text-2xl shrink-0 shadow-inner">
+            🔒
+          </div>
+          <div>
+            <div className="flex items-center space-x-2 flex-wrap">
+              <h3 className="text-xl font-black uppercase tracking-tight text-red-400">
+                Доступ запрещен
+              </h3>
+              <span className="text-xs font-bold text-red-300 uppercase tracking-wider bg-red-500/20 px-2.5 py-0.5 rounded-full border border-red-500/40">
+                Access is denied
+              </span>
+            </div>
+            <p className="text-xs text-gray-300 font-bold mt-0.5">
+              {accessDeniedReason || 'Управление Gemini API ключами Администратора и Разработчика'}
+            </p>
+          </div>
         </div>
-        <h3 className="text-xl font-black uppercase tracking-tight text-white">
-          Раздел защищен авторизацией Владельца
-        </h3>
-        <p className="text-sm text-gray-400 max-w-md mx-auto leading-relaxed">
-          Управление Gemini API ключами Администратора и Разработчика доступно исключительно владельцам платформы (<b className="text-amber-300">abramovanatolij81@gmail.com</b>, <b className="text-amber-300">va997217@gmail.com</b>).
-        </p>
-        <div className="inline-flex items-center gap-2 bg-rose-950/80 border border-rose-500/40 text-rose-300 px-4 py-2 rounded-xl text-xs font-bold">
-          <span>🚫 Доступ закрыт для стандартных пользователей</span>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs sm:text-sm pt-1">
+          <div className="bg-black/60 border border-red-500/30 p-4 rounded-2xl space-y-1.5">
+            <span className="text-[10px] font-black uppercase text-red-400 block">Русский язык</span>
+            <p className="font-black text-white text-sm">
+              У вас нет доступа к этой администрации.
+            </p>
+            <p className="text-xs text-red-200 font-medium leading-relaxed">
+              Обратитесь к администратору вашей учетной записи, чтобы запросить доступ.
+            </p>
+          </div>
+
+          <div className="bg-black/50 border border-gray-700/60 p-4 rounded-2xl space-y-1.5">
+            <span className="text-[10px] font-black uppercase text-gray-400 block">English</span>
+            <p className="font-bold text-gray-200 text-xs sm:text-sm">
+              You do not have access to this administration.
+            </p>
+            <p className="text-[11px] text-gray-400 font-medium leading-relaxed">
+              Contact your account administrator to request access.
+            </p>
+          </div>
+        </div>
+
+        <div className="pt-2 flex flex-col sm:flex-row gap-2">
+          <a
+            href="mailto:abramovanatolij81@gmail.com?subject=Запрос доступа к Gemini API Keys"
+            className="flex-1 py-2.5 px-4 bg-red-600 hover:bg-red-500 text-white rounded-xl font-black text-xs uppercase tracking-wider text-center transition-all flex items-center justify-center space-x-1.5 shadow cursor-pointer"
+          >
+            <span>📧</span>
+            <span>Запросить доступ у администратора (abramovanatolij81@gmail.com)</span>
+          </a>
         </div>
       </div>
     );
@@ -595,6 +742,42 @@ export const AdminGeminiKeyManager: React.FC<AdminGeminiKeyManagerProps> = ({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* GOOGLE RECAPTCHA SECURITY CARD FOR GEMINI API & KEYS */}
+      <div className="bg-gradient-to-r from-gray-900 via-[#13121f] to-gray-900 border-2 border-purple-500/40 rounded-3xl p-5 shadow-2xl space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-800 pb-3">
+          <div className="flex items-center space-x-3">
+            <span className="text-2xl">🛡️</span>
+            <div>
+              <h4 className="text-sm font-black uppercase text-white tracking-wide flex items-center gap-2">
+                <span>Google reCAPTCHA API • Проверка Gemini API & Ключей</span>
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                  API Security
+                </span>
+              </h4>
+              <p className="text-xs text-gray-400 font-medium mt-0.5">
+                Защита от автоматизированного перебора и проверка человека перед тестированием (ping) и сохранением Gemini API Keys
+              </p>
+            </div>
+          </div>
+          <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 w-fit">
+            🔒 Обязательная проверка
+          </span>
+        </div>
+
+        <GoogleRecaptcha
+          isVerified={!!recaptchaToken}
+          onVerify={(tok) => {
+            setRecaptchaToken(tok);
+            setRecaptchaError(null);
+            playSound?.('click');
+          }}
+          onExpire={() => setRecaptchaToken(null)}
+          language="ru"
+          error={recaptchaError}
+          className="pt-1"
+        />
       </div>
 
       {/* TWO COLUMN INPUT SECTION: ADMIN KEY & DEVELOPER KEY */}
@@ -1109,6 +1292,41 @@ export const AdminGeminiKeyManager: React.FC<AdminGeminiKeyManagerProps> = ({
           >
             🔄 Jules Default
           </button>
+
+          <button
+            type="button"
+            onClick={handleCheckJulesApi}
+            disabled={julesApiChecking}
+            className="py-3 px-4 bg-emerald-950/60 hover:bg-emerald-900/70 text-emerald-300 font-bold text-xs rounded-xl border border-emerald-500/40 transition-all disabled:opacity-50 cursor-pointer"
+            title="Проверить серверный прокси Google Jules API"
+          >
+            {julesApiChecking ? '⏳ Проверка Jules API...' : '🛡️ Тест Google Jules API'}
+          </button>
+        </div>
+
+        {/* Google Jules Server-Side Security & Exposed Key Protection Notice */}
+        <div className="bg-amber-950/30 border border-amber-500/40 rounded-2xl p-4 text-xs space-y-2">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <span className="font-black text-amber-300 uppercase tracking-wider">
+              🛡️ Безопасность ключей Google Jules API (Server Proxy)
+            </span>
+            <span className="text-[10px] font-mono bg-black/40 text-amber-200 px-2 py-0.5 rounded border border-amber-500/30">
+              {julesApiStatus?.configured ? `ENV: ${julesApiStatus.maskedKey || 'Configured'}` : 'ENV: JULES_API_KEY (/api/jules/*)'}
+            </span>
+          </div>
+          <p className="text-[11px] text-amber-100/90 leading-relaxed">
+            В соответствии с политикой автоматического обнаружения злоупотреблений Google Cloud (<code>disable-exposed-keys</code>), ключи Google Jules API запрещено хранить в браузерном коде или в открытом доступе. Прокси-маршруты <code>/api/jules/*</code> передают заголовок <code>X-Goog-Api-Key</code> исключительно на сервере из переменной окружения <code>JULES_API_KEY</code>.
+          </p>
+          {julesApiMessage && (
+            <div className={`p-3 rounded-xl border text-[11px] font-bold ${
+              julesApiMessage.ok
+                ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-200'
+                : 'bg-red-950/60 border-red-500/50 text-red-200'
+            }`}>
+              {julesApiMessage.ok ? '✅ ' : '⚠️ '}
+              {julesApiMessage.text}
+            </div>
+          )}
         </div>
       </div>
 

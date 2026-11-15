@@ -45,15 +45,15 @@ export const SystemCompatibilityBanner: React.FC<SystemCompatibilityBannerProps>
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="font-black text-sm sm:text-base tracking-wide uppercase flex items-center gap-1.5">
                 {isXpOrVista ? (
-                  lang === 'ru' ? 'DuoWindo6601: Прекращение поддержки Win XP / 2003, Mypal 78.0.3 XP & SAPI 4.0' : 'DuoWindo6601: Windows XP / 2003, Mypal & SAPI 4.0 Support Ended'
+                  (lang !== 'en') ? 'DuoWindo6601: Прекращение поддержки Win XP / 2003, Mypal 78.0.3 XP & SAPI 4.0' : 'DuoWindo6601: Windows XP / 2003, Mypal & SAPI 4.0 Support Ended'
                 ) : isIOS ? (
-                  lang === 'ru' ? 'DuoWindo6601: Старая версия iOS / iPad (< 14.0) — Не получится обновить PWA' : 'DuoWindo6601: Legacy iOS / iPad (< 14.0) — PWA Update Unsupported'
+                  (lang !== 'en') ? 'DuoWindo6601: Старая версия iOS / iPad (< 14.0) — Не получится обновить PWA' : 'DuoWindo6601: Legacy iOS / iPad (< 14.0) — PWA Update Unsupported'
                 ) : isAndroid ? (
-                  lang === 'ru' ? 'DuoWindo6601: Старая версия Android (4.x - 7.x) — Не получится обновить PWA' : 'DuoWindo6601: Legacy Android Version (4.x - 7.x)'
+                  (lang !== 'en') ? 'DuoWindo6601: Старая версия Android (4.x - 7.x) — Не получится обновить PWA' : 'DuoWindo6601: Legacy Android Version (4.x - 7.x)'
                 ) : isMacLinux ? (
-                  lang === 'ru' ? 'DuoWindo6601: Устаревшая версия macOS / Linux' : 'DuoWindo6601: Outdated macOS / Linux'
+                  (lang !== 'en') ? 'DuoWindo6601: Устаревшая версия macOS / Linux' : 'DuoWindo6601: Outdated macOS / Linux'
                 ) : (
-                  lang === 'ru' ? 'DuoWindo6601: Устаревший браузер — Обновление PWA не получится' : 'DuoWindo6601: Outdated Web Browser'
+                  (lang !== 'en') ? 'DuoWindo6601: Устаревший браузер — Обновление PWA не получится' : 'DuoWindo6601: Outdated Web Browser'
                 )}
               </h3>
               
@@ -71,7 +71,7 @@ export const SystemCompatibilityBanner: React.FC<SystemCompatibilityBannerProps>
             {/* Supported OS Badges */}
             {isXpOrVista && (
               <div className="pt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
-                <span className="font-bold opacity-75">{lang === 'ru' ? 'Поддерживаются:' : 'Supported Windows:'}</span>
+                <span className="font-bold opacity-75">{(lang !== 'en') ? 'Поддерживаются:' : 'Supported Windows:'}</span>
                 {['Windows 7', 'Windows 8', 'Windows 8.1', 'Windows 10', 'Windows 11'].map((os) => (
                   <span key={os} className="bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-md font-black">
                     ✓ {os}
@@ -82,7 +82,7 @@ export const SystemCompatibilityBanner: React.FC<SystemCompatibilityBannerProps>
 
             {isIOS && (
               <div className="pt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
-                <span className="font-bold opacity-75">{lang === 'ru' ? 'Требуется для iOS / iPad:' : 'Required for iOS / iPad:'}</span>
+                <span className="font-bold opacity-75">{(lang !== 'en') ? 'Требуется для iOS / iPad:' : 'Required for iOS / iPad:'}</span>
                 <span className="bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-md font-black">
                   ✓ iOS / iPadOS 15.0+ (Safari 15+) — Новый Систем
                 </span>
@@ -91,7 +91,7 @@ export const SystemCompatibilityBanner: React.FC<SystemCompatibilityBannerProps>
 
             {isAndroid && (
               <div className="pt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
-                <span className="font-bold opacity-75">{lang === 'ru' ? 'Рекомендация:' : 'Required Android:'}</span>
+                <span className="font-bold opacity-75">{(lang !== 'en') ? 'Рекомендация:' : 'Required Android:'}</span>
                 <span className="bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-md font-black">
                   ✓ Android 8.0+ / 9 / 10 / 11 / 12 / 13 / 14 / 15 + Chrome Mobile
                 </span>
@@ -100,7 +100,7 @@ export const SystemCompatibilityBanner: React.FC<SystemCompatibilityBannerProps>
 
             {isMacLinux && (
               <div className="pt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
-                <span className="font-bold opacity-75">{lang === 'ru' ? 'Рекомендация:' : 'Required OS:'}</span>
+                <span className="font-bold opacity-75">{(lang !== 'en') ? 'Рекомендация:' : 'Required OS:'}</span>
                 <span className="bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-md font-black">
                   ✓ macOS 11+ / Modern Linux + Chrome 100+ / Firefox 100+ / Safari 14+
                 </span>
@@ -120,13 +120,13 @@ export const SystemCompatibilityBanner: React.FC<SystemCompatibilityBannerProps>
             }`}
           >
             <span>ℹ️</span>
-            <span>{lang === 'ru' ? 'Подробнее' : 'Details'}</span>
+            <span>{(lang !== 'en') ? 'Подробнее' : 'Details'}</span>
           </button>
 
           <button
             onClick={onDismiss}
             className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-black/40 hover:bg-black/60 text-white/80 hover:text-white transition-all border border-white/10 cursor-pointer"
-            title={lang === 'ru' ? 'Закрыть предупреждение' : 'Dismiss warning'}
+            title={(lang !== 'en') ? 'Закрыть предупреждение' : 'Dismiss warning'}
           >
             ✕
           </button>

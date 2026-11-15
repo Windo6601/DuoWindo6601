@@ -65,50 +65,50 @@ export const LanguageLockModal: React.FC<LanguageLockModalProps> = ({
         {/* Mascot & Header */}
         <div className="flex flex-col items-center text-center mt-2 mb-4">
           <div className="relative mb-3">
-            <Mascot emotion="thinking" className="w-24 h-24" />
-            <div className="absolute -bottom-1 -right-1 bg-amber-500 text-black font-black text-xs px-2.5 py-0.5 rounded-full border-2 border-slate-900 shadow-md">
-              🔒 1 нояб.
+            <Mascot emotion="happy" className="w-24 h-24" />
+            <div className="absolute -bottom-1 -right-1 bg-emerald-500 text-black font-black text-xs px-2.5 py-0.5 rounded-full border-2 border-slate-900 shadow-md">
+              ✅ 1 нояб.
             </div>
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-2 mb-2">
-            <span className="text-[11px] font-black uppercase tracking-widest text-amber-400 bg-amber-500/15 border border-amber-500/30 px-3 py-1 rounded-full">
-              {isRu ? 'В разработке • Доступно 1 ноября 2026 г.' : 'Under Development • Available Nov 1, 2026'}
+            <span className="text-[11px] font-black uppercase tracking-widest text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 rounded-full">
+              {isRu ? '✅ Открыто 1 ноября 2026 г.' : '✅ Unlocked Nov 1, 2026'}
             </span>
-            <span className="text-[11px] font-black uppercase tracking-widest text-rose-300 bg-rose-500/15 border border-rose-500/30 px-2.5 py-1 rounded-full">
-              {isRu ? '15 языков • 🔒 1 нояб. 2026' : '15 Languages • 🔒 Nov 1, 2026'}
+            <span className="text-[11px] font-black uppercase tracking-widest text-teal-300 bg-teal-500/15 border border-teal-500/30 px-2.5 py-1 rounded-full">
+              {isRu ? '15 языков • Доступно' : '15 Languages • Unlocked'}
             </span>
           </div>
 
-          <h3 className="text-xl sm:text-2xl font-black mb-1.5 leading-snug">
+          <h3 className="text-xl sm:text-2xl font-black mb-1.5 leading-snug text-emerald-300">
             {isRu 
-              ? 'Переключение на эти языки и раздел «Письмо» откроются 1 ноября 2026 года' 
-              : 'Language switching and the "Letters" section will open November 1, 2026'}
+              ? '🎉 Переключение на эти языки и раздел «Письмо» открыты!' 
+              : '🎉 Language switching and the "Letters" section are now open!'}
           </h3>
 
           <p className={`text-xs sm:text-sm font-medium max-w-lg ${isLightMode ? 'text-gray-600' : 'text-gray-300'}`}>
             {isRu 
-              ? 'Команда DuoWindo6601 готовит 15 языков, озвучку носителей речи, шрифты и упражнения прописей букв. До официального релиза осталось совсем немного!' 
-              : '15 languages, native audio, custom fonts and writing exercises are actively being finalized for release!'}
+              ? 'Сегодня 1 ноября 2026 года! Все 15 языков, озвучка носителей речи, шрифты и раздел «Письмо» теперь официально открыты для всех пользователей DuoWindo6601.' 
+              : 'Today is November 1, 2026! All 15 languages, audio, fonts and "Letters" section are officially open for everyone.'}
           </p>
         </div>
 
         {/* Selected Language Alert if triggered by a specific click */}
         {currentLocked && (
-          <div className="p-3.5 rounded-2xl bg-amber-950/50 border-2 border-amber-500/50 text-amber-200 mb-4 flex items-center justify-between text-left">
+          <div className="p-3.5 rounded-2xl bg-emerald-950/50 border-2 border-emerald-500/50 text-emerald-200 mb-4 flex items-center justify-between text-left">
             <div className="flex items-center space-x-3">
               <span className="text-3xl">{currentLocked.flagEmoji}</span>
               <div>
-                <div className="text-xs font-black text-amber-300 uppercase">
+                <div className="text-xs font-black text-emerald-300 uppercase">
                   {currentLocked.nameRu} ({currentLocked.nativeName})
                 </div>
-                <div className="text-[11px] text-amber-200/90 font-medium">
-                  {currentLocked.noteRu || 'Переключение на этот язык откроется 1 ноября 2026 года'}
+                <div className="text-[11px] text-emerald-200/90 font-medium">
+                  {isRu ? '✅ Язык и раздел «Письмо» открыты с 1 ноября 2026 года!' : '✅ Language and Letters section unlocked as of Nov 1, 2026!'}
                 </div>
               </div>
             </div>
-            <span className="px-2.5 py-1 bg-amber-500 text-black font-black text-xs rounded-xl shrink-0">
-              🔒 1 нояб.
+            <span className="px-2.5 py-1 bg-emerald-500 text-black font-black text-xs rounded-xl shrink-0">
+              ✅ Открыт
             </span>
           </div>
         )}
@@ -116,36 +116,36 @@ export const LanguageLockModal: React.FC<LanguageLockModalProps> = ({
         {/* Target Countdown Banner */}
         <div className={`p-3.5 sm:p-4 rounded-2xl border mb-5 flex items-center justify-between ${
           isLightMode 
-            ? 'bg-amber-50 border-amber-300 text-amber-950' 
-            : 'bg-amber-950/40 border-amber-500/40 text-amber-200'
+            ? 'bg-emerald-50 border-emerald-300 text-emerald-950' 
+            : 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
         }`}>
           <div className="flex items-center space-x-3">
-            <span className="text-2xl">⏳</span>
+            <span className="text-2xl">🎉</span>
             <div>
-              <div className="text-[10px] font-black uppercase tracking-wider text-amber-400">
-                {isRu ? 'Обратный отсчёт до открытия:' : 'Countdown to Unlock:'}
+              <div className="text-[10px] font-black uppercase tracking-wider text-emerald-400">
+                {isRu ? 'Статус открытия:' : 'Unlock Status:'}
               </div>
               <div className="text-sm sm:text-base font-black text-white">
                 {isRu 
-                  ? `До 1 ноября 2026 г. осталось: ${daysLeft} ${daysLeft === 1 ? 'день' : daysLeft < 5 ? 'дня' : 'дней'}` 
-                  : `${daysLeft} days remaining until November 1, 2026`}
+                  ? '1 ноября 2026 г. наступило! Доступ разблокирован' 
+                  : 'November 1, 2026 arrived! Access unlocked'}
               </div>
             </div>
           </div>
-          <span className="text-xs font-black px-3 py-1.5 rounded-xl bg-amber-500 text-black shadow font-mono">
-            01.11.2026
+          <span className="text-xs font-black px-3 py-1.5 rounded-xl bg-emerald-500 text-black shadow font-mono">
+            01.11.2026 ✅
           </span>
         </div>
 
-        {/* Section 1: 🌍 Языки мира (10): 🔒 1 нояб. 2026 */}
+        {/* Section 1: 🌍 Языки мира (10) */}
         <div className="mb-5 text-left space-y-2">
           <div className="flex items-center justify-between">
-            <h4 className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+            <h4 className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
               <span>🌍</span>
-              <span>{isRu ? 'Языки мира (10):' : 'World Languages (10):'}</span>
+              <span>{isRu ? 'Языки мира (10) — Открыты с 1 ноября 2026:' : 'World Languages (10) — Open Nov 1, 2026:'}</span>
             </h4>
-            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40">
-              🔒 1 нояб. 2026
+            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+              ✅ 1 нояб. 2026
             </span>
           </div>
 
@@ -153,12 +153,12 @@ export const LanguageLockModal: React.FC<LanguageLockModalProps> = ({
             {worldLanguages.map(lang => (
               <div
                 key={lang.code}
-                className="p-2.5 rounded-2xl border border-amber-500/30 bg-amber-950/20 text-gray-300 flex flex-col justify-between space-y-1 hover:border-amber-400/60 transition-all"
+                className="p-2.5 rounded-2xl border border-emerald-500/30 bg-emerald-950/20 text-gray-300 flex flex-col justify-between space-y-1 hover:border-emerald-400/60 transition-all"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xl">{lang.flagEmoji}</span>
-                  <span className="text-[9px] font-black bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded">
-                    🔒 1 нояб.
+                  <span className="text-[9px] font-black bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded">
+                    ✅ Открыт
                   </span>
                 </div>
                 <div>
@@ -170,14 +170,14 @@ export const LanguageLockModal: React.FC<LanguageLockModalProps> = ({
           </div>
         </div>
 
-        {/* Section 2: 🏛️ Заблокированные языки мира (Раздел Письмо Будут доступ 1 ноября 2026 год) */}
+        {/* Section 2: 🏛️ Языки мира и стран СНГ */}
         <div className="mb-6 text-left space-y-2">
           <div className="flex items-center justify-between">
-            <h4 className="text-xs font-black uppercase tracking-wider text-rose-400 flex items-center gap-1.5">
+            <h4 className="text-xs font-black uppercase tracking-wider text-teal-400 flex items-center gap-1.5">
               <span>🏛️</span>
-              <span>{isRu ? 'Заблокированные языки мира (Раздел Письмо Будут доступ 1 ноября 2026 год):' : 'Locked Languages (Letters section until Nov 1, 2026):'}</span>
+              <span>{isRu ? 'Языки мира и стран СНГ (Раздел «Письмо» открыт 1 ноября 2026 год):' : 'World & CIS Languages (Letters section open Nov 1, 2026):'}</span>
             </h4>
-            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-300 border border-rose-500/40">
+            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-teal-500/20 text-teal-300 border border-teal-500/40">
               5 языков
             </span>
           </div>
@@ -186,21 +186,21 @@ export const LanguageLockModal: React.FC<LanguageLockModalProps> = ({
             {cisLanguages.map(lang => (
               <div
                 key={lang.code}
-                className="p-3 rounded-2xl border border-rose-500/30 bg-rose-950/20 text-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:border-rose-400/60 transition-all"
+                className="p-3 rounded-2xl border border-teal-500/30 bg-teal-950/20 text-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:border-teal-400/60 transition-all"
               >
                 <div className="flex items-center space-x-2.5 min-w-0">
                   <span className="text-2xl shrink-0">{lang.flagEmoji}</span>
                   <div className="min-w-0">
                     <div className="font-black text-xs sm:text-sm text-white truncate">
-                      🔒 {lang.fullLabelRu || lang.nameRu}
+                      ✨ {lang.fullLabelRu || lang.nameRu}
                     </div>
-                    <div className="text-[11px] text-rose-300/90 font-bold">
-                      {lang.noteRu || 'Раздел Письмо Будут доступ 1 ноября 2026 год'}
+                    <div className="text-[11px] text-teal-300/90 font-bold">
+                      {isRu ? '✅ Раздел «Письмо» открыт 1 ноября 2026 год' : '✅ Section "Letters" is open as of Nov 1, 2026'}
                     </div>
                   </div>
                 </div>
-                <span className="px-2.5 py-1 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-black uppercase tracking-wider shrink-0 self-start sm:self-center">
-                  🔒 1 нояб.
+                <span className="px-2.5 py-1 rounded-xl bg-teal-500/20 text-teal-300 border border-teal-500/40 text-[10px] font-black uppercase tracking-wider shrink-0 self-start sm:self-center">
+                  ✅ 1 нояб.
                 </span>
               </div>
             ))}
@@ -211,8 +211,7 @@ export const LanguageLockModal: React.FC<LanguageLockModalProps> = ({
         <div className="p-3 rounded-2xl bg-gray-800/80 border border-gray-700/80 mb-5 text-left flex items-center justify-between text-xs font-bold text-gray-300">
           <div className="flex items-center space-x-2">
             <span>✨</span>
-            <span>{isRu ? 'Сейчас доступны для переключения (8):' : 'Available now (8):'}</span>
-            <span className="text-emerald-400 font-black">RU, EN, DE, FR, ES, JA, ZH, AR</span>
+            <span>{isRu ? 'Все 23+ языка доступны для мгновенного переключения и изучения!' : 'All 23+ languages available for switching and learning!'}</span>
           </div>
           <span className="text-emerald-400 font-black">✓ Открыты</span>
         </div>
@@ -227,7 +226,7 @@ export const LanguageLockModal: React.FC<LanguageLockModalProps> = ({
                 onClose();
                 onOpenFeedback();
               }}
-              className="w-full sm:w-1/2 py-3.5 bg-gray-800 hover:bg-gray-700 text-amber-300 font-bold rounded-2xl uppercase tracking-wider text-xs border border-amber-500/40 shadow transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center space-x-1.5"
+              className="w-full sm:w-1/2 py-3.5 bg-gray-800 hover:bg-gray-700 text-emerald-300 font-bold rounded-2xl uppercase tracking-wider text-xs border border-emerald-500/40 shadow transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center space-x-1.5"
             >
               <span>💬</span>
               <span>{isRu ? 'Отзывы о языках' : 'Language Reviews'}</span>
@@ -240,10 +239,10 @@ export const LanguageLockModal: React.FC<LanguageLockModalProps> = ({
               playSound('click');
               onClose();
             }}
-            className={`w-full ${onOpenFeedback ? 'sm:w-1/2' : ''} py-3.5 bg-amber-500 hover:bg-amber-400 text-black font-black rounded-2xl uppercase tracking-wider text-xs shadow-lg transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center space-x-2`}
+            className={`w-full ${onOpenFeedback ? 'sm:w-1/2' : ''} py-3.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black rounded-2xl uppercase tracking-wider text-xs shadow-lg transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center space-x-2`}
           >
-            <span>{isRu ? 'ПОНЯТНО (ЖДЁМ 1 НОЯБРЯ 2026 Г.)' : 'UNDERSTOOD (WAITING FOR NOV 1, 2026)'}</span>
-            <span className="text-sm">🔒</span>
+            <span>{isRu ? 'ОТЛИЧНО • ИЗУЧАТЬ И ПЕРЕКЛЮЧАТЬ 🎉' : 'EXCELLENT • LEARN & SWITCH 🎉'}</span>
+            <span className="text-sm">✨</span>
           </button>
         </div>
       </div>

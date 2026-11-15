@@ -77,11 +77,10 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
   // Handler: Unit Review (+20 XP) - "Тренировка"
   const handleUnitReview = () => {
     playSound('fanfare');
-    setToast(
-      isRu
-        ? `⚡ Повторение раздела ${user.currentUnit || 1}: +20 очков!`
-        : `⚡ Unit ${user.currentUnit || 1} Review: +20 XP!`
-    );
+    const unitMsg = t('unitReviewToast') 
+      ? t('unitReviewToast').replace('{unit}', String(user.currentUnit || 1))
+      : (isRu ? `⚡ Повторение раздела ${user.currentUnit || 1}: +20 очков!` : `⚡ Unit ${user.currentUnit || 1} Review: +20 XP!`);
+    setToast(unitMsg);
     startTraining('translation', `Раздел ${user.currentUnit || 1}: закрепление материала`);
   };
 
@@ -95,11 +94,10 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
     setExplanation(null);
     setShowExplanationModal(false);
     setScreen(AppScreen.LESSON);
-    setToast(
-      isRu 
-        ? `🔄 Исправление ошибки: ${targetMistake.originalSentence}` 
-        : `🔄 Reviewing mistake: ${targetMistake.originalSentence}`
-    );
+    const toastMsg = t('mistakePracticeToast')
+      ? t('mistakePracticeToast').replace('{text}', targetMistake.originalSentence)
+      : (isRu ? `🔄 Исправление ошибки: ${targetMistake.originalSentence}` : `🔄 Reviewing mistake: ${targetMistake.originalSentence}`);
+    setToast(toastMsg);
   };
 
   const handlePracticeAllMistakes = () => {
@@ -109,9 +107,7 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
       handlePracticeSingleMistake(targetMistake);
     } else {
       setToast(
-        isRu 
-          ? '🎉 Все ошибки исправлены! Запускаем быструю тренировку.' 
-          : '🎉 All mistakes corrected! Starting quick practice.'
+        t('mistakesZero') || (isRu ? '🎉 Все ошибки исправлены! Запускаем быструю тренировку.' : '🎉 All mistakes corrected! Starting quick practice.')
       );
       startTraining('translation');
     }
@@ -138,10 +134,10 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
         <div className="flex items-center justify-between relative z-10 mb-6">
           <div>
             <h1 className="text-3xl md:text-5xl font-black text-white tracking-tight drop-shadow-md">
-              {isRu ? 'Тренировка' : 'Practice'}
+              {t('practiceTitle') || (isRu ? 'Тренировка' : 'Practice')}
             </h1>
             <p className="text-sky-100 font-extrabold text-xs md:text-sm mt-1 uppercase tracking-wider">
-              {isRu ? 'ЗАКРЕПЛЯЙТЕ ПРОЙДЕННОЕ И СТАВЬТЕ РЕКОРДЫ' : 'STRENGTHEN SKILLS & ACHIEVE DAILY GOALS'}
+              {t('practiceSubtitle') || (isRu ? 'ЗАКРЕПЛЯЙТЕ ПРОЙДЕННОЕ И СТАВЬТЕ РЕКОРДЫ' : 'STRENGTHEN SKILLS & ACHIEVE DAILY GOALS')}
             </p>
           </div>
 
@@ -158,10 +154,10 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
         <div className="bg-[#131f24] border-2 border-[#20343f] rounded-2xl md:rounded-3xl p-5 md:p-6 shadow-2xl relative z-10 space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-white font-black text-base md:text-lg">
-              {isRu ? 'Повторение раздела' : 'Unit Review'}
+              {t('unitReview') || (isRu ? 'Повторение раздела' : 'Unit Review')}
             </span>
             <span className="bg-sky-500/20 text-sky-300 border border-sky-400/40 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-              {isRu ? `Раздел ${user.currentUnit || 1}` : `Unit ${user.currentUnit || 1}`}
+              {t('unit') || (isRu ? 'Раздел' : 'Unit')} {user.currentUnit || 1}
             </span>
           </div>
 
@@ -171,7 +167,7 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
             className="w-full py-4 bg-[#1cb0f6] hover:bg-[#189ddc] active:translate-y-1 active:border-b-0 border-b-4 border-[#1482b8] text-white font-black text-sm md:text-base uppercase tracking-wider rounded-2xl shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2 group"
           >
             <span>⚡</span>
-            <span>{isRu ? 'НАЧАТЬ ТРЕНИРОВКУ: +20 ОЧКОВ' : 'START PRACTICE: +20 XP'}</span>
+            <span>{t('unitReviewAction') || (isRu ? 'НАЧАТЬ ТРЕНИРОВКУ: +20 ОЧКОВ' : 'START PRACTICE: +20 XP')}</span>
           </button>
         </div>
       </div>
@@ -181,7 +177,7 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
       {/* ============================================================== */}
       <div className="text-left space-y-3 mb-8">
         <h3 className="text-xs font-black uppercase tracking-wider text-gray-400 px-2 flex items-center justify-between">
-          <span>{isRu ? 'ОТРАБОТКА НАВЫКОВ' : 'SKILL PRACTICE'}</span>
+          <span>{t('skillsPractice') || (isRu ? 'ОТРАБОТКА НАВЫКОВ' : 'SKILL PRACTICE')}</span>
           <span className="text-[10px] text-gray-500 font-bold">{currentCourse.localName}</span>
         </h3>
 
@@ -197,7 +193,7 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
             <div className="space-y-0.5">
               <div className="flex items-center gap-2">
                 <h4 className="text-white font-black text-lg md:text-xl group-hover:text-amber-300 transition-colors">
-                  {isRu ? 'Исправление ошибок' : 'Mistakes Review'}
+                  {t('mistakesReview') || (isRu ? 'Исправление ошибок' : 'Mistakes Review')}
                 </h4>
                 {mistakeCount > 0 && (
                   <span className="bg-amber-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded-full shadow-sm">
@@ -207,8 +203,8 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
               </div>
               <p className="text-xs text-gray-400 font-bold">
                 {mistakeCount > 0 
-                  ? (isRu ? `${mistakeCount} неисправленных фраз • Нажмите для просмотра` : `${mistakeCount} mistakes to review • Tap to practice`)
-                  : (isRu ? 'Все ошибки исправлены! Отличная работа' : 'All mistakes resolved! Great work')}
+                  ? (t('mistakesCount') ? t('mistakesCount').replace('{count}', String(mistakeCount)) : (isRu ? `${mistakeCount} неисправленных фраз • Нажмите для просмотра` : `${mistakeCount} mistakes to review • Tap to practice`))
+                  : (t('mistakesZero') || (isRu ? 'Все ошибки исправлены! Отличная работа' : 'All mistakes resolved! Great work'))}
               </p>
             </div>
 
@@ -227,10 +223,10 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
           >
             <div className="space-y-0.5">
               <h4 className="text-white font-black text-lg md:text-xl group-hover:text-sky-300 transition-colors">
-                {isRu ? 'Слова' : 'Words'}
+                {t('wordsTitle') || (isRu ? 'Слова' : 'Words')}
               </h4>
               <p className="text-xs text-gray-400 font-bold">
-                {isRu ? `${learnedCount} изученных слов в словаре • Карточки и тренировка` : `${learnedCount} learned words in vocabulary • Flashcards and review`}
+                {t('wordsDesc') ? t('wordsDesc').replace('{count}', String(learnedCount)) : (isRu ? `${learnedCount} изученных слов в словаре • Карточки и тренировка` : `${learnedCount} learned words in vocabulary • Flashcards and review`)}
               </p>
             </div>
 
@@ -247,10 +243,10 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
           >
             <div className="space-y-0.5">
               <h4 className="text-white font-black text-lg md:text-xl group-hover:text-rose-300 transition-colors">
-                {isRu ? 'Аудирование' : 'Listening'}
+                {t('listeningTitle') || (isRu ? 'Аудирование' : 'Listening')}
               </h4>
               <p className="text-xs text-gray-400 font-bold">
-                {isRu ? 'Что вы услышали? Тренируйте восприятие речи на слух' : 'What did you hear? Practice listening comprehension'}
+                {t('listeningDesc') || (isRu ? 'Что вы услышали? Тренируйте восприятие речи на слух' : 'What did you hear? Practice listening comprehension')}
               </p>
             </div>
 
@@ -267,10 +263,10 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
           >
             <div className="space-y-0.5">
               <h4 className="text-white font-black text-lg md:text-xl group-hover:text-emerald-300 transition-colors">
-                {isRu ? 'Речь' : 'Speaking'}
+                {t('speakingTitle') || (isRu ? 'Речь' : 'Speaking')}
               </h4>
               <p className="text-xs text-gray-400 font-bold">
-                {isRu ? 'Говорите за DuoWindo6601 • Отрабатывайте чистое произношение' : 'Speak for DuoWindo6601 • Master pure pronunciation'}
+                {t('speakingDesc') || (isRu ? 'Говорите за DuoWindo6601 • Отрабатывайте чистое произношение' : 'Speak for DuoWindo6601 • Master pure pronunciation')}
               </p>
             </div>
 
@@ -291,16 +287,16 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
             <div className="space-y-0.5">
               <div className="flex items-center gap-2">
                 <h4 className="text-white font-black text-lg md:text-xl group-hover:text-purple-300 transition-colors">
-                  {isRu ? 'Выучить стихотворение наизусть' : 'Memorize Poem by Heart'}
+                  {t('poemTitle') || (isRu ? 'Выучить стихотворение наизусть' : 'Memorize Poem by Heart')}
                 </h4>
                 <span className="bg-purple-500 text-white font-black text-[10px] px-2.5 py-0.5 rounded-full shadow-sm">
                   {(user.learnedPoems || []).length > 0 ? `${user.learnedPoems?.length} выучено` : '+35 XP'}
                 </span>
               </div>
               <p className="text-xs text-gray-400 font-bold">
-                {isRu 
+                {t('poemDesc') || (isRu 
                   ? 'Поэтический тренажёр • Метод исчезающих слов, ритм, озвучка и проверка наизусть' 
-                  : 'Poetry trainer • Vanishing words, rhythm, audio reciting and memory test'}
+                  : 'Poetry trainer • Vanishing words, rhythm, audio reciting and memory test')}
               </p>
             </div>
 
@@ -317,8 +313,8 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
       {/* ============================================================== */}
       <div className="text-left space-y-3 mb-10">
         <h3 className="text-xs font-black uppercase tracking-wider text-gray-400 px-2 flex items-center justify-between">
-          <span>{isRu ? 'КОЛЛЕКЦИИ ИСТОРИЙ' : 'STORY COLLECTIONS'}</span>
-          <span className="text-[10px] text-purple-400 font-black">+25 XP ЗА ИСТОРИЮ</span>
+          <span>{t('storiesTitle') || (isRu ? 'КОЛЛЕКЦИИ ИСТОРИЙ' : 'STORY COLLECTIONS')}</span>
+          <span className="text-[10px] text-purple-400 font-black">+25 XP ZA STORY</span>
         </h3>
 
         <div
@@ -331,13 +327,13 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <h4 className="text-white font-black text-lg md:text-xl group-hover:text-purple-300 transition-colors">
-                {isRu ? 'Истории (Stories)' : 'Stories'}
+                {t('storiesTitle') || (isRu ? 'Истории (Stories)' : 'Stories')}
               </h4>
             </div>
             <p className="text-xs text-gray-300 font-bold">
-              {isRu 
+              {t('storiesDesc') || (isRu 
                 ? 'Интерактивные сюжетные диалоги с озвучкой реплик и вопросами на понимание' 
-                : 'Interactive story dialogues with voice playback and comprehension questions'}
+                : 'Interactive story dialogues with voice playback and comprehension questions')}
             </p>
           </div>
 
@@ -356,10 +352,10 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
           <div>
             <h3 className="text-sm font-black uppercase tracking-wider text-white flex items-center gap-2">
               <span>🚀</span>
-              <span>{isRu ? 'РЕЖИМЫ DUOWINDO6601' : 'DUOWINDO6601 MODES'}</span>
+              <span>{t('duowindoModes') || (isRu ? 'РЕЖИМЫ DUOWINDO6601' : 'DUOWINDO6601 MODES')}</span>
             </h3>
             <p className="text-[11px] text-gray-400 font-bold">
-              {isRu ? 'Все специальные AI и интерактивные форматы обучения сохранены' : 'All special AI & interactive learning formats preserved intact'}
+              {t('duowindoModesDesc') || (isRu ? 'Все специальные AI и интерактивные форматы обучения сохранены' : 'All special AI & interactive learning formats preserved intact')}
             </p>
           </div>
           <span className="bg-sky-500/20 text-sky-400 border border-sky-400/40 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">
@@ -402,7 +398,7 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-xl md:text-2xl font-black text-white">
-                        {isRu ? 'Конвертер (0-99) и Справочник арабских цифр' : 'Arabic Numerals Converter (0-99) & Handbook'}
+                        {t('arabicHandbook')}
                       </h3>
                       {isArabicCourse ? (
                         <span className="bg-emerald-500 text-slate-950 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
@@ -411,18 +407,16 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
                       ) : (
                         <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
                           <span>🔒</span>
-                          <span>Доступ только в Курсе Арабской</span>
+                          <span>{t('lockedBtn')}</span>
                         </span>
                       )}
                     </div>
                     <p className="text-xs md:text-sm text-emerald-200/90 font-bold leading-relaxed">
-                      {isRu 
-                        ? 'Западные цифры слева (0-99) и восточно-арабские справа (٠-٩٩) • Интерактивный ползунок, озвучка и поиск' 
-                        : 'Western digits on left (0-99) & Eastern Arabic on right (٠-٩٩) • Interactive slider, speech & search'}
+                      {t('arabicHandbookDesc')}
                     </p>
                     <div className="flex items-center gap-2 pt-0.5">
                       <span className="text-[10px] font-black text-amber-300 bg-amber-950/80 border border-amber-500/40 px-2 py-0.5 rounded-md">
-                        ✍️ Автор-переводчик: DuoWindo6601
+                        ✍️ DuoWindo6601
                       </span>
                     </div>
                   </div>
@@ -434,12 +428,12 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
                   </span>
                   {isArabicCourse ? (
                     <span className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow-md">
-                      {isRu ? 'Открыть' : 'Open'}
+                      {t('openBtn')}
                     </span>
                   ) : (
                     <span className="px-3.5 py-2 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/40 font-black text-xs uppercase tracking-wider shadow-md flex items-center gap-1">
                       <span>🔒</span>
-                      <span>{isRu ? 'Заблокировано' : 'Locked'}</span>
+                      <span>{t('lockedBtn')}</span>
                     </span>
                   )}
                 </div>
@@ -566,11 +560,11 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-2xl md:text-3xl font-bold text-white">{t('translator')}</h3>
                   <span className="bg-emerald-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
-                    {isRu ? 'СЛОВАРИ БЕЗ ИНТЕРНЕТА 💾' : 'OFFLINE DICTIONARIES 💾'}
+                    {t('offlineDictTitle')}
                   </span>
                 </div>
                 <p className="opacity-90 font-bold uppercase tracking-widest text-xs text-sky-200 mt-0.5">
-                  {isRu ? 'Переключение языков стран ⇄ и офлайн-пакеты' : 'Country language switching ⇄ & offline packs'}
+                  {t('offlineDictDesc')}
                 </p>
               </div>
             </div>
@@ -657,16 +651,14 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
               <div>
                 <div className="flex items-center space-x-2 mb-1">
                   <h3 className="text-2xl md:text-3xl font-black text-white">
-                    {isRu ? 'Стихи наизусть' : 'Poetry by Heart'}
+                    {t('poemTitle')}
                   </h3>
                   <span className="bg-purple-950 text-purple-300 text-[10px] px-2.5 py-0.5 rounded-md font-black border border-purple-400 uppercase">
                     NEW DUOWINDO6601
                   </span>
                 </div>
                 <p className="opacity-90 font-bold text-xs md:text-sm text-purple-200">
-                  {isRu 
-                    ? 'Учите стихотворения наизусть: метод исчезающих слов, ритм, аудио и проверка рецитации (+35 XP)' 
-                    : 'Memorize classic poems by heart: vanishing words, audio rhythm and recitation test (+35 XP)'}
+                  {t('poemDesc')}
                 </p>
               </div>
             </div>

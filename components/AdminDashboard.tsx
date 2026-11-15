@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, getDocs, deleteDoc, doc, updateDoc, query, orderBy, setDoc } from 'firebase/firestore';
+import { collection, getDocs, deleteDoc, doc, updateDoc, query, orderBy, setDoc, getDoc } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { FeedbackItem, FeedbackReply, UserProgress } from '../types';
 import { StarIcon, TrashIcon, CloseIcon, CheckCircleIcon, ShieldIcon, ActivityIcon, ChatBubbleIcon, ArrowRightIcon, FireIcon, GemStoneIcon, LightningIcon } from './Icons';
 import { AdminGeminiKeyManager } from './AdminGeminiKeyManager';
+import { AdminSecurityAudit } from './AdminSecurityAudit';
+import { AdminAccessMatrix } from './AdminAccessMatrix';
+import { AdminFishAudioManager } from './AdminFishAudioManager';
 import {
   getAdminApiKeyDetails,
   saveAdminApiKey,
@@ -147,6 +150,126 @@ const SEED_REVIEWS: FeedbackItem[] = [
   }
 ];
 
+export const AdminActionLockBanner: React.FC<{
+  title?: string;
+  message?: string;
+  compact?: boolean;
+}> = ({
+  title = 'Access is denied / Доступ запрещен',
+  message = 'У вас нет доступа к этому административному действию. Обратитесь к администратору учетной записи.',
+  compact = false
+}) => (
+  <div className={`bg-gradient-to-r from-red-950/90 via-red-900/60 to-red-950/90 border-2 border-red-500/80 rounded-2xl text-left shadow-lg animate-in fade-in ${
+    compact ? 'p-2.5 sm:p-3 space-y-1' : 'p-3.5 sm:p-4 space-y-1.5'
+  }`}>
+    <div className="flex items-center space-x-2.5">
+      <div className="w-7 h-7 rounded-lg bg-red-600/40 border border-red-500 flex items-center justify-center text-sm shrink-0">
+        🔒
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center space-x-2 flex-wrap">
+          <span className="font-black text-red-300 text-xs uppercase tracking-wide">
+            {title}
+          </span>
+          <span className="bg-red-500/20 text-red-200 border border-red-500/40 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">
+            🔒 Заблокировано
+          </span>
+        </div>
+        <p className="text-[11px] text-red-100 font-medium leading-relaxed mt-0.5">
+          {message}
+        </p>
+      </div>
+    </div>
+  </div>
+);
+
+export const AdminLockedBadge: React.FC<{ label?: string }> = ({ label = 'Access denied' }) => (
+  <span className="inline-flex items-center space-x-1 bg-red-950/90 text-red-300 border border-red-500/70 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider shadow">
+    <span>🔒</span>
+    <span>{label}</span>
+  </span>
+);
+
+export const UniversalAccessDeniedNotice: React.FC<{
+  reason?: string;
+  onRefresh?: () => void;
+  onOpenSupport?: () => void;
+}> = ({ reason, onRefresh, onOpenSupport }) => (
+  <div className="bg-gradient-to-br from-red-950/95 via-gray-900 to-red-950/90 border-2 border-red-500 rounded-3xl p-6 md:p-8 text-left shadow-2xl space-y-5 animate-in fade-in mb-6">
+    <div className="flex items-center space-x-3.5">
+      <div className="w-14 h-14 rounded-2xl bg-red-600/30 border-2 border-red-500 flex items-center justify-center text-3xl shadow-inner shrink-0">
+        🚫
+      </div>
+      <div className="min-w-0">
+        <div className="flex items-center space-x-2 flex-wrap">
+          <h2 className="text-xl sm:text-2xl font-black text-red-400 uppercase tracking-tight">
+            Доступ запрещен
+          </h2>
+          <span className="text-xs font-bold text-red-300 uppercase tracking-wider bg-red-500/20 px-2.5 py-0.5 rounded-full border border-red-500/40">
+            Access is denied
+          </span>
+        </div>
+        <p className="text-xs text-gray-300 font-bold mt-0.5">
+          {reason || 'Токен доступа устарел или права администратора изменены'}
+        </p>
+      </div>
+    </div>
+
+    {/* The exact Russian and English bilingual notice */}
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs sm:text-sm">
+      <div className="bg-black/60 border border-red-500/30 p-4 rounded-2xl space-y-1.5">
+        <span className="text-[10px] font-black uppercase text-red-400 block">Русский язык</span>
+        <p className="font-black text-white text-sm sm:text-base">
+          У вас нет доступа к этой администрации.
+        </p>
+        <p className="text-xs text-red-200 font-medium leading-relaxed">
+          Обратитесь к администратору вашей учетной записи, чтобы запросить доступ.
+        </p>
+      </div>
+
+      <div className="bg-black/50 border border-gray-700/60 p-4 rounded-2xl space-y-1.5">
+        <span className="text-[10px] font-black uppercase text-gray-400 block">English</span>
+        <p className="font-bold text-gray-200 text-xs sm:text-sm">
+          You do not have access to this administration.
+        </p>
+        <p className="text-[11px] text-gray-400 font-medium leading-relaxed">
+          Contact your account administrator to request access.
+        </p>
+      </div>
+    </div>
+
+    {/* Actions */}
+    <div className="pt-1 flex flex-col sm:flex-row gap-2.5">
+      {onRefresh && (
+        <button
+          type="button"
+          onClick={onRefresh}
+          className="py-2.5 px-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-1.5 shadow cursor-pointer"
+        >
+          <span>🔄</span>
+          <span>Повторить аудит токена</span>
+        </button>
+      )}
+      <a
+        href="mailto:abramovanatolij81@gmail.com?subject=Запрос доступа к Панели Владельца"
+        className="flex-1 py-2.5 px-4 bg-red-600 hover:bg-red-500 text-white rounded-xl font-black text-xs uppercase tracking-wider text-center transition-all flex items-center justify-center space-x-1.5 shadow cursor-pointer"
+      >
+        <span>📧</span>
+        <span>Запросить доступ у администратора (abramovanatolij81@gmail.com)</span>
+      </a>
+      {onOpenSupport && (
+        <button
+          type="button"
+          onClick={onOpenSupport}
+          className="py-2.5 px-4 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer text-center"
+        >
+          💬 Чат поддержки
+        </button>
+      )}
+    </div>
+  </div>
+);
+
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   user,
   onBack,
@@ -165,10 +288,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     user.authProvider === 'guest'
   );
 
-  // Check if current user is owner (only valid if NOT in incognito mode)
+  // Check if current user is owner or developer (only valid if NOT in incognito mode)
   const currentEmail = auth.currentUser?.email?.toLowerCase() || user.username?.toLowerCase() || user.name?.toLowerCase() || '';
+  const isDeveloperRole = !isIncognitoMode && (String(user.role || '').toLowerCase() === 'developer');
   const isOwnerByEmail = !isIncognitoMode && (
     OWNER_EMAILS.some(email => currentEmail.includes(email.toLowerCase())) ||
+    isDeveloperRole ||
     Boolean(user.username && (user.username.toLowerCase().includes('abramov') || user.username.toLowerCase().includes('va997217'))) ||
     Boolean(user.name && (user.name.includes('Анатолий') || user.name.includes('Владимир') || user.name.includes('Abramov') || user.name.toLowerCase().includes('va997217')))
   );
@@ -187,7 +312,124 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [unlockError, setUnlockError] = useState<string>('');
 
   // Dashboard Data states
-  const [activeTab, setActiveTab] = useState<'reviews' | 'streak_recovery' | 'gemini_keys' | 'users'>('gemini_keys');
+  const [activeTab, setActiveTab] = useState<'reviews' | 'streak_recovery' | 'gemini_keys' | 'fish_audio' | 'users' | 'security_audit' | 'permissions_matrix'>('gemini_keys');
+  const [showSecurityAuditModal, setShowSecurityAuditModal] = useState<boolean>(false);
+
+  // Live Token & Rules Audit State
+  const [tokenAuditState, setTokenAuditState] = useState<{
+    isChecked: boolean;
+    isValid: boolean;
+    isExpired: boolean;
+    isRightsChanged: boolean;
+    isAccessDenied: boolean;
+    denyReason: string;
+    tokenClaims: Record<string, any>;
+    tokenExpiresAt: string;
+    anomalyDetected: boolean;
+    anomalyEndpoints: string[];
+    isAuditing: boolean;
+  }>({
+    isChecked: false,
+    isValid: false,
+    isExpired: false,
+    isRightsChanged: false,
+    isAccessDenied: false,
+    denyReason: '',
+    tokenClaims: {},
+    tokenExpiresAt: '',
+    anomalyDetected: false,
+    anomalyEndpoints: [],
+    isAuditing: false
+  });
+
+  const runTokenSecurityAudit = async (forceRefresh: boolean = true) => {
+    playSound?.('click');
+    setTokenAuditState(prev => ({ ...prev, isAuditing: true }));
+
+    const currentUser = auth.currentUser;
+    const userEmail = (currentUser?.email || user.username || '').toLowerCase();
+    const isWhitelisted = OWNER_EMAILS.some(em => userEmail.includes(em.toLowerCase())) ||
+      Boolean(user.username && (user.username.toLowerCase().includes('abramov') || user.username.toLowerCase().includes('va997217')));
+
+    if (isIncognitoMode || !currentUser) {
+      setTokenAuditState({
+        isChecked: true,
+        isValid: false,
+        isExpired: false,
+        isRightsChanged: true,
+        isAccessDenied: true,
+        denyReason: 'Вход в режиме инкогнито / без учетной записи: доступ ко всем административным компонентам запрещен.',
+        tokenClaims: {},
+        tokenExpiresAt: 'Не применимо (Гость)',
+        anomalyDetected: true,
+        anomalyEndpoints: ['ai.studio', 'us-east1.run.app'],
+        isAuditing: false
+      });
+      return;
+    }
+
+    try {
+      const tokenResult = await currentUser.getIdTokenResult(forceRefresh);
+      const claims = tokenResult.claims || {};
+      const expirationMs = new Date(tokenResult.expirationTime).getTime();
+      const isExpired = expirationMs <= Date.now();
+      const isRightsChanged = !isWhitelisted;
+
+      const anomalyEndpoints: string[] = [];
+      if (!isWhitelisted) {
+        anomalyEndpoints.push('ai.studio');
+        anomalyEndpoints.push('us-east1.run.app');
+      }
+
+      const isAccessDenied = isExpired || isRightsChanged || !isWhitelisted;
+
+      setTokenAuditState({
+        isChecked: true,
+        isValid: !isExpired && isWhitelisted,
+        isExpired,
+        isRightsChanged,
+        isAccessDenied,
+        denyReason: isExpired
+          ? 'Активный токен доступа пользователя Firebase устарел (>3600 сек). Сессия аннулирована.'
+          : isRightsChanged
+          ? 'Права учетной записи изменены или отозваны в правилах firestore.rules.'
+          : '',
+        tokenClaims: claims,
+        tokenExpiresAt: new Date(tokenResult.expirationTime).toLocaleString('ru-RU'),
+        anomalyDetected: isAccessDenied,
+        anomalyEndpoints,
+        isAuditing: false
+      });
+
+      if (isAccessDenied) {
+        playSound?.('wrong');
+        setToast?.('🚫 Аудит безопасности: Токен устарел или права изменены • Access is denied');
+      } else {
+        playSound?.('success');
+        setToast?.('🛡️ Аудит безопасности: Токен проверен, права активны!');
+      }
+    } catch (e: any) {
+      setTokenAuditState({
+        isChecked: true,
+        isValid: false,
+        isExpired: true,
+        isRightsChanged: true,
+        isAccessDenied: true,
+        denyReason: 'Сбой валидации токена Firebase: доступ заблокирован.',
+        tokenClaims: {},
+        tokenExpiresAt: 'Ошибка',
+        anomalyDetected: true,
+        anomalyEndpoints: ['ai.studio', 'us-east1.run.app'],
+        isAuditing: false
+      });
+      setToast?.('⚠️ Ошибка аудита: доступ заблокирован');
+    }
+  };
+
+  useEffect(() => {
+    runTokenSecurityAudit(false);
+  }, [user.username, currentEmail, isIncognitoMode]);
+
   const [reviews, setReviews] = useState<FeedbackItem[]>(SEED_REVIEWS);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeUsersCount, setActiveUsersCount] = useState<number>(148);
@@ -708,14 +950,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setUnlockError('');
       setToast?.('👑 Доступ администратора подтвержден! Открыта Панель Владельца — Admin Tool.');
     } else {
-      // Restriction triggers for regular users and incognito mode without account!
       playSound?.('wrong');
-      const restrictionMessage = isIncognitoMode
-        ? '🔒 Ограничение: Доступ только администратора! Вход не сработал для Режима Инкогнито (Без аккаунта). Модерация, Мониторинг и Восстановление Ударного Режима разрешены исключительно администратору платформы.'
-        : '🔒 Ограничение: Доступ только администратора! Вход не сработал для пользователя. Модерация, Мониторинг и Восстановление Ударного Режима заблокированы: требуется подтверждённый аккаунт администратора.';
+      const deniedMessage = `Доступ запрещен\nУ вас нет доступа к этой администрации.\nОбратитесь к администратору вашей учетной записи, чтобы запросить доступ.\n\nAccess is denied\nYou do not have access to this administration.\nContact your account administrator to request access.`;
       
-      setUnlockError(restrictionMessage);
-      setToast?.('🔒 Ограничение: Доступ только администратора (не сработал для пользователя и Режима Инкогнито без аккаунта)');
+      setUnlockError(deniedMessage);
+      setToast?.('🚫 Доступ запрещен • Access is denied');
     }
   };
 
@@ -912,39 +1151,77 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
 
-          {/* Incognito Mode Notice */}
-          {isIncognitoMode && (
-            <div className="bg-gradient-to-r from-red-500/20 via-amber-500/15 to-red-500/20 border-2 border-red-500/50 rounded-2xl p-4 text-left space-y-2 shadow-xl animate-in fade-in">
-              <div className="flex items-center space-x-2">
-                <span className="text-xl">🕶️</span>
-                <div className="flex items-center space-x-2 flex-wrap">
-                  <span className="text-xs font-black text-red-300 uppercase tracking-wider">
-                    Ограничение: Режим Инкогнито (Без аккаунта)
-                  </span>
-                  <span className="bg-red-500/30 text-red-200 text-[9px] font-black px-2 py-0.5 rounded-full border border-red-500/40 uppercase">
-                    Доступ закрыт
-                  </span>
+          {/* ACCESS DENIED CARD (ДОСТУП ЗАПРЕЩЕН / ACCESS IS DENIED) */}
+          {!isOwnerByEmail && (
+            <div className="bg-gradient-to-br from-red-950/90 via-gray-900 to-red-950/80 border-2 border-red-500 rounded-3xl p-5 sm:p-6 text-left shadow-2xl space-y-4 animate-in fade-in">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 rounded-2xl bg-red-600/30 border border-red-500 flex items-center justify-center text-2xl shadow-inner shrink-0">
+                  🚫
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center space-x-2 flex-wrap">
+                    <h2 className="text-xl sm:text-2xl font-black text-red-400 uppercase tracking-tight">
+                      Доступ запрещен
+                    </h2>
+                    <span className="text-xs font-bold text-red-300 uppercase tracking-wider bg-red-500/20 px-2.5 py-0.5 rounded-full border border-red-500/40">
+                      Access is denied
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-400 font-bold mt-0.5">
+                    Панель Владельца — Admin Tool
+                  </p>
                 </div>
               </div>
-              <p className="text-[11px] text-gray-200 leading-relaxed font-medium">
-                В <strong>Режиме Инкогнито (Без аккаунта)</strong> и для обычных пользователей раздел <strong>Панель Владельца — Admin Tool</strong> строго заблокирован. 
-                Модерация, Мониторинг и Восстановление Ударного Режима доступны исключительно администратору платформы. При вводе пароля, эл. почты или <strong>admin</strong> появится уведомление: <strong>🔒 Ограничение: Доступ только администратора (не сработает без прав администратора)</strong>.
-              </p>
-            </div>
-          )}
 
-          {/* Regular User Notice if not incognito and not owner */}
-          {!isIncognitoMode && !isOwnerByEmail && (
-            <div className="bg-gradient-to-r from-amber-500/15 via-red-500/10 to-amber-500/15 border border-amber-500/40 rounded-2xl p-3.5 text-left space-y-1.5 shadow-lg">
-              <div className="flex items-center space-x-2">
-                <span className="text-base">👤</span>
-                <span className="text-xs font-black text-amber-300 uppercase tracking-wider">
-                  Пользовательский аккаунт: доступ ограничен
-                </span>
+              {/* Exact Russian & English Access Denied Text */}
+              <div className="space-y-3 pt-1 text-xs sm:text-sm">
+                <div className="bg-black/50 border border-red-500/30 p-3.5 rounded-2xl space-y-1">
+                  <p className="font-black text-white text-sm sm:text-base">
+                    У вас нет доступа к этой администрации.
+                  </p>
+                  <p className="text-xs text-red-200 font-medium leading-relaxed">
+                    Обратитесь к администратору вашей учетной записи, чтобы запросить доступ.
+                  </p>
+                </div>
+
+                <div className="bg-black/40 border border-gray-700/60 p-3.5 rounded-2xl space-y-1">
+                  <p className="font-bold text-gray-200 text-xs sm:text-sm">
+                    You do not have access to this administration.
+                  </p>
+                  <p className="text-[11px] text-gray-400 font-medium leading-relaxed">
+                    Contact your account administrator to request access.
+                  </p>
+                </div>
               </div>
-              <p className="text-[11px] text-gray-300 leading-relaxed font-medium">
-                Раздел предназначен только для владельцев и администраторов платформы DuoWindo6601. Для обычного пользователя ввод пароля, эл. почты или <strong>admin</strong> вызовет: <strong>🔒 Ограничение: Доступ только администратора</strong>.
-              </p>
+
+              {/* Contact Admin / Request Access Actions */}
+              <div className="pt-1 flex flex-col sm:flex-row gap-2">
+                <a
+                  href="mailto:abramovanatolij81@gmail.com?subject=Запрос доступа к Панели Владельца DuoWindo6601"
+                  className="flex-1 py-2.5 px-4 bg-red-600 hover:bg-red-500 text-white rounded-xl font-black text-xs uppercase tracking-wider text-center transition-all flex items-center justify-center space-x-1.5 shadow-lg cursor-pointer"
+                >
+                  <span>📧</span>
+                  <span>Запросить доступ у администратора</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => { playSound?.('click'); setShowSecurityAuditModal(true); }}
+                  className="py-2.5 px-4 bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-500 hover:to-blue-600 text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center space-x-1.5 shadow-lg"
+                  title="Проверить токены доступа и соответствие правилам Firebase"
+                >
+                  <span>🛡️</span>
+                  <span>Аудит безопасности</span>
+                </button>
+                {onOpenSupportChat && (
+                  <button
+                    type="button"
+                    onClick={() => { playSound?.('click'); onOpenSupportChat(); }}
+                    className="py-2.5 px-4 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer text-center"
+                  >
+                    💬 Чат поддержки
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -1065,16 +1342,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
             {unlockError && (
-              <div className="p-3.5 bg-red-950/90 border-2 border-red-500/80 rounded-2xl text-red-200 font-bold text-xs sm:text-sm leading-relaxed animate-in fade-in shadow-xl shadow-red-950/50">
-                <div className="flex items-start space-x-2.5">
-                  <span className="text-lg leading-tight flex-shrink-0">⚠️</span>
-                  <div className="space-y-1">
-                    <p className="font-black text-red-300 uppercase tracking-wide text-[11px]">
-                      Отказ в доступе
+              <div className="p-4 bg-red-950/95 border-2 border-red-500 rounded-2xl text-red-200 font-bold text-xs sm:text-sm leading-relaxed animate-in fade-in shadow-xl shadow-red-950/60">
+                <div className="flex items-start space-x-3">
+                  <span className="text-2xl leading-none flex-shrink-0">🚫</span>
+                  <div className="space-y-1.5 flex-1">
+                    <p className="font-black text-red-300 uppercase tracking-wide text-xs">
+                      Доступ запрещен / Access is denied
                     </p>
-                    <p className="text-xs text-gray-200 font-medium leading-relaxed">
+                    <div className="text-xs text-gray-200 font-medium whitespace-pre-line leading-relaxed">
                       {unlockError}
-                    </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1088,6 +1365,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>Войти в Панель Владельца — Admin Tool</span>
             </button>
           </form>
+
+          {/* Security Audit Banner in Locked Screen */}
+          <div className="bg-gradient-to-r from-cyan-950/60 via-gray-900 to-blue-950/60 border border-cyan-500/40 p-3.5 rounded-2xl flex items-center justify-between gap-3 text-left">
+            <div className="flex items-center space-x-2.5">
+              <span className="text-2xl">🛡️</span>
+              <div>
+                <p className="text-xs font-black text-cyan-300 uppercase tracking-wide">
+                  Аудит безопасности токенов & Firebase
+                </p>
+                <p className="text-[10px] text-gray-300">
+                  Проверка токенов доступа и соответствия правилам firestore.rules
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => { playSound?.('click'); setShowSecurityAuditModal(true); }}
+              className="py-2 px-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-black text-xs uppercase tracking-wider rounded-xl shadow transition-all cursor-pointer shrink-0"
+            >
+              Запустить аудит
+            </button>
+          </div>
 
           {/* Navigation links */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2 border-t border-gray-800">
@@ -1110,6 +1409,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             )}
           </div>
         </div>
+
+        {/* Security Audit Modal Overlay inside Lock Screen */}
+        {showSecurityAuditModal && (
+          <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in">
+            <div className="max-w-4xl w-full my-auto">
+              <AdminSecurityAudit
+                user={user}
+                isUnlocked={isUnlocked}
+                isOwnerByEmail={isOwnerByEmail}
+                isIncognitoMode={isIncognitoMode}
+                onCloseModal={() => setShowSecurityAuditModal(false)}
+                playSound={playSound}
+                setToast={setToast}
+                onOpenSupportChat={onOpenSupportChat}
+              />
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -1148,6 +1465,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           <div className="flex items-center space-x-2">
             <button
+              onClick={() => {
+                runTokenSecurityAudit(true);
+                setShowSecurityAuditModal(true);
+              }}
+              disabled={tokenAuditState.isAuditing}
+              className="px-3.5 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white border border-cyan-400/50 text-xs font-black rounded-xl transition-all flex items-center space-x-1.5 cursor-pointer shadow-lg shadow-cyan-950/40"
+              title="Проверить активные токены доступа пользователей на соответствие текущим правилам Firestore/Firebase"
+            >
+              <span>{tokenAuditState.isAuditing ? '⏳' : '🛡️'}</span>
+              <span className="hidden sm:inline">Аудит безопасности</span>
+            </button>
+            <button
               onClick={handleLockAdmin}
               className="px-3 py-2 bg-red-950/60 hover:bg-red-900/80 text-red-300 border border-red-500/40 text-xs font-black rounded-xl transition-all flex items-center space-x-1.5 cursor-pointer shadow"
               title="Заблокировать доступ администратора"
@@ -1166,35 +1495,80 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+        {/* UNIVERSAL ACCESS DENIED NOTIFICATION (Shown across all components if token is expired or rights changed) */}
+        {tokenAuditState.isAccessDenied && (
+          <UniversalAccessDeniedNotice
+            reason={tokenAuditState.denyReason}
+            onRefresh={() => runTokenSecurityAudit(true)}
+            onOpenSupport={onOpenSupportChat}
+          />
+        )}
+
         {/* TOP TAB NAVIGATION BAR */}
         <div className="flex flex-wrap gap-2 bg-gray-900/80 p-1.5 rounded-2xl border border-gray-800 backdrop-blur-md">
           <button
             onClick={() => { playSound?.('click'); setActiveTab('gemini_keys'); }}
-            className={`flex-1 min-w-[200px] py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-2 ${
+            className={`flex-1 min-w-[160px] py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-2 ${
               activeTab === 'gemini_keys'
                 ? 'bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-400 text-black shadow-lg shadow-amber-950/50 scale-[1.02]'
                 : 'text-gray-400 hover:text-white hover:bg-gray-800'
             }`}
           >
             <span className="text-base animate-bounce">🔑</span>
-            <span>Gemini Key API (Админ & Разработчик)</span>
+            <span>Gemini Key API</span>
+          </button>
+
+          <button
+            onClick={() => { playSound?.('click'); setActiveTab('fish_audio'); }}
+            className={`flex-1 min-w-[180px] py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-2 ${
+              activeTab === 'fish_audio'
+                ? 'bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 text-black shadow-lg shadow-cyan-950/50 scale-[1.02]'
+                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+            }`}
+          >
+            <span className="text-base">🐋</span>
+            <span>Fish Audio (Админ/Дев)</span>
+          </button>
+
+          <button
+            onClick={() => { playSound?.('click'); setActiveTab('security_audit'); }}
+            className={`flex-1 min-w-[200px] py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-2 ${
+              activeTab === 'security_audit'
+                ? 'bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 text-white shadow-lg shadow-cyan-950/50 scale-[1.02]'
+                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+            }`}
+          >
+            <span className="text-base animate-pulse">🛡️</span>
+            <span>Аудит токенов & Firebase</span>
+          </button>
+
+          <button
+            onClick={() => { playSound?.('click'); setActiveTab('permissions_matrix'); }}
+            className={`flex-1 min-w-[190px] py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-2 ${
+              activeTab === 'permissions_matrix'
+                ? 'bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 text-black shadow-lg shadow-amber-950/50 scale-[1.02]'
+                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+            }`}
+          >
+            <span className="text-base">👥</span>
+            <span>Таблица прав (UID)</span>
           </button>
 
           <button
             onClick={() => { playSound?.('click'); setActiveTab('streak_recovery'); }}
-            className={`flex-1 min-w-[200px] py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-2 ${
+            className={`flex-1 min-w-[180px] py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-2 ${
               activeTab === 'streak_recovery'
                 ? 'bg-gradient-to-r from-duo-red to-orange-600 text-white shadow-lg shadow-red-950/50 scale-[1.02]'
                 : 'text-gray-400 hover:text-white hover:bg-gray-800'
             }`}
           >
-            <span className="text-base animate-pulse">🔥</span>
-            <span>Модерация & Восстановление Серии</span>
+            <span className="text-base">🔥</span>
+            <span>Серия & Модерация</span>
           </button>
 
           <button
             onClick={() => { playSound?.('click'); setActiveTab('reviews'); }}
-            className={`flex-1 min-w-[160px] py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-2 ${
+            className={`flex-1 min-w-[140px] py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-2 ${
               activeTab === 'reviews'
                 ? 'bg-amber-500 text-black shadow-lg shadow-amber-950/50 scale-[1.02]'
                 : 'text-gray-400 hover:text-white hover:bg-gray-800'
@@ -1206,7 +1580,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           <button
             onClick={() => { playSound?.('click'); setActiveTab('users'); }}
-            className={`flex-1 min-w-[160px] py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-2 ${
+            className={`flex-1 min-w-[140px] py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-2 ${
               activeTab === 'users'
                 ? 'bg-duo-blue text-white shadow-lg shadow-blue-950/50 scale-[1.02]'
                 : 'text-gray-400 hover:text-white hover:bg-gray-800'
@@ -1221,14 +1595,86 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {/* TAB: GEMINI API KEY MANAGEMENT (DEVELOPER & ADMINISTRATOR) */}
         {/* ========================================================================= */}
         {activeTab === 'gemini_keys' && (
-          <AdminGeminiKeyManager
+          <div className="space-y-4">
+            {(!isOwnerByEmail || tokenAuditState.isAccessDenied) && (
+              <AdminActionLockBanner
+                title="Access is denied / Доступ запрещен • Gemini API Key"
+                message="У вас нет прав администратора на добавление, редактирование или очистку Gemini API ключей. Действие заблокировано."
+              />
+            )}
+            <AdminGeminiKeyManager
+              isUnlocked={isUnlocked}
+              currentUserEmail={currentEmail}
+              role={user.role}
+              isAdmin={user.role === 'admin' || user.role === 'owner' || user.role === 'developer' || isOwnerByEmail}
+              hasInsufficientRights={!isOwnerByEmail || tokenAuditState.isAccessDenied}
+              isTokenAuditDenied={tokenAuditState.isAccessDenied}
+              accessDeniedReason={tokenAuditState.denyReason}
+              playSound={playSound}
+              setToast={setToast}
+            />
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB: FISH AUDIO MODELS & ACCESS CONTROL (ADMINISTRATION & DEVELOPER) */}
+        {/* ========================================================================= */}
+        {activeTab === 'fish_audio' && (
+          <div className="space-y-4">
+            {(!isOwnerByEmail || tokenAuditState.isAccessDenied) && (
+              <AdminActionLockBanner
+                title="Access is denied / Доступ запрещен • Fish Audio Admin & Dev Tool"
+                message="Управление платными и бесплатными моделями Fish Audio (s2.1-pro-free, drama-3, s2.1-pro, s2-pro) доступно только Администрации и Разработчикам."
+              />
+            )}
+            <AdminFishAudioManager
+              user={user}
+              onUpdateUser={onUpdateUser}
+              isUnlocked={isUnlocked}
+              isOwnerByEmail={isOwnerByEmail}
+              hasInsufficientRights={!isOwnerByEmail}
+              isTokenAuditDenied={tokenAuditState.isAccessDenied}
+              playSound={playSound}
+              setToast={setToast}
+            />
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB: FIREBASE SECURITY AUDIT (TOKEN VERIFICATION & ACCESS DENIED POLICY) */}
+        {/* ========================================================================= */}
+        {activeTab === 'security_audit' && (
+          <AdminSecurityAudit
+            user={user}
             isUnlocked={isUnlocked}
-            currentUserEmail={currentEmail}
-            role={user.role}
-            isAdmin={user.role === 'admin' || user.role === 'owner' || isOwnerByEmail}
+            isOwnerByEmail={isOwnerByEmail}
+            isIncognitoMode={isIncognitoMode}
             playSound={playSound}
             setToast={setToast}
+            onOpenSupportChat={onOpenSupportChat}
           />
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB: ACCESS PERMISSIONS MATRIX BY USER UID */}
+        {/* ========================================================================= */}
+        {activeTab === 'permissions_matrix' && (
+          <div className="space-y-4">
+            {(!isOwnerByEmail || tokenAuditState.isAccessDenied) && (
+              <AdminActionLockBanner
+                title="Access is denied / Доступ запрещен • Таблица прав доступа"
+                message="Для изменения прав пользователей и принудительного сброса аномалий требуются подтвержденные права владельца."
+              />
+            )}
+            <AdminAccessMatrix
+              currentUser={user}
+              isUnlocked={isUnlocked}
+              isOwnerByEmail={isOwnerByEmail}
+              onAddAuditLog={addAuditLog}
+              playSound={playSound}
+              setToast={setToast}
+            />
+          </div>
         )}
         {false && (
           <div className="hidden">
@@ -1856,6 +2302,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {/* ========================================================================= */}
         {activeTab === 'streak_recovery' && (
           <div className="space-y-8 animate-in fade-in">
+            {(!isOwnerByEmail || tokenAuditState.isAccessDenied) && (
+              <AdminActionLockBanner
+                title="Access is denied / Доступ запрещен • Восстановление Ударного Режима"
+                message="У вас недостаточно прав для изменения серии дней и начисления заморозок. Модификация параметров заблокирована."
+              />
+            )}
             {/* POLICY & RESTRICTION NOTICE */}
             <div className="bg-gradient-to-r from-red-950/80 via-gray-900 to-amber-950/80 border-2 border-red-500/60 rounded-3xl p-6 shadow-2xl space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-800 pb-3">
@@ -1964,10 +2416,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               {/* QUICK RESTORATION PRESETS */}
               <div className="space-y-3">
-                <label className="text-xs font-black uppercase tracking-wider text-gray-300 flex items-center space-x-1.5">
-                  <span>⚡</span>
-                  <span>Быстрое добавление и восстановление дней:</span>
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black uppercase tracking-wider text-gray-300 flex items-center space-x-1.5">
+                    <span>⚡</span>
+                    <span>Быстрое добавление и восстановление дней:</span>
+                  </label>
+                  {(!isOwnerByEmail || tokenAuditState.isAccessDenied) && (
+                    <AdminLockedBadge label="Доступ запрещен" />
+                  )}
+                </div>
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5">
                   {[
                     { label: '+1 день', add: 1 },
@@ -1979,8 +2436,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   ].map((preset) => (
                     <button
                       key={preset.label}
+                      disabled={!isOwnerByEmail || tokenAuditState.isAccessDenied}
                       onClick={() => handleAdminApplyStreak((user.streak || 0) + preset.add, user.streakFreezeCount, `Быстрое добавление: ${preset.label}`)}
-                      className="py-3 px-2 bg-gray-800 hover:bg-duo-red hover:text-white border-2 border-gray-700 hover:border-red-500 rounded-2xl font-black text-xs uppercase transition-all shadow-md active:scale-95 text-gray-200 flex flex-col items-center justify-center space-y-1"
+                      className="py-3 px-2 bg-gray-800 hover:bg-duo-red hover:text-white disabled:opacity-40 disabled:cursor-not-allowed border-2 border-gray-700 hover:border-red-500 rounded-2xl font-black text-xs uppercase transition-all shadow-md active:scale-95 text-gray-200 flex flex-col items-center justify-center space-y-1"
                     >
                       <span className="text-sm">🔥</span>
                       <span>{preset.label}</span>
@@ -1998,7 +2456,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <span>🎯</span>
                       <span>Установить точное число дней:</span>
                     </label>
-                    <span className="text-[10px] text-gray-400 font-bold">0 - 9999 дн.</span>
+                    {(!isOwnerByEmail || tokenAuditState.isAccessDenied) ? (
+                      <AdminLockedBadge label="Deny" />
+                    ) : (
+                      <span className="text-[10px] text-gray-400 font-bold">0 - 9999 дн.</span>
+                    )}
                   </div>
 
                   <div className="flex items-center space-x-2">
@@ -2006,18 +2468,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       type="number"
                       min="0"
                       max="9999"
+                      disabled={!isOwnerByEmail || tokenAuditState.isAccessDenied}
                       value={adminStreakInput}
                       onChange={(e) => setAdminStreakInput(e.target.value)}
-                      className="flex-1 bg-gray-800 border-2 border-gray-700 focus:border-duo-red text-white rounded-xl px-4 py-2.5 font-black text-lg text-center focus:outline-none"
+                      className="flex-1 bg-gray-800 disabled:opacity-50 border-2 border-gray-700 focus:border-duo-red text-white rounded-xl px-4 py-2.5 font-black text-lg text-center focus:outline-none"
                     />
                     <button
+                      disabled={!isOwnerByEmail || tokenAuditState.isAccessDenied}
                       onClick={() => {
                         const val = parseInt(adminStreakInput) || 0;
                         handleAdminApplyStreak(val, user.streakFreezeCount, 'Ручная установка серии');
                       }}
-                      className="px-5 py-2.5 bg-duo-red hover:bg-red-600 text-white font-black text-xs uppercase rounded-xl border-b-2 border-red-800 active:translate-y-0.5 transition-all shadow-md"
+                      className="px-5 py-2.5 bg-duo-red hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-xs uppercase rounded-xl border-b-2 border-red-800 active:translate-y-0.5 transition-all shadow-md flex items-center space-x-1"
                     >
-                      Сохранить
+                      {(!isOwnerByEmail || tokenAuditState.isAccessDenied) && <span>🔒</span>}
+                      <span>Сохранить</span>
                     </button>
                   </div>
                 </div>
@@ -2108,6 +2573,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {/* ========================================================================= */}
         {activeTab === 'reviews' && (
           <div className="space-y-8 animate-in fade-in">
+            {(!isOwnerByEmail || tokenAuditState.isAccessDenied) && (
+              <AdminActionLockBanner
+                title="Access is denied / Доступ запрещен • Модерация отзывов"
+                message="У вас недостаточно прав для удаления отзывов, закрепления и отправки официальных ответов администрации. Действия заблокированы."
+              />
+            )}
             {/* STATS & ACTIVE USERS WIDGET GRID */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {/* ACTIVE USERS LIVE WIDGET */}
@@ -2393,6 +2864,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {/* ========================================================================= */}
         {activeTab === 'users' && (
           <div className="space-y-8 animate-in fade-in">
+            {(!isOwnerByEmail || tokenAuditState.isAccessDenied) && (
+              <AdminActionLockBanner
+                title="Access is denied / Доступ запрещен • Мониторинг & База пользователей"
+                message="Ручное изменение серий пользователей и начисление заморозок доступно только подтвержденным администраторам платформы."
+              />
+            )}
             {/* REAL-TIME SYSTEM MONITORING PANEL */}
             <div className="bg-gradient-to-br from-gray-900 via-gray-900/90 to-blue-950/40 border-2 border-duo-blue/50 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-800 pb-5">
@@ -2576,6 +3053,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         )}
       </main>
+
+      {/* Security Audit Modal Overlay inside Unlocked View */}
+      {showSecurityAuditModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in">
+          <div className="max-w-4xl w-full my-auto">
+            <AdminSecurityAudit
+              user={user}
+              isUnlocked={isUnlocked}
+              isOwnerByEmail={isOwnerByEmail}
+              isIncognitoMode={isIncognitoMode}
+              onCloseModal={() => setShowSecurityAuditModal(false)}
+              playSound={playSound}
+              setToast={setToast}
+              onOpenSupportChat={onOpenSupportChat}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

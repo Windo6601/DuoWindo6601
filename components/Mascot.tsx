@@ -1,14 +1,28 @@
 import React from 'react';
 
-// A clean SVG reconstruction of the Mascot with variants and proportional original Duolingo crying tears (no face distortion)
+// A clean SVG reconstruction of the Mascot with variants, proportional original Duolingo crying tears, and celebratory dance animation
 export const Mascot: React.FC<{ 
-    emotion?: 'neutral' | 'happy' | 'confused' | 'sad' | 'thinking' | 'surprised'; 
+    emotion?: 'neutral' | 'happy' | 'confused' | 'sad' | 'thinking' | 'surprised' | 'dance' | 'celebrate'; 
     className?: string;
     variant?: 'default' | 'math' | 'music' | 'chess';
 }> = ({ emotion = 'neutral', className = "w-48 h-48", variant = 'default' }) => {
+  const isDancing = emotion === 'dance' || emotion === 'celebrate';
   
   return (
-    <div className={`relative mx-auto ${className}`}>
+    <div className={`relative mx-auto ${className} ${isDancing ? 'animate-duo-dance' : ''}`}>
+       {/* Celebratory Floating Sparkles & Confetti */}
+       {isDancing && (
+         <div className="absolute inset-0 pointer-events-none z-20 overflow-visible">
+           <svg viewBox="0 0 200 200" className="w-full h-full overflow-visible">
+             <path d="M 30 40 L 35 50 L 45 52 L 37 60 L 40 70 L 30 63 L 20 70 L 23 60 L 15 52 L 25 50 Z" fill="#FFC800" className="animate-sparkle" style={{ animationDelay: '0s' }} />
+             <path d="M 170 35 L 174 43 L 183 45 L 176 52 L 179 60 L 170 54 L 161 60 L 164 52 L 157 45 L 166 43 Z" fill="#FF4B4B" className="animate-sparkle" style={{ animationDelay: '0.2s' }} />
+             <circle cx="20" cy="110" r="4" fill="#58CC02" className="animate-sparkle" style={{ animationDelay: '0.4s' }} />
+             <circle cx="180" cy="110" r="5" fill="#1CB0F6" className="animate-sparkle" style={{ animationDelay: '0.15s' }} />
+             <rect x="95" y="10" width="6" height="6" rx="1" fill="#FF9600" className="animate-sparkle" style={{ animationDelay: '0.3s' }} transform="rotate(45 98 13)" />
+           </svg>
+         </div>
+       )}
+
        {/* React Atom Static */}
        <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 w-16 h-16 opacity-80 z-10">
          <svg viewBox="0 0 100 100" className="w-full h-full text-blue-300">
@@ -21,8 +35,8 @@ export const Mascot: React.FC<{
 
       <svg viewBox="0 0 200 200" className="w-full h-full drop-shadow-2xl">
         {/* Wings */}
-        <path d="M10 100 Q 5 70 40 80 L 45 130 Z" fill="#003366" /> 
-        <path d="M190 100 Q 195 70 160 80 L 155 130 Z" fill="#003366" />
+        <path d="M10 100 Q 5 70 40 80 L 45 130 Z" fill="#003366" className={isDancing ? 'animate-wing-left' : ''} /> 
+        <path d="M190 100 Q 195 70 160 80 L 155 130 Z" fill="#003366" className={isDancing ? 'animate-wing-right' : ''} />
         
         {/* Body */}
         <path d="M50 60 Q 100 20 150 60 L 160 160 Q 100 190 40 160 Z" fill="#0047AB" />
@@ -48,6 +62,16 @@ export const Mascot: React.FC<{
                 <>
                  <path d="M60 90 Q 75 75 90 90" stroke="#131F24" strokeWidth="4" fill="none" />
                  <path d="M110 90 Q 125 75 140 90" stroke="#131F24" strokeWidth="4" fill="none" />
+                </>
+            )}
+            {isDancing && (
+                <>
+                 {/* Celebratory Dancing Eyes (^ ^) */}
+                 <path d="M56 94 Q 75 70 94 94" stroke="#131F24" strokeWidth="6" strokeLinecap="round" fill="none" />
+                 <path d="M106 94 Q 125 70 144 94" stroke="#131F24" strokeWidth="6" strokeLinecap="round" fill="none" />
+                 {/* Sparkle highlights near eyes */}
+                 <circle cx="62" cy="78" r="3" fill="#FFC800" />
+                 <circle cx="138" cy="78" r="3" fill="#FFC800" />
                 </>
             )}
             {emotion === 'confused' && (
@@ -91,8 +115,15 @@ export const Mascot: React.FC<{
             )}
         </g>
 
-        {/* Beak / Sad Mouth */}
-        {emotion === 'sad' ? (
+        {/* Beak / Mouth */}
+        {isDancing ? (
+            <g>
+              {/* Wide open celebratory mouth */}
+              <path d="M85 112 Q 100 138 115 112 Q 100 108 85 112" fill="#FF8C00" stroke="#D6A600" strokeWidth="1.5" />
+              <path d="M88 116 Q 100 134 112 116 Z" fill="#FF4B4B" />
+              <path d="M92 124 Q 100 132 108 124 Z" fill="#FF8080" />
+            </g>
+        ) : emotion === 'sad' ? (
             <path d="M85 125 Q 100 115 115 125 Q 100 135 85 125" fill="#FF8C00" />
         ) : (
             <path d="M90 115 Q 100 135 110 115 Q 100 110 90 115" fill="#FF8C00" />
@@ -134,8 +165,10 @@ export const Mascot: React.FC<{
         )}
 
         {/* Feet */}
-        <ellipse cx="80" cy="185" rx="15" ry="8" fill="#FF8C00" />
-        <ellipse cx="120" cy="185" rx="15" ry="8" fill="#FF8C00" />
+        <g className={isDancing ? 'animate-feet-tap' : ''}>
+          <ellipse cx="80" cy="185" rx="15" ry="8" fill="#FF8C00" />
+          <ellipse cx="120" cy="185" rx="15" ry="8" fill="#FF8C00" />
+        </g>
       </svg>
     </div>
   );

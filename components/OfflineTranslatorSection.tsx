@@ -64,7 +64,7 @@ export const OfflineTranslatorSection: React.FC<OfflineTranslatorSectionProps> =
           playSound('success');
           if (setToast) {
             setToast(
-              userLanguage === 'ru'
+              (userLanguage !== 'en')
                 ? `Офлайн-словарь "${pack.nameRu}" успешно загружен!`
                 : `Offline dictionary "${pack.nameEn}" successfully downloaded!`
             );
@@ -84,7 +84,7 @@ export const OfflineTranslatorSection: React.FC<OfflineTranslatorSectionProps> =
     playSound('click');
     const missing = OFFLINE_DICTIONARY_PACKS.filter(p => !downloadedIds.includes(p.id));
     if (missing.length === 0) {
-      if (setToast) setToast(userLanguage === 'ru' ? 'Все словари уже загружены!' : 'All dictionaries are already downloaded!');
+      if (setToast) setToast((userLanguage !== 'en') ? 'Все словари уже загружены!' : 'All dictionaries are already downloaded!');
       return;
     }
 
@@ -107,7 +107,7 @@ export const OfflineTranslatorSection: React.FC<OfflineTranslatorSectionProps> =
           playSound('fanfare');
           if (setToast) {
             setToast(
-              userLanguage === 'ru'
+              (userLanguage !== 'en')
                 ? 'Все офлайн-словари успешно загружены (12 языков)!'
                 : 'All offline dictionaries downloaded successfully (12 languages)!'
             );
@@ -129,7 +129,7 @@ export const OfflineTranslatorSection: React.FC<OfflineTranslatorSectionProps> =
     });
     if (setToast) {
       setToast(
-        userLanguage === 'ru'
+        (userLanguage !== 'en')
           ? 'Словарь удален из памяти устройства'
           : 'Dictionary removed from device memory'
       );
@@ -142,7 +142,7 @@ export const OfflineTranslatorSection: React.FC<OfflineTranslatorSectionProps> =
     setDownloadedIds([]);
     saveDownloadedDictionaryIds([]);
     if (setToast) {
-      setToast(userLanguage === 'ru' ? 'Все офлайн-словари удалены' : 'All offline dictionaries cleared');
+      setToast((userLanguage !== 'en') ? 'Все офлайн-словари удалены' : 'All offline dictionaries cleared');
     }
   };
 
@@ -195,7 +195,7 @@ export const OfflineTranslatorSection: React.FC<OfflineTranslatorSectionProps> =
               </span>
             </div>
             <p className="text-xs text-gray-400 font-bold mt-1">
-              {userLanguage === 'ru'
+              {(userLanguage !== 'en')
                 ? 'Загружайте словарные базы на устройство для мнгновенного перевода без подключения к сети'
                 : 'Download dictionary bases to your device for instant offline translation'}
             </p>
@@ -210,7 +210,7 @@ export const OfflineTranslatorSection: React.FC<OfflineTranslatorSectionProps> =
             className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md border-b-2 border-emerald-800 transition-all flex items-center space-x-2 disabled:opacity-50"
           >
             <span>⚡</span>
-            <span>{userLanguage === 'ru' ? 'Скачать все (12)' : 'Download All (12)'}</span>
+            <span>{(userLanguage !== 'en') ? 'Скачать все (12)' : 'Download All (12)'}</span>
           </button>
           {downloadedIds.length > 0 && (
             <button
@@ -219,7 +219,7 @@ export const OfflineTranslatorSection: React.FC<OfflineTranslatorSectionProps> =
               title="Очистить память"
             >
               <TrashIcon className="w-4 h-4" />
-              <span>{userLanguage === 'ru' ? 'Очистить' : 'Clear'}</span>
+              <span>{(userLanguage !== 'en') ? 'Очистить' : 'Clear'}</span>
             </button>
           )}
         </div>
@@ -258,7 +258,7 @@ export const OfflineTranslatorSection: React.FC<OfflineTranslatorSectionProps> =
             type="text"
             value={filterQuery}
             onChange={e => setFilterQuery(e.target.value)}
-            placeholder={userLanguage === 'ru' ? 'Поиск словаря...' : 'Search dictionary...'}
+            placeholder={(userLanguage !== 'en') ? 'Поиск словаря...' : 'Search dictionary...'}
             className="w-full bg-transparent text-xs font-bold text-white focus:outline-none placeholder-gray-500"
           />
           {filterQuery && (

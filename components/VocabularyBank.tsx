@@ -100,7 +100,7 @@ export const VocabularyBank: React.FC<VocabularyBankProps> = ({
   const [playingWordId, setPlayingWordId] = useState<string | null>(null);
   const [playbackSpeed, setPlaybackSpeed] = useState<'normal' | 'slow'>('normal');
 
-  const isRu = user.language === 'ru';
+  const isRu = user.language !== 'en';
 
   // Merge default vocabulary with any extra words stored in user progress or local cache
   const allWords: VocabularyWord[] = useMemo(() => {

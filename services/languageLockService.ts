@@ -184,31 +184,41 @@ export const AVAILABLE_SWITCH_LANGUAGES = [
   { code: 'es', label: '🇪🇸 Español' },
   { code: 'ja', label: '🇯🇵 日本語' },
   { code: 'zh', label: '🇨🇳 中文' },
-  { code: 'ar', label: '🇸🇦 العربية' }
+  { code: 'ar', label: '🇸🇦 العربية' },
+  { code: 'pt', label: '🇧🇷 Português' },
+  { code: 'it', label: '🇮🇹 Italiano' },
+  { code: 'tr', label: '🇹🇷 Türkçe' },
+  { code: 'ko', label: '🇰🇷 한국어' },
+  { code: 'hi', label: '🇮🇳 हिन्दी' },
+  { code: 'pl', label: '🇵🇱 Polski' },
+  { code: 'id', label: '🇮🇩 Bahasa Indonesia' },
+  { code: 'bn', label: '🇧🇩 বাংলা' },
+  { code: 'th', label: '🇹🇭 ไทย' },
+  { code: 'vi', label: '🇻🇳 Tiếng Việt' },
+  { code: 'kk', label: '🇰🇿 Қазақша' },
+  { code: 'uz', label: '🇺🇿 Oʻzbekcha' },
+  { code: 'hy', label: '🇦🇲 Հայերեն' },
+  { code: 'ka', label: '🇬🇪 ქართული' },
+  { code: 'az', label: '🇦🇿 Azərbaycan' }
 ];
 
 // Target unlock date: November 1, 2026 (2026-11-01 00:00:00 UTC)
 export const UNLOCK_DEADLINE_ISO = '2026-11-01T00:00:00Z';
 export const UNLOCK_DEADLINE_DATE = new Date(UNLOCK_DEADLINE_ISO);
 
-export const isLanguageSwitchLocked = (langCode: string | undefined | null): boolean => {
-  if (!langCode) return false;
-  const now = new Date();
-  if (now >= UNLOCK_DEADLINE_DATE) return false;
+// Status: Starting November 1, 2026, language switching and the "Letters" section are officially UNLOCKED
+export const IS_UNLOCKED_DATE_REACHED = true;
 
-  const clean = langCode.toLowerCase().trim();
-  return Boolean(LOCKED_WORLD_LANGUAGES[clean] || LOCKED_CIS_LANGUAGES[clean]);
+export const isLanguageSwitchLocked = (_langCode: string | undefined | null): boolean => {
+  // Always unlocked as of November 1, 2026
+  if (IS_UNLOCKED_DATE_REACHED) return false;
+  return false;
 };
 
-export const isWritingSectionLocked = (courseId: string | undefined | null): boolean => {
-  if (!courseId) return false;
-  const now = new Date();
-  if (now >= UNLOCK_DEADLINE_DATE) return false;
-
-  const clean = courseId.toLowerCase().trim();
-  // Specifically the 5 CIS / world writing-locked languages:
-  // kk (Kazakhstan), uz (Uzbekistan), hy (Armenia), ka (Georgia), az (Azerbaijan)
-  return Boolean(LOCKED_CIS_LANGUAGES[clean]);
+export const isWritingSectionLocked = (_courseId: string | undefined | null): boolean => {
+  // Always unlocked as of November 1, 2026
+  if (IS_UNLOCKED_DATE_REACHED) return false;
+  return false;
 };
 
 export const getLanguageLockInfo = (langCode: string): LockedLanguageInfo | undefined => {
@@ -229,10 +239,7 @@ export const getCisLockedLanguages = (): LockedLanguageInfo[] => {
 };
 
 export const getDaysRemainingUntilUnlock = (): number => {
-  const now = new Date();
-  const diff = UNLOCK_DEADLINE_DATE.getTime() - now.getTime();
-  if (diff <= 0) return 0;
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  return 0;
 };
 
 export const getLanguageLockedToastMessage = (langCode: string, userLang: string = 'ru'): string => {
@@ -240,19 +247,19 @@ export const getLanguageLockedToastMessage = (langCode: string, userLang: string
   const isRu = userLang === 'ru';
   if (!info) {
     return isRu 
-      ? '🔒 В разработке • Доступно 1 ноября 2026 г.' 
-      : '🔒 Under development • Available November 1, 2026';
+      ? '✅ 1 ноября 2026 г. • Переключение на языки и раздел «Письмо» открыты!' 
+      : '✅ November 1, 2026 • Language switching and Letters section are open!';
   }
 
   if (info.category === 'cis' || info.noteRu) {
     return isRu
-      ? `🔒 ${info.fullLabelRu || info.nameRu}. Раздел Письмо Будут доступ 1 ноября 2026 год • 🔒 1 нояб.`
-      : `🔒 ${info.nameEn}. Section "Letters" will be available November 1, 2026.`;
+      ? `✅ 1 ноября 2026 г.: ${info.fullLabelRu || info.nameRu}. Раздел «Письмо» открыт!`
+      : `✅ November 1, 2026: ${info.nameEn}. Section "Letters" is now open!`;
   }
 
   return isRu
-    ? `🔒 ${info.nameRu} (${info.nativeName}) — в разработке. Доступно 1 ноября 2026 г. • 🔒 1 нояб.`
-    : `🔒 ${info.nameEn} (${info.nativeName}) — under development. Available November 1, 2026.`;
+    ? `✅ 1 ноября 2026 г.: ${info.nameRu} (${info.nativeName}) — переключение доступно!`
+    : `✅ November 1, 2026: ${info.nameEn} (${info.nativeName}) — switching is available!`;
 };
 
 // -----------------------------------------------------------------------------
@@ -373,14 +380,10 @@ export const BETA_WRITING_RESTRICTED_COURSES: Record<string, BetaCourseLockInfo>
   }
 };
 
-export const isBetaWritingRestricted = (courseId: string | undefined | null): boolean => {
-  if (!courseId) return false;
-  const now = new Date();
-  if (now >= UNLOCK_DEADLINE_DATE) return false;
-
-  const clean = courseId.toLowerCase().trim();
-  if (isWritingSectionLocked(clean)) return true;
-  return Boolean(BETA_WRITING_RESTRICTED_COURSES[clean]);
+export const isBetaWritingRestricted = (_courseId: string | undefined | null): boolean => {
+  // Always unlocked as of November 1, 2026
+  if (IS_UNLOCKED_DATE_REACHED) return false;
+  return false;
 };
 
 export const getBetaWritingRestrictedInfo = (courseId: string | undefined | null): BetaCourseLockInfo | undefined => {

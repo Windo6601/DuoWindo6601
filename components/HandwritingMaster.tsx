@@ -33,7 +33,7 @@ export const HandwritingMaster: React.FC<HandwritingMasterProps> = ({
   initialChar,
   isLightMode = false
 }) => {
-  const isRu = user.language === 'ru';
+  const isRu = user.language !== 'en';
 
   // Tabs and selection
   const [currentTab, setCurrentTab] = useState<StageTab>('alphabet');

@@ -20,6 +20,7 @@ import {
 } from '../services/aiLimitManager';
 import { pingGeminiApi } from '../services/geminiService';
 import { UserProgress } from '../types';
+import { GoogleRecaptcha } from './GoogleRecaptcha';
 
 interface GeminiApiKeyManagerProps {
   user: UserProgress;
@@ -52,6 +53,8 @@ export const GeminiApiKeyManager: React.FC<GeminiApiKeyManagerProps> = ({
   const [showInstructions, setShowInstructions] = useState<boolean>(false);
   const [isSkipped, setIsSkipped] = useState<boolean>(() => isCustomApiKeySkipped());
   const [canClaimFree, setCanClaimFree] = useState<boolean>(() => canClaimFreeDailyLimit());
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const [recaptchaError, setRecaptchaError] = useState<string | null>(null);
 
   // Sync state from localStorage on mount and on storage events
   const loadKeyDetails = () => {
@@ -104,17 +107,19 @@ export const GeminiApiKeyManager: React.FC<GeminiApiKeyManagerProps> = ({
 
   const handleTestConnection = async () => {
     playSound('click');
-    const keyToTest = inputKey.trim();
-    if (!keyToTest && !customKeyDetails.isCustom) {
-      setTestResult({
-        ok: false,
-        message: isRu 
-          ? 'Введите Gemini API Key для проверки или оставьте пустым для проверки системного ключа.' 
-          : 'Enter a Gemini API Key to test or leave empty to test default system key.'
-      });
+    setRecaptchaError(null);
+
+    if (!recaptchaToken) {
+      const err = isRu
+        ? 'Подтвердите капчу Google reCAPTCHA («Я не робот») перед проверкой соединения с Gemini API'
+        : 'Please complete the Google reCAPTCHA verification before testing Gemini API connection';
+      setRecaptchaError(err);
       playSound('wrong');
+      if (onToast) onToast(`⚠️ ${err}`);
       return;
     }
+
+    const keyToTest = inputKey.trim();
 
     setIsTesting(true);
     setTestResult(null);
@@ -147,6 +152,18 @@ export const GeminiApiKeyManager: React.FC<GeminiApiKeyManagerProps> = ({
   };
 
   const handleSaveKey = () => {
+    setRecaptchaError(null);
+
+    if (!recaptchaToken) {
+      const err = isRu
+        ? 'Подтвердите капчу Google reCAPTCHA («Я не робот») перед сохранением Gemini API Key'
+        : 'Please complete the Google reCAPTCHA verification before saving Gemini API Key';
+      setRecaptchaError(err);
+      playSound('wrong');
+      if (onToast) onToast(`⚠️ ${err}`);
+      return;
+    }
+
     const trimmed = inputKey.trim();
     if (!trimmed) {
       playSound('wrong');
@@ -487,6 +504,41 @@ export const GeminiApiKeyManager: React.FC<GeminiApiKeyManagerProps> = ({
           )}
         </div>
       )}
+
+      {/* Google reCAPTCHA Security Verification Card */}
+      <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-[#0e0e18] border-2 border-purple-500/30 space-y-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+          <div className="flex items-center space-x-2">
+            <span className="text-xl">🛡️</span>
+            <div>
+              <h4 className="text-xs sm:text-sm font-black uppercase text-white tracking-wide">
+                {isRu ? 'Капча Google reCAPTCHA API (Gemini API & Key)' : 'Google reCAPTCHA API (Gemini API & Key)'}
+              </h4>
+              <p className="text-[11px] text-gray-400 font-medium">
+                {isRu 
+                  ? 'Защита от ботов и верификация перед проверкой связи с ИИ и сохранением ключа' 
+                  : 'Bot protection & verification before testing AI connection and saving key'}
+              </p>
+            </div>
+          </div>
+          <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 w-fit">
+            {isRu ? '🔒 Обязательно' : '🔒 Required'}
+          </span>
+        </div>
+
+        <GoogleRecaptcha
+          isVerified={!!recaptchaToken}
+          onVerify={(tok) => {
+            setRecaptchaToken(tok);
+            setRecaptchaError(null);
+            playSound('click');
+          }}
+          onExpire={() => setRecaptchaToken(null)}
+          language={user.language || 'ru'}
+          error={recaptchaError}
+          className="pt-1"
+        />
+      </div>
 
       {/* Action Buttons: Test Connection / Save / Reset */}
       <div className="flex flex-wrap items-center gap-3">

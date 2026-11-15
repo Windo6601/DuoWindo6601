@@ -252,7 +252,7 @@ export const MusicStudioModal: React.FC<MusicStudioModalProps> = ({
 
   if (!isOpen) return null;
 
-  const isRu = user.language === 'ru';
+  const isRu = user.language !== 'en';
 
   return (
     <div className="fixed inset-0 z-[150] bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">

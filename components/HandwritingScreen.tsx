@@ -512,18 +512,16 @@ export const HandwritingScreen: React.FC<HandwritingScreenProps> = ({
         </div>
       </header>
 
-      {/* Beta Course Writing Restriction Notice Banner */}
-      {isBetaWritingRestricted(currentCourse.id) && (
-        <div className="bg-gradient-to-r from-amber-950/90 via-purple-950/90 to-amber-950/90 border-b-2 border-amber-500/60 px-4 py-2.5 text-center flex flex-col sm:flex-row items-center justify-center gap-2 shadow-xl animate-in fade-in">
-          <span className="text-amber-300 font-black text-xs uppercase tracking-wider flex items-center gap-1.5">
-            <span className="text-sm">🔒</span>
-            <span>Бета Курс: {currentCourse.localName || currentCourse.name} ({getBetaWritingRestrictedInfo(currentCourse.id)?.version || 'Beta'})</span>
-          </span>
-          <span className="text-amber-200 font-bold text-xs bg-amber-500/20 border border-amber-500/40 px-2.5 py-0.5 rounded-full">
-            Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год
-          </span>
-        </div>
-      )}
+      {/* 1 November 2026: Letters Section Unlocked Banner */}
+      <div className="bg-gradient-to-r from-emerald-950/90 via-teal-950/90 to-emerald-950/90 border-b-2 border-emerald-500/60 px-4 py-2 text-center flex flex-col sm:flex-row items-center justify-center gap-2 shadow-xl animate-in fade-in">
+        <span className="text-emerald-300 font-black text-xs uppercase tracking-wider flex items-center gap-1.5">
+          <span className="text-sm">🎉</span>
+          <span>{currentCourse.localName || currentCourse.name}</span>
+        </span>
+        <span className="text-emerald-200 font-bold text-xs bg-emerald-500/20 border border-emerald-500/40 px-2.5 py-0.5 rounded-full">
+          ✅ 1 ноября 2026 год: Раздел «Письмо» и тренировки во время урока официально открыты!
+        </span>
+      </div>
 
       {/* TOP NAVIGATION TABS */}
       <div className="bg-[#111827] border-b border-gray-800 px-4 py-2">

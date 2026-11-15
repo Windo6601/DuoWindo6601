@@ -1,7 +1,7 @@
 {
   "name": "duowindo6601",
   "private": true,
-  "version": "1.0.3",
+  "version": "1.0.4",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
@@ -11,21 +11,25 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@google/genai": "^1.31.0",
+    "@google/genai": "^3.3.0",
     "@tailwindcss/vite": "^4.0.0",
+    "@types/ws": "^8.18.2",
     "@vitejs/plugin-react": "^5.0.0",
     "canvas-confetti": "^1.9.4",
     "chess.js": "^1.4.0",
     "cors": "^2.8.6",
     "express": "^5.3.0",
     "firebase": "^11.4.0",
+    "fish-audio": "^0.1.0",
     "framer-motion": "^12.42.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^2.15.1",
+    "stripe": "^23.1.0",
     "tailwindcss": "^4.0.0",
     "vite": "^6.2.0",
-    "vite-plugin-pwa": "^2.0.0"
+    "vite-plugin-pwa": "^2.0.0",
+    "ws": "^8.23.0"
   },
   "devDependencies": {
     "@types/canvas-confetti": "^1.9.0",

@@ -8,14 +8,19 @@ import { auth, db, googleProvider, handleFirestoreError, OperationType } from '.
 import { MultiUserShareModal } from './components/MultiUserShareModal';
 import { AppScreen, Exercise, UserProgress, Course, WordToken, LeaderboardEntry, SubscriptionTier, RoleplayMessage } from './types';
 import { Chess, Square } from 'chess.js';
-import { generateExercise, checkAnswerWithAI, pingGeminiApi, speakText, startRoleplay, replyToRoleplay, generateIllusion, generateDrawing, checkDrawing, getFallbackExercise, getChessMove, getChessChatReply, translateText, getMistakeExplanation, generateLocalMistakeExplanation, generateIshihara, generateInterviewQuestion, getInterviewHint, generateReading, generateVideoCallRoleplayResponse } from './services/geminiService';
+import { generateExercise, checkAnswerWithAI, pingGeminiApi, speakText, startRoleplay, replyToRoleplay, generateIllusion, generateDrawing, checkDrawing, getFallbackExercise, getChessMove, getChessChatReply, getChessTutorialHint, translateText, getMistakeExplanation, generateLocalMistakeExplanation, generateIshihara, generateInterviewQuestion, getInterviewHint, generateReading, generateVideoCallRoleplayResponse } from './services/geminiService';
 
 import { detectSystemCompatibility, SimulationMode, SystemCompatibilityResult } from "./services/systemCompatibilityService";
 import { SystemCompatibilityBanner } from "./components/SystemCompatibilityBanner";
 import { SystemInfoModal } from "./components/SystemInfoModal";
 import { PwaUpdateSecuritySection } from "./components/PwaUpdateSecuritySection";
+import { PwaUpdateProcessOverlay } from "./components/PwaUpdateProcessOverlay";
+import { readPendingPwaUpdate, clearPendingPwaUpdate, InstalledPwaPatchInfo } from "./services/pwaUpdateService";
+import { AppVersionCard } from "./components/AppVersionCard";
+import { APP_VERSION } from "./services/appVersionService";
 import { BetaModal } from "./components/BetaModal";
 import { playSound } from './services/audioService';
+import { createStripeCheckout, createStripeGemsCheckout, cancelStripeSubscription, openStripePortal, checkStripeSession, navigateToStripeUrl } from './services/stripeService';
 import { 
   HomeIcon, DumbbellIcon, ShieldIcon, ChestIcon, UserIcon, SearchIcon,
   FireIcon, GemStoneIcon, VolumeIcon, CloseIcon, BookIcon, 
@@ -28,6 +33,9 @@ import { IshiharaPlateCanvas } from './components/IshiharaPlateCanvas';
 import { DrawingCanvas } from './components/DrawingCanvas';
 import { FeedbackScreen } from './components/FeedbackScreen';
 import { AdminDashboard } from './components/AdminDashboard';
+import { ShopFishModelsSection } from './components/ShopFishModelsSection';
+import { ProgrammingCourseHub } from './components/ProgrammingCourseHub';
+import { canUserAccessFishModel } from './services/fishAudioConfig';
 import { SupportChatScreen } from './components/SupportChatScreen';
 import { ActivityChart } from './components/ActivityChart';
 import { VocabularyBank } from './components/VocabularyBank';
@@ -96,11 +104,14 @@ import {
   isBetaWritingRestricted,
   getBetaWritingRestrictedInfo
 } from './services/languageLockService';
+import { EXTENDED_TRANSLATIONS } from './services/extendedTranslations';
 import { DomainMigrationBanner } from './components/DomainMigrationBanner';
 import { DomainAccessBlockedModal } from './components/DomainAccessBlockedModal';
+import { CourseSelectAccordionScreen } from './components/CourseSelectAccordionScreen';
 import { 
   isRunAppAccessBlocked, 
   isRunAppWarningActive, 
+  isOnlineHostedEnvironment,
   getDomainSimMode, 
   setDomainSimMode, 
   DomainSimMode 
@@ -122,6 +133,7 @@ interface ChessPiece {
   type: string;
   color: ChessColor;
   piece: string;
+  id?: string;
 }
 type Board = (ChessPiece | null)[][];
 interface Coords { r: number; c: number; }
@@ -133,6 +145,8 @@ const isValidCoord = (r: number, c: number) => r >= 0 && r < 8 && c >= 0 && c < 
 const parseFen = (fen: string): Board => {
   const board: Board = [];
   const rows = fen.split(' ')[0].split('/');
+  const pieceCounts: Record<string, number> = {};
+
   for (const rowStr of rows) {
     const row: (ChessPiece | null)[] = [];
     for (const char of rowStr) {
@@ -141,7 +155,9 @@ const parseFen = (fen: string): Board => {
         for (let i = 0; i < count; i++) row.push(null);
       } else {
         const color = char === char.toUpperCase() ? 'w' : 'b';
-        row.push({ type: char.toLowerCase(), color, piece: char });
+        pieceCounts[char] = (pieceCounts[char] || 0) + 1;
+        const pieceId = `piece-${char}-${pieceCounts[char]}`;
+        row.push({ type: char.toLowerCase(), color, piece: char, id: pieceId });
       }
     }
     board.push(row);
@@ -509,23 +525,27 @@ export const sortCoursesByDifficulty = (
 const ALL_HARDEST_COURSES: Course[] = HARDEST_COURSES;
 
 const SPECIAL_COURSES: Course[] = [
-  { id: 'math', name: 'Mathematics', localName: 'Математика (Курс не является языком • Точная наука / Навык)', flagCode: 'math', themeColor: 'bg-duo-blue', themeBorder: 'border-duo-blueDark', mascotVariant: 'math' },
-  { id: 'music', name: 'Music', localName: 'Музыка (Курс не является языком • Навык/Теория)', flagCode: 'music', themeColor: 'bg-pink-500', themeBorder: 'border-pink-700', mascotVariant: 'music' },
+  { id: 'math', name: 'Mathematics', localName: 'Математика (Курс не является языком • Точные науки)', flagCode: 'math', themeColor: 'bg-duo-blue', themeBorder: 'border-duo-blueDark', mascotVariant: 'math' },
+  { id: 'music', name: 'Music', localName: 'Музыка (Курс не является языком • Ноты и ритм)', flagCode: 'music', themeColor: 'bg-pink-500', themeBorder: 'border-pink-700', mascotVariant: 'music' },
   { id: 'chess', name: 'Chess', localName: 'Шахматы (Курс не является языком • Навык/Игра)', flagCode: 'chess', themeColor: 'bg-slate-600', themeBorder: 'border-slate-800', mascotVariant: 'chess' },
+  { id: 'coding', name: 'Programming', localName: 'Программирование (Lua, Swift, Kotlin, APK • Языки и мобильная разработка)', flagCode: 'coding', themeColor: 'bg-indigo-600', themeBorder: 'border-indigo-800', mascotVariant: 'default' },
+  { id: 'art', name: 'Art', localName: 'Рисование и Каллиграфия (Курс не является языком • Творчество)', flagCode: 'art', themeColor: 'bg-amber-600', themeBorder: 'border-amber-800', mascotVariant: 'default' },
 ];
 
 export const BETA_COURSES: Course[] = [
   { id: 'eo', name: 'Esperanto', localName: 'Эсперанто (Esperanto)', flagCode: 'eu', themeColor: 'bg-emerald-600', themeBorder: 'border-emerald-800', mascotVariant: 'default', isBeta: false, betaTag: 'Самый лёгкий №1', betaVersion: 'v1.0 Официальный', betaFeedbackCount: 142 },
-  { id: 'la', name: 'Latin', localName: 'Латынь (Lingua Latina)', flagCode: 'it', themeColor: 'bg-amber-600', themeBorder: 'border-amber-800', mascotVariant: 'default', isBeta: true, betaTag: 'Классический', betaVersion: 'v0.8.2 Beta', betaFeedbackCount: 98, writingRestrictionNotice: 'Ограничение раздел письма будут доступ до 1 ноября 2026 год' },
-  { id: 'sv', name: 'Swedish', localName: 'Шведский (Svenska)', flagCode: 'se', themeColor: 'bg-blue-600', themeBorder: 'border-blue-800', mascotVariant: 'default', isBeta: true, betaTag: 'Скандинавский', betaVersion: 'v0.9.1 Beta', betaFeedbackCount: 115, writingRestrictionNotice: 'Ограничение раздел письма будут доступ до 1 ноября 2026 год' },
-  { id: 'no', name: 'Norwegian', localName: 'Норвежский (Norsk)', flagCode: 'no', themeColor: 'bg-red-600', themeBorder: 'border-red-800', mascotVariant: 'default', isBeta: true, betaTag: 'Скандинавский', betaVersion: 'v0.9.0 Beta', betaFeedbackCount: 84, writingRestrictionNotice: 'Ограничение раздел письма будут доступ до 1 ноября 2026 год' },
-  { id: 'tt', name: 'Tatar', localName: 'Татарский (Татар теле)', flagCode: 'ru', themeColor: 'bg-teal-600', themeBorder: 'border-teal-800', mascotVariant: 'default', isBeta: true, betaTag: 'Тюркский', betaVersion: 'v0.9.5 Beta', betaFeedbackCount: 230, writingRestrictionNotice: 'Ограничение раздел письма будут доступ до 1 ноября 2026 год' },
-  { id: 'hv', name: 'High Valyrian', localName: 'Высокий валирийский (Valyrio)', flagCode: 'gb', themeColor: 'bg-purple-700', themeBorder: 'border-purple-900', mascotVariant: 'default', isBeta: true, betaTag: 'Вымышленный', betaVersion: 'v0.8.0 Beta', betaFeedbackCount: 76, writingRestrictionNotice: 'Ограничение раздел письма будут доступ до 1 ноября 2026 год' },
-  { id: 'tlh', name: 'Klingon', localName: 'Клингонский (tlhIngan Hol)', flagCode: 'us', themeColor: 'bg-stone-700', themeBorder: 'border-stone-900', mascotVariant: 'default', isBeta: true, betaTag: 'Вымышленный', betaVersion: 'v0.7.3 Beta', betaFeedbackCount: 63, writingRestrictionNotice: 'Ограничение раздел письма будут доступ до 1 ноября 2026 год' },
-  { id: 'yi', name: 'Yiddish', localName: 'Идиш (ייִдиш)', flagCode: 'il', themeColor: 'bg-indigo-600', themeBorder: 'border-indigo-800', mascotVariant: 'default', isBeta: true, betaTag: 'Германский / Еврейский', betaVersion: 'v0.9.2 Beta', betaFeedbackCount: 91, writingRestrictionNotice: 'Ограничение раздел письма будут доступ до 1 ноября 2026 год' }
+  { id: 'la', name: 'Latin', localName: 'Латынь (Lingua Latina)', flagCode: 'it', themeColor: 'bg-amber-600', themeBorder: 'border-amber-800', mascotVariant: 'default', isBeta: true, betaTag: 'Классический', betaVersion: 'v0.8.2 Beta', betaFeedbackCount: 98, writingRestrictionNotice: '✅ Раздел «Письмо» открыт (1 ноября 2026 г.)' },
+  { id: 'sv', name: 'Swedish', localName: 'Шведский (Svenska)', flagCode: 'se', themeColor: 'bg-blue-600', themeBorder: 'border-blue-800', mascotVariant: 'default', isBeta: true, betaTag: 'Скандинавский', betaVersion: 'v0.9.1 Beta', betaFeedbackCount: 115, writingRestrictionNotice: '✅ Раздел «Письмо» открыт (1 ноября 2026 г.)' },
+  { id: 'no', name: 'Norwegian', localName: 'Норвежский (Norsk)', flagCode: 'no', themeColor: 'bg-red-600', themeBorder: 'border-red-800', mascotVariant: 'default', isBeta: true, betaTag: 'Скандинавский', betaVersion: 'v0.9.0 Beta', betaFeedbackCount: 84, writingRestrictionNotice: '✅ Раздел «Письмо» открыт (1 ноября 2026 г.)' },
+  { id: 'tt', name: 'Tatar', localName: 'Татарский (Татар теле)', flagCode: 'ru', themeColor: 'bg-teal-600', themeBorder: 'border-teal-800', mascotVariant: 'default', isBeta: true, betaTag: 'Тюркский', betaVersion: 'v0.9.5 Beta', betaFeedbackCount: 230, writingRestrictionNotice: '✅ Раздел «Письмо» открыт (1 ноября 2026 г.)' },
+  { id: 'hv', name: 'High Valyrian', localName: 'Высокий валирийский (Valyrio)', flagCode: 'gb', themeColor: 'bg-purple-700', themeBorder: 'border-purple-900', mascotVariant: 'default', isBeta: true, betaTag: 'Вымышленный', betaVersion: 'v0.8.0 Beta', betaFeedbackCount: 76, writingRestrictionNotice: '✅ Раздел «Письмо» открыт (1 ноября 2026 г.)' },
+  { id: 'tlh', name: 'Klingon', localName: 'Клингонский (tlhIngan Hol)', flagCode: 'us', themeColor: 'bg-stone-700', themeBorder: 'border-stone-900', mascotVariant: 'default', isBeta: true, betaTag: 'Вымышленный', betaVersion: 'v0.7.3 Beta', betaFeedbackCount: 63, writingRestrictionNotice: '✅ Раздел «Письмо» открыт (1 ноября 2026 г.)' },
+  { id: 'yi', name: 'Yiddish', localName: 'Идиш (ייִдиш)', flagCode: 'il', themeColor: 'bg-indigo-600', themeBorder: 'border-indigo-800', mascotVariant: 'default', isBeta: true, betaTag: 'Германский / Еврейский', betaVersion: 'v0.9.2 Beta', betaFeedbackCount: 91, writingRestrictionNotice: '✅ Раздел «Письмо» открыт (1 ноября 2026 г.)' }
 ];
 
-const SPECIAL_IDS = ['math', 'music', 'chess', 'hv', 'tlh'];
+const SPECIAL_IDS = ['math', 'music', 'chess', 'coding', 'art', 'hv', 'tlh'];
+const NON_LANGUAGE_IDS = ['math', 'music', 'chess', 'coding', 'art'];
+
 const CONLANG_IDS = ['yi', 'hv', 'tlh'];
 const BETA_IDS = BETA_COURSES.map(c => c.id);
 const CIS_IDS = CIS_COURSES.map(c => c.id);
@@ -2059,7 +2079,62 @@ const TRANSLATIONS: Record<string, any> = {
     signOut: 'Выйти из аккаунта',
     savedLocallyAs: 'Вы зашли как @{username}. Данные сохраняются только в этом браузере.',
     updateBrowserBtn: 'Обновите свой браузер',
-    continueDuoWindoBtn: 'Продолжить работу в DuoWindo6601'
+    continueDuoWindoBtn: 'Продолжить работу в DuoWindo6601',
+    notEnoughGems: 'Недостаточно гемов! Нужно 500 💎',
+    freezeBought: '❄️ Заморозка куплена! Всего: {count} шт.',
+    accountRequiredIncognito: 'Требуется аккаунт (Инкогнито)',
+    practiceTitle: 'Тренировка',
+    practiceSubtitle: 'ЗАКРЕПЛЯЙТЕ ПРОЙДЕННОЕ И СТАВЬТЕ РЕКОРДЫ',
+    unitReview: 'Повторение раздела',
+    unitReviewAction: 'НАЧАТЬ ТРЕНИРОВКУ: +20 ОЧКОВ',
+    skillsPractice: 'ОТРАБОТКА НАВЫКОВ',
+    mistakesReview: 'Исправление ошибок',
+    mistakesZero: 'Все ошибки исправлены! Отличная работа',
+    mistakesCount: '{count} неисправленных фраз • Нажмите для просмотра',
+    wordsTitle: 'Слова',
+    wordsDesc: '{count} изученных слов в словаре • Карточки и тренировка',
+    listeningTitle: 'Аудирование',
+    listeningDesc: 'Что вы услышали? Тренируйте восприятие речи на слух',
+    speakingTitle: 'Речь',
+    speakingDesc: 'Говорите за DuoWindo6601 • Отрабатывайте чистое произношение',
+    poemTitle: 'Выучить стихотворение наизусть',
+    poemDesc: 'Поэтический тренажёр • Метод исчезающих слов, ритм, озвучка и проверка наизусть',
+    storiesTitle: 'Коллекции историй',
+    storiesDesc: 'Интерактивные сюжетные диалоги с озвучкой реплик и вопросами на понимание',
+    duowindoModes: 'РЕЖИМЫ DUOWINDO6601',
+    duowindoModesDesc: 'Все специальные AI и интерактивные форматы обучения сохранены',
+    arabicHandbook: 'Конвертер (0-99) и Справочник арабских цифр',
+    arabicHandbookDesc: 'Западные цифры слева (0-99) и восточно-арабские справа (٠-٩٩) • Интерактивный ползунок, озвучка и поиск',
+    offlineDictTitle: 'СЛОВАРИ БЕЗ ИНТЕРНЕТА 💾',
+    offlineDictDesc: 'Переключение языков стран ⇄ и офлайн-пакеты',
+    openBtn: 'Открыть',
+    lockedBtn: 'Заблокировано',
+    unitReviewToast: '⚡ Повторение раздела {unit}: +20 очков!',
+    mistakePracticeToast: '🔄 Исправление ошибки: {text}',
+    dailyLeaderboard: 'Дневной рейтинг',
+    allTimeLeaderboard: 'Общий рейтинг',
+    dailyLeaderboardDesc: 'Фиксирует очки опыта (XP), заработанные только за текущий день. Обнуление каждые 24 часа в полночь.',
+    onlyToday: 'Только сегодня',
+    resetsIn: 'Сброс через',
+    yourXpToday: 'Ваш XP сегодня',
+    reviews_duowindo6601: 'Отзывы о DuoWindo6601',
+    reviews_subtitle: 'Оставьте отзыв или задайте вопрос Администратору DuoWindo6601!',
+    writeReviewBtn: '✍️ Написать отзыв',
+    refreshReviewsBtn: '🔄 Обновить отзывы',
+    tabReviews: '⭐ Отзывы',
+    tabSupport: '🛠 Поддержка',
+    tabTranslator: '🌐 Авто-Переводчик',
+    filterAll: 'Все',
+    filterPositive: '🌟 Положительные',
+    filterCritical: '💡 Критические',
+    incognitoReviewsTitle: 'Режим Инкогнито — Отзывы и комментарии',
+    incognitoReviewsNotice: 'Публикация отзывов требует аккаунта. Локальные черновики остаются в текущей сессии.',
+    restrictionsBtn: '🚫 Ограничения',
+    registerBtn: '✨ Зарегистрироваться',
+    switchLangTitle: 'Переключить язык',
+    settingsTitle: 'Настройки',
+    availableInterfaceLangs: 'Доступные языки интерфейса:',
+    worldLangsTitle: 'Языки мира (10) — Доступны:'
   },
   en: {
     androidAlertTitle: 'Android App Available!',
@@ -2246,7 +2321,62 @@ const TRANSLATIONS: Record<string, any> = {
     signOut: 'Sign Out',
     savedLocallyAs: 'Saved locally in browser as @{username}.',
     updateBrowserBtn: 'Update your browser',
-    continueDuoWindoBtn: 'Continue using DuoWindo6601'
+    continueDuoWindoBtn: 'Continue using DuoWindo6601',
+    notEnoughGems: 'Not enough gems! Need 500 💎',
+    freezeBought: '❄️ Streak Freeze purchased! Total: {count}',
+    accountRequiredIncognito: 'Account Required (Incognito)',
+    practiceTitle: 'Practice',
+    practiceSubtitle: 'STRENGTHEN SKILLS & ACHIEVE DAILY GOALS',
+    unitReview: 'Unit Review',
+    unitReviewAction: 'START PRACTICE: +20 XP',
+    skillsPractice: 'SKILL PRACTICE',
+    mistakesReview: 'Mistakes Review',
+    mistakesZero: 'All mistakes resolved! Great work',
+    mistakesCount: '{count} mistakes to review • Tap to practice',
+    wordsTitle: 'Words',
+    wordsDesc: '{count} learned words in vocabulary • Flashcards and review',
+    listeningTitle: 'Listening',
+    listeningDesc: 'What did you hear? Practice listening comprehension',
+    speakingTitle: 'Speaking',
+    speakingDesc: 'Speak for DuoWindo6601 • Master pure pronunciation',
+    poemTitle: 'Memorize Poem by Heart',
+    poemDesc: 'Poetry trainer • Vanishing words, rhythm, audio reciting and memory test',
+    storiesTitle: 'Story Collections',
+    storiesDesc: 'Interactive story dialogues with voice playback and comprehension questions',
+    duowindoModes: 'DUOWINDO6601 MODES',
+    duowindoModesDesc: 'All special AI & interactive learning formats preserved intact',
+    arabicHandbook: 'Arabic Numerals Converter (0-99) & Handbook',
+    arabicHandbookDesc: 'Western digits on left (0-99) & Eastern Arabic on right (٠-٩٩) • Interactive slider, speech & search',
+    offlineDictTitle: 'OFFLINE DICTIONARIES 💾',
+    offlineDictDesc: 'Country language switching ⇄ & offline packs',
+    openBtn: 'Open',
+    lockedBtn: 'Locked',
+    unitReviewToast: '⚡ Unit {unit} Review: +20 XP!',
+    mistakePracticeToast: '🔄 Reviewing mistake: {text}',
+    dailyLeaderboard: 'Daily Leaderboard',
+    allTimeLeaderboard: 'All-Time League',
+    dailyLeaderboardDesc: 'Specifically tracks and displays XP gains only for the current calendar day, resetting every 24 hours.',
+    onlyToday: 'Only Today',
+    resetsIn: 'Resets in',
+    yourXpToday: 'Your Today XP',
+    reviews_duowindo6601: 'Reviews about DuoWindo6601',
+    reviews_subtitle: 'Leave feedback or ask a DuoWindo6601 Administrator a question!',
+    writeReviewBtn: '✍️ Write Review',
+    refreshReviewsBtn: '🔄 Refresh Reviews',
+    tabReviews: '⭐ Reviews',
+    tabSupport: '🛠 Support',
+    tabTranslator: '🌐 Auto-Translator',
+    filterAll: 'All',
+    filterPositive: '🌟 Positive',
+    filterCritical: '💡 Critical',
+    incognitoReviewsTitle: 'Incognito Mode — Reviews and Feedback',
+    incognitoReviewsNotice: 'Publishing verified reviews requires an account. Local drafts remain in this session.',
+    restrictionsBtn: '🚫 Restrictions',
+    registerBtn: '✨ Register',
+    switchLangTitle: 'Switch Language',
+    settingsTitle: 'Settings',
+    availableInterfaceLangs: 'Available Interface Languages:',
+    worldLangsTitle: 'World Languages (10) — Available:'
   },
   de: {
     androidAlertTitle: 'Android-App verfügbar!',
@@ -3295,6 +3425,11 @@ const TRANSLATIONS: Record<string, any> = {
   }
 };
 
+const ALL_APP_TRANSLATIONS: Record<string, any> = {
+  ...TRANSLATIONS,
+  ...EXTENDED_TRANSLATIONS
+};
+
 const sanitizeForFirestore = (obj: any, isUpdate = false) => {
   const cleaned: any = {};
   for (const key of Object.keys(obj)) {
@@ -3321,6 +3456,7 @@ function App() {
   const [simSystemMode, setSimSystemMode] = useState<SimulationMode>("real");
   const [systemDismissed, setSystemDismissed] = useState<boolean>(false);
   const [showSystemInfoModal, setShowSystemInfoModal] = useState<boolean>(false);
+  const [pendingPwaUpdate, setPendingPwaUpdateState] = useState(() => readPendingPwaUpdate());
 
   const systemInfo = useMemo(() => {
     return detectSystemCompatibility(simSystemMode);
@@ -3332,7 +3468,9 @@ function App() {
   const isDomainWarningActive = useMemo(() => isRunAppWarningActive(domainSimMode), [domainSimMode]);
 
   const [screen, setScreen] = useState<AppScreen>(AppScreen.PATH);
+  const [lettersTabRequest, setLettersTabRequest] = useState<{ tab: 'letters' | 'words' | 'illusion' | 'audio'; nonce: number }>({ tab: 'letters', nonce: 0 });
   const [offlineMode, setOfflineMode] = useState<boolean>(() => {
+    if (isOnlineHostedEnvironment()) return false;
     if (typeof navigator !== 'undefined') {
       return !navigator.onLine;
     }
@@ -3372,11 +3510,11 @@ function App() {
   const [musicSection, setMusicSection] = useState<number>(() => {
     return Number(localStorage.getItem('duo_music_section_6601') || '1');
   });
-  // Math: Класс 1-11 & Темы (Арифметика / Алгебра / Геометрия / Тригонометрия и Анализ)
+  // Math: Классы 2-11 & Темы (🔢 Арифметика / 📐 Алгебра / 📏 Геометрия / 📈 Анализ)
   const [mathGrade, setMathGrade] = useState<number>(() => {
     return Number(localStorage.getItem('duo_math_grade_6601') || '2');
   });
-  const [mathTopic, setMathTopic] = useState<'arithmetic' | 'algebra' | 'geometry' | 'calculus'>(() => {
+  const [mathTopic, setMathTopic] = useState<'arithmetic' | 'algebra' | 'geometry' | 'analysis'>(() => {
     return (localStorage.getItem('duo_math_topic_6601') as any) || 'arithmetic';
   });
   // Languages: Раздел 1-8 (A1-B2)
@@ -3388,84 +3526,13 @@ function App() {
     return Number(localStorage.getItem('duo_chess_section_6601') || '6');
   });
 
-  const generateMathExercise = (grade: number, topic: 'arithmetic' | 'algebra' | 'geometry' | 'calculus'): Exercise => {
+  const generateMathExercise = (grade: number, topic: 'arithmetic' | 'algebra' | 'geometry' | 'analysis'): Exercise => {
     let question = "";
     let answer = "";
     let distractors: string[] = [];
 
-    if (topic === 'geometry') {
-      if (grade <= 3) {
-        const side = Math.floor(Math.random() * 8) + 2;
-        question = `Периметр квадрата со стороной ${side} см = ? см`;
-        answer = (side * 4).toString();
-      } else if (grade <= 5) {
-        const a = Math.floor(Math.random() * 8) + 3;
-        const b = Math.floor(Math.random() * 6) + 2;
-        question = `Площадь прямоугольника ${a} см × ${b} см = ? см²`;
-        answer = (a * b).toString();
-      } else if (grade <= 7) {
-        const angleA = [30, 40, 50, 60, 70][Math.floor(Math.random() * 5)];
-        const angleB = [30, 45, 60, 70, 80][Math.floor(Math.random() * 5)];
-        question = `Сумма углов треугольника 180°. Третий угол при ${angleA}° и ${angleB}° = ?°`;
-        answer = (180 - angleA - angleB).toString();
-      } else if (grade <= 9) {
-        const pythPairs = [[3, 4, 5], [6, 8, 10], [5, 12, 13], [8, 15, 17]];
-        const pair = pythPairs[Math.floor(Math.random() * pythPairs.length)];
-        question = `Теорема Пифагора: Катеты ${pair[0]} и ${pair[1]}. Гипотенуза c = ?`;
-        answer = pair[2].toString();
-      } else {
-        // Grade 10-11 geometry
-        const cubeSide = Math.floor(Math.random() * 5) + 2;
-        question = `Стереометрия: Объём куба со ребром ${cubeSide} см = ? см³`;
-        answer = Math.pow(cubeSide, 3).toString();
-      }
-    } else if (topic === 'calculus') {
-      if (grade <= 9) {
-        // Trigonometry basics
-        const trigList = [
-          { q: 'sin(30°) = ?', a: '1/2', d: ['1', '0', '√3/2'] },
-          { q: 'cos(60°) = ?', a: '1/2', d: ['1/3', '√2/2', '0'] },
-          { q: 'sin²(α) + cos²(α) = ?', a: '1', d: ['0', '2', 'sin(2α)'] },
-          { q: 'tg(45°) = ?', a: '1', d: ['0', '√3', '1/2'] }
-        ];
-        const choice = trigList[Math.floor(Math.random() * trigList.length)];
-        question = choice.q;
-        answer = choice.a;
-        distractors = choice.d;
-      } else if (grade === 10) {
-        const logList = [
-          { q: 'log₂(32) = ?', a: '5', d: ['4', '6', '16'] },
-          { q: 'log₃(81) = ?', a: '4', d: ['3', '9', '27'] },
-          { q: 'log₅(125) = ?', a: '3', d: ['5', '25', '2'] },
-          { q: '2ˣ = 16 ⟹ x = ?', a: '4', d: ['8', '3', '5'] },
-          { q: 'sin(π/2) = ?', a: '1', d: ['0', '-1', '1/2'] },
-          { q: 'cos(π) = ?', a: '-1', d: ['1', '0', '1/2'] }
-        ];
-        const choice = logList[Math.floor(Math.random() * logList.length)];
-        question = choice.q;
-        answer = choice.a;
-        distractors = choice.d;
-      } else {
-        // Grade 11: Derivatives and Integrals
-        const calcList = [
-          { q: 'Производная f(x) = x³ ⟹ f\'(x) = ?', a: '3x²', d: ['x²', '3x', 'x⁴/4'] },
-          { q: 'Производная f(x) = 5x⁴ ⟹ f\'(x) = ?', a: '20x³', d: ['5x³', '20x⁴', '10x²'] },
-          { q: 'Производная f(x) = sin(x) ⟹ f\'(x) = ?', a: 'cos(x)', d: ['-cos(x)', '-sin(x)', 'tg(x)'] },
-          { q: 'Первообразная ∫ 2x dx = ?', a: 'x² + C', d: ['2x² + C', 'x + C', 'x³/3 + C'] },
-          { q: 'Значение f\'(2) для f(x) = 3x² + 4x:', a: '16', d: ['12', '10', '14'] }
-        ];
-        const choice = calcList[Math.floor(Math.random() * calcList.length)];
-        question = choice.q;
-        answer = choice.a;
-        distractors = choice.d;
-      }
-    } else if (topic === 'arithmetic') {
-      if (grade === 1) {
-        const a = Math.floor(Math.random() * 10) + 1;
-        const b = Math.floor(Math.random() * 9) + 1;
-        question = `${a} + ${b} = ?`;
-        answer = (a + b).toString();
-      } else if (grade === 2) {
+    if (topic === 'arithmetic') {
+      if (grade === 2) {
         const mode = Math.random();
         if (mode < 0.4) {
           const a = Math.floor(Math.random() * 40) + 12;
@@ -3546,30 +3613,103 @@ function App() {
         question = `√${num} + ${plus} = ?`;
         answer = (Math.sqrt(num) + plus).toString();
       } else if (grade === 9) {
-        const num = [8, 27, 64, 125][Math.floor(Math.random() * 4)];
-        question = `∛${num} = ?`;
-        answer = Math.round(Math.cbrt(num)).toString();
+        const mode = Math.random();
+        if (mode < 0.5) {
+          const a1 = Math.floor(Math.random() * 5) + 1;
+          const d = Math.floor(Math.random() * 4) + 2;
+          const n = 4;
+          question = `Прогрессия: a₁ = ${a1}, d = ${d}. a₄ = ?`;
+          answer = (a1 + (n - 1) * d).toString();
+        } else {
+          const baseOptions = [
+            { q: '√8 × √2 = ?', a: '4' },
+            { q: '√18 × √2 = ?', a: '6' },
+            { q: '√50 × √2 = ?', a: '10' },
+            { q: '√72 / √2 = ?', a: '6' }
+          ];
+          const chosen = baseOptions[Math.floor(Math.random() * baseOptions.length)];
+          question = chosen.q;
+          answer = chosen.a;
+        }
       } else if (grade === 10) {
-        const a = [2, 3, 4, 5][Math.floor(Math.random() * 4)];
-        const b = [3, 4][Math.floor(Math.random() * 2)];
-        question = `Вчислить: (${a}²)³ ÷ ${a}⁴ = ?`;
-        answer = Math.pow(a, 2).toString();
+        // 10 класс: Арифметика / высшие вычисления (логарифмы, комбинаторика, степени)
+        const mode = Math.random();
+        if (mode < 0.4) {
+          const logs = [
+            { q: 'log₂(16) = ?', a: '4' },
+            { q: 'log₃(27) = ?', a: '3' },
+            { q: 'log₅(25) = ?', a: '2' },
+            { q: 'log₁₀(1000) = ?', a: '3' },
+            { q: 'log₂(64) = ?', a: '6' },
+            { q: 'log₄(64) = ?', a: '3' },
+            { q: 'log₇(49) = ?', a: '2' }
+          ];
+          const chosen = logs[Math.floor(Math.random() * logs.length)];
+          question = chosen.q;
+          answer = chosen.a;
+        } else if (mode < 0.7) {
+          const powers = [
+            { q: '27^(2/3) = ?', a: '9' },
+            { q: '16^(3/4) = ?', a: '8' },
+            { q: '4^(3/2) = ?', a: '8' },
+            { q: '8^(4/3) = ?', a: '16' },
+            { q: '2⁴ + 3² = ?', a: '25' },
+            { q: '5³ - 5² = ?', a: '100' }
+          ];
+          const chosen = powers[Math.floor(Math.random() * powers.length)];
+          question = chosen.q;
+          answer = chosen.a;
+        } else {
+          const facts = [
+            { q: 'P₃ = 3! (факториал) = ?', a: '6' },
+            { q: 'P₄ = 4! (факториал) = ?', a: '24' },
+            { q: '5! / 4! = ?', a: '5' },
+            { q: 'Сочетания C(4, 2) = ?', a: '6' },
+            { q: 'Сочетания C(5, 2) = ?', a: '10' }
+          ];
+          const chosen = facts[Math.floor(Math.random() * facts.length)];
+          question = chosen.q;
+          answer = chosen.a;
+        }
       } else {
-        // Grade 11
-        const mant = [1.2, 2.5, 3.6, 4.8][Math.floor(Math.random() * 4)];
-        const p1 = 5;
-        const p2 = 3;
-        question = `Научная запись: (${mant} · 10⁵) ÷ (10³) = ?`;
-        answer = (mant * 100).toString();
+        // 11 класс: Арифметика / прикладная математика (вероятности, лимиты, проценты)
+        const mode = Math.random();
+        if (mode < 0.4) {
+          const probs = [
+            { q: 'Бросок кубика: P(выпадет число 6) = 1/?', a: '6' },
+            { q: 'Бросок 2 монет: P(два орла) = 1/?', a: '4' },
+            { q: 'В урне 3 белых и 7 синих шаров. P(белый) = ?', a: '0.3' },
+            { q: 'Бросок кубика: P(чётное число) = ?', a: '0.5' },
+            { q: 'В колоде 36 карт. Карт каждой масти = ?', a: '9' }
+          ];
+          const chosen = probs[Math.floor(Math.random() * probs.length)];
+          question = chosen.q;
+          answer = chosen.a;
+        } else if (mode < 0.7) {
+          const limits = [
+            { q: 'lim(x→∞) (3x + 6)/(x + 1) = ?', a: '3' },
+            { q: 'lim(x→∞) (4x² + 5)/(2x² + 1) = ?', a: '2' },
+            { q: 'lim(x→0) sin(x)/x = ?', a: '1' },
+            { q: 'lim(x→2) (x² - 4)/(x - 2) = ?', a: '4' },
+            { q: 'lim(x→∞) 10/x = ?', a: '0' }
+          ];
+          const chosen = limits[Math.floor(Math.random() * limits.length)];
+          question = chosen.q;
+          answer = chosen.a;
+        } else {
+          const finance = [
+            { q: 'Вклад 1000₽ под 10% годовых на 2 года: 1000 × 1.1² = ?', a: '1210' },
+            { q: 'Вклад 2000₽ под 10% на 1 год: 2000 × 1.1 = ?', a: '2200' },
+            { q: 'Сложные проценты: 500 × 1.2 = ?', a: '600' },
+            { q: 'Сумма 1000₽ при росте 20%: 1000 × 1.2 = ?', a: '1200' }
+          ];
+          const chosen = finance[Math.floor(Math.random() * finance.length)];
+          question = chosen.q;
+          answer = chosen.a;
+        }
       }
-    } else {
-      // Algebra
-      if (grade === 1) {
-        const a = Math.floor(Math.random() * 8) + 2;
-        const b = Math.floor(Math.random() * 10) + 5;
-        question = `? + ${a} = ${a + b}`;
-        answer = b.toString();
-      } else if (grade === 2) {
+    } else if (topic === 'algebra') {
+      if (grade === 2) {
         const a = Math.floor(Math.random() * 10) + 3;
         const x = Math.floor(Math.random() * 15) + 2;
         question = `x + ${a} = ${x + a}, x = ?`;
@@ -3608,29 +3748,324 @@ function App() {
         question = `x² - ${sum}x + ${prod} = 0, x₁ + x₂ = ?`;
         answer = sum.toString();
       } else if (grade === 9) {
-        const a = Math.floor(Math.random() * 4) + 2;
-        question = `Арифметическая прогрессия: a₁ = 3, d = ${a}. Чему равен a₄?`;
-        answer = (3 + 3 * a).toString();
+        const mode = Math.random();
+        if (mode < 0.5) {
+          const roots = [
+            { q: 'x² - 25 = 0, при x > 0: x = ?', a: '5' },
+            { q: 'x² - 49 = 0, при x > 0: x = ?', a: '7' },
+            { q: 'x² - 64 = 0, |x| = ?', a: '8' },
+            { q: 'x² - 6x = 0, ненулевой корень x = ?', a: '6' }
+          ];
+          const chosen = roots[Math.floor(Math.random() * roots.length)];
+          question = chosen.q;
+          answer = chosen.a;
+        } else {
+          const vieta = [
+            { q: 'x² - 8x + 15 = 0, произведение x₁ · x₂ = ?', a: '15' },
+            { q: 'x² - 5x + 6 = 0, сумма x₁ + x₂ = ?', a: '5' },
+            { q: '(x - 4)(x + 2) = 0, положительный корень x = ?', a: '4' }
+          ];
+          const chosen = vieta[Math.floor(Math.random() * vieta.length)];
+          question = chosen.q;
+          answer = chosen.a;
+        }
       } else if (grade === 10) {
-        const x = [2, 3, 4, 5][Math.floor(Math.random() * 4)];
-        question = `Показательное уравнение: 3ˣ⁺¹ = ${Math.pow(3, x + 1)}, x = ?`;
-        answer = x.toString();
+        // 10 класс: Алгебра (тригонометрия, тождества, показательные уравнения)
+        const mode = Math.random();
+        if (mode < 0.4) {
+          const trigs = [
+            { q: 'sin(30°) = ?', a: '0.5' },
+            { q: 'cos(60°) = ?', a: '0.5' },
+            { q: 'sin(90°) = ?', a: '1' },
+            { q: 'cos(0°) = ?', a: '1' },
+            { q: 'tan(45°) = ?', a: '1' },
+            { q: 'sin²(α) + cos²(α) = ?', a: '1' }
+          ];
+          const chosen = trigs[Math.floor(Math.random() * trigs.length)];
+          question = chosen.q;
+          answer = chosen.a;
+        } else if (mode < 0.7) {
+          const exps = [
+            { q: '2^(x) = 16, x = ?', a: '4' },
+            { q: '3^(x) = 27, x = ?', a: '3' },
+            { q: '5^(x-1) = 25, x = ?', a: '3' },
+            { q: 'log₂(x) = 4, x = ?', a: '16' },
+            { q: 'log₃(x) = 3, x = ?', a: '27' },
+            { q: '4^(x) = 64, x = ?', a: '3' }
+          ];
+          const chosen = exps[Math.floor(Math.random() * exps.length)];
+          question = chosen.q;
+          answer = chosen.a;
+        } else {
+          const eqTrig = [
+            { q: '2 · sin(x) = 1 (в I четверти), sin(x) = ?', a: '0.5' },
+            { q: '2 · cos(x) = 1 (в I четверти), cos(x) = ?', a: '0.5' },
+            { q: '1 - cos²(x) при sin(x) = 0.8 равно ?', a: '0.64' },
+            { q: '2 · sin(x) · cos(x) = sin(?x)', a: '2' }
+          ];
+          const chosen = eqTrig[Math.floor(Math.random() * eqTrig.length)];
+          question = chosen.q;
+          answer = chosen.a;
+        }
       } else {
-        // Grade 11 Algebra
-        const b = [2, 3, 4][Math.floor(Math.random() * 3)];
-        question = `Логарифмическое уравнение: log₂(${b}x) = 4 ⟹ x = ?`;
-        answer = (16 / b).toString();
+        // 11 класс: Алгебра (производные, экстремумы, интегралы)
+        const mode = Math.random();
+        if (mode < 0.4) {
+          const derivs = [
+            { q: 'f(x) = x⁴, f\'(x) = ?x³', a: '4' },
+            { q: 'f(x) = 3x², производная f\'(4) = 6·4 = ?', a: '24' },
+            { q: 'f(x) = x², f\'(5) = 2·5 = ?', a: '10' },
+            { q: 'f(x) = 2x³ - 5x, f\'(1) = 6·1² - 5 = ?', a: '1' },
+            { q: 'f(x) = x³ - 3x, f\'(2) = 3·4 - 3 = ?', a: '9' },
+            { q: '(sin x)\' = cos x; при x=0: cos(0) = ?', a: '1' }
+          ];
+          const chosen = derivs[Math.floor(Math.random() * derivs.length)];
+          question = chosen.q;
+          answer = chosen.a;
+        } else if (mode < 0.7) {
+          const integrals = [
+            { q: '∫ 2x dx = x² + C; при x=4: 4² = ?', a: '16' },
+            { q: '∫₀² 3x² dx = [x³]₀² = 2³ - 0 = ?', a: '8' },
+            { q: '∫₁³ 2x dx = [x²]₁³ = 9 - 1 = ?', a: '8' },
+            { q: '∫₀¹ 4x³ dx = [x⁴]₀¹ = 1 - 0 = ?', a: '1' },
+            { q: '∫ 3x² dx = x³ + C; при x=3: 3³ = ?', a: '27' }
+          ];
+          const chosen = integrals[Math.floor(Math.random() * integrals.length)];
+          question = chosen.q;
+          answer = chosen.a;
+        } else {
+          const extrema = [
+            { q: 'Парабола f(x) = x² - 6x + 5: точка минимума x = ?', a: '3' },
+            { q: 'f(x) = -x² + 8x - 2: точка максимума x = ?', a: '4' },
+            { q: 'f(x) = x² - 4x: производная f\'(x) = 0 при x = ?', a: '2' },
+            { q: 'f(x) = x³ - 12x: f\'(x) = 3x² - 12 = 0 при x>0: x = ?', a: '2' }
+          ];
+          const chosen = extrema[Math.floor(Math.random() * extrema.length)];
+          question = chosen.q;
+          answer = chosen.a;
+        }
+      }
+    } else if (topic === 'geometry') {
+      if (grade === 2) {
+        const mode = Math.random();
+        if (mode < 0.5) {
+          const a = Math.floor(Math.random() * 6) + 3;
+          question = `Квадрат со стороной ${a} см. Периметр P = 4 × ${a} = ?`;
+          answer = (4 * a).toString();
+        } else {
+          const a = Math.floor(Math.random() * 4) + 2;
+          const b = Math.floor(Math.random() * 4) + 5;
+          question = `Прямоугольник ${a} см и ${b} см. Периметр P = 2·(a+b) = ?`;
+          answer = (2 * (a + b)).toString();
+        }
+      } else if (grade === 3) {
+        const mode = Math.random();
+        if (mode < 0.5) {
+          const a = Math.floor(Math.random() * 6) + 3;
+          const b = Math.floor(Math.random() * 5) + 2;
+          question = `Прямоугольник со сторонами ${a} и ${b}. Площадь S = a × b = ?`;
+          answer = (a * b).toString();
+        } else {
+          const a = Math.floor(Math.random() * 5) + 3;
+          question = `Квадрат со стороной ${a} см. Площадь S = a² = ?`;
+          answer = (a * a).toString();
+        }
+      } else if (grade === 4) {
+        const mode = Math.random();
+        if (mode < 0.5) {
+          const a = Math.floor(Math.random() * 3) + 2;
+          question = `Куб с ребром ${a} см. Объём V = a³ = ?`;
+          answer = (a * a * a).toString();
+        } else {
+          const a = 2, b = 3, c = Math.floor(Math.random() * 4) + 4;
+          question = `Параллелепипед ${a} × ${b} × ${c}. Объём V = ?`;
+          answer = (a * b * c).toString();
+        }
+      } else if (grade === 5) {
+        const mode = Math.random();
+        if (mode < 0.5) {
+          const angle = [30, 45, 60, 70, 80][Math.floor(Math.random() * 5)];
+          question = `Смежный угол к углу ${angle}° равен 180° - ${angle}° = ?°`;
+          answer = (180 - angle).toString();
+        } else {
+          const opt = [
+            { q: 'Градусная мера прямого угла = ?°', a: '90' },
+            { q: 'Градусная мера развёрнутого угла = ?°', a: '180' },
+            { q: 'В одном метре = ? сантиметров', a: '100' }
+          ];
+          const chosen = opt[Math.floor(Math.random() * opt.length)];
+          question = chosen.q;
+          answer = chosen.a;
+        }
+      } else if (grade === 6) {
+        const mode = Math.random();
+        if (mode < 0.5) {
+          const r = Math.floor(Math.random() * 7) + 3;
+          question = `Окружность с радиусом R = ${r}. Диаметр D = 2R = ?`;
+          answer = (2 * r).toString();
+        } else {
+          const r = [2, 3, 4][Math.floor(Math.random() * 3)];
+          question = `Круг с радиусом R = ${r}. При π ≈ 3 площадь S ≈ 3 × R² = ?`;
+          answer = (3 * r * r).toString();
+        }
+      } else if (grade === 7) {
+        const mode = Math.random();
+        if (mode < 0.5) {
+          const a1 = 50, a2 = 60;
+          question = `В треугольнике углы ${a1}° и ${a2}°. Третий угол = ?°`;
+          answer = (180 - a1 - a2).toString();
+        } else {
+          const acute = [30, 40, 45, 60][Math.floor(Math.random() * 4)];
+          question = `Прямоугольный треугольник: острый угол ${acute}°. Второй угол = ?°`;
+          answer = (90 - acute).toString();
+        }
+      } else if (grade === 8) {
+        const mode = Math.random();
+        if (mode < 0.5) {
+          const pyth = [
+            { a: 3, b: 4, c: 5 },
+            { a: 6, b: 8, c: 10 },
+            { a: 5, b: 12, c: 13 }
+          ][Math.floor(Math.random() * 3)];
+          question = `Теорема Пифагора: катеты ${pyth.a} и ${pyth.b}. Гипотенуза c = ?`;
+          answer = pyth.c.toString();
+        } else {
+          const base = 8, h = 5;
+          question = `Треугольник: основание a = ${base}, высота h = ${h}. Площадь S = (a·h)/2 = ?`;
+          answer = ((base * h) / 2).toString();
+        }
+      } else if (grade === 9) {
+        const mode = Math.random();
+        if (mode < 0.5) {
+          const arc = [60, 80, 100, 120][Math.floor(Math.random() * 4)];
+          question = `Вписанный угол опирается на дугу ${arc}°. Его величина = ?°`;
+          answer = (arc / 2).toString();
+        } else {
+          const vec = [
+            { q: 'Длина вектора a(3, 4): |a| = √(3² + 4²) = ?', a: '5' },
+            { q: 'Длина вектора b(6, 8): |b| = √(6² + 8²) = ?', a: '10' },
+            { q: 'Скалярное произведение a(2, 3) и b(4, 1): 2·4 + 3·1 = ?', a: '11' }
+          ];
+          const chosen = vec[Math.floor(Math.random() * vec.length)];
+          question = chosen.q;
+          answer = chosen.a;
+        }
+      } else if (grade === 10) {
+        // 10 класс: Стереометрия
+        const opts = [
+          { q: 'Куб со стороной a = 3. Площадь поверхности 6a² = ?', a: '54' },
+          { q: 'Куб со стороной a = 4. Площадь поверхности 6a² = ?', a: '96' },
+          { q: 'Сколько граней у правильного тетраэдра?', a: '4' },
+          { q: 'Сколько рёбер у прямоугольного параллелепипеда?', a: '12' },
+          { q: 'Сколько вершин у куба?', a: '8' },
+          { q: 'Параллелепипед 2×3×6: диагональ d = √(4 + 9 + 36) = ?', a: '7' }
+        ];
+        const chosen = opts[Math.floor(Math.random() * opts.length)];
+        question = chosen.q;
+        answer = chosen.a;
+      } else {
+        // 11 класс: Тела вращения
+        const opts = [
+          { q: 'Цилиндр: R = 2, h = 5. При π ≈ 3 объём V ≈ 3 × R² × h = ?', a: '60' },
+          { q: 'Конус: радиус R = 3, высота h = 4. Образующая L = √(9 + 16) = ?', a: '5' },
+          { q: 'Шар радиуса R = 2. При π ≈ 3 площадь сферы S ≈ 4 × 3 × R² = ?', a: '48' },
+          { q: 'Конус: радиус R = 6, высота h = 8. Образующая L = √(36 + 64) = ?', a: '10' },
+          { q: 'Сечение шара радиуса 5 на расстоянии 3: радиус сечения r = √(25 - 9) = ?', a: '4' }
+        ];
+        const chosen = opts[Math.floor(Math.random() * opts.length)];
+        question = chosen.q;
+        answer = chosen.a;
+      }
+    } else {
+      // topic === 'analysis' (📈 Анализ)
+      if (grade === 2) {
+        const seqs = [
+          { q: 'Числовой ряд: 2, 4, 6, 8, ?', a: '10' },
+          { q: 'Числовой ряд: 5, 10, 15, 20, ?', a: '25' },
+          { q: 'Числовой ряд: 10, 20, 30, 40, ?', a: '50' },
+          { q: 'Числовой ряд: 1, 3, 5, 7, ?', a: '9' }
+        ];
+        const chosen = seqs[Math.floor(Math.random() * seqs.length)];
+        question = chosen.q;
+        answer = chosen.a;
+      } else if (grade === 3) {
+        const a = Math.floor(Math.random() * 4) + 2;
+        const x = Math.floor(Math.random() * 5) + 3;
+        question = `Функция y = ${a}x. При x = ${x} значение y = ?`;
+        answer = (a * x).toString();
+      } else if (grade === 4) {
+        const s = [24, 36, 48, 60][Math.floor(Math.random() * 4)];
+        const t = [2, 3, 4][Math.floor(Math.random() * 3)];
+        question = `Скорость v = S/t: путь ${s} км за ${t} ч. v = ? км/ч`;
+        answer = (s / t).toString();
+      } else if (grade === 5) {
+        const n1 = 10, n2 = 20, n3 = 30;
+        question = `Среднее арифметическое чисел ${n1}, ${n2}, ${n3} = ?`;
+        answer = ((n1 + n2 + n3) / 3).toString();
+      } else if (grade === 6) {
+        const k = Math.floor(Math.random() * 4) + 2;
+        const x = Math.floor(Math.random() * 5) + 3;
+        question = `Прямая пропорциональность y = ${k}x. При x = ${x}: y = ?`;
+        answer = (k * x).toString();
+      } else if (grade === 7) {
+        const k = Math.floor(Math.random() * 5) + 2;
+        const b = Math.floor(Math.random() * 7) + 1;
+        question = `Линейная функция y = ${k}x + ${b}. Угловой коэффициент k = ?`;
+        answer = k.toString();
+      } else if (grade === 8) {
+        const root = [2, 3, 4, 5][Math.floor(Math.random() * 4)];
+        question = `Нули функции f(x) = x² - ${root * root}: положительный ноль x = ?`;
+        answer = root.toString();
+      } else if (grade === 9) {
+        const x0 = [2, 3, 4][Math.floor(Math.random() * 3)];
+        question = `Вершина параболы y = (x - ${x0})² + 5: координата вершины x₀ = ?`;
+        answer = x0.toString();
+      } else if (grade === 10) {
+        // 10 класс: Анализ (пределы в точке, приращение, угловой коэффициент касательной)
+        const lims = [
+          { q: 'Предел lim(x→3) (x² - 9)/(x - 3) = lim(x→3)(x + 3) = ?', a: '6' },
+          { q: 'Предел lim(x→2) (x² - 4)/(x - 2) = lim(x→2)(x + 2) = ?', a: '4' },
+          { q: 'Предел lim(x→0) (8x)/x = ?', a: '8' },
+          { q: 'Касательная под углом 45°: угловой коэффициент k = tan(45°) = ?', a: '1' },
+          { q: 'Предел lim(x→∞) (6x + 5)/(2x + 1) = ?', a: '3' }
+        ];
+        const chosen = lims[Math.floor(Math.random() * lims.length)];
+        question = chosen.q;
+        answer = chosen.a;
+      } else {
+        // 11 класс: Анализ (дифференцирование, интегралы, экстремумы)
+        const opts = [
+          { q: 'Производная f(x) = x⁵: показатель степени в f\'(x) = 5x^? равен ?', a: '4' },
+          { q: 'f(x) = 3x²: значение производной f\'(5) = 6·5 = ?', a: '30' },
+          { q: 'Критическая точка f(x) = x³ - 3x: f\'(x) = 3x² - 3 = 0, при x > 0: x = ?', a: '1' },
+          { q: 'Интеграл Ньютона-Лейбница: ∫₁² 3x² dx = [x³]₁² = 8 - 1 = ?', a: '7' },
+          { q: 'Площадь под параболой y = x² от x=0 до x=3: ∫₀³ x² dx = [x³/3]₀³ = ?', a: '9' },
+          { q: 'Вторая производная f\'\'(x): f(x) = x³, f\'\'(2) = 6·2 = ?', a: '12' }
+        ];
+        const chosen = opts[Math.floor(Math.random() * opts.length)];
+        question = chosen.q;
+        answer = chosen.a;
       }
     }
 
-    const numAns = parseInt(answer);
+    const numAns = parseFloat(answer);
     if (!isNaN(numAns) && distractors.length === 0) {
-      distractors = [
-        (numAns + 1).toString(),
-        (numAns - 1).toString(),
-        (numAns + (numAns > 10 ? 10 : 2)).toString(),
-        (Math.max(0, numAns - 2)).toString()
-      ].filter(d => d !== answer).slice(0, 3);
+      if (Number.isInteger(numAns)) {
+        distractors = [
+          (numAns + 1).toString(),
+          (numAns - 1).toString(),
+          (numAns + (numAns > 10 ? 10 : 2)).toString(),
+          (Math.max(0, numAns - 2)).toString()
+        ].filter(d => d !== answer).slice(0, 3);
+      } else {
+        distractors = [
+          (parseFloat((numAns + 0.1).toFixed(2))).toString(),
+          (parseFloat((Math.max(0, numAns - 0.1)).toFixed(2))).toString(),
+          (parseFloat((numAns + 0.25).toFixed(2))).toString(),
+          '1',
+          '0'
+        ].filter(d => d !== answer).slice(0, 3);
+      }
     }
 
     const wordBank = [answer, ...distractors].sort(() => Math.random() - 0.5);
@@ -3645,7 +4080,7 @@ function App() {
     };
   };
 
-  const startMathTraining = (grade: number = mathGrade, topic: 'arithmetic' | 'algebra' | 'geometry' | 'calculus' = mathTopic) => {
+  const startMathTraining = (grade: number = mathGrade, topic: 'arithmetic' | 'algebra' | 'geometry' | 'analysis' = mathTopic) => {
     playSound('click');
     const ex = generateMathExercise(grade, topic);
     setCurrentExercise(ex);
@@ -3700,8 +4135,6 @@ const getTodayChallenge = () => {
         return {
           ...defaultChessSettings,
           ...parsed,
-          brushSize: parsed.brushSize || 14,
-          brushColor: parsed.brushColor || '#1CB0F6',
           language: safeLang,
           chessStats: parsed.chessStats || { games: 265, wins: 134, elo: 590 },
         };
@@ -3722,8 +4155,6 @@ const getTodayChallenge = () => {
       voiceProvider: 'gemini',
       chessStats: { games: 265, wins: 134, elo: 590 },
       ...defaultChessSettings,
-      brushSize: 14,
-      brushColor: '#1CB0F6',
       streakFreezeCount: 1,
       lastActiveDate: todayStr
     };
@@ -3732,19 +4163,21 @@ const getTodayChallenge = () => {
   const [leaderboardLang, setLeaderboardLang] = useState<string>(() => user.language || 'ru');
 
   const t = (key: string) => {
-    const lang = TRANSLATIONS[user.language] ? user.language : 'en';
+    const userLang = user.language;
+    const lang = ALL_APP_TRANSLATIONS[userLang] ? userLang : (userLang || 'en');
     if (USER_TRANSLATIONS[key] && USER_TRANSLATIONS[key][lang]) {
       return USER_TRANSLATIONS[key][lang];
     }
-    return TRANSLATIONS[lang]?.[key] || TRANSLATIONS['en'][key] || TRANSLATIONS['ru'][key] || key;
+    return ALL_APP_TRANSLATIONS[lang]?.[key] || ALL_APP_TRANSLATIONS['en']?.[key] || ALL_APP_TRANSLATIONS['ru']?.[key] || key;
   };
 
   const getLocalizedCourseName = (c: any) => {
     if (!c) return '';
-    const lang = TRANSLATIONS[user.language] ? user.language : 'en';
+    const userLang = user.language;
+    const lang = ALL_APP_TRANSLATIONS[userLang] ? userLang : (userLang || 'en');
     const directKey = `lang_${c.id}`;
-    if (TRANSLATIONS[lang]?.[directKey]) {
-      return TRANSLATIONS[lang][directKey];
+    if (ALL_APP_TRANSLATIONS[lang]?.[directKey]) {
+      return ALL_APP_TRANSLATIONS[lang][directKey];
     }
     if (c.id === 'chess') {
       if (lang === 'ru') return 'Шахматы (Курс не является языком • Навык/Игра)';
@@ -3767,7 +4200,7 @@ const getTodayChallenge = () => {
       return 'Mathematics';
     }
     if (c.id === 'music') {
-      if (lang === 'ru') return 'Музыка';
+      if (lang === 'ru') return 'Музыка (Курс не является языком • Ноты и ритм)';
       if (lang === 'de') return 'Musik';
       if (lang === 'fr') return 'Musique';
       if (lang === 'es') return 'Música';
@@ -3775,6 +4208,14 @@ const getTodayChallenge = () => {
       if (lang === 'zh') return '音乐';
       if (lang === 'ar') return 'الموسيقى';
       return 'Music';
+    }
+    if (c.id === 'coding') {
+      if (lang === 'ru') return 'Программирование (Курс является языком программирования • Алгоритмы)';
+      return 'Programming (Course is a programming language • Algorithms)';
+    }
+    if (c.id === 'art') {
+      if (lang === 'ru') return 'Рисование и Каллиграфия (Курс не является языком • Творчество)';
+      return 'Art & Calligraphy (Not a Language • Drawing)';
     }
     const rfTranslations: Record<string, Record<string, string>> = {
       'rf-tatar': { ru: 'Татарский', en: 'Tatar', de: 'Tatarisch', fr: 'Tatar', es: 'Tártaro', ja: 'タタール語', zh: '鞑靼语', ar: 'التترية' },
@@ -3884,14 +4325,14 @@ const getTodayChallenge = () => {
     });
   }, []);
 
-  // Listen for online and offline network events to seamlessly sync offlineMode
+  // Listen for online and offline network events to seamlessly sync internet availability
   useEffect(() => {
     const handleOnline = () => {
       setOfflineMode(false);
       setToast(
         user.language === 'ru'
-          ? '🌐 Подключение к интернету восстановлено! Офлайн-режим отключен.'
-          : '🌐 Internet connection restored! Offline mode deactivated.'
+          ? '🌐 Подключение к интернету восстановлено! Работает без VPN и использует VPN.'
+          : '🌐 Internet connection restored! Works without VPN and with VPN.'
       );
     };
 
@@ -3899,21 +4340,17 @@ const getTodayChallenge = () => {
       setOfflineMode(true);
       setToast(
         user.language === 'ru'
-          ? '⚠️ Нет подключения к интернету. Активирован автономный офлайн-режим PWA.'
-          : '⚠️ No internet connection. PWA Offline mode activated.'
+          ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
+          : '📡 No internet connection. DuoWindo6601 requires internet. Turn on Wi-Fi or mobile data and try again.'
       );
     };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Initial check
+    // Initial check: disabled offline mode on us-east1.run.app / ai.studio when online
     if (typeof navigator !== 'undefined') {
-      if (!navigator.onLine) {
-        setOfflineMode(true);
-      } else {
-        setOfflineMode(false);
-      }
+      setOfflineMode(isOnlineHostedEnvironment() && navigator.onLine ? false : !navigator.onLine);
     }
 
     return () => {
@@ -4796,6 +5233,26 @@ const getTodayChallenge = () => {
   const [chessTurn, setChessTurn] = useState<ChessColor>('w');
   const [chessMode, setChessMode] = useState<'pve'|'pvp'|'tutorial'|'study'>('pve');
   const [tutorialMessage, setTutorialMessage] = useState("");
+  const [tutorialHintText, setTutorialHintText] = useState<string>("");
+  const [tutorialHintLoading, setTutorialHintLoading] = useState<boolean>(false);
+
+  const handleFetchChessTutorialHint = async () => {
+    if (tutorialHintLoading) return;
+    playSound('click');
+    setTutorialHintLoading(true);
+    try {
+      const hint = await getChessTutorialHint(chessFen, chessHistory, user.language, tutorialMessage);
+      setTutorialHintText(hint);
+    } catch (err) {
+      setTutorialHintText(
+        user.language === 'ru'
+          ? "💡 Подсказка: Развивайте фигуры ближе к центру!"
+          : "💡 Hint: Develop your pieces towards the center!"
+      );
+    } finally {
+      setTutorialHintLoading(false);
+    }
+  };
   const [chessSelected, setChessSelected] = useState<Coords | null>(null);
   const [chessValidMoves, setChessValidMoves] = useState<Coords[]>([]);
   const [chessHistory, setChessHistory] = useState<string[]>([]);
@@ -4816,6 +5273,7 @@ const getTodayChallenge = () => {
   const [transTarget, setTransTarget] = useState<Course>(currentCourse);
 
   const [courseRegionTab, setCourseRegionTab] = useState<'all' | 'speaker' | 'easiest' | 'hardest' | 'cis' | 'world' | 'special' | 'rf' | 'catalog' | 'beta'>('all');
+  const [showClassicCourseCatalog, setShowClassicCourseCatalog] = useState<boolean>(false);
   const [speakerLanguage, setSpeakerLanguage] = useState<string>(() => user.language || 'ru');
   const [courseSearch, setCourseSearch] = useState("");
   const [courseSortMode, setCourseSortMode] = useState<CourseSortMode>('default');
@@ -4833,12 +5291,26 @@ const getTodayChallenge = () => {
   const [videoCallHistory, setVideoCallHistory] = useState<RoleplayMessage[]>([]);
   const [videoInputText, setVideoInputText] = useState("");
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [lessonBackupExercise, setLessonBackupExercise] = useState<Exercise | null>(null);
+  const [showLessonAiPartnerModal, setShowLessonAiPartnerModal] = useState(false);
+  const [selectedGemsPackModal, setSelectedGemsPackModal] = useState<{
+    id: string;
+    gems: number;
+    bonusGems: number;
+    price: string;
+    amountUsd: number;
+    titleRu: string;
+    titleEn: string;
+    popular?: boolean;
+  } | null>(null);
+  const [isProcessingGemsCheckout, setIsProcessingGemsCheckout] = useState(false);
+  const [stripeGemsExternalUrl, setStripeGemsExternalUrl] = useState<string | null>(null);
 
   const recognitionRef = useRef<any>(null);
   const timerRef = useRef<any>(null);
   const transcriptRef = useRef<string>("");
 
-  const isLanguageCourse = useMemo(() => !SPECIAL_IDS.includes(currentCourse.id), [currentCourse]);
+  const isLanguageCourse = useMemo(() => !NON_LANGUAGE_IDS.includes(currentCourse.id), [currentCourse]);
 
   const [useRtlOverride, setUseRtlOverride] = useState<boolean>(true);
 
@@ -5020,7 +5492,7 @@ const getTodayChallenge = () => {
       const parsedUser = rawUser ? JSON.parse(rawUser) : user;
       const backupData = {
         app: 'DuoWindo6601',
-        version: '1.0.2',
+        version: APP_VERSION,
         backupType: 'Local Progress Backup',
         exportedAt: new Date().toISOString(),
         user: parsedUser,
@@ -5078,6 +5550,73 @@ const getTodayChallenge = () => {
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(user)); }, [user]);
   useEffect(() => { localStorage.setItem('duo_course_id_6601', currentCourse.id); }, [currentCourse]);
   useEffect(() => { setTransTarget(currentCourse); }, [currentCourse]);
+
+  // Handle Stripe Checkout Redirect Query Parameters on startup
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const stripeStatus = params.get('stripe_status');
+    const gemsParam = params.get('gems');
+    const tierParam = params.get('tier');
+    const sessionId = params.get('session_id');
+
+    if (stripeStatus === 'gems_success' && gemsParam) {
+      const addedGems = parseInt(gemsParam, 10) || 1200;
+      playSound('fanfare');
+      setUser(u => ({
+        ...u,
+        gems: u.gems + addedGems
+      }));
+      if (sessionId) {
+        void checkStripeSession(sessionId).then((sessionData) => {
+          if (sessionData?.customer) {
+            setUser(u => ({
+              ...u,
+              stripeCustomerId: typeof sessionData.customer === 'string' ? sessionData.customer : u.stripeCustomerId
+            }));
+          }
+        });
+      }
+      setToast(user.language === 'ru'
+        ? `🎉 Пополнение успешно! +${addedGems} 💎 зачислено на ваш баланс!`
+        : `🎉 Payment successful! +${addedGems} 💎 added to your balance!`
+      );
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (stripeStatus === 'success' && tierParam) {
+      const selectedTier = (tierParam === 'max' ? 'max' : 'super') as SubscriptionTier;
+      playSound('fanfare');
+      setUser(u => ({
+        ...u,
+        subscription: selectedTier,
+        infiniteHearts: true,
+        infiniteEnergy: true,
+        stripeSubscriptionStatus: 'active'
+      }));
+      if (sessionId) {
+        void checkStripeSession(sessionId).then((sessionData) => {
+          if (sessionData) {
+            setUser(u => ({
+              ...u,
+              stripeCustomerId: typeof sessionData.customer === 'string' ? sessionData.customer : u.stripeCustomerId,
+              stripeSubscriptionId: typeof sessionData.subscription === 'string' ? sessionData.subscription : u.stripeSubscriptionId,
+            }));
+          }
+        });
+      }
+      setToast(user.language === 'ru'
+        ? `👑 Подписка DuoWindo6601 ${selectedTier === 'max' ? 'Max' : 'Super'} успешно активирована!`
+        : `👑 DuoWindo6601 ${selectedTier === 'max' ? 'Max' : 'Super'} subscription activated!`
+      );
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (stripeStatus === 'cancel' || stripeStatus === 'gems_cancelled') {
+      playSound('wrong');
+      setToast(user.language === 'ru'
+        ? 'ℹ️ Оплата через Stripe Checkout отменена'
+        : 'ℹ️ Stripe Checkout payment cancelled'
+      );
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
 
   // Level & Achievement Toast Notification Tracker
   const prevXpRef = useRef(user.xp);
@@ -5170,7 +5709,16 @@ const getTodayChallenge = () => {
   }, [currentExercise?.roleplayData?.messages]);
 
   // ... (Video, Speech, Draw handlers same as before) ...
-  const startVideoCall = async (topic: string = "Заказ в кафе") => {
+  const startVideoCall = async (topic: string = "Заказ в кафе", fromLesson: boolean = false) => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          setOfflineMode(true);
+          setToast(
+              user.language === 'ru'
+                  ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
+                  : '📡 No internet connection. DuoWindo6601 requires internet. Turn on Wi-Fi or mobile data and try again.'
+          );
+          return;
+      }
       if (user.subscription !== 'max') {
           playSound('wrong');
           setToast(
@@ -5181,34 +5729,56 @@ const getTodayChallenge = () => {
           setScreen(AppScreen.SUBSCRIPTION);
           return;
       }
+      if (fromLesson && currentExercise) {
+          setLessonBackupExercise(currentExercise);
+      }
       playSound('click');
       setLoading(true);
       setVideoTopic(topic);
       setVideoHint("");
       setVideoInputText("");
+      setVideoQuestion("");
+      setVideoCallHistory([]);
       setScreen(AppScreen.VIDEO_CALL);
 
-      const initialGreeting = user.language === 'en'
-        ? `Hello! I'm DuoWindo6601. Welcome to our video call! Let's talk about "${topic}". How are you doing today?`
-        : `Привет! Я DuoWindo6601. Рад приветствовать тебя на нашем видеозвонке! Давай пообщаемся на тему: "${topic}". Как твои дела сегодня?`;
+      const speechLangId = NON_LANGUAGE_IDS.includes(currentCourse.id) ? (user.language === 'ru' ? 'ru' : 'en') : currentCourse.id;
+      try {
+          const greetingRes = await generateVideoCallRoleplayResponse(topic, [], '__START_VIDEO_CALL__', currentCourse.localName, user.language);
+          const initialGreeting = greetingRes.text;
+          setVideoQuestion(initialGreeting);
+          setVideoCallHistory([{ role: 'model', text: initialGreeting }]);
+          speakText(initialGreeting, speechLangId, false, user.preferredVoice, user.voiceProvider);
 
-      setVideoQuestion(initialGreeting);
-      const initialHistory: RoleplayMessage[] = [{ role: 'model', text: initialGreeting }];
-      setVideoCallHistory(initialHistory);
-
-      speakText(initialGreeting, currentCourse.id, false, user.preferredVoice, user.voiceProvider);
-
-      if (videoSmartMode) {
-          try {
-              const hint = await getInterviewHint(`Topic: ${topic}. How should I reply to the greeting?`);
-              setVideoHint(hint);
-          } catch (e) {}
+          if (videoSmartMode) {
+              try {
+                  const hint = await getInterviewHint(`Topic: ${topic}. How should I reply to: "${initialGreeting}"?`);
+                  setVideoHint(hint);
+              } catch (e) {}
+          }
+      } catch (e: any) {
+          console.error(e);
+          const isOfflineErr = (typeof navigator !== 'undefined' && !navigator.onLine) || String(e?.message || '').includes('Нет подключения к интернету');
+          setToast(
+              isOfflineErr
+                  ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
+                  : (e?.message || (user.language === 'ru' ? '⚠️ Ошибка подключения к AI видеозвонку' : '⚠️ AI Video Call connection error'))
+          );
+      } finally {
+          setLoading(false);
       }
-      setLoading(false);
   };
 
   const handleVideoCallSend = async (text: string) => {
       if (!text.trim() || loading) return;
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          setOfflineMode(true);
+          setToast(
+              user.language === 'ru'
+                  ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
+                  : '📡 No internet connection. DuoWindo6601 requires internet. Turn on Wi-Fi or mobile data and try again.'
+          );
+          return;
+      }
       playSound('click');
       setLoading(true);
       setVideoInputText("");
@@ -5216,23 +5786,30 @@ const getTodayChallenge = () => {
       const userMsg: RoleplayMessage = { role: 'user', text };
       const updatedHistory = [...videoCallHistory, userMsg];
       setVideoCallHistory(updatedHistory);
+      const speechLangId = NON_LANGUAGE_IDS.includes(currentCourse.id) ? (user.language === 'ru' ? 'ru' : 'en') : currentCourse.id;
 
       try {
-          const res = await generateVideoCallRoleplayResponse(videoTopic, updatedHistory, text, currentCourse.localName);
+          const res = await generateVideoCallRoleplayResponse(videoTopic, updatedHistory, text, currentCourse.localName, user.language);
           const aiMsg: RoleplayMessage = { role: 'model', text: res.text, correction: res.correction };
           const finalHistory = [...updatedHistory, aiMsg];
           setVideoCallHistory(finalHistory);
           setVideoQuestion(res.text);
 
-          speakText(res.text, currentCourse.id, false, user.preferredVoice, user.voiceProvider);
+          speakText(res.text, speechLangId, false, user.preferredVoice, user.voiceProvider);
           setUser(u => ({ ...u, xp: u.xp + 15 }));
 
           if (videoSmartMode) {
               const hint = await getInterviewHint(`Topic: ${videoTopic}. Question: "${res.text}". What are good ways to reply?`);
               setVideoHint(hint);
           }
-      } catch (e) {
+      } catch (e: any) {
           console.error(e);
+          const isOfflineErr = (typeof navigator !== 'undefined' && !navigator.onLine) || String(e?.message || '').includes('Нет подключения к интернету');
+          setToast(
+              isOfflineErr
+                  ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
+                  : (e?.message || (user.language === 'ru' ? '⚠️ Ошибка ответа AI. Попробуйте снова.' : '⚠️ AI response error. Please try again.'))
+          );
       } finally {
           setLoading(false);
       }
@@ -5242,15 +5819,52 @@ const getTodayChallenge = () => {
       startVideoCall("Собеседование на работу");
   };
 
+  const speechCtxRef = useRef<{
+    screen: AppScreen;
+    currentExercise: Exercise | null;
+    handleRoleplaySend: (text: string) => void;
+    handleVideoCallSend: (text: string) => void;
+    checkAnswer: (spokenText?: string) => void;
+  }>({
+    screen,
+    currentExercise,
+    handleRoleplaySend: () => {},
+    handleVideoCallSend: () => {},
+    checkAnswer: () => {}
+  });
+
+  useEffect(() => {
+    speechCtxRef.current = {
+      screen,
+      currentExercise,
+      handleRoleplaySend,
+      handleVideoCallSend,
+      checkAnswer
+    };
+  });
+
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (SpeechRecognition) {
         const recognition = new SpeechRecognition();
         recognition.continuous = false;
-        recognition.interimResults = true; 
+        recognition.interimResults = true;
         recognition.maxAlternatives = 1;
-        const langMap: Record<string, string> = { 'en': 'en-US', 'de': 'de-DE', 'fr': 'fr-FR', 'es': 'es-ES', 'ja': 'ja-JP', 'zh': 'zh-CN', 'ko': 'ko-KR', 'it': 'it-IT', 'pt': 'pt-BR', 'ru': 'ru-RU' };
-        recognition.lang = langMap[currentCourse.id] || 'en-US';
+        const langMap: Record<string, string> = {
+          'en': 'en-US', 'de': 'de-DE', 'fr': 'fr-FR', 'es': 'es-ES', 'ja': 'ja-JP',
+          'zh': 'zh-CN', 'ko': 'ko-KR', 'it': 'it-IT', 'pt': 'pt-BR', 'ru': 'ru-RU',
+          'ar': 'ar-SA', 'tr': 'tr-TR', 'uk': 'uk-UA', 'be': 'be-BY', 'kk': 'kk-KZ',
+          'uz': 'uz-UZ', 'pl': 'pl-PL', 'fi': 'fi-FI', 'hu': 'hu-HU', 'is': 'is-IS',
+          'id': 'id-ID', 'he': 'he-IL', 'yi': 'he-IL', 'hi': 'hi-IN', 'sv': 'sv-SE',
+          'no': 'nb-NO', 'ro': 'ro-RO', 'mo': 'ro-RO', 'nl': 'nl-NL', 'cs': 'cs-CZ',
+          'el': 'el-GR', 'vi': 'vi-VN', 'th': 'th-TH', 'cv': 'ru-RU', 'tt': 'ru-RU',
+          'ky': 'ru-RU', 'az': 'az-AZ', 'hy': 'hy-AM', 'ka': 'ka-GE', 'eo': 'eo',
+          'la': 'it-IT'
+        };
+        const resolvedRecLang = NON_LANGUAGE_IDS.includes(currentCourse.id)
+          ? (user.language === 'ru' ? 'ru-RU' : 'en-US')
+          : (langMap[currentCourse.id] || (currentCourse.id.startsWith('rf-') ? 'ru-RU' : 'en-US'));
+        recognition.lang = resolvedRecLang;
         recognition.onresult = (event: any) => {
             let interim = '';
             for (let i = event.resultIndex; i < event.results.length; ++i) {
@@ -5258,12 +5872,13 @@ const getTodayChallenge = () => {
                     const finalTrans = event.results[i][0].transcript;
                     transcriptRef.current = finalTrans;
                     setIsRecording(false);
-                    if (currentExercise?.type === 'roleplay') {
-                        handleRoleplaySend(finalTrans);
-                    } else if (screen === AppScreen.VIDEO_CALL) {
-                        handleVideoCallSend(finalTrans);
+                    const ctx = speechCtxRef.current;
+                    if (ctx.currentExercise?.type === 'roleplay') {
+                        ctx.handleRoleplaySend(finalTrans);
+                    } else if (ctx.screen === AppScreen.VIDEO_CALL) {
+                        ctx.handleVideoCallSend(finalTrans);
                     } else {
-                        checkAnswer(finalTrans);
+                        ctx.checkAnswer(finalTrans);
                     }
                     return;
                 } else interim += event.results[i][0].transcript;
@@ -5276,7 +5891,7 @@ const getTodayChallenge = () => {
         recognition.onend = () => setIsRecording(false);
         recognitionRef.current = recognition;
     }
-  }, [currentExercise, currentCourse.id]);
+  }, [currentCourse.id, user.language]);
 
   const onPointerDown = (e: React.PointerEvent) => {
       e.preventDefault(); e.stopPropagation(); isDrawing.current = true;
@@ -5303,28 +5918,36 @@ const getTodayChallenge = () => {
 
   // ... (API and Logic handlers) ...
   const checkApiStatus = async () => { 
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setOfflineMode(true);
+      setToast(
+        user.language === 'ru'
+          ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
+          : '📡 No internet connection. DuoWindo6601 requires internet. Turn on Wi-Fi or mobile data and try again.'
+      );
+      playSound('wrong');
+      return;
+    }
     setIsCheckingApi(true); 
     try { 
       const res = await pingGeminiApi(); 
-      if (res.ok || isCustomApiKeySkipped() || user.subscription === 'super' || user.subscription === 'max') { 
+      if (res.ok) { 
         setOfflineMode(false); 
-        setToast(user.language === 'ru' ? "⚡ Gemini API онлайн и работает (Трафик активен)!" : "⚡ Gemini API is Online!"); 
+        setToast(user.language === 'ru' ? "⚡ Gemini API онлайн! Работает без VPN и использует VPN." : "⚡ Gemini API is Online (Works with & without VPN)!"); 
         playSound('success'); 
       } else { 
-        setOfflineMode(true); 
-        setToast(user.language === 'ru' ? `⚠️ Ошибка API: ${res.message}` : `⚠️ API Error: ${res.message}`); 
+        setOfflineMode(false); 
+        setToast(user.language === 'ru' ? `⚠️ ${res.message}` : `⚠️ ${res.message}`); 
         playSound('wrong'); 
       } 
     } catch (e: any) { 
-      if (isCustomApiKeySkipped() || user.subscription === 'super' || user.subscription === 'max') {
-        setOfflineMode(false);
-        setToast(user.language === 'ru' ? "⚡ Бесплатный трафик DuoWindo6601 онлайн!" : "⚡ DuoWindo6601 Free Traffic Online!");
-        playSound('success');
-      } else {
-        setOfflineMode(true); 
-        setToast(user.language === 'ru' ? "⚠️ Сбой проверки соединения с API" : "⚠️ API Connection Test Failed"); 
-        playSound('wrong'); 
-      }
+      setOfflineMode(typeof navigator !== 'undefined' ? !navigator.onLine : false);
+      setToast(
+        typeof navigator !== 'undefined' && !navigator.onLine
+          ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
+          : (user.language === 'ru' ? "⚠️ Сбой проверки соединения с сервером API" : "⚠️ API Connection Test Failed")
+      ); 
+      playSound('wrong'); 
     } finally { 
       setIsCheckingApi(false); 
     } 
@@ -5705,11 +6328,17 @@ const getTodayChallenge = () => {
   
   const handleExplainMistake = async () => {
     playSound('click');
-    const isOffline = offlineMode || (typeof navigator !== 'undefined' && !navigator.onLine);
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setOfflineMode(true);
+      setToast(
+        user.language === 'ru'
+          ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
+          : '📡 No internet connection. DuoWindo6601 requires internet. Turn on Wi-Fi or mobile data and try again.'
+      );
+      return;
+    }
 
-    // In online mode without MAX subscription, invite user to upgrade to MAX.
-    // In offline mode or with MAX, allow accessing the answer explanation immediately!
-    if (!isOffline && user.subscription !== 'max') {
+    if (user.subscription !== 'max') {
       if (isIncognitoUser) {
         setToast(
           user.language === 'ru'
@@ -5743,13 +6372,16 @@ const getTodayChallenge = () => {
     const userLang = user.language === 'en' ? 'English' : 'Russian';
 
     try {
-      let explanationText = "";
-      if (user.subscription === 'max') {
-        explanationText = await getMistakeExplanation(original, userAnswer, correctAnswer, userLang, isCorrect, currentExercise.type, isOffline);
+      const explanationText = await getMistakeExplanation(original, userAnswer, correctAnswer, userLang, isCorrect, currentExercise.type, false);
+      setExplanation(explanationText);
+    } catch (e: any) {
+      const isOfflineErr = (typeof navigator !== 'undefined' && !navigator.onLine) || String(e?.message || '').includes('Нет подключения к интернету');
+      if (isOfflineErr) {
+        setShowExplanationModal(false);
+        setToast('📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова');
+      } else {
+        setExplanation(generateLocalMistakeExplanation(original, userAnswer, correctAnswer, userLang, isCorrect, currentExercise.type));
       }
-      setExplanation(explanationText || generateLocalMistakeExplanation(original, userAnswer, correctAnswer, userLang, isCorrect, currentExercise.type));
-    } catch (e) {
-      setExplanation(generateLocalMistakeExplanation(original, userAnswer, correctAnswer, userLang, isCorrect, currentExercise.type));
     } finally {
       setExplanationLoading(false);
     }
@@ -5762,7 +6394,7 @@ const getTodayChallenge = () => {
       return;
     }
 
-    if (currentCourse.id === 'chess') {
+    if (currentCourse.id === 'chess' && (type === 'translation' || type === 'chess')) {
       initChessGame();
       setCurrentExercise({
         id: crypto.randomUUID(),
@@ -5772,14 +6404,18 @@ const getTodayChallenge = () => {
         wordBank: [],
         chessData: { fen: INITIAL_BOARD_FEN, pgn: [], difficulty: 'beginner' }
       });
-      setLessonLoading(false);
-      setLoading(false);
       setScreen(AppScreen.LESSON);
       return;
     }
 
-    if (currentCourse.id === 'math') {
+    if (currentCourse.id === 'math' && type === 'translation') {
       startMathTraining(mathGrade, mathTopic);
+      return;
+    }
+
+    if (currentCourse.id === 'music' && type === 'translation') {
+      setMusicStudioTab('notes');
+      setShowMusicStudioModal(true);
       return;
     }
 
@@ -5797,82 +6433,95 @@ const getTodayChallenge = () => {
     setReadingInput("");
 
     const isPhysicalOffline = typeof navigator !== 'undefined' && !navigator.onLine;
-    if (isPhysicalOffline || (offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max')) {
-      const ex = getFallbackExercise(currentCourse.id, type, currentCourse.localName, user.language);
-      setCurrentExercise(ex);
-      setAvailableTokens((ex.wordBank || []).map(w => ({ id: crypto.randomUUID(), text: w })));
+    if (isPhysicalOffline) {
+      setOfflineMode(true);
       setLessonLoading(false);
       setLoading(false);
+      setScreen(AppScreen.PATH);
+      setToast(
+        user.language === 'ru'
+          ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
+          : '📡 No internet connection. DuoWindo6601 requires internet. Turn on Wi-Fi or mobile data and try again.'
+      );
       return;
     }
 
-    // Safety watchdog timer: guarantees the loading overlay WILL ALWAYS UNLOCK in max 3.6 seconds
-    let watchdogTimer: any = null;
-    const watchdogPromise = new Promise<Exercise>((resolve) => {
-      watchdogTimer = setTimeout(() => {
-        console.warn("Lesson load watchdog timeout (3.6s) reached - smoothly proceeding with offline fallback exercise");
-        resolve(getFallbackExercise(currentCourse.id, type, currentCourse.localName, user.language));
-      }, 3600);
-    });
+    const speechLangId = NON_LANGUAGE_IDS.includes(currentCourse.id) ? (user.language === 'ru' ? 'ru' : 'en') : currentCourse.id;
+    const toWordTokens = (bank: any) =>
+      (Array.isArray(bank) ? bank : [])
+        .map(w => String(w ?? '').trim())
+        .filter(Boolean)
+        .map(w => ({ id: crypto.randomUUID(), text: w }));
 
     try {
-      const fetchExercisePromise = (async (): Promise<Exercise> => {
-        if (type === 'roleplay') {
-          if (user.subscription !== 'max') {
-            playSound('wrong');
-            setToast(
-                user.language === 'ru'
-                    ? '💎 Roleplay Max (AI) доступен только по платной подписке DuoWindo6601 Max!'
-                    : '💎 Roleplay Max (AI) requires DuoWindo6601 Max paid subscription!'
-            );
-            setScreen(AppScreen.SUBSCRIPTION);
-            throw new Error('Subscription required for roleplay');
-          }
-          setRoleplayInput("");
-          const ex = await startRoleplay(currentCourse.localName, currentCourse.id);
-          if (ex.roleplayData?.messages[0]) speakText(ex.roleplayData.messages[0].text, currentCourse.id, false, user.preferredVoice, user.voiceProvider);
-          return ex;
-        } else if (type === 'illusion') {
-          const ex = await generateIllusion(currentCourse.localName, currentCourse.id);
-          if (ex.illusionData) speakText(ex.illusionData.soundText, currentCourse.id, false, user.preferredVoice, user.voiceProvider);
-          return ex;
-        } else if (type === 'drawing') {
-          const ex = await generateDrawing(currentCourse.localName, currentCourse.id, topicOverride);
-          setPaths([]);
-          setShowTrace(true);
-          if (ex.drawingData) speakText(ex.drawingData.character, currentCourse.id, false, user.preferredVoice, user.voiceProvider);
-          return ex;
-        } else if (type === 'ishihara') {
-          const ex = await generateIshihara(currentCourse.id);
-          setIshiharaInput("");
-          return ex;
-        } else if (type === 'reading') {
-          const ex = await generateReading(currentCourse.localName, currentCourse.id);
-          setReadingInput("");
-          return ex;
-        } else {
-          const ex = await generateExercise(currentCourse.localName, currentCourse.id, isLanguageCourse, type, user.subscription === 'max', topicOverride, user.language);
-          transcriptRef.current = "";
-          if (isLanguageCourse && type === 'listening') speakText(ex.originalSentence, currentCourse.id, false, user.preferredVoice, user.voiceProvider);
-          return ex;
+      if (type === 'roleplay') {
+        if (user.subscription !== 'max') {
+          playSound('wrong');
+          setToast(
+              user.language === 'ru'
+                  ? '💎 Roleplay Max (AI) доступен только по платной подписке DuoWindo6601 Max!'
+                  : '💎 Roleplay Max (AI) requires DuoWindo6601 Max paid subscription!'
+          );
+          setScreen(AppScreen.SUBSCRIPTION);
+          return;
         }
-      })();
-
-      const ex = await Promise.race([fetchExercisePromise, watchdogPromise]);
-      clearTimeout(watchdogTimer);
-
-      setAvailableTokens((ex.wordBank || []).map(w => ({ id: crypto.randomUUID(), text: w })));
-      setSelectedWordIds([]);
-      setCurrentExercise(ex);
+        setRoleplayInput("");
+        const ex = await startRoleplay(currentCourse.localName, currentCourse.id, user.language);
+        setCurrentExercise(ex);
+        if (ex.roleplayData?.messages[0]) speakText(ex.roleplayData.messages[0].text, speechLangId, false, user.preferredVoice, user.voiceProvider);
+      } else if (type === 'illusion') {
+        const ex = await generateIllusion(currentCourse.localName, currentCourse.id);
+        setCurrentExercise(ex);
+        if (ex.illusionData) speakText(ex.illusionData.soundText, speechLangId, false, user.preferredVoice, user.voiceProvider);
+      } else if (type === 'drawing') {
+        const ex = await generateDrawing(currentCourse.localName, currentCourse.id, topicOverride, user.language);
+        setCurrentExercise(ex);
+        setPaths([]);
+        setShowTrace(true);
+        if (ex.drawingData) speakText(ex.drawingData.character, speechLangId, false, user.preferredVoice, user.voiceProvider);
+      } else if (type === 'ishihara') {
+        const ex = await generateIshihara(currentCourse.id);
+        setCurrentExercise(ex);
+        setIshiharaInput("");
+      } else if (type === 'reading') {
+        const ex = await generateReading(currentCourse.localName, currentCourse.id, user.language);
+        setCurrentExercise(ex);
+        setReadingInput("");
+        if (ex.readingData?.mode === 'fill-blanks') {
+          setAvailableTokens(toWordTokens(ex.wordBank));
+          setSelectedWordIds([]);
+        }
+      } else {
+        const activeDifficulty: 'easy' | 'hard' = user.difficultyLevel === 'hard' ? 'hard' : 'easy';
+        const ex = await generateExercise(currentCourse.localName, currentCourse.id, isLanguageCourse, type, user.subscription === 'max', topicOverride, user.language, activeDifficulty);
+        setAvailableTokens(toWordTokens(ex.wordBank));
+        setSelectedWordIds([]);
+        setCurrentExercise(ex);
+        transcriptRef.current = "";
+        if (type === 'listening' && ex.originalSentence) speakText(ex.originalSentence, speechLangId, false, user.preferredVoice, user.voiceProvider);
+      }
     } catch (e: any) {
-      if (watchdogTimer) clearTimeout(watchdogTimer);
-      console.warn("API exercise generation failed, smoothly loading offline exercise:", e);
-      const ex = getFallbackExercise(currentCourse.id, type, currentCourse.localName, user.language);
-      setAvailableTokens((ex.wordBank || []).map(w => ({ id: crypto.randomUUID(), text: w })));
-      setSelectedWordIds([]);
-      setCurrentExercise(ex);
+      console.warn("API exercise generation failed:", e);
+      const isOfflineErr = (typeof navigator !== 'undefined' && !navigator.onLine) || String(e?.message || '').includes('Нет подключения к интернету');
+      if (isOfflineErr || type === 'roleplay') {
+        if (isOfflineErr) setOfflineMode(true);
+        setScreen(AppScreen.PATH);
+        setToast(
+          isOfflineErr
+            ? (user.language === 'ru'
+                ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
+                : '📡 No internet connection. DuoWindo6601 requires internet. Turn on Wi-Fi or mobile data and try again.')
+            : (e?.message || (user.language === 'ru' ? '⚠️ Не удалось подключиться к AI-диалогу. Попробуйте снова.' : '⚠️ Failed to start AI conversation.'))
+        );
+      } else {
+        const activeDifficulty: 'easy' | 'hard' = user.difficultyLevel === 'hard' ? 'hard' : 'easy';
+        const ex = { ...getFallbackExercise(currentCourse.id, type, currentCourse.localName, user.language, topicOverride, activeDifficulty), difficultyLevel: activeDifficulty };
+        setAvailableTokens(toWordTokens(ex.wordBank));
+        setSelectedWordIds([]);
+        setCurrentExercise(ex);
+        if (type === 'listening' && ex.originalSentence) speakText(ex.originalSentence, speechLangId, false, user.preferredVoice, user.voiceProvider);
+      }
     } finally {
-      if (watchdogTimer) clearTimeout(watchdogTimer);
       setLessonLoading(false);
       setLoading(false);
     }
@@ -5894,13 +6543,24 @@ const getTodayChallenge = () => {
     }
   };
 
-  const handleRoleplaySend = async (text: string) => { if (!currentExercise || !currentExercise.roleplayData || !text.trim()) return; const newMessage: RoleplayMessage = { role: 'user', text: text }; const updatedMessages = [...currentExercise.roleplayData.messages, newMessage]; setCurrentExercise({ ...currentExercise, roleplayData: { ...currentExercise.roleplayData, messages: updatedMessages, userTurn: false } }); setRoleplayInput(""); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); setLoading(true); try { const reply = await replyToRoleplay(updatedMessages, text, currentCourse.localName, user.subscription === 'max'); if (reply.isFallback && !offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); setCurrentExercise(prev => { if (!prev || !prev.roleplayData) return prev; return { ...prev, roleplayData: { ...prev.roleplayData, messages: [...updatedMessages, reply], userTurn: true } } }); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); speakText(reply.text, currentCourse.id, false, user.preferredVoice, user.voiceProvider); setUser(u => ({ ...u, xp: u.xp + 10 })); checkAndAwardDailyChallenge('roleplay'); awardLessonStreak(); } catch (e) { console.error(e); } finally { setLoading(false); } };
-  const checkIllusionAnswer = async (selectedOption: 'A' | 'B') => { if (!currentExercise || !currentExercise.illusionData) return; setLoading(true); try { const isCorrect = currentExercise.illusionData.correctOption === selectedOption; if (isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: currentExercise.illusionData.explanation }); setUser(u => ({ ...u, xp: u.xp + 20 })); checkAndAwardDailyChallenge('illusion'); awardLessonStreak(); } else { playSound('wrong'); const correctText = currentExercise.illusionData.correctOption === 'A' ? currentExercise.illusionData.optionA : currentExercise.illusionData.optionB; setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${correctText}. ${currentExercise.illusionData.explanation}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } finally { setLoading(false); } };
-  const checkDrawingAnswer = async () => { if (!currentExercise || !currentExercise.drawingData || !canvasRef.current) return; playSound('click'); setLoading(true); try { const imageBase64 = canvasRef.current.toDataURL('image/png').split(',')[1]; const result = await checkDrawing(imageBase64, currentExercise.drawingData.character); if (result.isFallback && !offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); if (result.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: result.feedback }); setUser(u => ({ ...u, xp: u.xp + 20 })); checkAndAwardDailyChallenge('drawing'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: result.feedback }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } catch (e) { console.error(e); } finally { setLoading(false); } };
-  const checkAnswer = async (spokenText?: string) => { if (!currentExercise) return; if (isRecording) { setIsRecording(false); if (recognitionRef.current) recognitionRef.current.stop(); if (timerRef.current) clearTimeout(timerRef.current); } if (!spokenText && currentExercise.type !== 'ishihara') playSound('click'); if (currentExercise.type === 'ishihara') { const correct = currentExercise.targetTranslation; const userAnswer = ishiharaInput.trim(); if (userAnswer === correct) { playSound('correct'); setFeedback({ status: 'correct', message: "Correct! You have good color vision for this plate." }); setUser(u => ({ ...u, xp: u.xp + 15 })); checkAndAwardDailyChallenge('ishihara'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `Incorrect. The number was ${correct}.` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } return; } if (currentExercise.type === 'reading') { setLoading(true); if (currentExercise.readingData?.mode === 'write') { const ans = readingInput; const res = await checkAnswerWithAI(currentCourse.localName, ans, currentExercise.readingData.prompt || "Write something relevant", user.subscription === 'max'); if (res.isFallback && !offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + 20, gems: u.gems + 5 })); checkAndAwardDailyChallenge('reading'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: res.feedback }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } setLoading(false); return; } else { let tempText = currentExercise.readingData!.text; const blanksCount = (tempText.match(/___/g) || []).length; if (selectedWordIds.length !== blanksCount) { setToast("Fill all blanks!"); setLoading(false); return; } const correctWords = currentExercise.readingData!.blanks?.map(b => b.word) || []; const userWords = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text); const isCorrect = correctWords.every((w, i) => w.toLowerCase() === userWords[i]?.toLowerCase()); if (isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: "Perfect!" }); setUser(u => ({ ...u, xp: u.xp + 20 })); checkAndAwardDailyChallenge('reading'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `Correct: ${currentExercise.targetTranslation}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } setLoading(false); return; } } setLoading(true); try { let ans = ""; if (typeof spokenText === 'string') ans = spokenText; else if (currentExercise.type === 'speech') { if (transcriptRef.current.trim()) ans = transcriptRef.current; else if (!recognitionRef.current) ans = currentExercise.originalSentence; else { setLoading(false); setToast(t('t_speech_empty')); return; } } else ans = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text).join(' '); const correctAnswer = currentExercise.type === 'speech' ? currentExercise.originalSentence : currentExercise.targetTranslation; const res = await checkAnswerWithAI(currentCourse.localName, ans, correctAnswer, user.subscription === 'max'); if (res.isFallback && !offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + 20, gems: u.gems + 5 })); checkAndAwardDailyChallenge(currentExercise.type); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${correctAnswer}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } catch (e) { console.error(e); setToast("Ошибка проверки"); } finally { setLoading(false); } };
+  const handleRoleplaySend = async (text: string) => { if (!currentExercise || !currentExercise.roleplayData || !text.trim()) return; if (typeof navigator !== 'undefined' && !navigator.onLine) { setOfflineMode(true); setToast(user.language === 'ru' ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова' : '📡 No internet connection. DuoWindo6601 requires internet.'); return; } const newMessage: RoleplayMessage = { role: 'user', text: text }; const updatedMessages = [...currentExercise.roleplayData.messages, newMessage]; setCurrentExercise({ ...currentExercise, roleplayData: { ...currentExercise.roleplayData, messages: updatedMessages, userTurn: false } }); setRoleplayInput(""); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); setLoading(true); const speechLangId = NON_LANGUAGE_IDS.includes(currentCourse.id) ? (user.language === 'ru' ? 'ru' : 'en') : currentCourse.id; try { const reply = await replyToRoleplay(updatedMessages, text, currentCourse.localName, user.subscription === 'max', user.language, currentCourse.id); if (reply.isFallback && !offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); setCurrentExercise(prev => { if (!prev || !prev.roleplayData) return prev; return { ...prev, roleplayData: { ...prev.roleplayData, messages: [...updatedMessages, reply], userTurn: true } } }); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); speakText(reply.text, speechLangId, false, user.preferredVoice, user.voiceProvider); setUser(u => ({ ...u, xp: u.xp + 10 })); checkAndAwardDailyChallenge('roleplay'); awardLessonStreak(); } catch (e: any) { console.error(e); const isOfflineErr = (typeof navigator !== 'undefined' && !navigator.onLine) || String(e?.message || '').includes('Нет подключения к интернету'); setCurrentExercise(prev => { if (!prev || !prev.roleplayData) return prev; return { ...prev, roleplayData: { ...prev.roleplayData, userTurn: true } }; }); setToast(isOfflineErr ? (user.language === 'ru' ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова' : '📡 Network error. Check your internet connection.') : (user.language === 'ru' ? '⚠️ Ошибка ответа AI. Попробуйте ещё раз.' : '⚠️ AI reply error. Please try again.')); } finally { setLoading(false); } };
+  const checkIllusionAnswer = async (selectedOption: 'A' | 'B') => { if (!currentExercise || !currentExercise.illusionData) return; setLoading(true); try { const isCorrect = currentExercise.illusionData.correctOption === selectedOption; const isHardMode = (currentExercise?.difficultyLevel || user.difficultyLevel) === 'hard'; if (isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: currentExercise.illusionData.explanation }); setUser(u => ({ ...u, xp: u.xp + (isHardMode ? 35 : 20) })); checkAndAwardDailyChallenge('illusion'); awardLessonStreak(); } else { playSound('wrong'); const correctText = currentExercise.illusionData.correctOption === 'A' ? currentExercise.illusionData.optionA : currentExercise.illusionData.optionB; setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${correctText}. ${currentExercise.illusionData.explanation}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } finally { setLoading(false); } };
+  const checkDrawingAnswer = async () => { if (!currentExercise || !currentExercise.drawingData || !canvasRef.current) return; playSound('click'); setLoading(true); try { const imageBase64 = canvasRef.current.toDataURL('image/png').split(',')[1]; const result = await checkDrawing(imageBase64, currentExercise.drawingData.character); const isHardMode = (currentExercise?.difficultyLevel || user.difficultyLevel) === 'hard'; if (result.isFallback && !offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); if (result.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: result.feedback }); setUser(u => ({ ...u, xp: u.xp + (isHardMode ? 35 : 20) })); checkAndAwardDailyChallenge('drawing'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: result.feedback }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } catch (e) { console.error(e); } finally { setLoading(false); } };
+  const checkAnswer = async (spokenText?: string) => { if (!currentExercise) return; const isHardMode = (currentExercise?.difficultyLevel || user.difficultyLevel) === 'hard'; if (isRecording) { setIsRecording(false); if (recognitionRef.current) recognitionRef.current.stop(); if (timerRef.current) clearTimeout(timerRef.current); } if (!spokenText && currentExercise.type !== 'ishihara') playSound('click'); if (currentExercise.type === 'ishihara') { const correct = currentExercise.targetTranslation; const userAnswer = ishiharaInput.trim(); if (userAnswer === correct) { playSound('correct'); setFeedback({ status: 'correct', message: "Correct! You have good color vision for this plate." }); setUser(u => ({ ...u, xp: u.xp + (isHardMode ? 30 : 15) })); checkAndAwardDailyChallenge('ishihara'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `Incorrect. The number was ${correct}.` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } return; } if (currentExercise.type === 'reading') { setLoading(true); try { if (currentExercise.readingData?.mode === 'write') { const ans = readingInput; if (!ans.trim()) { setToast(user.language === 'ru' ? 'Введите текст ответа!' : 'Please write an answer!'); return; } const res = await checkAnswerWithAI(currentCourse.localName, ans, currentExercise.readingData.prompt || "Write something relevant", user.subscription === 'max'); if (res.isFallback && !offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + (isHardMode ? 35 : 20), gems: u.gems + (isHardMode ? 10 : 5) })); checkAndAwardDailyChallenge('reading'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: res.feedback }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } return; } else { const tempText = currentExercise.readingData?.text || ''; const blanksCount = (tempText.match(/___/g) || []).length; if (selectedWordIds.length !== blanksCount) { setToast(user.language === 'ru' ? 'Заполните все пропуски!' : 'Fill all blanks!'); return; } const correctWords = (currentExercise.readingData?.blanks || []).map(b => String(b?.word || '')); const userWords = selectedWordIds.map(id => String(availableTokens.find(t => t.id === id)?.text || '')); const isCorrect = correctWords.length > 0 && correctWords.every((w, i) => w.toLowerCase() === (userWords[i] || '').toLowerCase()); if (isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: user.language === 'ru' ? 'Отлично!' : 'Perfect!' }); setUser(u => ({ ...u, xp: u.xp + (isHardMode ? 35 : 20) })); checkAndAwardDailyChallenge('reading'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${currentExercise.targetTranslation || correctWords.join(', ')}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } return; } } catch (e) { console.error(e); setToast(user.language === 'ru' ? 'Ошибка проверки чтения' : 'Reading check error'); return; } finally { setLoading(false); } } setLoading(true); try { let ans = ""; if (typeof spokenText === 'string') ans = spokenText; else if (currentExercise.type === 'speech') { if (transcriptRef.current.trim()) ans = transcriptRef.current; else if (!recognitionRef.current) ans = currentExercise.originalSentence; else { setLoading(false); setToast(t('t_speech_empty')); return; } } else ans = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text).join(' '); const correctAnswer = currentExercise.type === 'speech' ? currentExercise.originalSentence : currentExercise.targetTranslation; const res = await checkAnswerWithAI(currentCourse.localName, ans, correctAnswer, user.subscription === 'max'); if (res.isFallback && !offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + (isHardMode ? 35 : 20), gems: u.gems + (isHardMode ? 10 : 5) })); checkAndAwardDailyChallenge(currentExercise.type); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${correctAnswer}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } catch (e) { console.error(e); setToast("Ошибка проверки"); } finally { setLoading(false); } };
   const handleContinueAfterLesson = () => { playSound('click'); if (user.subscription === 'free' && Math.random() > 0.5) setShowAd(true); else setScreen(AppScreen.PATH); setFeedback({ status: 'idle', message: '' }); setCurrentExercise(null); setExplanation(null); setShowExplanationModal(false); }
+  const openLettersSubTab = (tab: 'letters' | 'words' | 'illusion' | 'audio') => {
+    playSound('click');
+    setFeedback({ status: 'idle', message: '' });
+    setCurrentExercise(null);
+    setExplanation(null);
+    setShowExplanationModal(false);
+    setLessonLoading(false);
+    setLoading(false);
+    setLettersTabRequest({ tab, nonce: Date.now() });
+    setScreen(AppScreen.ALPHABET);
+  };
   const handleSkip = () => { playSound('click'); setToast(t('t_skip')); handleContinueAfterLesson(); };
-  const toggleRecording = () => { playSound('click'); if (isRecording) { setIsRecording(false); if (recognitionRef.current) recognitionRef.current.stop(); if (timerRef.current) clearTimeout(timerRef.current); if (currentExercise?.type === 'roleplay') setTimeout(() => { if (transcriptRef.current) handleRoleplaySend(transcriptRef.current); }, 500); else if (screen === AppScreen.VIDEO_CALL) setTimeout(() => { if (transcriptRef.current) handleVideoCallSend(transcriptRef.current); }, 500); else if (!recognitionRef.current) checkAnswer(currentExercise?.originalSentence); else setTimeout(() => checkAnswer(), 200); } else { transcriptRef.current = ""; setIsRecording(true); if (recognitionRef.current) try { recognitionRef.current.start(); } catch (e) { console.error("Rec start error", e); setIsRecording(false); } else timerRef.current = setTimeout(() => { setIsRecording(false); if (currentExercise?.type === 'roleplay') handleRoleplaySend("Hello friend!"); else if (screen === AppScreen.VIDEO_CALL) handleVideoCallSend("Hello DuoWindo6601!"); else checkAnswer(currentExercise?.originalSentence); }, 3000); } };
+  const toggleRecording = () => { playSound('click'); if (isRecording) { setIsRecording(false); if (recognitionRef.current) recognitionRef.current.stop(); if (timerRef.current) clearTimeout(timerRef.current); if (currentExercise?.type === 'roleplay') setTimeout(() => { if (transcriptRef.current) handleRoleplaySend(transcriptRef.current); }, 500); else if (screen === AppScreen.VIDEO_CALL) setTimeout(() => { if (transcriptRef.current) handleVideoCallSend(transcriptRef.current); }, 500); else if (!recognitionRef.current) checkAnswer(currentExercise?.originalSentence); else setTimeout(() => checkAnswer(), 200); } else { transcriptRef.current = ""; if (recognitionRef.current) { setIsRecording(true); try { recognitionRef.current.start(); } catch (e) { console.error("Rec start error", e); setIsRecording(false); } } else { setIsRecording(false); setToast(user.language === 'ru' ? '🎙️ Голосовой ввод недоступен в этом браузере — введите ответ текстом' : '🎙️ Speech recognition unavailable in this browser — please type your response'); } } };
   const upgradeSubscription = (tier: SubscriptionTier) => {
     if (isIncognitoUser) {
       playSound('wrong');
@@ -5952,12 +6612,12 @@ const getTodayChallenge = () => {
         ? `🔒 Раздел «Письма» доступен только для языковых курсов. В курсе «${currentCourse.localName}» (Предметы & Игры) нет алфавита.`
         : `🔒 The Letters section is only accessible for language courses. Non-language courses do not have letters.`
       );
+      setLettersTabRequest({ tab: 'letters', nonce: Date.now() });
       setScreen(AppScreen.ALPHABET);
       return;
     }
-    if (s === AppScreen.ALPHABET && isBetaWritingRestricted(currentCourse.id)) {
-      const bInfo = getBetaWritingRestrictedInfo(currentCourse.id);
-      setToast(`🔒 ${currentCourse.localName || currentCourse.name} (${bInfo?.version || 'Beta'}): Ограничение раздел письма будут доступ до 1 ноября 2026 год`);
+    if (s === AppScreen.ALPHABET) {
+      setLettersTabRequest({ tab: 'letters', nonce: Date.now() });
     }
     playSound('screen_transition'); 
     setScreen(s); 
@@ -5975,23 +6635,21 @@ const getTodayChallenge = () => {
       screen: AppScreen.ALPHABET, 
       icon: AlphabetIcon, 
       label: isNonLangCourse 
-        ? (user.language === 'ru' ? 'Письма (Только языки 🔒)' : 'Letters (Languages only 🔒)')
-        : isBetaWritingRestricted(currentCourse.id)
-        ? (user.language === 'ru' ? 'Письма (Ограничение 🔒)' : 'Letters (Restricted 🔒)')
-        : (user.language === 'ru' ? 'Письма' : t('alphabet')) 
+        ? (t('alphabet') + ' 🔒')
+        : t('alphabet') 
     },
-    { screen: AppScreen.TRANSLATOR, icon: BookIcon, label: user.language === 'ru' ? 'Переводчик DuoWindo6601' : 'Translator DuoWindo6601' },
-    { screen: AppScreen.FEEDBACK, icon: StarIcon, label: user.language === 'ru' ? 'Отзывы о DuoWindo6601' : 'Reviews DuoWindo6601' },
-    { screen: AppScreen.SUPPORT_CHAT, icon: ChatBubbleIcon, label: user.language === 'ru' ? 'Чат техподдержки DuoWindo6601' : 'Support Chat DuoWindo6601' },
+    { screen: AppScreen.TRANSLATOR, icon: BookIcon, label: t('translator') },
+    { screen: AppScreen.FEEDBACK, icon: StarIcon, label: t('feedback') },
+    { screen: AppScreen.SUPPORT_CHAT, icon: ChatBubbleIcon, label: t('tabSupport') || (user.language === 'ru' ? 'Поддержка' : 'Support') },
     { screen: AppScreen.CHESS_MATCH, icon: ChessNavIcon, label: t('playChess') },
     { screen: AppScreen.PRACTICE, icon: DumbbellIcon, label: t('practice') },
-    { screen: AppScreen.VOCABULARY, icon: NewWordIcon, label: user.language === 'ru' ? 'Банк слов' : 'Vocabulary' },
+    { screen: AppScreen.VOCABULARY, icon: NewWordIcon, label: t('wordsTitle') || (user.language === 'ru' ? 'Банк слов' : 'Vocabulary') },
     { screen: AppScreen.VIDEO_CALL, icon: CameraIcon, label: t('videoCall') },
     { screen: AppScreen.LEADERBOARD, icon: ShieldIcon, label: t('leaderboard') },
     { screen: AppScreen.SHOP, icon: ChestIcon, label: t('shop') },
-    { screen: AppScreen.SUBSCRIPTION, icon: SparklesIcon, label: user.language === 'ru' ? 'Лимит & Подписка' : 'Limit & Subscription' },
+    { screen: AppScreen.SUBSCRIPTION, icon: SparklesIcon, label: t('subscription') || (user.language === 'ru' ? 'Лимит & Подписка' : 'Limit & Subscription') },
     { screen: AppScreen.PROFILE, icon: UserIcon, label: t('profile') },
-    ...(user.isAdmin ? [{ screen: AppScreen.ADMIN_DASHBOARD, icon: GearIcon, label: 'Admin Tool 🛡️' }] : [])
+    ...((user.isAdmin || user.role === 'developer' || user.role === 'admin' || user.role === 'owner') ? [{ screen: AppScreen.ADMIN_DASHBOARD, icon: GearIcon, label: 'Admin Tool 🛡️' }] : [])
   ];
 
   const MOBILE_NAV_SCREENS = [
@@ -6483,6 +7141,8 @@ const getTodayChallenge = () => {
               localStorage.setItem('duo_course_id_6601', course.id);
             }}
             allCourses={COURSES}
+            initialSectionTab={lettersTabRequest.tab}
+            initialTabNonce={lettersTabRequest.nonce}
           />
         )}
 
@@ -6492,6 +7152,17 @@ const getTodayChallenge = () => {
                 <div className="p-4 md:p-10 max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-5">
                     <button onClick={() => { playSound('click'); setScreen(AppScreen.PROFILE); }} className="mb-6 text-gray-500 hover:text-white flex items-center font-bold"><CloseIcon className="w-8 h-8 mr-2"/> {t('back')}</button>
                     <h2 className="text-4xl font-black mb-8">{t('settings')}</h2>
+
+                    {/* APP VERSION, CHANGELOG & RUNTIME DIAGNOSTICS CARD */}
+                    <AppVersionCard
+                      user={user}
+                      systemInfo={systemInfo}
+                      isLightMode={isLightMode}
+                      playSound={playSound}
+                      setToast={setToast}
+                      onOpenSystemChecker={() => setShowSystemInfoModal(true)}
+                      onOpenBetaCenter={() => setShowBetaModal(true)}
+                    />
                     
                                         {/* SYSTEM COMPATIBILITY & DUOWINDO6601 SYSTEM CHECKER CARD */}
                     <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl space-y-4">
@@ -6519,16 +7190,14 @@ const getTodayChallenge = () => {
                           <div>
                             <div className="flex items-center gap-2 flex-wrap">
                               <h4 className="font-black text-base text-white uppercase tracking-wider">
-                                {user.language === 'ru' ? 'Информация о системе: DuoWindo6601 System Checker' : 'System Info: DuoWindo6601 System Checker'}
+                                {t('sysCheckerTitle')}
                               </h4>
                               <span className="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-500/40 px-2 py-0.5 rounded-full font-bold uppercase">
                                 {user.language === 'ru' ? 'Поддержка iOS or iPad' : 'iOS & iPad Support'}
                               </span>
                             </div>
                             <p className="text-xs text-gray-400 font-bold mt-0.5">
-                              {user.language === 'ru'
-                                ? 'Новые Системы (Win 7-11, iOS/iPad 15+, Android 8+) | Старые Системы (XP/Vista/iOS<14) — не получится'
-                                : 'Modern Systems (Win 7-11, iOS/iPad 15+, Android 8+) | Old Systems: unsupported'}
+                              {t('sysCheckerSub')}
                             </p>
                           </div>
                         </div>
@@ -6538,13 +7207,13 @@ const getTodayChallenge = () => {
                           className="px-4 py-2.5 bg-duo-blue hover:bg-duo-blue/90 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
                         >
                           <span>🔍</span>
-                          <span>{user.language === 'ru' ? 'Открыть System Checker' : 'Open System Checker'}</span>
+                          <span>{t('openSysCheckerBtn')}</span>
                         </button>
                       </div>
 
                       <div className="bg-gray-800/80 p-3 rounded-2xl border border-gray-700 text-xs flex items-center justify-between flex-wrap gap-2">
                         <span className="text-gray-300 font-bold">
-                          {user.language === 'ru' ? 'Текущая ОС:' : 'Current OS:'} <strong className="text-white">{systemInfo.osName} {systemInfo.osVersion && `(${systemInfo.osVersion})`}</strong> | {user.language === 'ru' ? 'Браузер:' : 'Browser:'} <strong className="text-white">{systemInfo.browserName}</strong>
+                          {t('currentOsLabel')} <strong className="text-white">{systemInfo.osName} {systemInfo.osVersion && `(${systemInfo.osVersion})`}</strong> | {t('browserLabel')} <strong className="text-white">{systemInfo.browserName}</strong>
                         </span>
                         <span className={`font-black px-2.5 py-1 rounded text-[10px] uppercase ${
                           systemInfo.isModernSystem 
@@ -6552,8 +7221,8 @@ const getTodayChallenge = () => {
                             : "bg-red-950 text-red-300 border border-red-500/40"
                         }`}>
                           {systemInfo.isModernSystem 
-                            ? (user.language === 'ru' ? '✅ Новый Систем: Поддерживается' : '✅ Modern System') 
-                            : (user.language === 'ru' ? '🛑 Старая Система: Не получится' : '🛑 Old System')}
+                            ? t('modernSystemBadge') 
+                            : t('oldSystemBadge')}
                         </span>
                       </div>
                     </div>
@@ -6615,15 +7284,17 @@ const getTodayChallenge = () => {
                       <h3 className="text-xl font-bold mb-4 text-white uppercase tracking-widest">{t('apiStatus')}</h3>
                       <div className="flex items-center justify-between flex-wrap gap-4">
                         <div className="flex items-center space-x-3">
-                          <div className={`w-4 h-4 rounded-full ${offlineMode ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div>
+                          <div className={`w-4 h-4 rounded-full ${(typeof navigator !== 'undefined' && !navigator.onLine) ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div>
                           <div>
-                            <span className={`font-black text-lg ${offlineMode ? 'text-red-400' : 'text-green-400'}`}>
-                              {offlineMode 
-                                ? (user.language === 'ru' ? 'Офлайн / Ошибка' : t('limitReached')) 
-                                : (user.language === 'ru' ? 'Онлайн' : t('online'))}
+                            <span className={`font-black text-lg ${(typeof navigator !== 'undefined' && !navigator.onLine) ? 'text-red-400' : 'text-green-400'}`}>
+                              {(typeof navigator !== 'undefined' && !navigator.onLine)
+                                ? (user.language === 'ru' ? 'Нет подключения к интернету' : 'No Internet') 
+                                : (user.language === 'ru' ? 'Онлайн • Работает без VPN и использует VPN' : 'Online • Works without VPN and with VPN')}
                             </span>
                             <p className="text-xs text-gray-400 font-bold">
-                              {user.language === 'ru' ? 'Проверка связи с моделью Gemini 3.8 Flash' : 'Gemini 3.8 Flash model connection status'}
+                              {(typeof navigator !== 'undefined' && !navigator.onLine)
+                                ? 'Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
+                                : (user.language === 'ru' ? 'Серверный доступ к Gemini AI (us-east1.run.app / ai.studio без офлайн-режима)' : 'Server-side Gemini AI connection (us-east1.run.app / ai.studio)')}
                             </p>
                           </div>
                         </div>
@@ -6651,16 +7322,16 @@ const getTodayChallenge = () => {
                                 </div>
                                 <div>
                                     <h3 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
-                                        <span>{user.language === 'ru' ? 'Статус синхронизации Firestore' : 'Firestore Sync Status'}</span>
+                                        <span>{t('firestoreSyncTitle')}</span>
                                     </h3>
                                     <p className="text-xs text-gray-400 font-bold">
-                                        {user.language === 'ru' ? 'Синхронизация локального кэша с облачной базой данных' : 'Local cache synchronization with cloud database'}
+                                        {t('firestoreSyncDesc')}
                                     </p>
                                 </div>
                             </div>
                             <span className={`w-full py-3.5 px-6 rounded-2xl font-black text-xs uppercase tracking-wider border-b-4 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center space-x-2 shadow-lg ${isSyncing ? "bg-gray-700 text-gray-400 border-gray-900 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-800 hover:brightness-110"}`}>
                                 <span className="w-2 h-2 rounded-full bg-current animate-pulse"></span>
-                                <span>{firebaseUser ? (user.language === 'ru' ? 'Облако активно' : 'Cloud Active') : (user.language === 'ru' ? 'Локальный кэш' : 'Local Cache')}</span>
+                                <span>{firebaseUser ? t('cloudActiveBadge') : t('localCacheBadge')}</span>
                             </span>
                         </div>
 
@@ -6696,7 +7367,7 @@ const getTodayChallenge = () => {
                             <span>
                                 {isSyncing
                                     ? (user.language === 'ru' ? 'Синхронизация...' : 'Syncing...')
-                                    : (user.language === 'ru' ? 'Принудительная синхронизация (Force Sync)' : 'Force Sync with Firestore')}
+                                    : t('forceSyncBtn')}
                             </span>
                         </button>
                     </div>
@@ -6846,12 +7517,10 @@ const getTodayChallenge = () => {
                                 </div>
                                 <div>
                                     <h3 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
-                                        <span>{user.language === 'ru' ? 'Очистка кэша Firestore (>30 дней)' : 'Firestore Cache Cleanup (>30 Days)'}</span>
+                                        <span>{t('cacheCleanupTitle')}</span>
                                     </h3>
                                     <p className="text-xs text-gray-400 font-bold">
-                                        {user.language === 'ru' 
-                                            ? 'Автоматическое удаление старого кэша IndexedDB при неактивности более 30 дней' 
-                                            : 'Automatic IndexedDB cache cleanup when user is inactive for more than 30 days'}
+                                        {t('cacheCleanupDesc')}
                                     </p>
                                 </div>
                             </div>
@@ -6863,8 +7532,8 @@ const getTodayChallenge = () => {
                                 <span className={`w-2 h-2 rounded-full ${firestoreCacheStatus.isInactiveOverThreshold ? 'bg-rose-400 animate-ping' : 'bg-emerald-400'}`}></span>
                                 <span>
                                     {firestoreCacheStatus.isInactiveOverThreshold
-                                        ? (user.language === 'ru' ? 'Требуется очистка (>30 дн.)' : 'Purge Required (>30d)')
-                                        : (user.language === 'ru' ? 'Кэш оптимизирован' : 'Cache Optimized')}
+                                        ? t('cachePurgeRequired')
+                                        : t('cacheOptimizedBadge')}
                                 </span>
                             </span>
                         </div>
@@ -6920,7 +7589,7 @@ const getTodayChallenge = () => {
                                 <span>
                                     {isPurgingFirestoreCache
                                         ? (user.language === 'ru' ? 'Очистка...' : 'Purging...')
-                                        : (user.language === 'ru' ? 'Очистить кэш сейчас' : 'Purge Cache Now')}
+                                        : t('purgeCacheNowBtn')}
                                 </span>
                             </button>
 
@@ -6930,7 +7599,7 @@ const getTodayChallenge = () => {
                                 className="py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider bg-gray-800 hover:bg-gray-700 text-amber-300 border-b-4 border-gray-950 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
                             >
                                 <span>🧪</span>
-                                <span>{user.language === 'ru' ? 'Тест: 31 день неактивности' : 'Test: 31d Inactivity'}</span>
+                                <span>{t('testInactivityBtn')}</span>
                             </button>
 
                             <button
@@ -6939,7 +7608,7 @@ const getTodayChallenge = () => {
                                 className="py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider bg-gray-800 hover:bg-gray-700 text-gray-300 border-b-4 border-gray-950 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
                             >
                                 <span>🔄</span>
-                                <span>{user.language === 'ru' ? 'Сброс' : 'Reset'}</span>
+                                <span>{t('resetInactivityBtn')}</span>
                             </button>
                         </div>
                     </div>
@@ -6952,16 +7621,14 @@ const getTodayChallenge = () => {
                                 <div>
                                     <div className="flex items-center space-x-2">
                                         <h4 className="font-extrabold text-sm text-white uppercase tracking-wider">
-                                            {user.language === 'ru' ? 'Тактильный отклик (Haptic Feedback)' : 'Haptic Vibration Feedback'}
+                                            {t('hapticTitle')}
                                         </h4>
                                         <span className="bg-amber-500/30 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-md border border-amber-500/50 uppercase">
                                             Mobile & PC
                                         </span>
                                     </div>
                                     <p className="text-xs text-gray-300 font-medium mt-1">
-                                        {user.language === 'ru'
-                                            ? 'Вибрационный отклик смартфона и ПК версия при правильных и неправильных ответах в уроках'
-                                            : 'Tactile vibration response on mobile devices and PC version for correct and incorrect lesson answers'}
+                                        {t('hapticDesc')}
                                     </p>
                                 </div>
                             </div>
@@ -6989,8 +7656,8 @@ const getTodayChallenge = () => {
                             >
                                 <span>
                                     {(user.hapticFeedback ?? true)
-                                        ? (user.language === 'ru' ? 'ВКЛЮЧЕНО' : 'ENABLED')
-                                        : (user.language === 'ru' ? 'ВЫКЛЮЧЕНО' : 'DISABLED')}
+                                        ? t('hapticEnabled')
+                                        : t('hapticDisabled')}
                                 </span>
                             </button>
                         </div>
@@ -7028,18 +7695,24 @@ const getTodayChallenge = () => {
                       </div>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
                           {[
-                            { code: 'ru', name: 'Русский', fontClass: '' },
-                            { code: 'en', name: 'English', fontClass: '' },
-                            { code: 'de', name: 'Deutsch', fontClass: '' },
-                            { code: 'fr', name: 'Français', fontClass: '' },
-                            { code: 'es', name: 'Español', fontClass: '' },
-                            { code: 'ja', name: '日本語', fontClass: 'font-japanese' },
-                            { code: 'zh', name: '中文', fontClass: 'font-chinese' },
-                            { code: 'ar', name: 'العربية', fontClass: 'font-arabic' }
+                            { code: 'ru', name: 'Русский', native: 'Русский', fontClass: '' },
+                            { code: 'en', name: 'English', native: 'English', fontClass: '' },
+                            { code: 'de', name: 'Deutsch', native: 'Deutsch', fontClass: '' },
+                            { code: 'fr', name: 'Français', native: 'Français', fontClass: '' },
+                            { code: 'es', name: 'Español', native: 'Español', fontClass: '' },
+                            { code: 'ja', name: '日本語', native: '日本語', fontClass: 'font-japanese' },
+                            { code: 'zh', name: '中文', native: '中文', fontClass: 'font-chinese' },
+                            { code: 'ar', name: 'العربية', native: 'العربية', fontClass: 'font-arabic' }
                           ].map(item => (
                               <button 
                                 key={item.code} 
-                                onClick={() => { playSound('select'); setUser({...user, language: item.code as any}); }} 
+                                onClick={() => { 
+                                  playSound('select'); 
+                                  const updated = { ...user, language: item.code as any };
+                                  setUser(updated);
+                                  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); } catch {}
+                                  setToast(`✅ ${item.native}`);
+                                }} 
                                 className={`p-3 rounded-xl font-bold border-b-4 transition-all text-xs flex flex-col items-center justify-center space-y-1 cursor-pointer ${
                                   user.language === item.code 
                                     ? 'bg-duo-blue border-duo-blueDark text-white ring-2 ring-duo-blue/40' 
@@ -7052,31 +7725,31 @@ const getTodayChallenge = () => {
                           ))}
                       </div>
 
-                      {/* Locked languages in development (Until Nov 1, 2026) */}
-                      <div className="p-4 rounded-2xl bg-amber-950/20 border-2 border-amber-500/40 mb-5">
+                      {/* Unlocked languages as of Nov 1, 2026 */}
+                      <div className="p-4 rounded-2xl bg-emerald-950/20 border-2 border-emerald-500/40 mb-5">
                         <div className="flex items-center justify-between mb-2.5">
                           <div className="flex items-center space-x-2">
-                            <span className="text-lg">🔒</span>
+                            <span className="text-lg">🎉</span>
                             <div>
-                              <h4 className="text-xs sm:text-sm font-black text-amber-300 uppercase tracking-wider">
-                                {user.language === 'ru' ? 'В разработке • Доступно 1 ноября 2026 г.' : 'In Development • Available Nov 1, 2026'}
+                              <h4 className="text-xs sm:text-sm font-black text-emerald-300 uppercase tracking-wider">
+                                {user.language === 'ru' ? '✅ Открыто 1 ноября 2026 г. • Доступно переключение' : '✅ Unlocked Nov 1, 2026 • Language switching available'}
                               </h4>
-                              <p className="text-[11px] text-amber-200/80 font-medium">
+                              <p className="text-[11px] text-emerald-200/90 font-medium">
                                 {user.language === 'ru' 
-                                  ? 'Переключение на эти языки и раздел «Письмо» откроются 1 ноября 2026 года' 
-                                  : 'Switching to these languages and "Letters" section will unlock on Nov 1, 2026'}
+                                  ? 'Переключение на эти языки и раздел «Письмо» открыты с 1 ноября 2026 года' 
+                                  : 'Switching to these languages and "Letters" section are now open as of Nov 1, 2026'}
                               </p>
                             </div>
                           </div>
-                          <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-amber-500 text-black shrink-0 uppercase">
-                            15 {user.language === 'ru' ? 'языков' : 'langs'}
+                          <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-emerald-500 text-black shrink-0 uppercase">
+                            15 {user.language === 'ru' ? 'языков • Доступно' : 'langs • Available'}
                           </span>
                         </div>
 
                         {/* World Languages (10) */}
-                        <div className="text-[11px] font-black uppercase tracking-wider text-amber-300 mb-2 flex items-center justify-between">
-                          <span>🌍 {user.language === 'ru' ? 'Языки мира (10):' : 'World Languages (10):'}</span>
-                          <span className="text-[10px] font-bold text-amber-400">🔒 1 нояб. 2026</span>
+                        <div className="text-[11px] font-black uppercase tracking-wider text-emerald-300 mb-2 flex items-center justify-between">
+                          <span>🌍 {t('worldLangsTitle') || (user.language === 'ru' ? 'Языки мира (10) — Открыты с 1 ноября 2026:' : 'World Languages (10) — Open Nov 1, 2026:')}</span>
+                          <span className="text-[10px] font-bold text-emerald-400">✅ 1 нояб. 2026</span>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 mb-3.5">
                           {[
@@ -7094,67 +7767,87 @@ const getTodayChallenge = () => {
                             <button
                               key={item.code}
                               type="button"
-                              onClick={() => handleAttemptSwitchLanguage(item.code)}
-                              className="p-2.5 rounded-xl border border-amber-500/30 bg-black/40 hover:bg-amber-950/40 text-gray-300 hover:text-amber-200 transition-all text-xs flex items-center justify-between cursor-pointer group"
-                              title={user.language === 'ru' ? `${item.nameRu}: доступно 1 ноября 2026 г.` : `${item.nameEn}: available by Nov 1, 2026`}
+                              onClick={() => {
+                                playSound('select');
+                                const updated = { ...user, language: item.code as any };
+                                setUser(updated);
+                                try { localStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); } catch {}
+                                setToast(`✅ ${item.flag} ${item.native}`);
+                              }}
+                              className={`p-2.5 rounded-xl border transition-all text-xs flex items-center justify-between cursor-pointer group ${
+                                user.language === item.code
+                                  ? 'border-emerald-400 bg-emerald-950/60 text-white ring-2 ring-emerald-500/40 shadow-lg'
+                                  : 'border-emerald-500/30 bg-black/40 hover:bg-emerald-950/40 text-gray-300 hover:text-emerald-200'
+                              }`}
+                              title={`${item.flag} ${item.native}`}
                             >
                               <div className="flex items-center space-x-2 truncate">
                                 <span className="text-base select-none">{item.flag}</span>
                                 <div className="text-left truncate">
-                                  <div className="font-bold text-[11px] truncate text-white group-hover:text-amber-200">
-                                    {user.language === 'ru' ? item.nameRu : item.nameEn}
+                                  <div className="font-bold text-[11px] truncate text-white group-hover:text-emerald-200">
+                                    {item.native}
                                   </div>
                                   <div className="text-[9px] text-gray-400 truncate">
-                                    {item.native}
+                                    {user.language === 'ru' ? item.nameRu : item.nameEn}
                                   </div>
                                 </div>
                               </div>
-                              <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0 ml-1">
-                                🔒 1 нояб.
+                              <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0 ml-1">
+                                {user.language === item.code ? '✓' : '✅'}
                               </span>
                             </button>
                           ))}
                         </div>
 
                         {/* CIS Countries List (5) */}
-                        <div className="p-3 bg-black/40 border border-amber-500/30 rounded-xl space-y-2">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-1.5 border-b border-amber-500/20">
-                            <span className="text-[11px] font-black uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                        <div className="p-3 bg-black/40 border border-emerald-500/30 rounded-xl space-y-2">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-1.5 border-b border-emerald-500/20">
+                            <span className="text-[11px] font-black uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
                               <span>🌍</span>
-                              <span>{user.language === 'ru' ? 'Заблокированные языки мира' : 'Locked World Languages'}</span>
+                              <span>{t('cisSectionTitle') || (user.language === 'ru' ? 'Языки стран СНГ (5)' : 'CIS Languages (5)')}</span>
                             </span>
-                            <span className="text-[10px] font-black text-amber-300 bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 rounded-md self-start sm:self-auto">
-                              Раздел Письмо Будут доступ 1 ноября 2026 год
+                            <span className="text-[10px] font-black text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 rounded-md self-start sm:self-auto">
+                              ✅ 1 нояб. 2026 г.
                             </span>
                           </div>
 
                           <div className="space-y-1.5">
                             {[
-                              { code: 'kk', label: 'Казахстан (Қазақша) — Казахстан (казахский — выбран) 🇰🇿', flag: '🇰🇿' },
-                              { code: 'uz', label: 'Узбекистан (Oʻzbekcha) — Узбекистан (узбекский) 🇺🇿', flag: '🇺🇿' },
-                              { code: 'hy', label: 'Армения (Հայերեն) — Армения (армянский) 🇦🇲', flag: '🇦🇲' },
-                              { code: 'ka', label: 'Грузия (ქართული) — Грузия (грузинский) 🇬🇪', flag: '🇬🇪' },
-                              { code: 'az', label: 'Азербайджан (Azərbaycan) — Азербайджан (азербайджанский) 🇦🇿', flag: '🇦🇿' },
+                              { code: 'kk', label: 'Казахстан (Қазақша) — Қазақ тілі', native: 'Қазақша 🇰🇿', flag: '🇰🇿' },
+                              { code: 'uz', label: 'Узбекистан (Oʻzbekcha) — Oʻzbek tili', native: 'Oʻzbekcha 🇺🇿', flag: '🇺🇿' },
+                              { code: 'hy', label: 'Армения (Հայերեն) — Հայոց լեզու', native: 'Հայերեն 🇦🇲', flag: '🇦🇲' },
+                              { code: 'ka', label: 'Грузия (ქართული) — ქართული ენა', native: 'ქართული 🇬🇪', flag: '🇬🇪' },
+                              { code: 'az', label: 'Азербайджан (Azərbaycan) — Azərbaycan dili', native: 'Azərbaycan 🇦🇿', flag: '🇦🇿' },
                             ].map(item => (
                               <button
                                 key={item.code}
                                 type="button"
-                                onClick={() => handleAttemptSwitchLanguage(item.code)}
-                                className="w-full p-2.5 rounded-xl border border-amber-500/30 bg-black/50 hover:bg-amber-950/50 text-gray-300 hover:text-amber-200 transition-all text-xs flex items-center justify-between cursor-pointer group text-left"
+                                onClick={() => {
+                                  playSound('select');
+                                  const updated = { ...user, language: item.code as any };
+                                  setUser(updated);
+                                  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); } catch {}
+                                  setToast(`✅ ${item.flag} ${item.native}`);
+                                }}
+                                className={`w-full p-2.5 rounded-xl border transition-all text-xs flex items-center justify-between cursor-pointer group text-left ${
+                                  user.language === item.code
+                                    ? 'border-emerald-400 bg-emerald-950/60 text-white ring-2 ring-emerald-500/40 shadow-lg'
+                                    : 'border-emerald-500/30 bg-black/50 hover:bg-emerald-950/50 text-gray-300 hover:text-emerald-200'
+                                }`}
                               >
                                 <div className="flex items-center space-x-2.5 truncate">
                                   <span className="text-base select-none shrink-0">{item.flag}</span>
                                   <div className="truncate">
-                                    <div className="font-bold text-[11px] text-amber-100 group-hover:text-white truncate">
-                                      🔒 {item.label}
+                                    <div className="font-bold text-[11px] text-emerald-100 group-hover:text-white truncate">
+                                      ✨ {item.native}
                                     </div>
                                     <div className="text-[9px] text-gray-400 font-medium">
-                                      Раздел Письмо Будут доступ 1 ноября 2026 год
+                                      {item.label}
                                     </div>
                                   </div>
                                 </div>
-                                <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0 ml-1">
-                                  🔒 1 нояб.
+                                <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0 ml-1">
+                                  {user.language === item.code ? '✓ АКТИВЕН' : '✅ 1 нояб.'}
                                 </span>
                               </button>
                             ))}
@@ -7520,19 +8213,54 @@ const getTodayChallenge = () => {
                         ))}
                     </div>
                     </div>
-                    <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl"><h3 className="text-xl font-bold mb-4 text-white uppercase tracking-widest">{t('voiceProvider')}</h3><div className="grid grid-cols-2 md:grid-cols-6 gap-2"><button onClick={() => { playSound('select'); setUser({...user, voiceProvider: 'fish'}); }} className={`p-3 rounded-xl font-bold border-b-4 ${user.voiceProvider === 'fish' ? 'bg-cyan-600 border-cyan-800 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>Fish Audio 🐟</button><button onClick={() => { playSound('select'); setUser({...user, voiceProvider: 'gemini'}); }} className={`p-3 rounded-xl font-bold border-b-4 ${user.voiceProvider === 'gemini' || !user.voiceProvider ? 'bg-purple-600 border-purple-800 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>Gemini AI 🤖</button><button onClick={() => { playSound('select'); setUser({...user, voiceProvider: 'google'}); }} className={`p-3 rounded-xl font-bold border-b-4 ${user.voiceProvider === 'google' ? 'bg-blue-600 border-blue-800 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>Google</button><button onClick={() => { playSound('select'); setUser({...user, voiceProvider: 'yandex'}); }} className={`p-3 rounded-xl font-bold border-b-4 ${user.voiceProvider === 'yandex' ? 'bg-red-600 border-red-800 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>Yandex</button><button onClick={() => { playSound('select'); setUser({...user, voiceProvider: 'system'}); }} className={`p-3 rounded-xl font-bold border-b-4 ${user.voiceProvider === 'system' ? 'bg-green-600 border-green-800 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>System</button><button onClick={() => { playSound('select'); setUser({...user, voiceProvider: 'sapi53'}); }} className={`p-3 rounded-xl font-bold border-b-4 ${user.voiceProvider === 'sapi53' ? 'bg-blue-700 border-blue-900 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>Microsoft SAPI 5.3 🪟</button></div></div>
+                    <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl"><h3 className="text-xl font-bold mb-4 text-white uppercase tracking-widest">{t('voiceProvider')}</h3><div className="grid grid-cols-2 md:grid-cols-6 gap-2"><button onClick={() => { playSound('select'); setUser({...user, voiceProvider: 'fish', fishModel: user.fishModel && canUserAccessFishModel(user.fishModel, user).allowed ? user.fishModel : 's2.1-pro-free'}); }} className={`p-3 rounded-xl font-bold border-b-4 ${(user.voiceProvider === 'fish' || user.voiceProvider === 'fish-drama-3') ? 'bg-cyan-600 border-cyan-800 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>Fish Audio 🐋</button><button onClick={() => { playSound('select'); setUser({...user, voiceProvider: 'gemini'}); }} className={`p-3 rounded-xl font-bold border-b-4 ${user.voiceProvider === 'gemini' || !user.voiceProvider ? 'bg-purple-600 border-purple-800 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>Gemini AI 🤖</button><button onClick={() => { playSound('select'); setUser({...user, voiceProvider: 'google'}); }} className={`p-3 rounded-xl font-bold border-b-4 ${user.voiceProvider === 'google' ? 'bg-blue-600 border-blue-800 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>Google</button><button onClick={() => { playSound('select'); setUser({...user, voiceProvider: 'yandex'}); }} className={`p-3 rounded-xl font-bold border-b-4 ${user.voiceProvider === 'yandex' ? 'bg-red-600 border-red-800 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>Yandex</button><button onClick={() => { playSound('select'); setUser({...user, voiceProvider: 'system'}); }} className={`p-3 rounded-xl font-bold border-b-4 ${user.voiceProvider === 'system' ? 'bg-green-600 border-green-800 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>System</button><button onClick={() => { playSound('select'); setUser({...user, voiceProvider: 'sapi53'}); }} className={`p-3 rounded-xl font-bold border-b-4 ${user.voiceProvider === 'sapi53' ? 'bg-blue-700 border-blue-900 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'} text-[10px]`}>Microsoft SAPI 5.3 🪟</button></div><div className="mt-3 pt-3 border-t border-gray-700/60 grid grid-cols-2 md:grid-cols-4 gap-2">{[{ id: 's2.1-pro-free', label: '🐋 S2.1 Pro Free', badge: user.language === 'ru' ? 'Бесплатно' : 'Free', paid: false }, { id: 'drama-3', label: '🎭 Drama 3', badge: user.language === 'ru' ? 'Платно' : 'Paid', paid: true }, { id: 's2.1-pro', label: '✨ S2.1 Pro', badge: user.language === 'ru' ? 'Платно' : 'Paid', paid: true }, { id: 's2-pro', label: '⚡ S2 Pro', badge: user.language === 'ru' ? 'Платно' : 'Paid', paid: true }].map(m => { const currentM = user.voiceProvider === 'fish-drama-3' ? 'drama-3' : (user.fishModel || 's2.1-pro-free'); const active = (user.voiceProvider === 'fish' || user.voiceProvider === 'fish-drama-3') && currentM === m.id; return (<button key={m.id} onClick={() => { const access = canUserAccessFishModel(m.id, user); if (!access.allowed) { playSound('wrong'); setToast(user.language === 'ru' ? `💎 ${m.label} — платная модель (DuoWindo6601 Super / DuoWindo6601 Max). Бесплатно доступна S2.1 Pro Free!` : `💎 ${m.label} is a paid model (DuoWindo6601 Super / Max). S2.1 Pro Free is free!`); return; } playSound('select'); setUser({...user, voiceProvider: 'fish', fishModel: m.id}); }} className={`p-2 rounded-xl font-bold border-b-4 text-[10px] flex items-center justify-between ${active ? 'bg-cyan-700 border-cyan-900 text-white' : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'}`}><span>{m.label}</span><span className={`px-1.5 py-0.5 rounded text-[8px] font-black ${m.paid ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'}`}>{m.badge}</span></button>); })}</div></div>
                 </div>
             </div>
         )}
 
         {/* COURSE SELECT OVERLAY */}
         {screen === AppScreen.COURSE_SELECT && (
+          !showClassicCourseCatalog ? (
+            <CourseSelectAccordionScreen
+              currentCourse={currentCourse}
+              allCourses={COURSES}
+              userLanguage={user.language}
+              onSelectCourse={(c) => {
+                playSound('select');
+                setCurrentCourse(c);
+                localStorage.setItem('duo_course_id_6601', c.id);
+                setScreen(AppScreen.PATH);
+              }}
+              onSwitchLanguage={(newLang) => {
+                playSound('select');
+                setUser(prev => {
+                  const updated = { ...prev, language: newLang };
+                  localStorage.setItem('duo_user_progress_6601', JSON.stringify(updated));
+                  return updated;
+                });
+              }}
+              onClose={() => {
+                playSound('click');
+                setScreen(AppScreen.PATH);
+              }}
+              playSound={playSound}
+              onOpenClassicCatalog={() => setShowClassicCourseCatalog(true)}
+            />
+          ) : (
             <div className="fixed inset-0 z-[100] bg-duo-dark overflow-y-auto">
                 <div className="p-4 md:p-8 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-5 pb-16">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-gray-800 pb-4">
-                        <div className="flex items-center space-x-4">
+                        <div className="flex items-center space-x-3 flex-wrap gap-y-2">
                             <button onClick={() => { playSound('click'); setScreen(AppScreen.PATH); }} className="text-gray-400 hover:text-white transition-colors p-2 rounded-xl bg-gray-800"><CloseIcon className="w-8 h-8"/></button>
-                            <h2 className="text-2xl md:text-3xl font-black uppercase tracking-widest text-white">{t('coursesAndRegions')}</h2>
+                            <button
+                              type="button"
+                              onClick={() => { playSound('click'); setShowClassicCourseCatalog(false); }}
+                              className="px-3 py-2 rounded-xl bg-duo-blue hover:bg-duo-blue/80 text-white text-xs font-black uppercase tracking-wider flex items-center space-x-1.5 transition-all cursor-pointer shadow-md"
+                            >
+                              <span>✨</span>
+                              <span>{user.language === 'ru' ? 'Вид DuoWindo (Аккордеон)' : 'Duolingo Accordion View'}</span>
+                            </button>
+                            <h2 className="text-xl md:text-3xl font-black uppercase tracking-widest text-white">{t('coursesAndRegions')}</h2>
                         </div>
                         {/* SEARCH FIELD */}
                         <div className="relative w-full md:w-80">
@@ -7665,18 +8393,18 @@ const getTodayChallenge = () => {
                                 })}
                             </div>
 
-                            {/* SPEAKER LANGUAGES RELEASE NOTICE (1 НОЯБРЯ 2026 Г.) */}
-                            <div className="mt-3 p-3.5 rounded-2xl bg-amber-950/25 border-2 border-amber-500/40 text-left flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shadow-md">
+                            {/* SPEAKER LANGUAGES RELEASE NOTICE (1 НОЯБРЯ 2026 Г. - РАЗБЛОКИРОВАНО) */}
+                            <div className="mt-3 p-3.5 rounded-2xl bg-emerald-950/25 border-2 border-emerald-500/40 text-left flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shadow-md">
                                 <div className="flex items-center space-x-2.5">
-                                    <span className="text-xl shrink-0">🔒</span>
+                                    <span className="text-xl shrink-0">🎉</span>
                                     <div>
-                                        <div className="text-xs font-black text-amber-300 uppercase tracking-wider flex items-center gap-2">
-                                            <span>{user.language === 'ru' ? 'В разработке • Доступно 1 ноября 2026 г.' : 'In Development • Available Nov 1, 2026'}</span>
+                                        <div className="text-xs font-black text-emerald-300 uppercase tracking-wider flex items-center gap-2">
+                                            <span>{user.language === 'ru' ? '✅ Открыто 1 ноября 2026 г. • Языки и раздел «Письмо»' : '✅ Unlocked Nov 1, 2026 • Languages and Letters'}</span>
                                         </div>
-                                        <p className="text-[11px] text-amber-200/90 font-medium">
+                                        <p className="text-[11px] text-emerald-200/90 font-medium">
                                             {user.language === 'ru' 
-                                                ? 'Переключение на эти языки и раздел «Письмо» откроются 1 ноября 2026 года' 
-                                                : 'Switching to these languages and "Letters" section will unlock on November 1, 2026'}
+                                                ? 'Переключение на эти языки и раздел «Письмо» открыты с 1 ноября 2026 года' 
+                                                : 'Switching to these languages and "Letters" section are open as of November 1, 2026'}
                                         </p>
                                     </div>
                                 </div>
@@ -7686,9 +8414,9 @@ const getTodayChallenge = () => {
                                         playSound('click');
                                         setShowLanguageLockModal(true);
                                     }}
-                                    className="px-3 py-1 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap cursor-pointer transition-all self-end sm:self-center"
+                                    className="px-3 py-1 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap cursor-pointer transition-all self-end sm:self-center"
                                 >
-                                    {user.language === 'ru' ? 'Подробнее ↗' : 'Details ↗'}
+                                    {user.language === 'ru' ? 'Список открытых языков ↗' : 'View open list ↗'}
                                 </button>
                             </div>
                         </div>
@@ -8077,23 +8805,23 @@ const getTodayChallenge = () => {
                     )}
 
                     {/* COURSES & LANGUAGE REGIONS RELEASE ANNOUNCEMENT BANNER */}
-                    <div className="bg-amber-950/30 border-2 border-amber-500/50 rounded-3xl p-4 md:p-5 mb-6 text-left shadow-xl">
+                    <div className="bg-emerald-950/30 border-2 border-emerald-500/50 rounded-3xl p-4 md:p-5 mb-6 text-left shadow-xl">
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                             <div className="flex items-center space-x-3.5">
-                                <div className="w-11 h-11 rounded-2xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-2xl shrink-0">
-                                    🔒
+                                <div className="w-11 h-11 rounded-2xl bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center text-2xl shrink-0">
+                                    🎉
                                 </div>
                                 <div>
-                                    <h4 className="text-xs sm:text-sm md:text-base font-black text-amber-300 uppercase tracking-wider flex items-center gap-2 flex-wrap">
-                                        <span>{user.language === 'ru' ? 'В разработке • Доступно 1 ноября 2026 г.' : 'In Development • Available Nov 1, 2026'}</span>
-                                        <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-amber-500 text-black uppercase">
-                                            15 {user.language === 'ru' ? 'языков' : 'langs'}
+                                    <h4 className="text-xs sm:text-sm md:text-base font-black text-emerald-300 uppercase tracking-wider flex items-center gap-2 flex-wrap">
+                                        <span>{user.language === 'ru' ? '✅ Открыто 1 ноября 2026 г. • Языки и раздел «Письмо»' : '✅ Unlocked Nov 1, 2026 • Languages & Letters'}</span>
+                                        <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-emerald-500 text-black uppercase">
+                                            15 {user.language === 'ru' ? 'языков • Доступно' : 'langs • Available'}
                                         </span>
                                     </h4>
-                                    <p className="text-xs text-amber-200/90 font-medium mt-1">
+                                    <p className="text-xs text-emerald-200/90 font-medium mt-1">
                                         {user.language === 'ru'
-                                            ? 'Переключение на эти языки и раздел «Письмо» откроются 1 ноября 2026 года'
-                                            : 'Switching to these languages and the "Writing" section will unlock on November 1, 2026'}
+                                            ? 'Переключение на эти языки и раздел «Письмо» открыты с 1 ноября 2026 года'
+                                            : 'Switching to these languages and the "Writing" section are unlocked as of November 1, 2026'}
                                     </p>
                                 </div>
                             </div>
@@ -8103,9 +8831,9 @@ const getTodayChallenge = () => {
                                     playSound('click');
                                     setShowLanguageLockModal(true);
                                 }}
-                                className="px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-300 text-xs font-black uppercase tracking-wider whitespace-nowrap cursor-pointer transition-all self-end sm:self-center"
+                                className="px-4 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 text-emerald-300 text-xs font-black uppercase tracking-wider whitespace-nowrap cursor-pointer transition-all self-end sm:self-center"
                             >
-                                {user.language === 'ru' ? 'Смотреть список 🔒' : 'View locked list 🔒'}
+                                {user.language === 'ru' ? 'Смотреть список ✨' : 'View open list ✨'}
                             </button>
                         </div>
                     </div>
@@ -9049,6 +9777,7 @@ const getTodayChallenge = () => {
                     )}
                 </div>
             </div>
+          )
         )}
 
         {/* SUBSCRIPTION OVERLAY */}
@@ -9216,7 +9945,16 @@ const getTodayChallenge = () => {
                 <div className="flex items-center justify-between p-4 bg-black/60 backdrop-blur-xl absolute top-0 w-full z-20 border-b border-white/10">
                     <div className="flex items-center space-x-3">
                         <button 
-                            onClick={() => { playSound('click'); setScreen(AppScreen.PRACTICE); }}
+                            onClick={() => { 
+                                playSound('click'); 
+                                if (lessonBackupExercise) {
+                                    setCurrentExercise(lessonBackupExercise);
+                                    setScreen(AppScreen.LESSON);
+                                    setLessonBackupExercise(null);
+                                } else {
+                                    setScreen(AppScreen.PRACTICE); 
+                                }
+                            }}
                             className="p-2 bg-white/10 hover:bg-white/20 rounded-xl text-white transition-all active:scale-95"
                             title="Назад"
                         >
@@ -9433,8 +10171,17 @@ const getTodayChallenge = () => {
 
                     {/* Hangup / End Call */}
                     <button 
-                        onClick={() => { playSound('click'); setScreen(AppScreen.PRACTICE); }} 
-                        className="p-4 rounded-2xl bg-red-600 hover:bg-red-500 text-white transition-all transform hover:scale-105 active:scale-95 shadow-lg flex items-center justify-center"
+                        onClick={() => { 
+                            playSound('click'); 
+                            if (lessonBackupExercise) {
+                                setCurrentExercise(lessonBackupExercise);
+                                setScreen(AppScreen.LESSON);
+                                setLessonBackupExercise(null);
+                            } else {
+                                setScreen(AppScreen.PRACTICE); 
+                            }
+                        }} 
+                        className="p-4 rounded-2xl bg-red-600 hover:bg-red-500 text-white transition-all transform hover:scale-105 active:scale-95 shadow-lg flex items-center justify-center cursor-pointer"
                         title="Завершить видеозвонок"
                     >
                         <PhoneIcon className="w-6 h-6 transform rotate-135"/>
@@ -9447,6 +10194,58 @@ const getTodayChallenge = () => {
         <div className="p-4 md:p-10 max-w-5xl mx-auto">
           {screen === AppScreen.PATH && (
             <div className="flex flex-col items-center py-10 animate-in fade-in slide-in-from-bottom-5">
+              {/* DIFFICULTY LEVEL SELECTOR: ЛЁГКИЙ УРОВЕНЬ И СЛОЖНЫЙ УРОВЕНЬ */}
+              <div className="w-full max-w-md bg-gray-900/85 border border-gray-800 rounded-2xl p-2 mb-5 shadow-lg">
+                <div className="flex items-center justify-between px-2 pb-1.5">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-gray-300">
+                    {user.language === 'ru' ? 'Уровень сложности уроков:' : 'Lesson Difficulty Level:'}
+                  </span>
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                    user.difficultyLevel === 'hard'
+                      ? 'bg-red-500/20 text-red-300 border border-red-500/40'
+                      : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                  }`}>
+                    {user.difficultyLevel === 'hard'
+                      ? (user.language === 'ru' ? '🔥 +35 XP / +10💎' : '🔥 +35 XP / +10💎')
+                      : (user.language === 'ru' ? '🌱 +20 XP / +5💎' : '🌱 +20 XP / +5💎')}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playSound('select');
+                      setUser(u => ({ ...u, difficultyLevel: 'easy' }));
+                      setToast(user.language === 'ru' ? '🌱 Выбран Лёгкий уровень (базовые фразы и задания)' : '🌱 Easy level selected');
+                    }}
+                    className={`py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      (user.difficultyLevel || 'easy') === 'easy'
+                        ? 'bg-emerald-500 text-slate-950 shadow-md border-b-2 border-emerald-700'
+                        : 'bg-gray-800 text-gray-300 hover:text-white hover:bg-gray-700'
+                    }`}
+                  >
+                    <span>🌱</span>
+                    <span>{user.language === 'ru' ? 'Лёгкий уровень' : 'Easy Level'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playSound('select');
+                      setUser(u => ({ ...u, difficultyLevel: 'hard' }));
+                      setToast(user.language === 'ru' ? '🔥 Выбран Сложный уровень (повышенная сложность и +35 XP)' : '🔥 Hard level selected (+35 XP)');
+                    }}
+                    className={`py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      user.difficultyLevel === 'hard'
+                        ? 'bg-gradient-to-r from-red-600 to-amber-500 text-white shadow-md border-b-2 border-red-800'
+                        : 'bg-gray-800 text-gray-300 hover:text-white hover:bg-gray-700'
+                    }`}
+                  >
+                    <span>🔥</span>
+                    <span>{user.language === 'ru' ? 'Сложный уровень' : 'Hard Level'}</span>
+                  </button>
+                </div>
+              </div>
+
               {/* DAILY CHALLENGE BANNER */}
               {(() => {
                 const todayStr = new Date().toISOString().split('T')[0];
@@ -9587,7 +10386,7 @@ const getTodayChallenge = () => {
                           <div className="flex-1 pr-6">
                               <div className="flex items-center space-x-2 mb-1.5 flex-wrap">
                                   <span className="bg-purple-500 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">Бета-тестирование</span>
-                                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9.5px] font-bold px-2 py-0.5 rounded-full uppercase">v1.0.2 Active</span>
+                                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9.5px] font-bold px-2 py-0.5 rounded-full uppercase font-mono">v{APP_VERSION} Active</span>
                               </div>
                               <h3 className="font-din font-black text-xl text-white tracking-widest uppercase mb-1">DuoWindo6601 Доступ Бета-тестирование</h3>
                               <p className="font-din font-bold text-xs text-purple-200 leading-normal mb-3">
@@ -10058,78 +10857,45 @@ const getTodayChallenge = () => {
               ) : currentCourse.id === 'math' ? (
                   <div className="w-full max-w-md flex flex-col items-center px-4 relative">
                       {/* MATH BANNER */}
-                      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700 w-full p-6 rounded-3xl border-b-8 border-indigo-900 mb-6 flex justify-between items-center shadow-2xl transition-transform hover:scale-[1.01]">
+                      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 w-full p-6 rounded-3xl border-b-8 border-indigo-900 mb-6 flex justify-between items-center shadow-2xl transition-transform hover:scale-[1.01]">
                           <div>
                               <div className="flex items-center space-x-2 mb-1">
-                                  <span className="text-[11px] font-black uppercase tracking-widest text-amber-300 bg-black/40 px-3 py-1 rounded-full border border-amber-400/30">
-                                      {user.language === 'ru' ? 'Курс не является языком • Точная наука & Навыки' : 'Not a Language • Science & Skills Course'}
+                                  <span className="text-xs font-black uppercase tracking-widest text-blue-200 bg-black/40 px-3 py-1 rounded-full border border-blue-400/30">
+                                      {user.language === 'ru' ? 'Курс Математики не язык' : 'Not a Language • Math Course'}
                                   </span>
                               </div>
-                              <h2 className="text-2xl font-black text-white">{user.language === 'ru' ? 'Математика' : 'Mathematics'}</h2>
-                              <p className="text-xs text-blue-100 font-bold mt-1">
+                              <h2 className="text-2xl sm:text-3xl font-black text-white">{user.language === 'ru' ? 'Математика' : 'Mathematics'}</h2>
+                              <p className="text-xs text-blue-100 font-bold mt-0.5">
                                   {user.language === 'ru' 
-                                      ? `${mathGrade} класс • ${
-                                          mathTopic === 'arithmetic' ? '🔢 Арифметика' :
-                                          mathTopic === 'algebra' ? '📐 Алгебра' :
-                                          mathTopic === 'geometry' ? '📏 Геометрия' : '📈 Тригонометрия и Анализ'
-                                        }` 
-                                      : `Grade ${mathGrade} • ${mathTopic}`}
+                                      ? `${mathGrade} класс • ${mathTopic === 'arithmetic' ? '🔢 Арифметика' : mathTopic === 'algebra' ? '📐 Алгебра' : mathTopic === 'geometry' ? '📏 Геометрия' : '📈 Анализ'}` 
+                                      : `Grade ${mathGrade} • ${mathTopic === 'arithmetic' ? '🔢 Arithmetic' : mathTopic === 'algebra' ? '📐 Algebra' : mathTopic === 'geometry' ? '📏 Geometry' : '📈 Analysis'}`}
                               </p>
                           </div>
                           <span className="text-5xl drop-shadow-md">Σ</span>
                       </div>
 
-                      {/* GRADE SELECTOR: КЛАСС 1-11 ДОСТУП РАЗДЕЛ */}
-                      <div className="w-full bg-gray-900/80 border border-gray-800 p-3.5 rounded-2xl mb-4 shadow-inner">
+                      {/* GRADE SELECTOR: КЛАСС (ДОСТУП К РАЗДЕЛАМ): ДОБАВИТЬ 10-11 КЛАСС */}
+                      <div className="w-full bg-gray-900/90 border border-gray-800 p-3.5 rounded-2xl mb-4 shadow-inner">
                           <div className="flex items-center justify-between mb-2.5 px-1">
-                              <span className="text-xs font-black uppercase tracking-wider text-gray-300">
-                                  {user.language === 'ru' ? 'Класс (доступ к разделам 1–11):' : 'Grade selection (1–11):'}
+                              <span className="text-xs font-black uppercase tracking-wider text-gray-200 flex items-center space-x-1.5">
+                                  <span>📚</span>
+                                  <span>{user.language === 'ru' ? 'Класс (доступ к разделам):' : 'Grade (access to sections):'}</span>
                               </span>
-                              <span className="text-xs font-black text-blue-300 bg-blue-950/90 px-2.5 py-0.5 rounded-lg border border-blue-500/40 shadow">
-                                  {mathGrade} {user.language === 'ru' ? 'класс' : 'grade'}
-                              </span>
+                              <div className="flex items-center space-x-1.5">
+                                  <span className="text-[10px] font-black text-blue-300 bg-blue-950 px-2 py-0.5 rounded-md border border-blue-500/40">
+                                      {mathGrade} {user.language === 'ru' ? 'класс' : 'grade'}
+                                  </span>
+                                  {mathGrade >= 10 && (
+                                      <span className="text-[10px] font-black text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded-md border border-amber-500/40">
+                                          10-11 класс
+                                      </span>
+                                  )}
+                              </div>
                           </div>
-
-                          {/* Quick Grade Brackets */}
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-2.5">
-                              {[
-                                  { label: '1–4 кл. (Начальная)', startGrade: 2 },
-                                  { label: '5–6 кл. (Математика)', startGrade: 5 },
-                                  { label: '7–9 кл. (Алгебра/Геом)', startGrade: 7 },
-                                  { label: '10–11 кл. (Старшая/ЕГЭ) 🎓', startGrade: 10 }
-                              ].map(bracket => {
-                                  const isActiveBracket = (
-                                      (bracket.startGrade === 2 && mathGrade <= 4) ||
-                                      (bracket.startGrade === 5 && (mathGrade === 5 || mathGrade === 6)) ||
-                                      (bracket.startGrade === 7 && (mathGrade >= 7 && mathGrade <= 9)) ||
-                                      (bracket.startGrade === 10 && mathGrade >= 10)
-                                  );
-                                  return (
-                                      <button
-                                          key={bracket.label}
-                                          type="button"
-                                          onClick={() => {
-                                              playSound('click');
-                                              setMathGrade(bracket.startGrade);
-                                              localStorage.setItem('duo_math_grade_6601', String(bracket.startGrade));
-                                              setToast(user.language === 'ru' ? `Переход в раздел: ${bracket.label}` : `Selected ${bracket.label}`);
-                                          }}
-                                          className={`py-1.5 px-2 rounded-xl text-[10px] font-black tracking-wide transition-all cursor-pointer ${
-                                              isActiveBracket
-                                                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md border border-blue-400'
-                                                  : 'bg-gray-800/90 text-gray-400 hover:text-white hover:bg-gray-700/80 border border-transparent'
-                                          }`}
-                                      >
-                                          {bracket.label}
-                                      </button>
-                                  );
-                              })}
-                          </div>
-
-                          {/* Individual Grade Selector Chips (1 to 11) */}
-                          <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-                              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(gradeNum => {
+                          <div className="flex gap-1.5 overflow-x-auto pb-1.5 no-scrollbar">
+                              {[2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(gradeNum => {
                                   const isSel = mathGrade === gradeNum;
+                                  const isSenior = gradeNum >= 10;
                                   return (
                                       <button
                                           key={gradeNum}
@@ -10140,21 +10906,24 @@ const getTodayChallenge = () => {
                                               localStorage.setItem('duo_math_grade_6601', String(gradeNum));
                                               setToast(user.language === 'ru' ? `Выбран ${gradeNum} класс математики!` : `Selected Math Grade ${gradeNum}!`);
                                           }}
-                                          className={`px-3 py-2 rounded-xl font-black text-xs whitespace-nowrap transition-all cursor-pointer ${
+                                          className={`px-3 py-2 rounded-xl font-black text-xs whitespace-nowrap transition-all cursor-pointer flex items-center space-x-1 ${
                                               isSel
                                                   ? 'bg-blue-500 text-white shadow-lg scale-105 border-b-2 border-blue-700'
+                                                  : isSenior
+                                                  ? 'bg-indigo-950/80 border border-indigo-500/50 text-indigo-200 hover:text-white hover:bg-indigo-900'
                                                   : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
                                           }`}
                                       >
-                                          {gradeNum} {user.language === 'ru' ? 'кл.' : 'gr'}
+                                          <span>{gradeNum} {user.language === 'ru' ? 'класс' : 'gr'}</span>
+                                          {isSenior && <span className="text-[10px] text-amber-300 font-bold">★</span>}
                                       </button>
                                   );
                               })}
                           </div>
                       </div>
 
-                      {/* TOPIC SELECTOR: 4 ТЕМЫ (Арифметика, Алгебра, Геометрия, Анализ) */}
-                      <div className="w-full bg-gray-900/80 border border-gray-800 p-2 rounded-2xl mb-6 grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                      {/* TOPIC SELECTOR: 4 ТЕМЫ (🔢 АРИФМЕТИКА, 📐 АЛГЕБРА, 📏 ГЕОМЕТРИЯ, 📈 АНАЛИЗ) */}
+                      <div className="w-full bg-gray-900/80 border border-gray-800 p-2 rounded-2xl mb-6 grid grid-cols-2 sm:grid-cols-4 gap-2">
                           <button
                               type="button"
                               onClick={() => {
@@ -10162,13 +10931,13 @@ const getTodayChallenge = () => {
                                   setMathTopic('arithmetic');
                                   localStorage.setItem('duo_math_topic_6601', 'arithmetic');
                               }}
-                              className={`py-2 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                              className={`py-2.5 px-2 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                                   mathTopic === 'arithmetic'
                                       ? 'bg-blue-600 text-white shadow-md border-b-4 border-blue-800'
                                       : 'bg-gray-800 text-gray-400 hover:text-white'
                               }`}
                           >
-                              <span>🔢</span>
+                              <span className="text-base">🔢</span>
                               <span>{user.language === 'ru' ? 'Арифметика' : 'Arithmetic'}</span>
                           </button>
                           <button
@@ -10178,13 +10947,13 @@ const getTodayChallenge = () => {
                                   setMathTopic('algebra');
                                   localStorage.setItem('duo_math_topic_6601', 'algebra');
                               }}
-                              className={`py-2 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                              className={`py-2.5 px-2 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                                   mathTopic === 'algebra'
                                       ? 'bg-indigo-600 text-white shadow-md border-b-4 border-indigo-800'
                                       : 'bg-gray-800 text-gray-400 hover:text-white'
                               }`}
                           >
-                              <span>📐</span>
+                              <span className="text-base">📐</span>
                               <span>{user.language === 'ru' ? 'Алгебра' : 'Algebra'}</span>
                           </button>
                           <button
@@ -10194,46 +10963,47 @@ const getTodayChallenge = () => {
                                   setMathTopic('geometry');
                                   localStorage.setItem('duo_math_topic_6601', 'geometry');
                               }}
-                              className={`py-2 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                              className={`py-2.5 px-2 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                                   mathTopic === 'geometry'
                                       ? 'bg-emerald-600 text-white shadow-md border-b-4 border-emerald-800'
                                       : 'bg-gray-800 text-gray-400 hover:text-white'
                               }`}
                           >
-                              <span>📏</span>
+                              <span className="text-base">📏</span>
                               <span>{user.language === 'ru' ? 'Геометрия' : 'Geometry'}</span>
                           </button>
                           <button
                               type="button"
                               onClick={() => {
                                   playSound('click');
-                                  setMathTopic('calculus');
-                                  localStorage.setItem('duo_math_topic_6601', 'calculus');
+                                  setMathTopic('analysis');
+                                  localStorage.setItem('duo_math_topic_6601', 'analysis');
                               }}
-                              className={`py-2 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                                  mathTopic === 'calculus'
+                              className={`py-2.5 px-2 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                                  mathTopic === 'analysis'
                                       ? 'bg-purple-600 text-white shadow-md border-b-4 border-purple-800'
                                       : 'bg-gray-800 text-gray-400 hover:text-white'
                               }`}
                           >
-                              <span>📈</span>
-                              <span>{user.language === 'ru' ? 'Анализ' : 'Calculus'}</span>
+                              <span className="text-base">📈</span>
+                              <span>{user.language === 'ru' ? 'Анализ' : 'Analysis'}</span>
                           </button>
                       </div>
 
                       {/* ACTIVE MATH TOPIC & GRADE CARD */}
                       <div className="w-full bg-gray-800/90 border border-blue-500/30 p-4 rounded-2xl mb-6 shadow-md text-left">
                           <div className="flex items-center space-x-2 mb-1.5">
-                              <span className="bg-blue-500 text-white text-[10px] font-black px-2.5 py-0.5 rounded uppercase tracking-wider">
-                                  {mathGrade} {user.language === 'ru' ? 'класс' : 'Grade'} • {
-                                      mathTopic === 'arithmetic' ? '🔢 Арифметика' :
-                                      mathTopic === 'algebra' ? '📐 Алгебра' :
-                                      mathTopic === 'geometry' ? '📏 Геометрия' : '📈 Тригонометрия и Анализ'
-                                  }
+                              <span className="bg-blue-500 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase">
+                                  {mathGrade} {user.language === 'ru' ? 'класс' : 'Grade'} • {mathTopic === 'arithmetic' ? (user.language === 'ru' ? '🔢 Арифметика' : '🔢 Arithmetic') : mathTopic === 'algebra' ? (user.language === 'ru' ? '📐 Алгебра' : '📐 Algebra') : mathTopic === 'geometry' ? (user.language === 'ru' ? '📏 Геометрия' : '📏 Geometry') : (user.language === 'ru' ? '📈 Анализ' : '📈 Analysis')}
                               </span>
+                              {mathGrade >= 10 && (
+                                  <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black px-2 py-0.5 rounded uppercase">
+                                      Старшая школа (10-11 класс)
+                                  </span>
+                              )}
                           </div>
                           <p className="text-xs text-gray-300 font-bold leading-relaxed">
-                              {mathTopic === 'arithmetic' && mathGrade === 1 && (user.language === 'ru' ? 'Сложение и вычитание в пределах 20, прямое и обратное считывание.' : 'Addition and subtraction within 20.')}
+                              {/* АРИФМЕТИКА */}
                               {mathTopic === 'arithmetic' && mathGrade === 2 && (user.language === 'ru' ? 'Сложение и вычитание в пределах 100, умножение на 2 и 3, состав числа.' : 'Addition and subtraction within 100, basic multiplication.')}
                               {mathTopic === 'arithmetic' && mathGrade === 3 && (user.language === 'ru' ? 'Таблица умножения и деления до 100, скобки и порядок действий.' : 'Multiplication & division table to 100, order of operations.')}
                               {mathTopic === 'arithmetic' && mathGrade === 4 && (user.language === 'ru' ? 'Многозначные числа, умножение столбиком, деление с остатком, простые дроби.' : 'Multi-digit operations, long division, basic fractions.')}
@@ -10241,10 +11011,11 @@ const getTodayChallenge = () => {
                               {mathTopic === 'arithmetic' && mathGrade === 6 && (user.language === 'ru' ? 'Отрицательные числа, модуль числа, пропорции, НОД и НОК.' : 'Negative numbers, absolute values, proportions, GCD and LCM.')}
                               {mathTopic === 'arithmetic' && mathGrade === 7 && (user.language === 'ru' ? 'Рациональные числа, стандартный вид числа, степени с целым показателем.' : 'Rational numbers, scientific notation, integer exponents.')}
                               {mathTopic === 'arithmetic' && mathGrade === 8 && (user.language === 'ru' ? 'Арифметический квадратный корень √x, свойства корней, иррациональные числа.' : 'Square roots √x, radical properties and real numbers.')}
-                              {mathTopic === 'arithmetic' && mathGrade === 9 && (user.language === 'ru' ? 'Кубические корни ∛x, вычисление корней n-й степени, действительные числа.' : 'Cube roots, roots of nth degree, real number operations.')}
-                              {mathTopic === 'arithmetic' && (mathGrade === 10 || mathGrade === 11) && (user.language === 'ru' ? 'Свойства степеней с рациональным показателем, вычисления с экспонентами и приближенными значениями.' : 'Exponents with rational powers and precision arithmetic.')}
-
-                              {mathTopic === 'algebra' && mathGrade === 1 && (user.language === 'ru' ? 'Простейшие числовые равенства с неизвестным ? + a = b.' : 'Basic equations with missing value ? + a = b.')}
+                              {mathTopic === 'arithmetic' && mathGrade === 9 && (user.language === 'ru' ? 'Арифметическая и геометрическая прогрессии (an, bn), числовые последовательности и иррациональные корни.' : 'Arithmetic and geometric progressions, numerical sequences and surds.')}
+                              {mathTopic === 'arithmetic' && mathGrade === 10 && (user.language === 'ru' ? 'Логарифмические вычисления logₐ(b), степени с рациональным показателем, комбинаторика (n!, Cₙᵏ).' : 'Logarithmic computations logₐ(b), rational exponents, combinatorics (permutations & combinations).')}
+                              {mathTopic === 'arithmetic' && mathGrade === 11 && (user.language === 'ru' ? 'Теория вероятностей P(A), финансовая математика (сложные проценты), пределы lim.' : 'Probability theory P(A), compound interest capitalization, limits lim.')}
+                              
+                              {/* АЛГЕБРА */}
                               {mathTopic === 'algebra' && mathGrade === 2 && (user.language === 'ru' ? 'Числовые равенства и базовые уравнения вида x + a = b.' : 'Number equalities and simple x + a = b equations.')}
                               {mathTopic === 'algebra' && mathGrade === 3 && (user.language === 'ru' ? 'Уравнения с умножением и делением: a · x = b, x : a = b.' : 'Multiplication and division equations: a · x = b.')}
                               {mathTopic === 'algebra' && mathGrade === 4 && (user.language === 'ru' ? 'Составные уравнения со скобками: (x + a) · b = c.' : 'Compound equations with brackets: (x + a) · b = c.')}
@@ -10252,12 +11023,33 @@ const getTodayChallenge = () => {
                               {mathTopic === 'algebra' && mathGrade === 6 && (user.language === 'ru' ? 'Линейные уравнения с переносом слагаемых через знак равенства: 4x - 8 = 2x + 6.' : 'Linear equations with terms moved across equals sign.')}
                               {mathTopic === 'algebra' && mathGrade === 7 && (user.language === 'ru' ? 'Одночлены и многочлены, формулы сокращенного умножения (a+b)², графики y = kx + b.' : 'Polynomials, binomial squares (a+b)², linear functions.')}
                               {mathTopic === 'algebra' && mathGrade === 8 && (user.language === 'ru' ? 'Квадратные уравнения ax² + bx + c = 0, дискриминант D, теорема Виета и неравенства.' : 'Quadratic equations ax² + bx + c = 0, discriminant and Vieta.')}
-                              {mathTopic === 'algebra' && mathGrade === 9 && (user.language === 'ru' ? 'Квадратичная функция, системы уравнений, арифметическая и геометрическая прогрессии.' : 'Quadratic functions, systems of equations, progressions.')}
-                              {mathTopic === 'algebra' && mathGrade === 10 && (user.language === 'ru' ? 'Показательные уравнения 3ˣ⁺¹ = 27, логарифмы, свойства функций.' : 'Exponential equations, logarithms, function properties.')}
-                              {mathTopic === 'algebra' && mathGrade === 11 && (user.language === 'ru' ? 'Логарифмические уравнения log_a(f(x)) = b, комплексная подготовка к ЕГЭ.' : 'Logarithmic equations and high-school algebra prep.')}
+                              {mathTopic === 'algebra' && mathGrade === 9 && (user.language === 'ru' ? 'Системы уравнений, квадратные неравенства методом интервалов, свойства корней.' : 'Equation systems, quadratic inequalities by interval method, root properties.')}
+                              {mathTopic === 'algebra' && mathGrade === 10 && (user.language === 'ru' ? 'Тригонометрические уравнения (sin x, cos x, tg x), тождества sin²x + cos²x = 1, показательные уравнения aˣ = b.' : 'Trigonometric equations, identities sin²x + cos²x = 1, exponential equations aˣ = b.')}
+                              {mathTopic === 'algebra' && mathGrade === 11 && (user.language === 'ru' ? 'Производная функции f′(x), исследование на экстремумы, касательная к графику, первообразная и определенный интеграл ∫.' : 'Derivative of function f′(x), extrema analysis, tangents, anti-derivative and integral ∫.')}
 
-                              {mathTopic === 'geometry' && (user.language === 'ru' ? 'Периметры, площади фигур, теорема Пифагора, свойства треугольников, окружностей и стереометрия объёмов.' : 'Perimeters, areas, Pythagorean theorem, spatial geometry and volumes.')}
-                              {mathTopic === 'calculus' && (user.language === 'ru' ? 'Тригонометрические функции (sin, cos, tg), логарифмы, производные f\'(x), первообразные и интегралы.' : 'Trigonometric functions, logarithms, derivatives f\'(x), anti-derivatives and integrals.')}
+                              {/* ГЕОМЕТРИЯ */}
+                              {mathTopic === 'geometry' && mathGrade === 2 && (user.language === 'ru' ? 'Периметр квадрата и прямоугольника P = 2(a+b), геометрические фигуры, количество углов и сторон.' : 'Perimeter of rectangle P = 2(a+b), basic shapes, counting corners and sides.')}
+                              {mathTopic === 'geometry' && mathGrade === 3 && (user.language === 'ru' ? 'Площадь прямоугольника S = a × b, площадь квадрата S = a², вычисление площади фигур.' : 'Area of rectangle S = a × b, square area S = a², square centimeter units.')}
+                              {mathTopic === 'geometry' && mathGrade === 4 && (user.language === 'ru' ? 'Объём прямоугольного параллелепипеда V = a × b × c, куб, развёртки объемных фигур.' : 'Volume of rectangular cuboid V = a × b × c, cube volume.')}
+                              {mathTopic === 'geometry' && mathGrade === 5 && (user.language === 'ru' ? 'Виды углов (острый, прямой 90°, тупой, развёрнутый 180°), смежные углы и единицы площади.' : 'Types of angles (acute, right 90°, obtuse, straight 180°), supplementary angles.')}
+                              {mathTopic === 'geometry' && mathGrade === 6 && (user.language === 'ru' ? 'Окружность и круг, радиус R, диаметр D = 2R, длина окружности C = 2πR, площадь круга S = πR².' : 'Circle radius R, diameter D = 2R, circumference C = 2πR, circle area S = πR².')}
+                              {mathTopic === 'geometry' && mathGrade === 7 && (user.language === 'ru' ? 'Сумма углов треугольника 180°, признаки равенства треугольников, смежные и вертикальные углы.' : 'Triangle angle sum 180°, triangle congruence theorems, vertical angles.')}
+                              {mathTopic === 'geometry' && mathGrade === 8 && (user.language === 'ru' ? 'Теорема Пифагора c² = a² + b², площадь треугольника S = ½ah, свойства четырёхугольников (ромб, трапеция).' : 'Pythagorean theorem c² = a² + b², triangle area S = ½ah, quadrilaterals.')}
+                              {mathTopic === 'geometry' && mathGrade === 9 && (user.language === 'ru' ? 'Вписанные и центральные углы, теорема синусов и косинусов, векторы на плоскости (длина |a|, скалярное произведение).' : 'Inscribed & central angles, law of sines & cosines, 2D vectors.')}
+                              {mathTopic === 'geometry' && mathGrade === 10 && (user.language === 'ru' ? 'Стереометрия: взаимное расположение прямых и плоскостей, тетраэдр, параллелепипед, площадь поверхности 6a².' : 'Stereometry: 3D geometry, lines & planes, tetrahedron, cuboid diagonal, surface area.')}
+                              {mathTopic === 'geometry' && mathGrade === 11 && (user.language === 'ru' ? 'Тела вращения: цилиндр, конус, шар и сфера, объёмы тел V = ⅓πR²h, осевые сечения.' : 'Solids of revolution: cylinder, cone, sphere, volume formulas, spherical cross-sections.')}
+
+                              {/* АНАЛИЗ */}
+                              {mathTopic === 'analysis' && mathGrade === 2 && (user.language === 'ru' ? 'Числовые закономерности, шаги рядов чисел, нахождение следующего элемента последовательности.' : 'Number patterns, sequence progressions, next element prediction.')}
+                              {mathTopic === 'analysis' && mathGrade === 3 && (user.language === 'ru' ? 'Функциональные зависимости табличного вида y = kx, правило соответствия числовых величин.' : 'Functional relationships y = kx, table dependency rules.')}
+                              {mathTopic === 'analysis' && mathGrade === 4 && (user.language === 'ru' ? 'Скорость изменения величин, движение, формула пути S = v · t, средняя скорость.' : 'Rate of change, speed S = v · t, average speed calculations.')}
+                              {mathTopic === 'analysis' && mathGrade === 5 && (user.language === 'ru' ? 'Среднее арифметическое набора чисел, анализ числовых данных и диаграмм.' : 'Arithmetic mean of numbers, numerical data reading.')}
+                              {mathTopic === 'analysis' && mathGrade === 6 && (user.language === 'ru' ? 'Прямая пропорциональность y = kx и обратная пропорциональность y = k/x, коэффициент k.' : 'Direct & inverse proportionality, slope coefficient k.')}
+                              {mathTopic === 'analysis' && mathGrade === 7 && (user.language === 'ru' ? 'Линейная функция y = kx + b, угловой коэффициент k, точки пересечения графика с осями X и Y.' : 'Linear function y = kx + b, slope k, coordinate intercepts.')}
+                              {mathTopic === 'analysis' && mathGrade === 8 && (user.language === 'ru' ? 'Область определения функции D(f), нули функции f(x) = 0, исследование квадратичной функции.' : 'Domain D(f), roots f(x) = 0, quadratic function analysis.')}
+                              {mathTopic === 'analysis' && mathGrade === 9 && (user.language === 'ru' ? 'Свойства квадратичной функции y = ax² + bx + c, координаты вершины параболы x₀ = -b/(2a), монотонность.' : 'Quadratic function properties, parabola vertex x₀ = -b/(2a), monotonicity.')}
+                              {mathTopic === 'analysis' && mathGrade === 10 && (user.language === 'ru' ? 'Предел функции в точке lim(x→a) f(x), непрерывность, геометрический смысл производной (k = tg α).' : 'Function limits lim(x→a) f(x), continuity, derivative slope tangent k = tg α.')}
+                              {mathTopic === 'analysis' && mathGrade === 11 && (user.language === 'ru' ? 'Математический анализ: правила дифференцирования f′(x), критические точки и экстремумы, определенный интеграл ∫.' : 'Calculus: derivative rules f′(x), critical extrema, definite integral ∫.')}
                           </p>
                       </div>
 
@@ -10286,7 +11078,8 @@ const getTodayChallenge = () => {
                               onClick={() => {
                                   playSound('select');
                                   startMathTraining(mathGrade, mathTopic);
-                                  setToast(user.language === 'ru' ? `📐 Ежедневная математическая разминка: ${mathGrade} класс (+20 XP)!` : `📐 Daily math workout: Grade ${mathGrade} (+20 XP)!`);
+                                  const topicName = mathTopic === 'arithmetic' ? 'Арифметика' : mathTopic === 'algebra' ? 'Алгебра' : mathTopic === 'geometry' ? 'Геометрия' : 'Анализ';
+                                  setToast(user.language === 'ru' ? `📐 Разминка: ${mathGrade} класс (${topicName}) (+20 XP)!` : `📐 Workout: Grade ${mathGrade} (+20 XP)!`);
                               }}
                               className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-blue-500 hover:bg-blue-400 text-black font-black text-xs uppercase tracking-wider shadow-lg active:scale-95 transition-all whitespace-nowrap shrink-0 cursor-pointer text-center"
                           >
@@ -10298,8 +11091,16 @@ const getTodayChallenge = () => {
                       <div className="flex flex-col items-center space-y-8 relative w-full">
                           <button 
                               onClick={() => startMathTraining(mathGrade, mathTopic)} 
-                              className="w-28 h-28 rounded-full bg-blue-600 border-b-8 border-blue-800 active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center shadow-2xl hover:brightness-110 group cursor-pointer"
-                              title={user.language === 'ru' ? `Начать урок: ${mathTopic}` : 'Start Math Lesson'}
+                              className={`w-28 h-28 rounded-full border-b-8 active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center shadow-2xl hover:brightness-110 group cursor-pointer ${
+                                  mathTopic === 'arithmetic'
+                                      ? 'bg-blue-600 border-blue-800'
+                                      : mathTopic === 'algebra'
+                                      ? 'bg-indigo-600 border-indigo-800'
+                                      : mathTopic === 'geometry'
+                                      ? 'bg-emerald-600 border-emerald-800'
+                                      : 'bg-purple-600 border-purple-800'
+                              }`}
+                              title={user.language === 'ru' ? `Начать урок: ${mathTopic === 'arithmetic' ? 'Арифметика' : mathTopic === 'algebra' ? 'Алгебра' : mathTopic === 'geometry' ? 'Геометрия' : 'Анализ'}` : 'Start Math Lesson'}
                           >
                               <span className="text-3xl font-black text-white group-hover:scale-110 transition-transform">
                                   {mathTopic === 'arithmetic' ? '🔢' : mathTopic === 'algebra' ? '📐' : mathTopic === 'geometry' ? '📏' : '📈'}
@@ -10309,7 +11110,7 @@ const getTodayChallenge = () => {
                           <div className="w-full bg-gradient-to-r from-blue-900/60 to-indigo-900/60 border border-blue-500/40 p-5 rounded-3xl shadow-xl flex items-center justify-between gap-3">
                               <div className="text-left">
                                   <h4 className="font-din font-black text-white text-base">
-                                      {user.language === 'ru' ? `Урок: ${mathTopic === 'arithmetic' ? 'Арифметика' : 'Алгебра'}` : `Lesson: ${mathTopic === 'arithmetic' ? 'Arithmetic' : 'Algebra'}`}
+                                      {user.language === 'ru' ? `Урок: ${mathTopic === 'arithmetic' ? 'Арифметика' : mathTopic === 'algebra' ? 'Алгебра' : mathTopic === 'geometry' ? 'Геометрия' : 'Анализ'}` : `Lesson: ${mathTopic === 'arithmetic' ? 'Arithmetic' : mathTopic === 'algebra' ? 'Algebra' : mathTopic === 'geometry' ? 'Geometry' : 'Analysis'}`}
                                   </h4>
                                   <p className="text-xs text-blue-200 font-bold">
                                       {user.language === 'ru' ? `Задачи по стандартам ${mathGrade} класса • +20 XP` : `Grade ${mathGrade} curriculum practice • +20 XP`}
@@ -10327,6 +11128,15 @@ const getTodayChallenge = () => {
                           <Mascot emotion="neutral" className="w-56 h-56 mt-4 animate-float" variant="math" />
                       </div>
                   </div>
+              ) : currentCourse.id === 'coding' ? (
+                  <ProgrammingCourseHub
+                    language={user.language}
+                    difficultyLevel={user.difficultyLevel === 'hard' ? 'hard' : 'easy'}
+                    onChangeDifficulty={(level) => setUser((u) => ({ ...u, difficultyLevel: level }))}
+                    onStartLesson={(topic) => { void startTraining('translation', topic); }}
+                    playSound={playSound}
+                    setToast={setToast}
+                  />
               ) : (
                   <>
                   {/* NOTIFICATION PROMPT BANNER FOR PC & MOBILE */}
@@ -11316,7 +12126,7 @@ const getTodayChallenge = () => {
                     }`}
                   >
                     <span>🌟</span>
-                    <span>{user.language === 'ru' ? 'Дневной рейтинг' : 'Daily Leaderboard'}</span>
+                    <span>{t('dailyLeaderboard')}</span>
                     <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-black/20 font-mono font-bold">24ч</span>
                   </button>
 
@@ -11329,7 +12139,7 @@ const getTodayChallenge = () => {
                     }`}
                   >
                     <span>🏆</span>
-                    <span>{user.language === 'ru' ? 'Общий рейтинг' : 'All-Time League'}</span>
+                    <span>{t('allTimeLeaderboard')}</span>
                   </button>
                 </div>
 
@@ -11343,16 +12153,14 @@ const getTodayChallenge = () => {
                       <div>
                         <div className="flex items-center space-x-2 flex-wrap">
                           <h3 className="font-black text-base text-amber-300 uppercase tracking-wide">
-                            {user.language === 'ru' ? 'Дневной рейтинг (Daily Leaderboard)' : 'Daily Leaderboard'}
+                            {t('dailyLeaderboard')}
                           </h3>
                           <span className="bg-amber-400 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded-lg uppercase tracking-wider shadow-sm">
-                            Только сегодня
+                            {t('onlyToday')}
                           </span>
                         </div>
                         <p className="text-xs text-gray-300 font-bold mt-0.5">
-                          {user.language === 'ru'
-                            ? 'Фиксирует очки опыта (XP), заработанные только за текущий день. Обнуление каждые 24 часа в полночь.'
-                            : 'Specifically tracks and displays XP gains only for the current calendar day, resetting every 24 hours.'}
+                          {t('dailyLeaderboardDesc')}
                         </p>
                       </div>
                     </div>
@@ -11360,7 +12168,7 @@ const getTodayChallenge = () => {
                     <div className="flex items-center space-x-2 shrink-0">
                       <div className="bg-black/60 border border-amber-500/50 rounded-2xl px-4 py-2 text-center shadow-inner">
                         <span className="text-[10px] text-gray-400 uppercase font-black tracking-wider block">
-                          {user.language === 'ru' ? 'Сброс через' : 'Resets in'}
+                          {t('resetsIn')}
                         </span>
                         <span className="font-mono font-black text-sm text-amber-400">
                           ⏱ {dailyResetCountdown}
@@ -11368,7 +12176,7 @@ const getTodayChallenge = () => {
                       </div>
                       <div className="bg-amber-500/20 border border-amber-500/50 rounded-2xl px-4 py-2 text-center shadow-inner">
                         <span className="text-[10px] text-amber-300 uppercase font-black tracking-wider block">
-                          {user.language === 'ru' ? 'Ваш XP сегодня' : 'Your Today XP'}
+                          {t('yourXpToday')}
                         </span>
                         <span className="font-mono font-black text-sm text-yellow-300">
                           +{dailyXp} XP
@@ -11379,23 +12187,23 @@ const getTodayChallenge = () => {
                 )}
 
                 {/* LEADERBOARD RELEASE & RESTRICTION ANNOUNCEMENT BANNER */}
-                <div className="p-4 rounded-2xl bg-amber-950/30 border-2 border-amber-500/50 mb-5 text-left shadow-xl">
+                <div className="p-4 rounded-2xl bg-emerald-950/30 border-2 border-emerald-500/50 mb-5 text-left shadow-xl">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-xl shrink-0">
-                        🔒
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center text-xl shrink-0">
+                        🎉
                       </div>
                       <div>
-                        <h4 className="text-xs sm:text-sm font-black text-amber-300 uppercase tracking-wider flex items-center gap-2 flex-wrap">
-                          <span>{user.language === 'ru' ? 'В разработке • Доступно 1 ноября 2026 г.' : 'In Development • Available Nov 1, 2026'}</span>
-                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500 text-black uppercase">
-                            1 ноября 2026 г.
+                        <h4 className="text-xs sm:text-sm font-black text-emerald-300 uppercase tracking-wider flex items-center gap-2 flex-wrap">
+                          <span>{user.language === 'ru' ? '✅ Открыто 1 ноября 2026 г. • Языки и раздел «Письмо»' : '✅ Unlocked Nov 1, 2026 • Languages and Letters'}</span>
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500 text-black uppercase">
+                            1 ноября 2026 г. • Открыто
                           </span>
                         </h4>
-                        <p className="text-[11px] text-amber-200/90 font-medium mt-0.5">
+                        <p className="text-[11px] text-emerald-200/90 font-medium mt-0.5">
                           {user.language === 'ru'
-                            ? 'Переключение на эти языки и раздел «Письмо» откроются 1 ноября 2026 года'
-                            : 'Switching to these languages and the "Writing" section will unlock on November 1, 2026'}
+                            ? 'Переключение на эти языки и раздел «Письмо» открыты с 1 ноября 2026 года'
+                            : 'Switching to these languages and the "Writing" section are unlocked as of November 1, 2026'}
                         </p>
                       </div>
                     </div>
@@ -11405,9 +12213,9 @@ const getTodayChallenge = () => {
                         playSound('click');
                         setShowLanguageLockModal(true);
                       }}
-                      className="px-3.5 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-300 text-xs font-black uppercase tracking-wider whitespace-nowrap cursor-pointer transition-all self-end sm:self-center"
+                      className="px-3.5 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 text-emerald-300 text-xs font-black uppercase tracking-wider whitespace-nowrap cursor-pointer transition-all self-end sm:self-center"
                     >
-                      {user.language === 'ru' ? 'Подробнее ↗' : 'Details ↗'}
+                      {user.language === 'ru' ? 'Список открытых языков ↗' : 'View open list ↗'}
                     </button>
                   </div>
                 </div>
@@ -11416,13 +12224,13 @@ const getTodayChallenge = () => {
                 <div className="bg-duo-card border-2 border-purple-500/50 rounded-2xl p-4 mb-6 shadow-xl">
                   <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                     <span className="text-xs font-black text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
-                      <span>🌐</span> {user.language === 'ru' ? 'Переводчик имен лидера (18 языков)' : 'Leaderboard Name Translator (18 languages)'}
+                      <span>🌐</span> {user.language === 'ru' ? 'Переводчик имен лидера (23 языка)' : 'Leaderboard Name Translator (23 languages)'}
                     </span>
                     <span className="text-[10px] bg-purple-900/50 text-purple-200 px-2 py-0.5 rounded-md border border-purple-500/40 font-mono">
                       {leaderboardLang.toUpperCase()}
                     </span>
                   </div>
-                  <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-9 gap-1.5">
+                  <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-1.5">
                     {[
                       { code: 'ru', label: 'RU', flag: '🇷🇺' },
                       { code: 'en', label: 'EN', flag: '🇬🇧' },
@@ -11442,6 +12250,11 @@ const getTodayChallenge = () => {
                       { code: 'bn', label: 'BN', flag: '🇧🇩' },
                       { code: 'th', label: 'TH', flag: '🇹🇭' },
                       { code: 'vi', label: 'VI', flag: '🇻🇳' },
+                      { code: 'kk', label: 'KK', flag: '🇰🇿' },
+                      { code: 'uz', label: 'UZ', flag: '🇺🇿' },
+                      { code: 'hy', label: 'HY', flag: '🇦🇲' },
+                      { code: 'ka', label: 'KA', flag: '🇬🇪' },
+                      { code: 'az', label: 'AZ', flag: '🇦🇿' },
                     ].map((l) => {
                       const isLocked = isLanguageSwitchLocked(l.code);
                       return (
@@ -11464,7 +12277,7 @@ const getTodayChallenge = () => {
                                 ? 'bg-amber-950/40 text-amber-200 border-amber-900/60 hover:bg-amber-900/50'
                                 : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border-gray-700'
                           }`}
-                          title={isLocked ? `${l.label}: Доступно до 1 ноября 2026 г. 🔒` : l.label}
+                          title={`${l.label} (${l.flag})`}
                         >
                           <div className="flex items-center gap-0.5">
                             <span className="text-base">{l.flag}</span>
@@ -11496,14 +12309,14 @@ const getTodayChallenge = () => {
                         className="w-full md:w-auto px-4 py-2.5 bg-amber-900/80 hover:bg-amber-800 text-amber-200 font-bold text-xs uppercase rounded-2xl border border-amber-500/40 active:translate-y-0.5 transition-all whitespace-nowrap shadow-md flex items-center justify-center gap-1.5"
                       >
                         <span>🚫</span>
-                        <span>{user.language === 'ru' ? 'Ограничения (8)' : 'Restrictions (8)'}</span>
+                        <span>{t('restrictionsBtn') || (user.language === 'ru' ? 'Ограничения (8)' : 'Restrictions (8)')}</span>
                       </button>
                       <button
                         onClick={() => openRegisterModal('register')}
                         className="w-full md:w-auto px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase rounded-2xl border-b-2 border-amber-700 active:translate-y-0.5 transition-all whitespace-nowrap shadow-md flex items-center justify-center gap-1 shrink-0"
                       >
                         <span>✨</span>
-                        <span><bdi dir="auto">{t('register')}</bdi></span>
+                        <span>{t('registerBtn') || t('register')}</span>
                       </button>
                     </div>
                   </div>
@@ -11566,12 +12379,22 @@ const getTodayChallenge = () => {
                    STORAGE_KEY={STORAGE_KEY}
                 />
 
-                {user.subscription === 'free' && (
+                {/* FISH AUDIO MODELS SHOP ACCESS SECTION */}
+                <ShopFishModelsSection
+                   user={user}
+                   setUser={setUser}
+                   playSound={playSound}
+                   setToast={(msg) => setToast(msg)}
+                   onUpgrade={(tier) => upgradeSubscription(tier)}
+                   STORAGE_KEY={STORAGE_KEY}
+                />
+
+                 {user.subscription === 'free' && (
                   <div onClick={() => { playSound('click'); setScreen(AppScreen.SUBSCRIPTION); }} className={`bg-gradient-to-r from-blue-600 to-purple-600 p-8 rounded-3xl border-b-8 border-purple-800 cursor-pointer hover:scale-[1.02] transition-all shadow-2xl mb-10 flex items-center justify-between relative overflow-hidden`}>
                     {isIncognitoUser && (
                       <div className="absolute top-3 right-3 bg-amber-500 text-black text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-md flex items-center space-x-1">
                         <span>🔒</span>
-                        <span>{user.language === 'ru' ? 'Требуется аккаунт (Инкогнито)' : 'Account Required (Incognito)'}</span>
+                        <span>{t('accountRequiredIncognito')}</span>
                       </div>
                     )}
                     <div>
@@ -11588,12 +12411,12 @@ const getTodayChallenge = () => {
                       onClick={() => { 
                         if (user.gems < 500) {
                           playSound('wrong');
-                          setToast(user.language === 'ru' ? "Недостаточно гемов! Нужно 500 💎" : "Not enough gems! Need 500 💎");
+                          setToast(t('notEnoughGems'));
                         } else {
                           playSound('purchase');
                           const newCount = (user.streakFreezeCount || 0) + 1;
                           setUser(u => ({ ...u, gems: u.gems - 500, streakFreezeCount: newCount }));
-                          setToast(user.language === 'ru' ? `❄️ Заморозка куплена! Всего: ${newCount} шт.` : `❄️ Streak Freeze purchased! Total: ${newCount}`);
+                          setToast(t('freezeBought').replace('{count}', String(newCount)));
                         }
                       }}
                    >
@@ -11632,9 +12455,78 @@ const getTodayChallenge = () => {
 
                 <h3 className="text-2xl font-bold text-gray-400 mb-6 uppercase tracking-wider mt-12 border-t-2 border-gray-800 pt-8">{t('refillGems')}</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                    <div onClick={() => { playSound('success'); setUser(u => ({...u, gems: u.gems + 300})); setToast(`${t('t_buy_gems')}: 300 💎`); }} className="bg-duo-card p-6 rounded-3xl border-2 border-b-8 border-gray-700 cursor-pointer hover:scale-[1.05] transition-all flex flex-col items-center shadow-xl text-center group"><GemStoneIcon className="w-16 h-16 text-duo-blue mb-4 group-hover:animate-bounce" /><h4 className="font-bold text-lg mb-1">{t('handful')}</h4><p className="text-gray-500 font-bold text-sm mb-4">300 шт.</p><div className="w-full py-2 rounded-xl bg-gray-800 font-bold text-green-400 group-hover:bg-green-500 group-hover:text-white transition-colors">Бесплатно</div></div>
-                    <div onClick={() => { playSound('success'); setUser(u => ({...u, gems: u.gems + 1200})); setToast(`${t('t_buy_gems')}: 1200 💎`); }} className="bg-duo-card p-6 rounded-3xl border-2 border-b-8 border-gray-700 cursor-pointer hover:scale-[1.05] transition-all flex flex-col items-center shadow-xl text-center group relative overflow-hidden"><div className="absolute top-0 right-0 bg-duo-orange text-white text-[10px] font-black px-2 py-1 rounded-bl-xl uppercase tracking-wider">{t('popular')}</div><GemStoneIcon className="w-20 h-20 text-purple-500 mb-4 group-hover:animate-pulse" /><h4 className="font-bold text-lg mb-1">{t('sack')}</h4><p className="text-gray-500 font-bold text-sm mb-4">1200 шт.</p><div className="w-full py-2 rounded-xl bg-gray-800 font-bold text-white group-hover:bg-duo-blue transition-colors">$4.99</div></div>
-                    <div onClick={() => { playSound('success'); setUser(u => ({...u, gems: u.gems + 6500})); setToast(`${t('t_buy_gems')}: 6500 💎`); }} className="bg-duo-card p-6 rounded-3xl border-2 border-b-8 border-gray-700 cursor-pointer hover:scale-[1.05] transition-all flex flex-col items-center shadow-xl text-center group"><ChestIcon className="w-20 h-20 mb-4 group-hover:rotate-12 transition-transform" /><h4 className="font-bold text-lg mb-1">{t('chest')}</h4><p className="text-gray-500 font-bold text-sm mb-4">6500 шт.</p><div className="w-full py-2 rounded-xl bg-gray-800 font-bold text-white group-hover:bg-duo-orange transition-colors">$19.99</div></div>
+                    {/* Pack 1: 300 Gems Free Daily */}
+                    <div 
+                      onClick={() => { 
+                        playSound('success'); 
+                        setUser(u => ({...u, gems: u.gems + 300})); 
+                        setToast(`${t('t_buy_gems')}: +300 💎`); 
+                      }} 
+                      className="bg-duo-card p-6 rounded-3xl border-2 border-b-8 border-gray-700 cursor-pointer hover:scale-[1.05] transition-all flex flex-col items-center shadow-xl text-center group"
+                    >
+                      <GemStoneIcon className="w-16 h-16 text-duo-blue mb-4 group-hover:animate-bounce" />
+                      <h4 className="font-bold text-lg mb-1">{t('handful')}</h4>
+                      <p className="text-gray-400 font-bold text-sm mb-4">300 💎</p>
+                      <div className="w-full py-2.5 rounded-xl bg-emerald-950/80 border border-emerald-500/50 font-bold text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors text-xs uppercase tracking-wider">
+                        {t('free')}
+                      </div>
+                    </div>
+
+                    {/* Pack 2: 1,200 Gems ($4.99) + 20% Bonus */}
+                    <div 
+                      onClick={() => {
+                        playSound('select');
+                        setSelectedGemsPackModal({
+                          id: 'gems_1200',
+                          gems: 1200,
+                          bonusGems: 200,
+                          price: '$4.99',
+                          amountUsd: 4.99,
+                          titleRu: 'Мешок кристаллов (1200 💎)',
+                          titleEn: 'Sack of Gems (1,200 💎)',
+                          popular: true
+                        });
+                      }} 
+                      className="bg-duo-card p-6 rounded-3xl border-2 border-b-8 border-purple-600/70 hover:border-purple-400 cursor-pointer hover:scale-[1.05] transition-all flex flex-col items-center shadow-xl text-center group relative overflow-hidden"
+                    >
+                      <div className="absolute top-0 right-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[10px] font-black px-2.5 py-1 rounded-bl-xl uppercase tracking-wider shadow">
+                        +20% {user.language === 'ru' ? 'бонусов' : 'bonus'}
+                      </div>
+                      <GemStoneIcon className="w-20 h-20 text-purple-400 mb-2 group-hover:animate-pulse" />
+                      <h4 className="font-bold text-lg mb-0.5">{t('sack')}</h4>
+                      <p className="text-purple-300 font-black text-sm mb-1">1,200 💎 <span className="text-emerald-400 text-xs">(+200 💎)</span></p>
+                      <div className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 font-black text-white transition-colors text-xs uppercase tracking-wider border-b-4 border-purple-800 shadow">
+                        $4.99
+                      </div>
+                    </div>
+
+                    {/* Pack 3: 6,500 Gems ($19.99) + 35% Bonus */}
+                    <div 
+                      onClick={() => {
+                        playSound('select');
+                        setSelectedGemsPackModal({
+                          id: 'gems_6500',
+                          gems: 6500,
+                          bonusGems: 1500,
+                          price: '$19.99',
+                          amountUsd: 19.99,
+                          titleRu: 'Сундук кристаллов (6500 💎)',
+                          titleEn: 'Chest of Gems (6,500 💎)',
+                          popular: false
+                        });
+                      }} 
+                      className="bg-duo-card p-6 rounded-3xl border-2 border-b-8 border-amber-500/70 hover:border-amber-400 cursor-pointer hover:scale-[1.05] transition-all flex flex-col items-center shadow-xl text-center group relative overflow-hidden"
+                    >
+                      <div className="absolute top-0 right-0 bg-gradient-to-r from-amber-500 to-orange-600 text-slate-950 font-black text-[10px] px-2.5 py-1 rounded-bl-xl uppercase tracking-wider shadow">
+                        +35% {user.language === 'ru' ? 'бонусов' : 'bonus'}
+                      </div>
+                      <ChestIcon className="w-20 h-20 mb-2 group-hover:rotate-12 transition-transform" />
+                      <h4 className="font-bold text-lg mb-0.5">{t('chest')}</h4>
+                      <p className="text-amber-300 font-black text-sm mb-1">6,500 💎 <span className="text-emerald-400 text-xs">(+1500 💎)</span></p>
+                      <div className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black transition-colors text-xs uppercase tracking-wider border-b-4 border-amber-700 shadow">
+                        $19.99
+                      </div>
+                    </div>
                 </div>
              </div>
           )}
@@ -13135,25 +14027,6 @@ const getTodayChallenge = () => {
                   </span>
                   <span className="text-emerald-400 font-mono font-black">{Math.round(loadingProgress)}%</span>
                 </div>
-                
-                <div className="pt-2 flex justify-center">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      playSound('click');
-                      const ex = getFallbackExercise(currentCourse.id, currentExercise?.type || 'translation', currentCourse.localName, user.language);
-                      setAvailableTokens((ex.wordBank || []).map(w => ({ id: crypto.randomUUID(), text: w })));
-                      setSelectedWordIds([]);
-                      setCurrentExercise(ex);
-                      setLessonLoading(false);
-                      setLoading(false);
-                    }}
-                    className="px-5 py-2.5 rounded-2xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 hover:border-emerald-400 font-black text-xs uppercase tracking-wider transition-all shadow-lg active:scale-95 cursor-pointer flex items-center space-x-2"
-                  >
-                    <span>⚡</span>
-                    <span>{user.language === 'ru' ? 'Начать без ожидания' : 'Start without waiting'}</span>
-                  </button>
-                </div>
               </div>
             </div>
           </div>
@@ -13201,17 +14074,47 @@ const getTodayChallenge = () => {
                     <span className="absolute inset-0 flex items-center justify-center text-[10px] md:text-xs font-black text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] pointer-events-none z-10 tracking-wider">
                       {feedback.status === 'correct' ? 100 : feedback.status === 'wrong' ? 30 : selectedWordIds.length > 0 ? Math.min(95, Math.max(10, Math.round((selectedWordIds.length / Math.max(1, availableTokens.length)) * 100))) : 45}%
                     </span>
-                    {(offlineMode || (typeof navigator !== 'undefined' && !navigator.onLine)) && (
-                      <span className="absolute right-3 text-[9px] md:text-[10px] uppercase font-black tracking-widest text-emerald-400/90 pointer-events-none drop-shadow">
-                        {user.language === 'ru' ? 'Офлайн' : 'Offline'}
-                      </span>
-                    )}
                   </div>
                ) : (
                   <div className="flex-1 text-center font-bold text-gray-400 uppercase tracking-widest text-xs md:text-sm truncate px-2">Roleplay: {currentExercise.originalSentence}</div>
                )}
                {currentExercise.type !== 'chess' ? (
-                   <div className="flex items-center space-x-2 text-yellow-400 font-bold text-xl md:text-2xl">{user.subscription !== 'free' ? <InfiniteEnergyIcon className="w-6 h-6 md:w-8 md:h-8 text-yellow-400"/> : <><LightningIcon className="w-5 h-5 md:w-7 md:h-7" /> <span>{user.energy}</span></>}</div>
+                   <div className="flex items-center space-x-2">
+                       <span className={`hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-black uppercase tracking-wider border ${
+                         (currentExercise.difficultyLevel || user.difficultyLevel) === 'hard'
+                           ? 'bg-red-500/20 text-red-300 border-red-500/40'
+                           : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                       }`}>
+                         {(currentExercise.difficultyLevel || user.difficultyLevel) === 'hard'
+                           ? (user.language === 'ru' ? '🔥 Сложный' : '🔥 Hard')
+                           : (user.language === 'ru' ? '🌱 Лёгкий' : '🌱 Easy')}
+                       </span>
+                       {/* Live AI Partner (Video Call & Roleplays Max) Button during Lesson */}
+                       <button
+                           type="button"
+                           onClick={() => {
+                               playSound('select');
+                               setShowLessonAiPartnerModal(true);
+                           }}
+                           className="flex items-center space-x-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 hover:brightness-110 active:scale-95 text-white rounded-2xl font-black text-xs shadow-lg transition-all border border-purple-400/40 cursor-pointer"
+                           title={user.language === 'ru' ? 'AI Партнер: Видеозвонок и Roleplays Max' : 'AI Partner: Video Call & Roleplays Max'}
+                       >
+                           <VideoIcon className="w-4 h-4 text-white animate-pulse" />
+                           <span className="hidden sm:inline">{user.language === 'ru' ? 'AI Партнер' : 'AI Partner'}</span>
+                           {user.subscription !== 'max' ? (
+                             <span className="bg-slate-900/90 text-amber-300 border border-amber-400/60 text-[9px] px-1.5 py-0.5 rounded-full font-black tracking-wider flex items-center gap-0.5 shadow">
+                               <span>🔒</span>
+                               <span>MAX</span>
+                             </span>
+                           ) : (
+                             <span className="bg-yellow-400 text-black text-[9px] px-1.5 py-0.5 rounded font-black tracking-wider">MAX</span>
+                           )}
+                       </button>
+
+                       <div className="flex items-center space-x-2 text-yellow-400 font-bold text-xl md:text-2xl">
+                           {user.subscription !== 'free' ? <InfiniteEnergyIcon className="w-6 h-6 md:w-8 md:h-8 text-yellow-400"/> : <><LightningIcon className="w-5 h-5 md:w-7 md:h-7" /> <span>{user.energy}</span></>}
+                       </div>
+                   </div>
                ) : (
                    <div className="w-8 md:w-10"></div>
                )}
@@ -13227,8 +14130,8 @@ const getTodayChallenge = () => {
                      {getBetaWritingRestrictedInfo(currentCourse.id)?.version || 'Beta'}
                    </span>
                  </div>
-                 <div className="text-[11px] text-amber-200 font-bold">
-                   Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год
+                 <div className="text-[11px] text-emerald-200 font-bold">
+                   ✅ 1 ноября 2026 год: Раздел «Письмо» и тренировки во время урока открыты!
                  </div>
                </div>
              )}
@@ -13313,15 +14216,51 @@ const getTodayChallenge = () => {
                          </div>
                      </div>
                      {chessMode === 'tutorial' && (
-                         <div className="w-full bg-duo-blue/20 border-2 border-duo-blue text-duo-blue p-4 rounded-xl mb-4 text-sm font-bold shadow-sm flex items-start space-x-3">
-                             <span className="text-2xl flex-shrink-0">💡</span>
-                             <p className="leading-tight">{tutorialMessage}</p>
+                         <div 
+                             id="chess-tutorial-message" 
+                             className="w-full bg-duo-blue/15 border-2 border-duo-blue text-duo-blue p-4 rounded-2xl mb-4 text-sm font-bold shadow-md flex flex-col space-y-3"
+                         >
+                             <div className="flex items-start justify-between gap-3 w-full">
+                                 <div className="flex items-start space-x-3 flex-1 min-w-0">
+                                     <span className="text-2xl flex-shrink-0 animate-pulse">💡</span>
+                                     <p className="leading-snug text-white font-extrabold text-sm sm:text-base">{tutorialMessage}</p>
+                                 </div>
+
+                                 <button
+                                     type="button"
+                                     onClick={handleFetchChessTutorialHint}
+                                     disabled={tutorialHintLoading}
+                                     className="shrink-0 bg-duo-blue hover:bg-sky-400 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow-md active:scale-95 transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                                     title="Запросить подсказку Gemini"
+                                 >
+                                     {tutorialHintLoading ? (
+                                         <>
+                                             <span className="animate-spin text-sm">⏳</span>
+                                             <span>{user.language === 'ru' ? 'Думаю...' : 'Thinking...'}</span>
+                                         </>
+                                     ) : (
+                                         <>
+                                             <span className="text-sm">🤖</span>
+                                             <span>{user.language === 'ru' ? 'Подсказка Gemini' : 'Gemini Hint'}</span>
+                                         </>
+                                     )}
+                                 </button>
+                             </div>
+
+                             {tutorialHintText && (
+                                 <div className="bg-sky-950/85 border border-sky-400/60 p-3 rounded-xl text-sky-100 text-xs sm:text-sm font-medium leading-relaxed animate-in fade-in slide-in-from-top-1 duration-200 shadow-inner">
+                                     <div className="flex items-center space-x-1.5 text-yellow-300 font-extrabold mb-1 uppercase tracking-wider text-[11px]">
+                                         <span>🦉 DuoWindo6601 Coach:</span>
+                                     </div>
+                                     <div>{tutorialHintText}</div>
+                                 </div>
+                             )}
                          </div>
                      )}
                      
                      {/* Board Container */}
                      <div className="relative flex-shrink-0 flex items-center justify-center w-full aspect-square max-w-[400px]">
-                         <div className="grid grid-cols-8 gap-0 border-4 border-gray-800 rounded-xl shadow-2xl bg-gray-800 w-full h-full overflow-hidden">
+                         <div className="grid grid-cols-8 gap-0 border-4 border-gray-800 rounded-xl shadow-2xl bg-gray-800 w-full h-full overflow-hidden chess-board-grid">
                              {chessBoard.map((row, r) => row.map((square, c) => {
                                  const isSelected = chessSelected?.r === r && chessSelected?.c === c;
                                  const isLight = (r + c) % 2 === 0;
@@ -13345,14 +14284,24 @@ const getTodayChallenge = () => {
                                          {isValid && square && <div className="absolute inset-0 border-[3px] border-emerald-400/80 rounded-full pointer-events-none z-20"></div>}
 
                                          {square && (
-                                             <div className={`w-[85%] h-[85%] drop-shadow-sm select-none pointer-events-none transform transition-transform ${chessTurn === square.color ? 'hover:scale-105' : ''}`}>
+                                             <motion.div 
+                                                 key={square.id || `${square.color}-${square.piece}-${r}-${c}`}
+                                                 layout
+                                                 transition={{
+                                                     type: "spring",
+                                                     stiffness: 380,
+                                                     damping: 28,
+                                                     mass: 0.8
+                                                 }}
+                                                 className={`w-[85%] h-[85%] drop-shadow-sm select-none pointer-events-none transform chess-piece-animated ${chessTurn === square.color ? 'hover:scale-105' : ''}`}
+                                             >
                                                  <ChessPieceIcon 
                                                     type={square.piece} 
                                                     color={square.color} 
                                                     theme={user.chessPieceTheme || 'graphical'}
                                                     className="w-full h-full filter drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]"
                                                  />
-                                             </div>
+                                             </motion.div>
                                          )}
                                      </div>
                                  );
@@ -13426,7 +14375,6 @@ const getTodayChallenge = () => {
                     onSpeak={() => speakText(currentExercise.drawingData!.character, currentCourse.id, false, user.preferredVoice, user.voiceProvider)}
                     showTrace={showTrace}
                     setShowTrace={setShowTrace}
-                    initialBrushSize={user.handwritingBrushSize || 12}
                  />
              ) : 
              currentExercise.type === 'ishihara' && currentExercise.ishiharaData ? (
@@ -13504,52 +14452,18 @@ const getTodayChallenge = () => {
                  </div>
              ) : 
              currentExercise.type === 'illusion' && currentExercise.illusionData ? (
-                 <div className="flex-1 flex flex-col items-center justify-center min-h-0 w-full max-w-xl mx-auto px-4 py-4 animate-in fade-in duration-300">
-                    <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-xs font-black uppercase tracking-wider mb-4 shadow-sm">
-                      <span className="text-base">👂</span>
-                      <span>{t('illusion')}</span>
-                      <span className="opacity-50">•</span>
-                      <span>{t('realOrNot')}</span>
-                    </div>
-
-                    <h2 className="text-2xl md:text-3xl font-black mb-6 md:mb-8 text-center tracking-tight text-white">
-                      {user.language === 'ru' ? 'Какое слово было произнесено?' : 'Which word was pronounced?'}
+                 <div className="flex-1 flex flex-col items-center justify-center min-h-0">
+                    <h2 className="text-2xl md:text-3xl font-black mb-2 md:mb-3 text-center tracking-tight bg-gradient-to-r from-indigo-300 via-purple-300 to-pink-300 bg-clip-text text-transparent">
+                      {user.language === 'ru' ? 'Звуковая Иллюзия: Что реально, а что нет?' : 'Sound Illusion: What is real and what is not?'}
                     </h2>
-
-                    <button 
-                      type="button"
-                      onClick={() => speakText(currentExercise.illusionData!.soundText, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} 
-                      className="w-32 h-32 md:w-44 md:h-44 rounded-[2.5rem] bg-indigo-600 border-b-8 border-indigo-800 shadow-2xl flex flex-col items-center justify-center mb-8 md:mb-12 hover:brightness-110 active:translate-y-2 active:border-b-2 transition-all group cursor-pointer focus:outline-none"
-                      title={user.language === 'ru' ? 'Слушать еще раз' : 'Listen again'}
-                    >
-                      <VolumeIcon className="w-16 h-16 md:w-20 md:h-20 text-white group-hover:scale-110 transition-transform" />
-                      <span className="text-[11px] font-black uppercase tracking-widest text-indigo-200 mt-2">
-                        {user.language === 'ru' ? 'Слушать' : 'Listen'}
-                      </span>
-                    </button>
-
-                    <div className="grid grid-cols-2 gap-4 md:gap-6 w-full max-w-lg px-2">
-                        <button 
-                          type="button"
-                          disabled={feedback.status !== 'idle'} 
-                          onClick={() => checkIllusionAnswer('A')} 
-                          className="bg-duo-card border-2 border-b-6 border-gray-700 hover:border-indigo-500 hover:bg-gray-800/90 active:border-b-2 active:translate-y-1 p-5 md:p-8 rounded-3xl font-black text-xl md:text-2xl text-white transition-all shadow-xl flex items-center justify-center text-center cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                          {currentExercise.illusionData.optionA}
-                        </button>
-                        <button 
-                          type="button"
-                          disabled={feedback.status !== 'idle'} 
-                          onClick={() => checkIllusionAnswer('B')} 
-                          className="bg-duo-card border-2 border-b-6 border-gray-700 hover:border-indigo-500 hover:bg-gray-800/90 active:border-b-2 active:translate-y-1 p-5 md:p-8 rounded-3xl font-black text-xl md:text-2xl text-white transition-all shadow-xl flex items-center justify-center text-center cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                          {currentExercise.illusionData.optionB}
-                        </button>
-                    </div>
-
-                    <p className="text-xs text-gray-400 font-bold mt-6 text-center">
-                      💡 {user.language === 'ru' ? 'Прислушайтесь к долготе гласных, мягкости или удвоенным согласным' : 'Listen closely to vowel length, softness, or doubled consonants'}
+                    <p className="text-sm md:text-base text-gray-300 font-bold mb-6 md:mb-10 text-center">
+                      {user.language === 'ru' ? 'Какое слово было произнесено?' : 'Which word was spoken?'}
                     </p>
+                    <button onClick={() => speakText(currentExercise.illusionData!.soundText, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} className="w-32 h-32 md:w-48 md:h-48 rounded-[2rem] md:rounded-[3rem] bg-indigo-600 border-b-8 border-indigo-800 shadow-2xl flex items-center justify-center mb-10 md:mb-16 hover:brightness-110 active:translate-y-2 active:border-b-0 transition-all group"><VolumeIcon className="w-16 h-16 md:w-24 md:h-24 text-white group-hover:scale-110 transition-transform" /></button>
+                    <div className="grid grid-cols-2 gap-4 md:gap-6 w-full max-w-lg px-4">
+                        <button disabled={feedback.status !== 'idle'} onClick={() => checkIllusionAnswer('A')} className="bg-duo-card border-2 border-b-4 border-gray-700 p-4 md:p-8 rounded-3xl font-bold text-xl md:text-2xl hover:bg-gray-700 active:border-b-0 active:translate-y-1 transition-all">{currentExercise.illusionData.optionA}</button>
+                        <button disabled={feedback.status !== 'idle'} onClick={() => checkIllusionAnswer('B')} className="bg-duo-card border-2 border-b-4 border-gray-700 p-4 md:p-8 rounded-3xl font-bold text-xl md:text-2xl hover:bg-gray-700 active:border-b-0 active:translate-y-1 transition-all">{currentExercise.illusionData.optionB}</button>
+                    </div>
                  </div>
              ) : currentExercise.type === 'roleplay' && currentExercise.roleplayData ? (
                  <div className="flex-1 flex flex-col relative overflow-hidden min-h-0">
@@ -13564,12 +14478,27 @@ const getTodayChallenge = () => {
                                  <p className="text-[11px] text-purple-200">Живой разговор с AI партнером DuoWindo6601</p>
                              </div>
                          </div>
-                         <button 
-                             onClick={() => startVideoCall(currentCourse.localName || "Ролевой диалог")}
-                             className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center space-x-1"
-                         >
-                             <span>Начать звонок</span>
-                         </button>
+                         <div className="flex items-center space-x-2">
+                             {lessonBackupExercise && (
+                                 <button
+                                     type="button"
+                                     onClick={() => {
+                                         playSound('click');
+                                         setCurrentExercise(lessonBackupExercise);
+                                         setLessonBackupExercise(null);
+                                     }}
+                                     className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold text-xs uppercase tracking-wider rounded-xl transition-all border border-gray-600 cursor-pointer"
+                                 >
+                                     <span>К уроку</span>
+                                 </button>
+                             )}
+                             <button 
+                                 onClick={() => startVideoCall(currentCourse.localName || "Ролевой диалог", true)}
+                                 className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center space-x-1 cursor-pointer"
+                             >
+                                 <span>Начать звонок</span>
+                             </button>
+                         </div>
                      </div>
 
                      <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 md:space-y-6 pb-24 px-2" dir="auto">
@@ -13669,10 +14598,14 @@ const getTodayChallenge = () => {
                    transition={{ duration: 0.3 }}
                    className="flex-1 overflow-y-auto no-scrollbar min-h-0"
                  >
-                   <h2 className="text-2xl md:text-3xl font-bold mb-6 md:mb-10 text-center sm:text-left tracking-tight px-2">{currentExercise.type === 'listening' ? t('whatHeard') : currentExercise.type === 'speech' ? t('speakForDuo') : t('readPractice')}</h2>
+                   <h2 className="text-2xl md:text-3xl font-black mb-6 md:mb-10 text-center sm:text-left tracking-tight px-2">
+                     {currentExercise.type === 'listening' 
+                       ? (user.language === 'ru' ? 'Аудио: Что вы услышали?' : 'Audio: What did you hear?') 
+                       : currentExercise.type === 'speech' ? t('speakForDuo') : t('readPractice')}
+                   </h2>
                    <div className="flex flex-col md:flex-row items-center space-y-6 md:space-y-0 md:space-x-12 mb-8 md:mb-12">
                      <div className="relative flex flex-col items-center flex-shrink-0">
-                        <Mascot emotion={feedback.status === 'wrong' ? 'confused' : (feedback.status === 'correct' ? 'happy' : 'neutral')} className="w-32 h-32 md:w-48 md:h-48" variant={currentCourse.mascotVariant} />
+                        <Mascot emotion={feedback.status === 'wrong' ? 'confused' : (feedback.status === 'correct' ? 'dance' : 'neutral')} className="w-32 h-32 md:w-48 md:h-48" variant={currentCourse.mascotVariant} />
                         {currentExercise.type === 'speech' && <button onClick={() => speakText(currentExercise.originalSentence, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} className="md:hidden mt-4 bg-duo-card border-2 border-gray-700 p-3 px-4 rounded-2xl shadow-xl flex items-center space-x-2 active:scale-95 transition-transform"><VolumeIcon className="w-6 h-6 text-duo-blue" /><span className="font-bold text-lg">{currentExercise.originalSentence}</span></button>}
                         {currentExercise.type === 'speech' && <button onClick={() => speakText(currentExercise.originalSentence, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} className="hidden md:flex absolute -top-4 -right-48 w-max max-w-xs bg-duo-card border-2 border-gray-700 p-4 rounded-2xl shadow-2xl animate-in zoom-in items-center space-x-3 hover:bg-gray-800 transition-colors active:scale-95"><VolumeIcon className="w-6 h-6 text-duo-blue" /><span className="font-bold text-lg border-b-2 border-dashed border-gray-500">{currentExercise.originalSentence}</span></button>}
                      </div>
@@ -13758,52 +14691,89 @@ const getTodayChallenge = () => {
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.25 }}
-                    className={`w-full flex flex-col md:flex-row items-center justify-between p-4 md:p-6 rounded-2xl md:rounded-3xl ${feedback.status === 'correct' ? 'bg-duo-green/20 border-2 border-duo-green' : 'bg-duo-red/20 border-2 border-duo-red'}`}
+                    className={`w-full flex flex-col gap-3 p-4 md:p-6 rounded-2xl md:rounded-3xl ${feedback.status === 'correct' ? 'bg-duo-green/20 border-2 border-duo-green' : 'bg-duo-red/20 border-2 border-duo-red'}`}
                   >
-                    <div className="flex items-center space-x-4 mb-4 md:mb-0">
-                      <span className="text-3xl md:text-5xl">{feedback.status === 'correct' ? '🎉' : '❌'}</span>
-                      <div>
-                        <h3 className={`font-black text-xl md:text-2xl ${feedback.status === 'correct' ? 'text-duo-green' : 'text-duo-red'}`}>{feedback.status === 'correct' ? (user.language === 'ru' ? 'Отлично!' : 'Great job!') : (user.language === 'ru' ? 'Решение:' : 'Solution:')}</h3>
-                        <p className="text-gray-300 font-bold text-sm md:text-lg">{feedback.message}</p>
+                    <div className="w-full flex flex-col md:flex-row items-center justify-between">
+                      <div className="flex items-center space-x-4 mb-4 md:mb-0">
+                        <span className="text-3xl md:text-5xl">{feedback.status === 'correct' ? '🎉' : '❌'}</span>
+                        <div>
+                          <h3 className={`font-black text-xl md:text-2xl ${feedback.status === 'correct' ? 'text-duo-green' : 'text-duo-red'}`}>{feedback.status === 'correct' ? (user.language === 'ru' ? 'Отлично!' : 'Great job!') : (user.language === 'ru' ? 'Решение:' : 'Solution:')}</h3>
+                          <p className="text-gray-300 font-bold text-sm md:text-lg">{feedback.message}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3 w-full md:w-auto">
+                        <button 
+                          onClick={handleExplainMistake} 
+                          className={`p-3 md:p-4 rounded-2xl border-2 font-bold flex items-center space-x-2 transition-all active:scale-95 ${
+                            feedback.status === 'correct'
+                              ? 'bg-[#e2f7d3] hover:bg-[#d0f0ba] text-[#58cc02] border-[#a5ed6e] dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-600'
+                              : 'bg-[#ffefef] hover:bg-[#ffd3d3] text-[#ff4b4b] border-[#ffb3b3] dark:bg-rose-950/80 dark:text-rose-300 dark:border-rose-600'
+                          }`}
+                        >
+                          <SparklesIcon className="w-5 h-5 text-amber-400 animate-pulse" />
+                          <span className="font-black uppercase tracking-wide text-xs md:text-sm">
+                            {feedback.status === 'correct' 
+                              ? (user.language === 'ru' ? '✨ ОБЪЯСНИТЬ МОЙ ОТВЕТ' : '✨ EXPLAIN MY ANSWER')
+                              : (user.language === 'ru' ? '✨ ОБЪЯСНИТЬ ОШИБКУ' : '✨ EXPLAIN MY MISTAKE')
+                            }
+                          </span>
+                          {user.subscription !== 'max' && (
+                            <span className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm flex items-center space-x-1 ml-1">
+                              <span>🔒</span>
+                              <span>Max</span>
+                            </span>
+                          )}
+                        </button>
+                        {currentExercise?.type === 'chess' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              playSound("click");
+                              setScreen(AppScreen.CHESS_ANALYSIS);
+                            }}
+                            className="p-3 md:p-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black rounded-2xl border-2 border-amber-600 flex items-center space-x-2 transition-all active:scale-95 shadow-md text-xs md:text-sm uppercase tracking-wide cursor-pointer"
+                          >
+                            <span className="text-base">🔍</span>
+                            <span>{user.language === "ru" ? "АНАЛИЗИРОВАТЬ ПАРТИЮ" : "ANALYZE GAME"}</span>
+                          </button>
+                        )}
+                        <button onClick={() => handleContinueAfterLesson()} className={`w-full md:w-auto px-10 md:px-16 py-4 md:py-6 rounded-2xl md:rounded-3xl font-black text-white border-b-4 transition-all hover:scale-105 active:translate-y-1 ${feedback.status === 'correct' ? 'bg-duo-green border-duo-greenDark shadow-xl shadow-duo-green/20' : 'bg-duo-red border-red-800'}`}>{t('next')}</button>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-3 w-full md:w-auto">
-                      <button 
-                        onClick={handleExplainMistake} 
-                        className={`p-3 md:p-4 rounded-2xl border-2 font-bold flex items-center space-x-2 transition-all active:scale-95 ${
-                          feedback.status === 'correct'
-                            ? 'bg-[#e2f7d3] hover:bg-[#d0f0ba] text-[#58cc02] border-[#a5ed6e] dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-600'
-                            : 'bg-[#ffefef] hover:bg-[#ffd3d3] text-[#ff4b4b] border-[#ffb3b3] dark:bg-rose-950/80 dark:text-rose-300 dark:border-rose-600'
-                        }`}
-                      >
-                        <SparklesIcon className="w-5 h-5 text-amber-400 animate-pulse" />
-                        <span className="font-black uppercase tracking-wide text-xs md:text-sm">
-                          {feedback.status === 'correct' 
-                            ? (user.language === 'ru' ? '✨ ОБЪЯСНИТЬ МОЙ ОТВЕТ' : '✨ EXPLAIN MY ANSWER')
-                            : (user.language === 'ru' ? '✨ ОБЪЯСНИТЬ ОШИБКУ' : '✨ EXPLAIN MY MISTAKE')
-                          }
-                        </span>
-                        {user.subscription !== 'max' && (
-                          <span className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm flex items-center space-x-1 ml-1">
-                            <span>🔒</span>
-                            <span>Max</span>
-                          </span>
+
+                    {/* Post-lesson bonus practice modes */}
+                    <div className="pt-3 border-t border-white/10 flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-gray-300">
+                        {user.language === 'ru' ? 'После окончания урока • Дополнительно:' : 'After lesson completion • Bonus practice:'}
+                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {!isSpecialNonLanguage(currentCourse.id) && (
+                          <button
+                            type="button"
+                            onClick={() => openLettersSubTab('words')}
+                            className="px-3 py-2 rounded-xl bg-emerald-600/25 hover:bg-emerald-600/40 border border-emerald-500/60 text-emerald-200 font-black text-xs transition-all cursor-pointer flex items-center gap-1.5"
+                          >
+                            <span>📖</span>
+                            <span>{user.language === 'ru' ? 'Слово (не буква на слово)' : 'Words (Full Words)'}</span>
+                          </button>
                         )}
-                      </button>
-                      {currentExercise?.type === 'chess' && (
                         <button
                           type="button"
-                          onClick={() => {
-                            playSound("click");
-                            setScreen(AppScreen.CHESS_ANALYSIS);
-                          }}
-                          className="p-3 md:p-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black rounded-2xl border-2 border-amber-600 flex items-center space-x-2 transition-all active:scale-95 shadow-md text-xs md:text-sm uppercase tracking-wide cursor-pointer"
+                          onClick={() => openLettersSubTab('illusion')}
+                          className="px-3 py-2 rounded-xl bg-purple-600/25 hover:bg-purple-600/40 border border-purple-500/60 text-purple-200 font-black text-xs transition-all cursor-pointer flex items-center gap-1.5"
                         >
-                          <span className="text-base">🔍</span>
-                          <span>{user.language === "ru" ? "АНАЛИЗИРОВАТЬ ПАРТИЮ" : "ANALYZE GAME"}</span>
+                          <span>🌀</span>
+                          <span>{user.language === 'ru' ? 'Звуковая Иллюзия: ЧТО РЕАЛЬНО, А ЧТО НЕТ?' : 'Sound Illusion: Real or Not?'}</span>
                         </button>
-                      )}
-                      <button onClick={() => handleContinueAfterLesson()} className={`w-full md:w-auto px-10 md:px-16 py-4 md:py-6 rounded-2xl md:rounded-3xl font-black text-white border-b-4 transition-all hover:scale-105 active:translate-y-1 ${feedback.status === 'correct' ? 'bg-duo-green border-duo-greenDark shadow-xl shadow-duo-green/20' : 'bg-duo-red border-red-800'}`}>{t('next')}</button>
+                        <button
+                          type="button"
+                          onClick={() => openLettersSubTab('audio')}
+                          className="px-3 py-2 rounded-xl bg-sky-600/25 hover:bg-sky-600/40 border border-sky-500/60 text-sky-200 font-black text-xs transition-all cursor-pointer flex items-center gap-1.5"
+                        >
+                          <span>🎧</span>
+                          <span>{user.language === 'ru' ? 'Аудио: ЧТО ВЫ УСЛЫШАЛИ?' : 'Audio: What Did You Hear?'}</span>
+                        </button>
+                      </div>
                     </div>
                   </motion.div>
                 )}
@@ -13849,6 +14819,295 @@ const getTodayChallenge = () => {
         </div>
       )}
 
+      {/* LESSON AI PARTNER (VIDEO CALL & ROLEPLAYS MAX) MODAL */}
+      {showLessonAiPartnerModal && (
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-duo-card border-2 border-purple-500/50 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl relative animate-in zoom-in-95">
+            <button
+              onClick={() => { playSound('click'); setShowLessonAiPartnerModal(false); }}
+              className="absolute top-4 right-4 p-2 bg-gray-800/80 hover:bg-gray-700 text-gray-400 hover:text-white rounded-xl transition-colors cursor-pointer"
+              title="Закрыть"
+            >
+              <CloseIcon className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="p-3 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl shadow-lg">
+                <VideoIcon className="w-7 h-7 text-white animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h3 className="text-xl font-black text-white">
+                    {user.language === 'ru' ? 'AI Партнер DuoWindo' : 'AI Partner DuoWindo'}
+                  </h3>
+                  <span className="bg-yellow-400 text-black text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider">MAX</span>
+                </div>
+                <p className="text-xs text-purple-300 font-bold">
+                  {user.language === 'ru' ? 'Живое общение прямо во время урока' : 'Live communication during lesson'}
+                </p>
+              </div>
+            </div>
+
+            {user.subscription === 'max' ? (
+              <div className="space-y-3.5 my-5">
+                {/* Option 1: Live Video Call */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    playSound('click');
+                    setShowLessonAiPartnerModal(false);
+                    startVideoCall(
+                      currentExercise?.originalSentence
+                        ? `${currentCourse.localName}: ${currentExercise.originalSentence.substring(0, 40)}`
+                        : (currentCourse.localName || "Урок"),
+                      true
+                    );
+                  }}
+                  className="w-full p-4 rounded-2xl bg-gradient-to-r from-purple-700/80 to-indigo-700/80 hover:from-purple-600 hover:to-indigo-600 border border-purple-400/40 text-left transition-all active:scale-98 shadow-md flex items-center justify-between group cursor-pointer"
+                >
+                  <div className="flex items-center space-x-3.5">
+                    <div className="p-3 bg-white/20 rounded-xl group-hover:scale-105 transition-transform">
+                      <CameraIcon className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-sm text-white flex items-center space-x-2">
+                        <span>{user.language === 'ru' ? 'Видеозвонок DuoWindo6601' : 'Video Call DuoWindo6601'}</span>
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                      </h4>
+                      <p className="text-xs text-purple-200 font-bold">
+                        {user.language === 'ru' ? 'Живое общение с AI партнером (камера, речь, AI Copilot)' : 'Live communication with AI partner'}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-white text-lg font-bold group-hover:translate-x-1 transition-transform">→</span>
+                </button>
+
+                {/* Option 2: Roleplays Max */}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    playSound('click');
+                    setShowLessonAiPartnerModal(false);
+                    if (currentExercise) {
+                      setLessonBackupExercise(currentExercise);
+                    }
+                    try {
+                      setLessonLoading(true);
+                      const speechLangId = NON_LANGUAGE_IDS.includes(currentCourse.id) ? (user.language === 'ru' ? 'ru' : 'en') : currentCourse.id;
+                      const ex = await startRoleplay(currentCourse.localName, currentCourse.id, user.language);
+                      setCurrentExercise(ex);
+                      if (ex.roleplayData?.messages[0]) {
+                        speakText(ex.roleplayData.messages[0].text, speechLangId, false, user.preferredVoice, user.voiceProvider);
+                      }
+                    } catch (e: any) {
+                      console.error("Roleplay start error:", e);
+                      const isOfflineErr = (typeof navigator !== 'undefined' && !navigator.onLine) || String(e?.message || '').includes('Нет подключения к интернету');
+                      setToast(
+                        isOfflineErr
+                          ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
+                          : (e?.message || (user.language === 'ru' ? '⚠️ Ошибка запуска Roleplay' : '⚠️ Roleplay start error'))
+                      );
+                    } finally {
+                      setLessonLoading(false);
+                    }
+                  }}
+                  className="w-full p-4 rounded-2xl bg-gradient-to-r from-pink-700/80 to-purple-700/80 hover:from-pink-600 hover:to-purple-600 border border-pink-400/40 text-left transition-all active:scale-98 shadow-md flex items-center justify-between group cursor-pointer"
+                >
+                  <div className="flex items-center space-x-3.5">
+                    <div className="p-3 bg-white/20 rounded-xl group-hover:scale-105 transition-transform">
+                      <ChatBubbleIcon className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-sm text-white">
+                        {user.language === 'ru' ? 'Roleplays Max («Начни говорить →»)' : 'Roleplays Max (Start Speaking →)'}
+                      </h4>
+                      <p className="text-xs text-pink-200 font-bold">
+                        {user.language === 'ru' ? 'Интерактивный ролевой диалог с разбором ошибок' : 'Interactive roleplay with mistake breakdown'}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-white text-lg font-bold group-hover:translate-x-1 transition-transform">→</span>
+                </button>
+              </div>
+            ) : (
+              <div className="my-5 bg-gradient-to-b from-purple-950/60 to-gray-900/90 border border-purple-500/30 rounded-2xl p-4 text-center">
+                <div className="w-14 h-14 mx-auto mb-2 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-2xl flex items-center justify-center shadow-lg">
+                  <span className="text-2xl">🦉</span>
+                </div>
+                <h4 className="text-white font-black text-sm mb-1">
+                  {user.language === 'ru' ? 'Эксклюзив подписки DuoWindo Max' : 'Exclusive to DuoWindo Max'}
+                </h4>
+                <p className="text-xs text-gray-300 font-bold mb-4 leading-relaxed">
+                  {user.language === 'ru' 
+                    ? 'AI Видеозвонки и Roleplays Max («Начни говорить») доступны только подписчикам DuoWindo6601 Max!'
+                    : 'AI Video Calls and Roleplays Max are exclusively available on DuoWindo6601 Max!'}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    playSound('click');
+                    setShowLessonAiPartnerModal(false);
+                    setScreen(AppScreen.SUBSCRIPTION);
+                  }}
+                  className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:brightness-110 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg border-b-4 border-purple-900 active:translate-y-0.5 transition-all cursor-pointer"
+                >
+                  {user.language === 'ru' ? 'Перейти на DuoWindo Max' : 'Upgrade to DuoWindo Max'}
+                </button>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => { playSound('click'); setShowLessonAiPartnerModal(false); }}
+              className="w-full py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
+            >
+              {user.language === 'ru' ? 'Продолжить текущий урок' : 'Continue Current Lesson'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* GEMS STRIPE CHECKOUT BREAKDOWN MODAL ("Пополнить алмазы") */}
+      {selectedGemsPackModal && (
+        <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-slate-900 border-2 border-purple-500/70 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl relative space-y-5 text-left">
+            <button
+              onClick={() => { playSound('click'); setSelectedGemsPackModal(null); }}
+              className="absolute top-4 right-4 p-2 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white rounded-xl transition-colors cursor-pointer"
+            >
+              <CloseIcon className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center space-x-3.5">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-600 border border-purple-400/40 flex items-center justify-center text-3xl shadow-lg shrink-0">
+                💎
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-white">
+                  {user.language === 'ru' ? selectedGemsPackModal.titleRu : selectedGemsPackModal.titleEn}
+                </h3>
+                <p className="text-xs text-purple-300 font-bold flex items-center gap-1.5 mt-0.5">
+                  <span>💳</span>
+                  <span>Stripe API Payments</span>
+                </p>
+              </div>
+            </div>
+
+            {/* BREAKDOWN BOX */}
+            <div className="bg-black/60 border border-purple-500/30 rounded-2xl p-4 space-y-3">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-gray-400 font-medium">{user.language === 'ru' ? 'Основной пакет:' : 'Base Package:'}</span>
+                <span className="font-bold text-white font-mono">{selectedGemsPackModal.gems.toLocaleString()} 💎</span>
+              </div>
+
+              {selectedGemsPackModal.bonusGems > 0 && (
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-emerald-400 font-bold">{user.language === 'ru' ? 'Бонусный подарок:' : 'Bonus Gift:'}</span>
+                  <span className="font-bold text-emerald-400 font-mono">+{selectedGemsPackModal.bonusGems.toLocaleString()} 💎</span>
+                </div>
+              )}
+
+              <div className="border-t border-gray-800 pt-2 flex justify-between items-center text-xs">
+                <span className="text-gray-300 font-bold">{user.language === 'ru' ? 'Итоговое зачисление:' : 'Total Credited:'}</span>
+                <span className="font-black text-amber-300 text-sm font-mono">
+                  {(selectedGemsPackModal.gems + selectedGemsPackModal.bonusGems).toLocaleString()} 💎
+                </span>
+              </div>
+
+              <div className="pt-2 border-t border-gray-800/80 flex items-center justify-between text-[11px] text-gray-400">
+                <span className="flex items-center gap-1">
+                  <span>🧾</span>
+                  <span>Stripe Tax:</span>
+                </span>
+                <span className="text-emerald-300 font-medium">
+                  {user.language === 'ru' ? 'Включен в расчет ✓' : 'Included ✓'}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2.5 pt-1">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (isIncognitoUser) {
+                    playSound('wrong');
+                    setToast(user.language === 'ru' ? '🔒 Режим Инкогнито: Для покупки кристаллов требуется аккаунт!' : '🔒 Incognito Mode: Account required!');
+                    return;
+                  }
+
+                  setIsProcessingGemsCheckout(true);
+                  try {
+                    const totalGems = (selectedGemsPackModal.gems >= 6500 ? 6500 : 1200) as 1200 | 6500;
+                    const res = await createStripeGemsCheckout({
+                      gems: totalGems,
+                      email: user.email,
+                      username: user.username || user.name
+                    });
+
+                    if (res.url) {
+                      const nav = navigateToStripeUrl(res.url);
+                      if (!nav.navigated && nav.fallbackUrl) {
+                        setStripeGemsExternalUrl(nav.fallbackUrl);
+                        setToast(user.language === 'ru' ? '💳 Сессия Stripe Checkout готова!' : '💳 Stripe Checkout session ready!');
+                        return;
+                      }
+                      setToast(user.language === 'ru' ? '💳 Перенаправление в Stripe Checkout...' : '💳 Redirecting to Stripe Checkout...');
+                      return;
+                    }
+                  } catch (e) {
+                    console.warn('Gems checkout error:', e);
+                  } finally {
+                    setIsProcessingGemsCheckout(false);
+                  }
+
+                  // Local fallback
+                  const addedGems = selectedGemsPackModal.gems + selectedGemsPackModal.bonusGems;
+                  playSound('fanfare');
+                  setUser(u => ({ ...u, gems: u.gems + addedGems }));
+                  setToast(user.language === 'ru' ? `🎉 Кристаллы успешно зачислены: +${addedGems} 💎!` : `🎉 Gems credited: +${addedGems} 💎!`);
+                  setSelectedGemsPackModal(null);
+                  setStripeGemsExternalUrl(null);
+                }}
+                disabled={isProcessingGemsCheckout}
+                className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:brightness-110 active:scale-98 text-white font-black text-xs uppercase tracking-wider rounded-2xl border-b-4 border-purple-900 shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <span>{isProcessingGemsCheckout ? '⏳' : '💳'}</span>
+                <span>
+                  {user.language === 'ru' 
+                    ? `Оплатить через Stripe Checkout (${selectedGemsPackModal.price})` 
+                    : `Pay via Stripe Checkout (${selectedGemsPackModal.price})`}
+                </span>
+              </button>
+
+              {stripeGemsExternalUrl && (
+                <a
+                  href={stripeGemsExternalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3 bg-duo-green hover:brightness-110 text-white font-black text-xs uppercase tracking-wider rounded-2xl border-b-4 border-duo-greenDark shadow-xl transition-all flex items-center justify-center gap-2"
+                >
+                  <span>↗</span>
+                  <span>
+                    {user.language === 'ru'
+                      ? 'Открыть Stripe Checkout в новой вкладке'
+                      : 'Open Stripe Checkout in New Tab'}
+                  </span>
+                </a>
+              )}
+
+              <button
+                type="button"
+                onClick={() => { playSound('click'); setSelectedGemsPackModal(null); setStripeGemsExternalUrl(null); }}
+                className="w-full py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
+              >
+                {user.language === 'ru' ? 'Отмена' : 'Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* DUOLINGO MAX "EXPLAIN MY ANSWER" SCREEN */}
       {showExplanationModal && (
         <div className="fixed inset-0 z-[200] bg-gray-950/95 backdrop-blur-md flex flex-col items-center justify-between p-4 md:p-6 animate-in fade-in duration-200">
@@ -13867,11 +15126,6 @@ const getTodayChallenge = () => {
               <span className="text-xs md:text-sm font-black text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
                 <span>DuoWindo6601 Max</span>
                 <SparklesIcon className="w-4 h-4 text-amber-400" />
-                {(offlineMode || (typeof navigator !== 'undefined' && !navigator.onLine)) && (
-                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] font-black px-2 py-0.5 rounded-md ml-1">
-                    ⚡ {user.language === 'ru' ? 'Офлайн' : 'Offline'}
-                  </span>
-                )}
               </span>
             </div>
 
@@ -13979,8 +15233,8 @@ const getTodayChallenge = () => {
             <h3 className="text-2xl font-black text-white mb-2">⚡ {user.language === 'ru' ? 'Достигнут лимит ИИ' : 'Limit Reached'}</h3>
             <p className="text-gray-300 font-bold text-sm mb-6">
               {user.language === 'ru' 
-                ? 'Переключение в кэшированный автономный режим из-за большого объема запросов.' 
-                : 'Switching to cached offline mode due to high request volume.'}
+                ? 'Временное ограничение частоты запросов к ИИ. Попробуйте снова через минуту (работает с VPN и без VPN).' 
+                : 'Temporary AI rate limit reached. Please try again in a minute (works with or without VPN).'}
             </p>
             <button onClick={() => setShowLimitModal(false)} className="w-full py-3.5 bg-duo-green hover:brightness-110 text-white font-black rounded-2xl border-b-4 border-duo-greenDark active:border-b-0 active:translate-y-1 transition-all uppercase text-sm shadow-lg">
               {user.language === 'ru' ? 'ПОНЯТНО' : 'OK'}
@@ -14028,6 +15282,24 @@ const getTodayChallenge = () => {
 
       {/* OFFLINE INDICATOR */}
       <OfflineIndicator isRu={user.language === 'ru'} />
+
+      {/* POST-RELOAD FULL PWA & SECURITY UPDATE PROCESS OVERLAY */}
+      {pendingPwaUpdate && (
+        <PwaUpdateProcessOverlay
+          lang={pendingPwaUpdate.lang || user.language}
+          onComplete={(patchInfo?: InstalledPwaPatchInfo) => {
+            clearPendingPwaUpdate();
+            setPendingPwaUpdateState(null);
+            if (patchInfo) {
+              setToast(
+                user.language === 'en'
+                  ? `✅ DuoWindo6601 PWA v${patchInfo.version} & Security Patch (${patchInfo.signatureShort}) installed!`
+                  : `✅ Обновление DuoWindo6601 PWA v${patchInfo.version} и патч безопасности (${patchInfo.signatureShort}) установлены!`
+              );
+            }
+          }}
+        />
+      )}
 </div>
 );
 };

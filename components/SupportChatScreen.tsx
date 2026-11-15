@@ -159,6 +159,18 @@ export const SupportChatScreen: React.FC<SupportChatScreenProps> = ({
 Вы можете оформить подписку в разделе «Магазин»!`;
     } else if (queryLower.includes('ошибк') || queryLower.includes('баг') || queryLower.includes('bug')) {
       responseText = `Спасибо за сообщение об ошибке! Наша команда разработчиков и администраторов уже уведомлена. Мы устраним неисправность в ближайшем обновлении.`;
+    } else if (queryLower.includes('доступ') || queryLower.includes('admin tool') || queryLower.includes('панел')) {
+      responseText = `🛑 **Панель Владельца — Admin Tool**:
+
+**Доступ запрещен**
+У вас нет доступа к этой администрации.
+Обратитесь к администратору вашей учетной записи, чтобы запросить доступ.
+
+**Access is denied**
+You do not have access to this administration.
+Contact your account administrator to request access.
+
+Ваш запрос зафиксирован и направлен администратору вашей учетной записи (abramovanatolij81@gmail.com).`;
     } else if (queryLower.includes('админ') || queryLower.includes('оператор')) {
       responseText = `Ваш запрос отправлен Администратору DuoWindo6601. Администратор ответит вам прямо в этом чате.`;
     } else {
@@ -279,10 +291,17 @@ export const SupportChatScreen: React.FC<SupportChatScreenProps> = ({
         </button>
         <button
           onClick={() => handleSendMessage('Я хочу сообщить об ошибке в уроке 🐞')}
-          className="flex-shrink-0 bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/30 px-3.5 py-2 rounded-xl transition-all flex items-center space-x-1.5 active:scale-95"
+          className="flex-shrink-0 bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/30 px-3.5 py-2 rounded-xl transition-all flex items-center space-x-1.5 active:scale-95 cursor-pointer"
         >
           <span>🐞</span>
           <span>Сообщить об ошибке</span>
+        </button>
+        <button
+          onClick={() => handleSendMessage('Запрос доступа: У меня нет доступа к администрации Панели Владельца — Admin Tool. Прошу предоставить доступ.')}
+          className="flex-shrink-0 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 px-3.5 py-2 rounded-xl transition-all flex items-center space-x-1.5 active:scale-95 cursor-pointer"
+        >
+          <span>🛡️</span>
+          <span>Запросить доступ к администрации</span>
         </button>
       </div>
 

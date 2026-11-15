@@ -30,7 +30,15 @@ export const isRunAppHost = (hostname?: string): boolean => {
 export const isOfficialStudioHost = (hostname?: string): boolean => {
   if (typeof window === 'undefined' && !hostname) return false;
   const host = (hostname || window.location.hostname || '').toLowerCase();
-  return host.includes('duowindo6601.ai.studio') || host.includes('ai.studio');
+  return host.includes('duowindo6601.ai.studio') || host.includes('ai.studio') || host.includes('aistudio.google.com');
+};
+
+/**
+ * Checks if the app is running in hosted Cloud Run (us-east1.run.app) or AI Studio (ai.studio),
+ * where offline mode and offline fallback banners must be disabled.
+ */
+export const isOnlineHostedEnvironment = (hostname?: string): boolean => {
+  return isRunAppHost(hostname) || isOfficialStudioHost(hostname);
 };
 
 /**
@@ -113,22 +121,57 @@ export const formatTimeUntilClosure = (remaining: TimeRemaining, isRu: boolean =
   return `${remaining.days}d ${remaining.hours}h ${remaining.minutes}m`;
 };
 
+export const RUN_APP_CONTINUED_STORAGE_KEY = 'duo_runapp_continued_risk_accepted_6601';
+
+/**
+ * Checks if user chose to continue using the application on us-east1.run.app despite the restriction and risk.
+ */
+export const isRunAppContinuedRiskAccepted = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  try {
+    return sessionStorage.getItem(RUN_APP_CONTINUED_STORAGE_KEY) === 'true' ||
+           localStorage.getItem(RUN_APP_CONTINUED_STORAGE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Sets whether the user has accepted the risk to continue using on us-east1.run.app
+ */
+export const setRunAppContinuedRiskAccepted = (accepted: boolean): void => {
+  if (typeof window === 'undefined') return;
+  try {
+    if (accepted) {
+      sessionStorage.setItem(RUN_APP_CONTINUED_STORAGE_KEY, 'true');
+      localStorage.setItem(RUN_APP_CONTINUED_STORAGE_KEY, 'true');
+    } else {
+      sessionStorage.removeItem(RUN_APP_CONTINUED_STORAGE_KEY);
+      localStorage.removeItem(RUN_APP_CONTINUED_STORAGE_KEY);
+    }
+  } catch {}
+};
+
 /**
  * Determines whether access to us-east1.run.app is completely blocked.
- * If blocked: user must see the full-screen restriction page.
+ * If blocked: user must see the full-screen restriction page unless they choose to continue with risk.
  */
-export const isRunAppAccessBlocked = (simMode?: DomainSimMode): boolean => {
+export const isRunAppAccessBlocked = (simMode?: DomainSimMode, checkRiskBypass: boolean = true): boolean => {
   const mode = simMode || getDomainSimMode();
   
   if (mode === 'sim_blocked') return true;
-  if (mode === 'sim_warning' || mode === 'sim_official') return false;
+  // By default (including auto mode and AI Studio preview), access is active and unblocked. No warning/block banner.
+  return false;
+};
 
-  // Auto mode:
-  // Check if we are on a run.app domain and past deadline
-  const onRunApp = isRunAppHost();
-  const pastDeadline = getTimeUntilRunAppClosure().isPast;
-
-  return onRunApp && pastDeadline;
+/**
+ * Determines whether the user is continuing to use us-east1.run.app under risk warning.
+ */
+export const isRunAppRiskWarningActive = (simMode?: DomainSimMode): boolean => {
+  const mode = simMode || getDomainSimMode();
+  if (mode === 'sim_warning') return true;
+  // No warning banner or risk popup in AI Studio or default mode
+  return false;
 };
 
 /**
@@ -138,13 +181,8 @@ export const isRunAppWarningActive = (simMode?: DomainSimMode): boolean => {
   const mode = simMode || getDomainSimMode();
 
   if (mode === 'sim_warning') return true;
-  if (mode === 'sim_blocked' || mode === 'sim_official') return false;
-
-  // Auto mode:
-  const onRunApp = isRunAppHost();
-  const pastDeadline = getTimeUntilRunAppClosure().isPast;
-
-  return onRunApp && !pastDeadline;
+  // No warning banner in AI Studio or default mode
+  return false;
 };
 
 /**

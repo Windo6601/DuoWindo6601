@@ -27,7 +27,7 @@ export const DuoWindo6601MistakesModal: React.FC<DuoWindo6601MistakesModalProps>
   onPracticeMistake,
   onPracticeAllMistakes
 }) => {
-  const isRu = user.language === 'ru';
+  const isRu = user.language !== 'en';
   const mistakes = user.mistakes || [];
   const mistakeCount = mistakes.length;
 

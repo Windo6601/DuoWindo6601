@@ -475,7 +475,7 @@ export const DuoWindo6601PoemModal: React.FC<DuoWindo6601PoemModalProps> = ({
   setToast,
   speakText
 }) => {
-  const isRu = user.language === 'ru';
+  const isRu = user.language !== 'en';
   const learnedPoems = user.learnedPoems || [];
 
   const [step, setStep] = useState<TrainingStep>('select');

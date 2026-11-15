@@ -150,7 +150,7 @@ export const DuoWindo6601StoriesModal: React.FC<DuoWindo6601StoriesModalProps> =
   setToast,
   speakText
 }) => {
-  const isRu = user.language === 'ru';
+  const isRu = user.language !== 'en';
   const [activeStory, setActiveStory] = useState<DuolingoStory | null>(null);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
   const [showQuestion, setShowQuestion] = useState(false);

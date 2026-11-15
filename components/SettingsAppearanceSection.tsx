@@ -4,6 +4,7 @@ import { StreakSaverCountdown } from './StreakSaverCountdown';
 import { NotificationManager } from './NotificationManager';
 import { LanguageLockModal } from './LanguageLockModal';
 import { getLanguageLockedToastMessage } from '../services/languageLockService';
+import { canUserAccessFishModel } from '../services/fishAudioConfig';
 import { 
   getDomainSimMode, 
   setDomainSimMode, 
@@ -13,7 +14,9 @@ import {
   AI_STUDIO_URL, 
   getTimeUntilRunAppClosure, 
   formatTimeUntilClosure, 
-  isRunAppHost 
+  isRunAppHost,
+  isRunAppContinuedRiskAccepted,
+  setRunAppContinuedRiskAccepted
 } from '../services/domainMigrationService';
 
 interface SettingsAppearanceSectionProps {
@@ -37,12 +40,13 @@ export const SettingsAppearanceSection: React.FC<SettingsAppearanceSectionProps>
   const [lockedLang, setLockedLang] = useState<string | null>(null);
   const [simMode, setSimModeState] = useState<DomainSimMode>(() => getDomainSimMode());
   const [copiedDomain, setCopiedDomain] = useState<boolean>(false);
+  const [continuedRisk, setContinuedRisk] = useState<boolean>(() => isRunAppContinuedRiskAccepted());
 
   const currentSize: TextSizeType = user.textSize || 'normal';
   const currentFont: AppFontFamily = user.fontFamily || 'din';
   const currentTheme: AppThemeType = user.theme || (user.nightMode === false ? 'light' : 'dark');
 
-  const isRu = user.language === 'ru';
+  const isRu = user.language !== 'en';
 
   const handleSetSize = (size: TextSizeType) => {
     playSound('click');
@@ -543,6 +547,32 @@ export const SettingsAppearanceSection: React.FC<SettingsAppearanceSectionProps>
           </span>
         </div>
 
+        {/* QUICK 3-WAY THEME TOGGLE BAR */}
+        <div className="bg-black/40 border border-indigo-500/30 p-2 rounded-2xl mb-4 flex items-center justify-between gap-2">
+          {[
+            { id: 'light' as const, labelRu: 'Светлая', labelEn: 'Light', icon: '☀️', colorClass: 'bg-amber-500 text-slate-900 border-amber-300' },
+            { id: 'dark' as const, labelRu: 'Тёмная', labelEn: 'Dark', icon: '🌙', colorClass: 'bg-duo-green text-white border-green-400' },
+            { id: 'midnight' as const, labelRu: 'Полночь', labelEn: 'Midnight', icon: '🌌', colorClass: 'bg-purple-600 text-white border-purple-400' },
+          ].map((themeOption) => {
+            const active = currentTheme === themeOption.id;
+            return (
+              <button
+                key={themeOption.id}
+                type="button"
+                onClick={() => handleSetTheme(themeOption.id)}
+                className={`flex-1 py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center space-x-2 transition-all cursor-pointer active:scale-95 ${
+                  active
+                    ? `${themeOption.colorClass} shadow-lg ring-2 ring-indigo-400/60 font-black`
+                    : 'bg-transparent text-gray-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <span className="text-base sm:text-lg">{themeOption.icon}</span>
+                <span>{isRu ? themeOption.labelRu : themeOption.labelEn}</span>
+              </button>
+            );
+          })}
+        </div>
+
         {/* 5 THEME CARDS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {themes.map(item => {
@@ -708,36 +738,53 @@ export const SettingsAppearanceSection: React.FC<SettingsAppearanceSectionProps>
             </div>
           </div>
           <span className="text-xs font-black px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 uppercase">
-            {user.voiceProvider === 'fish' || user.voiceProvider === 'fish-drama-3' ? 'Fish Audio 🐟' : user.voiceProvider === 'google' ? 'Google' : user.voiceProvider === 'yandex' ? 'Yandex' : user.voiceProvider === 'system' ? 'System' : user.voiceProvider === 'sapi53' ? 'Microsoft SAPI 5.3' : 'Gemini AI 🤖'}
+            {user.voiceProvider === 'fish' || user.voiceProvider === 'fish-drama-3'
+              ? `Fish Audio 🐋 (${
+                  (user.fishModel === 'drama-3' || user.voiceProvider === 'fish-drama-3') ? 'Drama 3' :
+                  user.fishModel === 's2.1-pro' ? 'S2.1 Pro' :
+                  user.fishModel === 's2-pro' ? 'S2 Pro' :
+                  'S2.1 Pro Free'
+                })`
+              : user.voiceProvider === 'google' ? 'Google'
+              : user.voiceProvider === 'yandex' ? 'Yandex'
+              : user.voiceProvider === 'system' ? 'System'
+              : user.voiceProvider === 'sapi53' ? 'Microsoft SAPI 5.3'
+              : 'Gemini AI 🤖'}
           </span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-          {/* Fish Audio */}
+          {/* Fish Audio (Default Free: S2.1 Pro Free) */}
           <button
             type="button"
             onClick={() => {
               playSound('select');
               setUser(prev => {
-                const updated: UserProgress = { ...prev, voiceProvider: 'fish-drama-3' };
+                const updated: UserProgress = {
+                  ...prev,
+                  voiceProvider: 'fish',
+                  fishModel: prev.fishModel && prev.subscription !== 'free' ? prev.fishModel : 's2.1-pro-free',
+                };
                 try { localStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); } catch {}
                 return updated;
               });
-              setToast(isRu ? '🎭 Голосовой провайдер: Fish Audio (Drama 3)' : '🎭 Voice Provider: Fish Audio (Drama 3)');
+              setToast(isRu ? '🐋 Голосовой провайдер: Fish Audio (S2.1 Pro Free — Бесплатно)' : '🐋 Voice Provider: Fish Audio (S2.1 Pro Free — Free)');
             }}
             className={`p-3.5 rounded-2xl border-2 text-left transition-all flex flex-col justify-between cursor-pointer active:scale-95 ${
-              user.voiceProvider === 'fish-drama-3'
-                ? 'bg-amber-600/90 border-amber-400 text-white shadow-lg ring-2 ring-amber-400/50'
+              user.voiceProvider === 'fish' || user.voiceProvider === 'fish-drama-3'
+                ? 'bg-cyan-600/90 border-cyan-400 text-white shadow-lg ring-2 ring-cyan-400/50'
                 : 'bg-black/40 hover:bg-black/60 border-gray-700 text-gray-200'
             }`}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xl">🎭</span>
-              <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-500/40">Drama 3</span>
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-xl">🐋</span>
+              <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/40">
+                {isRu ? 'Бесплатно' : 'Free'}
+              </span>
             </div>
             <div className="mt-2">
               <span className="font-extrabold text-xs block text-white">Fish Audio</span>
-              <span className="text-[10px] text-amber-200 block font-medium">Новейшая Drama 3</span>
+              <span className="text-[10px] text-cyan-200 block font-medium">S2.1 Pro Free</span>
             </div>
           </button>
 
@@ -880,6 +927,92 @@ export const SettingsAppearanceSection: React.FC<SettingsAppearanceSectionProps>
               <span className="text-[10px] text-blue-200 block font-medium">+ Windows AI Speech</span>
             </div>
           </button>
+        </div>
+
+        {/* Fish Audio Model Selector (S2.1 Pro Free Бесплатно vs Drama 3 / S2.1 Pro / S2 Pro Платно) */}
+        <div className="mt-4 pt-4 border-t border-gray-700/70">
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+            <div className="flex items-center space-x-2">
+              <span className="text-base">🐋</span>
+              <span className="text-xs font-black uppercase tracking-wider text-cyan-300">
+                {isRu ? 'Модели Fish Audio (SDK: fish-audio)' : 'Fish Audio Models (SDK: fish-audio)'}
+              </span>
+            </div>
+            <span className="text-[10px] font-bold text-emerald-300">
+              {isRu ? 'Drama 3 → платно • S2.1 Pro Free → бесплатно' : 'Drama 3 → Paid • S2.1 Pro Free → Free'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            {[
+              { id: 's2.1-pro-free', label: 'S2.1 Pro Free', icon: '🐋', paid: false, descRu: 'Бесплатная модель речи', descEn: 'Free neural speech' },
+              { id: 'drama-3', label: 'Drama 3', icon: '🎭', paid: true, descRu: 'Выразительный голос (Платно)', descEn: 'Expressive Drama 3 (Paid)' },
+              { id: 's2.1-pro', label: 'S2.1 Pro', icon: '✨', paid: true, descRu: 'Студийное качество (Платно)', descEn: 'Studio S2.1 Pro (Paid)' },
+              { id: 's2-pro', label: 'S2 Pro', icon: '⚡', paid: true, descRu: 'Профессиональная S2 Pro (Платно)', descEn: 'Professional S2 Pro (Paid)' },
+            ].map((m) => {
+              const activeFishModel = user.voiceProvider === 'fish-drama-3' ? 'drama-3' : (user.fishModel || 's2.1-pro-free');
+              const isSelected = (user.voiceProvider === 'fish' || user.voiceProvider === 'fish-drama-3') && activeFishModel === m.id;
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => {
+                    const access = canUserAccessFishModel(m.id, user);
+                    if (!access.allowed) {
+                      playSound('wrong');
+                      setToast(
+                        isRu
+                          ? `💎 ${m.label} — платная модель Fish Audio (требуется подписка DuoWindo6601 Super или DuoWindo6601 Max). Бесплатно используйте S2.1 Pro Free!`
+                          : `💎 ${m.label} is a paid Fish Audio model (DuoWindo6601 Super or DuoWindo6601 Max required). Use S2.1 Pro Free for free!`
+                      );
+                      return;
+                    }
+                    playSound('select');
+                    setUser(prev => {
+                      const updated: UserProgress = {
+                        ...prev,
+                        voiceProvider: 'fish',
+                        fishModel: m.id,
+                      };
+                      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); } catch {}
+                      return updated;
+                    });
+                    setToast(
+                      isRu
+                        ? `${m.icon} Fish Audio: выбрана модель ${m.label} (${m.paid ? 'Платно • Super/Max' : 'Бесплатно'})`
+                        : `${m.icon} Fish Audio model: ${m.label} (${m.paid ? 'Paid' : 'Free'})`
+                    );
+                  }}
+                  className={`p-3 rounded-2xl border-2 text-left transition-all cursor-pointer active:scale-95 ${
+                    isSelected
+                      ? 'bg-cyan-700/80 border-cyan-400 text-white shadow-md ring-2 ring-cyan-400/40'
+                      : m.paid && user.subscription === 'free'
+                        ? 'bg-black/30 border-amber-500/30 text-gray-300 hover:bg-black/50'
+                        : 'bg-black/40 border-gray-700 text-gray-200 hover:bg-black/60'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-lg">{m.icon}</span>
+                    <span
+                      className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded border ${
+                        m.paid
+                          ? 'bg-amber-950/90 text-amber-300 border-amber-500/50'
+                          : 'bg-emerald-950/90 text-emerald-300 border-emerald-500/50'
+                      }`}
+                    >
+                      {m.paid ? (isRu ? 'Платно' : 'Paid') : (isRu ? 'Бесплатно' : 'Free')}
+                    </span>
+                  </div>
+                  <div className="mt-1.5">
+                    <span className="font-extrabold text-xs block text-white">{m.label}</span>
+                    <span className="text-[10px] text-gray-300 block font-medium leading-tight mt-0.5">
+                      {isRu ? m.descRu : m.descEn}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -1095,15 +1228,15 @@ export const SettingsAppearanceSection: React.FC<SettingsAppearanceSectionProps>
             </div>
           </div>
 
-          {/* Locked World Languages */}
+          {/* Unlocked World Languages */}
           <div>
-            <div className="text-xs font-extrabold text-amber-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+            <div className="text-xs font-extrabold text-emerald-400 uppercase tracking-wider mb-2 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <span>🔒</span>
-                <span>{isRu ? 'Заблокированные языки мира (10) — до 1 ноября 2026:' : 'Locked world languages (10) — until November 1, 2026:'}</span>
+                <span>🎉</span>
+                <span>{isRu ? 'Языки мира (10) — Открыты с 1 ноября 2026:' : 'World languages (10) — Unlocked Nov 1, 2026:'}</span>
               </span>
-              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                🔒 1 нояб. 2026
+              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                ✅ Доступно с 1 нояб. 2026
               </span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
@@ -1118,38 +1251,46 @@ export const SettingsAppearanceSection: React.FC<SettingsAppearanceSectionProps>
                 { code: 'bn', name: 'বাংলা', flag: '🇧🇩' },
                 { code: 'th', name: 'ไทย', flag: '🇹🇭' },
                 { code: 'vi', name: 'Tiếng Việt', flag: '🇻🇳' }
-              ].map(locked => (
-                <button
-                  key={locked.code}
-                  type="button"
-                  onClick={() => {
-                    playSound('wrong');
-                    setToast(getLanguageLockedToastMessage(locked.code, user.language));
-                    setLockedLang(locked.code);
-                    setShowLockModal(true);
-                  }}
-                  className="p-2.5 rounded-2xl border border-amber-500/30 bg-amber-950/20 text-gray-300 hover:text-amber-200 hover:border-amber-500/60 transition-all flex items-center justify-between text-left cursor-pointer active:scale-95"
-                  title={`${locked.name} — 🔒 1 нояб. 2026`}
-                >
-                  <div className="flex items-center space-x-1.5 truncate">
-                    <span className="text-base">{locked.flag}</span>
-                    <span className="font-bold text-[11px] truncate">{locked.name}</span>
-                  </div>
-                  <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1 py-0.2 rounded font-black shrink-0">🔒 1 нояб.</span>
-                </button>
-              ))}
+              ].map(item => {
+                const isSelected = user.language === item.code;
+                return (
+                  <button
+                    key={item.code}
+                    type="button"
+                    onClick={() => {
+                      playSound('select');
+                      setUser({ ...user, language: item.code as any });
+                      setToast(isRu ? `✅ Язык переключен: ${item.name}` : `Language switched: ${item.name}`);
+                    }}
+                    className={`p-2.5 rounded-2xl border transition-all flex items-center justify-between text-left cursor-pointer active:scale-95 ${
+                      isSelected
+                        ? 'border-emerald-400 bg-emerald-950/60 text-white ring-2 ring-emerald-500/40 shadow-lg'
+                        : 'border-emerald-500/30 bg-emerald-950/20 text-gray-300 hover:text-emerald-200 hover:border-emerald-500/60'
+                    }`}
+                    title={`${item.name} — ✅ Доступно с 1 ноября 2026 г.`}
+                  >
+                    <div className="flex items-center space-x-1.5 truncate">
+                      <span className="text-base">{item.flag}</span>
+                      <span className="font-bold text-[11px] truncate">{item.name}</span>
+                    </div>
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-1 py-0.2 rounded font-black shrink-0">
+                      {isSelected ? '✓' : '✅'}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Locked CIS / World Languages for Letters Section */}
+          {/* CIS / World Languages with Letters Section Unlocked */}
           <div>
-            <div className="text-xs font-extrabold text-rose-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+            <div className="text-xs font-extrabold text-teal-400 uppercase tracking-wider mb-2 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
                 <span>🏛️</span>
-                <span>{isRu ? 'Заблокированные языки мира (Раздел Письмо до 1 ноября 2026):' : 'Locked languages (Letters section until November 1, 2026):'}</span>
+                <span>{isRu ? 'Языки мира и стран СНГ (5) — Раздел «Письмо» открыт с 1 ноября 2026:' : 'World & CIS languages (5) — Letters section open Nov 1, 2026:'}</span>
               </span>
-              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40">
-                5 языков
+              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 border border-teal-500/40">
+                ✅ 5 языков открыты
               </span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
@@ -1159,23 +1300,31 @@ export const SettingsAppearanceSection: React.FC<SettingsAppearanceSectionProps>
                 { code: 'hy', fullLabel: 'Армения (Հայերեն) — Армения (армянский) 🇦🇲', flag: '🇦🇲' },
                 { code: 'ka', fullLabel: 'Грузия (ქართული) — Грузия (грузинский) 🇬🇪', flag: '🇬🇪' },
                 { code: 'az', fullLabel: 'Азербайджан (Azərbaycan) — Азербайджан (азербайджанский) 🇦🇿', flag: '🇦🇿' }
-              ].map(cis => (
-                <button
-                  key={cis.code}
-                  type="button"
-                  onClick={() => {
-                    playSound('wrong');
-                    setToast(getLanguageLockedToastMessage(cis.code, user.language));
-                    setLockedLang(cis.code);
-                    setShowLockModal(true);
-                  }}
-                  className="p-3 rounded-2xl border border-rose-500/30 bg-rose-950/20 text-gray-200 hover:text-rose-200 hover:border-rose-500/60 transition-all flex items-center justify-between text-left cursor-pointer text-[11px] font-bold active:scale-95"
-                  title={`${cis.fullLabel} — Раздел Письмо Будут доступ 1 ноября 2026 год`}
-                >
-                  <span className="truncate pr-1">{cis.fullLabel}</span>
-                  <span className="shrink-0 text-[10px] bg-rose-500/30 text-rose-300 border border-rose-500/40 px-1.5 py-0.5 rounded font-black">🔒 1 нояб.</span>
-                </button>
-              ))}
+              ].map(cis => {
+                const isSelected = user.language === cis.code;
+                return (
+                  <button
+                    key={cis.code}
+                    type="button"
+                    onClick={() => {
+                      playSound('select');
+                      setUser({ ...user, language: cis.code as any });
+                      setToast(isRu ? `✅ Язык переключен: ${cis.fullLabel}` : `Language switched: ${cis.code}`);
+                    }}
+                    className={`p-3 rounded-2xl border transition-all flex items-center justify-between text-left cursor-pointer text-[11px] font-bold active:scale-95 ${
+                      isSelected
+                        ? 'border-teal-400 bg-teal-950/60 text-white ring-2 ring-teal-500/40 shadow-lg'
+                        : 'border-teal-500/30 bg-teal-950/20 text-gray-200 hover:text-teal-200 hover:border-teal-500/60'
+                    }`}
+                    title={`${cis.fullLabel} — ✅ Раздел «Письмо» открыт 1 ноября 2026 год`}
+                  >
+                    <span className="truncate pr-1">{cis.fullLabel}</span>
+                    <span className="shrink-0 text-[10px] bg-teal-500/30 text-teal-300 border border-teal-500/40 px-1.5 py-0.5 rounded font-black">
+                      {isSelected ? '✓ АКТИВЕН' : '✅ Открыт'}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -1280,6 +1429,76 @@ export const SettingsAppearanceSection: React.FC<SettingsAppearanceSectionProps>
           </button>
         </div>
 
+        {/* CONTINUE USING US-EAST1.RUN.APP UNDER RISK */}
+        <div className="p-4 bg-amber-950/30 border-2 border-amber-500/50 rounded-2xl space-y-2.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-500/30 pb-2">
+            <div className="flex items-center space-x-2">
+              <span className="text-lg">⚠️</span>
+              <div>
+                <h4 className="font-black text-xs uppercase tracking-wide text-amber-300">
+                  {isRu ? 'Продолжение использования: Нет доступа к us-east1.run.app' : 'Continue Using: No Access to us-east1.run.app'}
+                </h4>
+                <p className="text-[11px] text-amber-200/80 font-medium">
+                  {isRu ? 'Риск: могут некорректно работать Gemini API, распознавание речи и функции' : 'Risk: features and Gemini API may not function correctly'}
+                </p>
+              </div>
+            </div>
+            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded border self-start sm:self-auto ${
+              continuedRisk 
+                ? 'bg-amber-500/30 text-amber-300 border-amber-500/50' 
+                : 'bg-red-500/30 text-red-300 border-red-500/50'
+            }`}>
+              {continuedRisk 
+                ? (isRu ? '✓ Продолжение активно' : '✓ Active (Risk Accepted)') 
+                : (isRu ? '🛑 Доступ заблокирован' : '🛑 Blocked')}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                playSound('click');
+                const next = !continuedRisk;
+                setContinuedRisk(next);
+                setRunAppContinuedRiskAccepted(next);
+                setToast(
+                  next 
+                    ? (isRu ? '⚠️ Включено продолжение работы на us-east1.run.app (Риск: могут некорректно работать)' : '⚠️ Continuing on us-east1.run.app active under risk')
+                    : (isRu ? '🛑 Восстановлена блокировка адреса us-east1.run.app' : '🛑 us-east1.run.app access restriction restored')
+                );
+              }}
+              className={`py-2 px-3.5 rounded-xl font-bold text-xs uppercase transition-all cursor-pointer flex items-center space-x-1.5 ${
+                continuedRisk
+                  ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-md'
+                  : 'bg-gray-800 hover:bg-gray-700 text-amber-300 border border-amber-500/40'
+              }`}
+            >
+              <span>{continuedRisk ? '✓' : '⚠️'}</span>
+              <span>
+                {continuedRisk
+                  ? (isRu ? 'Продолжение использования включено' : 'Continue Using Enabled')
+                  : (isRu ? 'Продолжить использование (Риск: могут некорректно работать)' : 'Continue Using (Risk: May Malfunction)')}
+              </span>
+            </button>
+
+            {continuedRisk && (
+              <button
+                type="button"
+                onClick={() => {
+                  playSound('click');
+                  setContinuedRisk(false);
+                  setRunAppContinuedRiskAccepted(false);
+                  setToast(isRu ? '🛑 Доступ к us-east1.run.app снова заблокирован' : '🛑 Access blocked');
+                }}
+                className="py-2 px-3 rounded-xl bg-red-950/80 hover:bg-red-900 text-red-300 border border-red-500/40 text-xs font-bold transition-all cursor-pointer"
+              >
+                🛑 {isRu ? 'Сбросить (Заблокировать)' : 'Reset (Block)'}
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* SIMULATOR SWITCHER FOR TESTING */}
         <div className="p-4 bg-black/40 border border-gray-800 rounded-2xl">
           <div className="flex items-center justify-between text-xs mb-2.5">
@@ -1361,70 +1580,6 @@ export const SettingsAppearanceSection: React.FC<SettingsAppearanceSectionProps>
               {isRu ? '4. ai.studio' : '4. ai.studio'}
             </button>
           </div>
-        </div>
-      </div>
-
-      {/* 5. WINDOWS WALLPAPERS EXPLANATION (ОБЪЯСНЕНИЕ ОБОЕВ WINDOWS) */}
-      <div className={`p-5 rounded-3xl border-2 transition-all text-left ${isLightMode ? 'bg-white border-blue-200 shadow-md' : 'bg-gray-850/80 border-blue-900/30 shadow-xl'}`}>
-        <div className="flex items-center space-x-3 mb-4">
-          <span className="text-2xl p-2.5 bg-blue-950/60 rounded-2xl border border-blue-500/40 text-blue-300 shadow-inner">
-            🖼️
-          </span>
-          <div>
-            <div className="flex items-center space-x-2">
-              <h3 className="font-extrabold text-base sm:text-lg text-white uppercase tracking-wider">
-                {isRu ? 'Обои WINDOWS: Объяснение' : 'Windows Wallpapers: Explained'}
-              </h3>
-              <span className="bg-blue-500/30 text-blue-300 text-[10px] font-black px-2 py-0.5 rounded-md border border-blue-500/50 uppercase">
-                Design Philosophy
-              </span>
-            </div>
-            <p className="text-xs text-gray-400 font-medium mt-1">
-              {isRu ? 'Почему DuoWindo6601 использует классические обои и эстетику Windows' : 'Why DuoWindo6601 embraces classic Windows wallpapers and aesthetics'}
-            </p>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <div className="p-4 rounded-2xl bg-black/40 border border-blue-500/20 leading-relaxed">
-            <p className="text-xs sm:text-sm text-gray-200 font-medium">
-              {isRu 
-                ? 'DuoWindo6601 — это не просто приложение для изучения языков, это портал в эпоху "золотого века" персональных компьютеров. Мы используем легендарные обои, такие как Bliss (XP), Harmony и классические интерфейсы, чтобы создать чувство стабильности, продуктивности и ностальгического уюта.' 
-                : 'DuoWindo6601 is more than a language app; it\'s a portal to the "Golden Age" of personal computing. We use legendary wallpapers like Bliss (XP), Harmony, and classic UI patterns to foster a sense of stability, productivity, and nostalgic comfort.'}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="p-3 rounded-2xl bg-blue-900/20 border border-blue-800/40 flex items-start space-x-3">
-              <span className="text-xl mt-1">🏞️</span>
-              <div>
-                <h5 className="text-xs font-black text-white uppercase">{isRu ? 'Легендарная "Безмятежность"' : 'The Bliss Legacy'}</h5>
-                <p className="text-[10px] text-gray-400 mt-0.5">
-                  {isRu ? 'Холмы Сономы — самые узнаваемые обои в истории. Они символизируют чистоту и бесконечные возможности обучения.' : 'The rolling hills of Sonoma — the most recognized photo ever. It symbolizes clarity and infinite learning possibilities.'}
-                </p>
-              </div>
-            </div>
-            <div className="p-3 rounded-2xl bg-indigo-900/20 border border-indigo-800/40 flex items-start space-x-3">
-              <span className="text-xl mt-1">💻</span>
-              <div>
-                <h5 className="text-xs font-black text-white uppercase">{isRu ? 'Стандарт DuoWindo' : 'The DuoWindo Standard'}</h5>
-                <p className="text-[10px] text-gray-400 mt-0.5">
-                  {isRu ? 'Использование Windows-эстетики помогает мозгу настроиться на серьезную работу, при этом сохраняя игровую механику.' : 'Using Windows aesthetics primes the brain for focused work while maintaining fun gamified mechanics.'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              playSound('click');
-              setToast(isRu ? '🎨 Обои Windows — это символ надежности!' : '🎨 Windows wallpapers symbolize reliability!');
-            }}
-            className="w-full py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black text-xs uppercase tracking-widest shadow-lg hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer"
-          >
-            {isRu ? 'Понимаю и принимаю дизайн' : 'I Understand & Love the Design'}
-          </button>
         </div>
       </div>
 

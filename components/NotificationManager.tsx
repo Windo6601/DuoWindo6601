@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { UserProgress } from '../types';
 import { VolumeIcon, CheckCircleIcon, WarningIcon, CloseIcon, SparklesIcon, LightningIcon } from './Icons';
+import { 
+  getTimeOfDay, 
+  getMascotMotivationalNotification, 
+  sendMascotPushNotification, 
+  TimeOfDay 
+} from '../services/mascotNotificationService';
+
 
 interface NotificationManagerProps {
   user: UserProgress;
@@ -22,7 +29,7 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({
   const [testSent, setTestSent] = useState<boolean>(false);
   const [isSaved, setIsSaved] = useState<boolean>(false);
 
-  const isRu = user.language === 'ru';
+  const isRu = user.language !== 'en';
   const userName = user.name || 'Тимур';
 
   // Sync selected time if user profile changes
@@ -280,9 +287,143 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({
         </div>
       </div>
 
+      {/* MASCOT MOTIVATIONAL PUSH NOTIFICATIONS SECTION */}
+      <MascotNotificationSection user={user} isRu={isRu} playSound={playSound} setToast={setToast} />
+
     </div>
   );
 };
+
+// Interactive Mascot Motivational Push Notification Component
+const MascotNotificationSection: React.FC<{
+  user: UserProgress;
+  isRu: boolean;
+  playSound: (sound: string) => void;
+  setToast: (msg: string | null) => void;
+}> = ({ user, isRu, playSound, setToast }) => {
+  const [selectedPeriod, setSelectedPeriod] = useState<TimeOfDay>(() => getTimeOfDay());
+  const [sentSuccess, setSentSuccess] = useState<boolean>(false);
+
+  const currentStreak = user.streak || 0;
+  const currentMsg = getMascotMotivationalNotification(user, selectedPeriod);
+
+  const handleSendMascotNotification = () => {
+    playSound('select');
+    const sent = sendMascotPushNotification(user, selectedPeriod);
+    if (sent) {
+      playSound('success');
+      setSentSuccess(true);
+      setTimeout(() => setSentSuccess(false), 3500);
+      setToast(
+        isRu 
+          ? `🦉 Мотивационное уведомление от Совёнка Duo отправлено! (${currentStreak} дн. серии)` 
+          : `🦉 Duo Mascot motivational notification sent! (${currentStreak}d streak)`
+      );
+    } else {
+      playSound('wrong');
+      setToast(
+        isRu 
+          ? '⚠️ Сначала включите разрешения на уведомления выше!' 
+          : '⚠️ Please enable notification permissions above first!'
+      );
+    }
+  };
+
+  const timePeriodLabels: { id: TimeOfDay; icon: string; labelRu: string; labelEn: string }[] = [
+    { id: 'morning', icon: '🌅', labelRu: 'Утро (05:00-11:59)', labelEn: 'Morning' },
+    { id: 'afternoon', icon: '☀️', labelRu: 'День (12:00-17:59)', labelEn: 'Afternoon' },
+    { id: 'evening', icon: '🌆', labelRu: 'Вечер (18:00-21:59)', labelEn: 'Evening' },
+    { id: 'night', icon: '🌙', labelRu: 'Ночь (22:00-04:59)', labelEn: 'Night' },
+  ];
+
+  return (
+    <div className="mt-5 pt-4 border-t border-indigo-500/30 space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center space-x-2.5">
+          <span className="text-2xl p-2 bg-indigo-950/80 rounded-xl border border-indigo-500/40">🦉</span>
+          <div>
+            <div className="flex items-center space-x-2">
+              <h4 className="font-extrabold text-sm sm:text-base text-white uppercase tracking-wider">
+                {isRu ? 'Мотивационные пуш-уведомления от Совёнка Duo' : 'Duo Mascot Motivational Push Notifications'}
+              </h4>
+              <span className="bg-amber-500/30 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded border border-amber-500/40 uppercase">
+                🔥 {currentStreak} {isRu ? 'дн. серии' : 'd streak'}
+              </span>
+            </div>
+            <p className="text-xs text-gray-300 font-medium">
+              {isRu 
+                ? 'Персонализированные напоминания от маскота DuoWindo6601 с учётом ударного режима и времени суток'
+                : 'Personalized mascot reminders tailored to your current streak and local time of day'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Time of Day Tabs */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {timePeriodLabels.map(period => {
+          const isSelected = selectedPeriod === period.id;
+          return (
+            <button
+              key={period.id}
+              type="button"
+              onClick={() => {
+                playSound('click');
+                setSelectedPeriod(period.id);
+              }}
+              className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 cursor-pointer border ${
+                isSelected
+                  ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-black border-yellow-300 font-black shadow-md scale-[1.02]'
+                  : 'bg-black/40 hover:bg-black/60 border-gray-700 text-gray-300 hover:text-white'
+              }`}
+            >
+              <span>{period.icon}</span>
+              <span className="truncate">{isRu ? period.labelRu : period.labelEn}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Notification Preview Box */}
+      <div className="bg-indigo-950/40 border border-indigo-400/40 rounded-2xl p-4 space-y-2 relative overflow-hidden shadow-inner">
+        <div className="flex items-center justify-between text-[11px] font-bold text-amber-300 uppercase tracking-wider">
+          <span className="flex items-center space-x-1">
+            <span>{currentMsg.emoji}</span>
+            <span>{isRu ? 'Предпросмотр уведомления Совёнка Duo' : 'Duo Mascot Notification Preview'}</span>
+          </span>
+          <span className="bg-black/40 text-gray-400 px-2 py-0.5 rounded font-mono text-[10px]">
+            {selectedPeriod.toUpperCase()} • STREAK #{currentStreak}
+          </span>
+        </div>
+
+        <div className="p-3 bg-black/60 rounded-xl border border-gray-700/80 space-y-1">
+          <div className="font-extrabold text-sm text-white flex items-center space-x-2">
+            <span>{currentMsg.title}</span>
+          </div>
+          <p className="text-xs text-gray-200 font-medium leading-relaxed">
+            {currentMsg.body}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleSendMascotNotification}
+          className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 hover:brightness-110 text-black font-black text-xs uppercase tracking-wider rounded-xl shadow-lg border-b-4 border-amber-800 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center space-x-2 cursor-pointer mt-2"
+        >
+          <span>🦉</span>
+          <span>{isRu ? 'ОТПРАВИТЬ МОТИВАЦИОННОЕ УВЕДОМЛЕНИЕ (ТЕСТ)' : 'SEND MASCOT MOTIVATIONAL PUSH (TEST)'}</span>
+        </button>
+
+        {sentSuccess && (
+          <div className="text-center text-xs font-black text-emerald-400 bg-emerald-950/90 border border-emerald-500/60 py-1.5 rounded-lg animate-bounce mt-1">
+            {isRu ? '🎉 Пуш-уведомление от Совёнка Duo успешно отправлено!' : '🎉 Duo Mascot Push Notification sent!'}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 
 // Prominent Standalone Notification Permission Banner for Top of App
 export const NotificationPromptBanner: React.FC<{
@@ -294,7 +435,7 @@ export const NotificationPromptBanner: React.FC<{
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const [isDismissed, setIsDismissed] = useState<boolean>(false);
 
-  const isRu = user.language === 'ru';
+  const isRu = user.language !== 'en';
   const userName = user.name || 'Тимур';
 
   useEffect(() => {

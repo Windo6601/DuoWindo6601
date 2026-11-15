@@ -220,7 +220,7 @@ export const AiLimitSection: React.FC<AiLimitSectionProps> = ({
               </span>
             ) : (
               <span className="text-amber-400 font-bold flex items-center gap-1">
-                <span>⚠️</span> {isRu ? 'Дневной лимит исчерпан. Офлайн-режим активен.' : 'Daily limit reached. Offline mode active.'}
+                <span>⚠️</span> {isRu ? 'Дневной лимит исчерпан. Обновитесь до Super / Max или добавьте API Key.' : 'Daily limit reached. Upgrade to Super / Max or add an API Key.'}
               </span>
             )}
           </span>
@@ -259,8 +259,8 @@ export const AiLimitSection: React.FC<AiLimitSectionProps> = ({
             <ul className="text-xs space-y-1.5 text-gray-300 border-t border-gray-800/80 pt-3">
               <li className="flex items-center gap-1.5"><CheckCircleIcon className="w-3.5 h-3.5 text-amber-400 shrink-0" /> 250 ИИ-запросов (Gemini 3 Flash)</li>
               <li className="flex items-center gap-1.5"><CheckCircleIcon className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> Проверка уроков и переводчик</li>
-              <li className="flex items-center gap-1.5"><CheckCircleIcon className="w-3.5 h-3.5 text-cyan-400 shrink-0" /> Озвучка вопросов и фраз</li>
-              <li className="flex items-center gap-1.5 text-gray-400"><span className="text-gray-600">❌</span> Стандартная энергия</li>
+              <li className="flex items-center gap-1.5"><CheckCircleIcon className="w-3.5 h-3.5 text-cyan-400 shrink-0" /> Fish Audio: s2.1-pro-free (Бесплатно)</li>
+              <li className="flex items-center gap-1.5 text-gray-400"><span className="text-gray-600">❌</span> Платные модели Fish Audio (Super/Max)</li>
             </ul>
           </div>
         </div>
@@ -295,8 +295,8 @@ export const AiLimitSection: React.FC<AiLimitSectionProps> = ({
             <ul className="text-xs space-y-1.5 text-purple-100 border-t border-purple-800/50 pt-3">
               <li className="flex items-center gap-1.5"><CheckCircleIcon className="w-3.5 h-3.5 text-purple-300 shrink-0" /> 1000 ИИ-запросов (Gemini 3 Flash)</li>
               <li className="flex items-center gap-1.5"><CheckCircleIcon className="w-3.5 h-3.5 text-yellow-300 shrink-0" /> Бесконечная энергия & Без рекламы</li>
-              <li className="flex items-center gap-1.5"><CheckCircleIcon className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> Интерактивный Ролевой ИИ-Чат</li>
-              <li className="flex items-center gap-1.5"><CheckCircleIcon className="w-3.5 h-3.5 text-cyan-300 shrink-0" /> Ускоренное обучение</li>
+              <li className="flex items-center gap-1.5"><CheckCircleIcon className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> Fish Audio: drama-3, s2.1-pro, s2-pro</li>
+              <li className="flex items-center gap-1.5"><CheckCircleIcon className="w-3.5 h-3.5 text-cyan-300 shrink-0" /> Интерактивный Ролевой ИИ-Чат</li>
             </ul>
           </div>
           {tier !== 'super' && tier !== 'max' && (
@@ -341,8 +341,8 @@ export const AiLimitSection: React.FC<AiLimitSectionProps> = ({
             </p>
             <ul className="text-xs space-y-1.5 text-cyan-100 border-t border-cyan-800/50 pt-3">
               <li className="flex items-center gap-1.5"><CheckCircleIcon className="w-3.5 h-3.5 text-cyan-300 shrink-0" /> 5000 ИИ-запросов (Gemini 3 Pro)</li>
+              <li className="flex items-center gap-1.5"><CheckCircleIcon className="w-3.5 h-3.5 text-cyan-300 shrink-0" /> Fish Audio: drama-3, s2.1-pro, s2-pro</li>
               <li className="flex items-center gap-1.5"><CheckCircleIcon className="w-3.5 h-3.5 text-cyan-300 shrink-0" /> Глубокий ИИ-разбор ошибок и речи</li>
-              <li className="flex items-center gap-1.5"><CheckCircleIcon className="w-3.5 h-3.5 text-cyan-300 shrink-0" /> ИИ-Шахматы и продвинутый анализ</li>
               <li className="flex items-center gap-1.5"><CheckCircleIcon className="w-3.5 h-3.5 text-amber-300 shrink-0" /> Все возможности Super</li>
             </ul>
           </div>

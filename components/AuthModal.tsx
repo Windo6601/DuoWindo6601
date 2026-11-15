@@ -11,6 +11,7 @@ import {
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, googleProvider, handleFirestoreError, OperationType } from '../firebase';
 import { UserProgress, Course } from '../types';
+import { APP_VERSION, APP_PWA_CORE_VERSION } from '../services/appVersionService';
 import { 
   isIncognitoLoginClosed, 
   getDaysUntilIncognitoClosure, 
@@ -27,6 +28,7 @@ import {
   getLanguageLockInfo, 
   AVAILABLE_SWITCH_LANGUAGES 
 } from '../services/languageLockService';
+import { GoogleRecaptcha } from './GoogleRecaptcha';
 
 export interface AuthModalProps {
   isOpen: boolean;
@@ -164,8 +166,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [isOperationNotAllowed, setIsOperationNotAllowed] = useState(false);
   const [notAllowedProvider, setNotAllowedProvider] = useState<'google' | 'email' | null>(null);
   const [exportCopied, setExportCopied] = useState(false);
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const [recaptchaError, setRecaptchaError] = useState<string | null>(null);
 
-  const isRu = user.language === 'ru';
+  const isRu = user.language !== 'en';
   const isIframe = typeof window !== 'undefined' && window.self !== window.top;
   const incognitoClosed = isIncognitoLoginClosed();
   const daysUntilClosure = getDaysUntilIncognitoClosure();
@@ -344,6 +348,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setResetSent(false);
       setIsOperationNotAllowed(false);
       setNotAllowedProvider(null);
+      setRecaptchaToken(null);
+      setRecaptchaError(null);
 
       if (initialTab === 'register') {
         setDisplayName(user.name !== 'Ученик 6601' && user.name !== 'Ученик' && !user.name.includes('Гость') ? user.name : '');
@@ -605,6 +611,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
+    if (!recaptchaToken) {
+      setRecaptchaError(isRu ? 'Пожалуйста, подтвердите капчу Google reCAPTCHA («Я не робот»)' : 'Please complete the Google reCAPTCHA verification');
+      setErrorMessage(isRu ? 'Требуется проверка Google reCAPTCHA перед входом' : 'Google reCAPTCHA verification required');
+      playSound('wrong');
+      return;
+    }
+
     setLoading(true);
     playSound('click');
 
@@ -795,6 +808,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
+    if (!recaptchaToken) {
+      setRecaptchaError(isRu ? 'Пожалуйста, подтвердите капчу Google reCAPTCHA («Я не робот»)' : 'Please complete the Google reCAPTCHA verification');
+      setErrorMessage(isRu ? 'Требуется проверка Google reCAPTCHA перед регистрацией' : 'Google reCAPTCHA verification required');
+      playSound('wrong');
+      return;
+    }
+
     setLoading(true);
     playSound('click');
 
@@ -893,6 +913,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // ==========================================
   const handleGoogleAuth = async () => {
     setErrorMessage(null);
+    setRecaptchaError(null);
+
+    if (!recaptchaToken) {
+      setRecaptchaError(isRu ? 'Пожалуйста, подтвердите капчу Google reCAPTCHA («Я не робот») перед входом через Google' : 'Please complete the Google reCAPTCHA verification before Google Sign-In');
+      setErrorMessage(isRu ? 'Требуется проверка Google reCAPTCHA перед входом через Google' : 'Google reCAPTCHA verification required');
+      playSound('wrong');
+      return;
+    }
+
     setLoading(true);
     playSound('click');
 
@@ -1160,7 +1189,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         <div className="grid grid-cols-4 gap-1.5 p-1 bg-gray-950/80 rounded-2xl border border-gray-800">
           <button
             type="button"
-            onClick={() => { playSound('click'); setActiveTab('login'); setErrorMessage(null); setShowForgotPassword(false); }}
+            onClick={() => { playSound('click'); setActiveTab('login'); setErrorMessage(null); setRecaptchaError(null); setShowForgotPassword(false); }}
             className={`py-2.5 px-2 rounded-xl font-black text-xs transition-all flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer ${
               activeTab === 'login'
                 ? 'bg-duo-blue text-white shadow-lg border-b-2 border-duo-blueDark'
@@ -1173,7 +1202,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           <button
             type="button"
-            onClick={() => { playSound('click'); setActiveTab('register'); setErrorMessage(null); setShowForgotPassword(false); }}
+            onClick={() => { playSound('click'); setActiveTab('register'); setErrorMessage(null); setRecaptchaError(null); setShowForgotPassword(false); }}
             className={`py-2.5 px-2 rounded-xl font-black text-xs transition-all flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer ${
               activeTab === 'register'
                 ? 'bg-emerald-600 text-white shadow-lg border-b-2 border-emerald-800'
@@ -1186,7 +1215,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           <button
             type="button"
-            onClick={() => { playSound('click'); setActiveTab('google'); setErrorMessage(null); setShowForgotPassword(false); }}
+            onClick={() => { playSound('click'); setActiveTab('google'); setErrorMessage(null); setRecaptchaError(null); setShowForgotPassword(false); }}
             className={`py-2.5 px-2 rounded-xl font-black text-xs transition-all flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer ${
               activeTab === 'google'
                 ? 'bg-purple-600 text-white shadow-lg border-b-2 border-purple-800'
@@ -1199,7 +1228,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           <button
             type="button"
-            onClick={() => { playSound('click'); setActiveTab('incognito'); setErrorMessage(null); setShowForgotPassword(false); }}
+            onClick={() => { playSound('click'); setActiveTab('incognito'); setErrorMessage(null); setRecaptchaError(null); setShowForgotPassword(false); }}
             className={`py-2.5 px-2 rounded-xl font-black text-xs transition-all flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer relative ${
               activeTab === 'incognito'
                 ? (incognitoClosed 
@@ -1382,6 +1411,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                 {/* COUNTRY & LANGUAGE SELECTOR */}
                 {renderCountryAndLanguageSelectors()}
+
+                {/* GOOGLE RECAPTCHA */}
+                <GoogleRecaptcha
+                  isVerified={!!recaptchaToken}
+                  onVerify={(tok) => {
+                    setRecaptchaToken(tok);
+                    setRecaptchaError(null);
+                    playSound('click');
+                  }}
+                  onExpire={() => setRecaptchaToken(null)}
+                  language={user.language}
+                  error={recaptchaError}
+                  className="py-1"
+                />
 
                 {/* SUBMIT BUTTON */}
                 <button
@@ -1598,6 +1641,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             {/* COUNTRY & LANGUAGE SELECTOR */}
             {renderCountryAndLanguageSelectors()}
 
+            {/* GOOGLE RECAPTCHA */}
+            <GoogleRecaptcha
+              isVerified={!!recaptchaToken}
+              onVerify={(tok) => {
+                setRecaptchaToken(tok);
+                setRecaptchaError(null);
+                playSound('click');
+              }}
+              onExpire={() => setRecaptchaToken(null)}
+              language={user.language}
+              error={recaptchaError}
+              className="py-1"
+            />
+
             {/* SUBMIT REGISTRATION BUTTON */}
             <button
               type="submit"
@@ -1665,6 +1722,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
             {/* COUNTRY & LANGUAGE SELECTOR */}
             {renderCountryAndLanguageSelectors()}
+
+            {/* GOOGLE RECAPTCHA */}
+            <GoogleRecaptcha
+              isVerified={!!recaptchaToken}
+              onVerify={(tok) => {
+                setRecaptchaToken(tok);
+                setRecaptchaError(null);
+                playSound('click');
+              }}
+              onExpire={() => setRecaptchaToken(null)}
+              language={user.language}
+              error={recaptchaError}
+              className="py-1"
+            />
 
             <button
               type="button"
@@ -1930,7 +2001,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {t('skipContinueIncognitoBtn')}
             </button>
           )}
-          <span className="text-[11px] text-gray-500">DuoWindo 6601 v1.0.2</span>
+          <span className="text-[11px] text-gray-500 font-mono">DuoWindo6601 v{APP_VERSION} • {APP_PWA_CORE_VERSION}</span>
         </div>
 
       </div>

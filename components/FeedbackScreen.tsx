@@ -223,7 +223,22 @@ export const ADMIN_NAME_TRANSLATIONS: Record<string, string> = {
   es: 'Administrador de DuoWindo6601',
   ja: 'DuoWindo6601 管理者',
   zh: 'DuoWindo6601 管理员',
-  ar: 'مسؤول DuoWindo6601'
+  ar: 'مسؤول DuoWindo6601',
+  pt: 'Administrador DuoWindo6601',
+  it: 'Amministratore DuoWindo6601',
+  tr: 'DuoWindo6601 Yöneticisi',
+  ko: 'DuoWindo6601 관리자',
+  hi: 'DuoWindo6601 प्रशासक',
+  pl: 'Administrator DuoWindo6601',
+  id: 'Administrator DuoWindo6601',
+  bn: 'DuoWindo6601 প্রশাসক',
+  th: 'ผู้ดูแลระบบ DuoWindo6601',
+  vi: 'Quản trị viên DuoWindo6601',
+  kk: 'DuoWindo6601 Әкімшісі',
+  uz: 'DuoWindo6601 Administratori',
+  hy: 'DuoWindo6601 Ադմինիստրատոր',
+  ka: 'DuoWindo6601 ადმინისტრატორი',
+  az: 'DuoWindo6601 Administratoru'
 };
 
 export const COMMON_NAME_TRANSLATIONS: Record<string, Record<string, string>> = {
@@ -351,7 +366,7 @@ export const COMMON_NAME_TRANSLATIONS: Record<string, Record<string, string>> = 
 
 export const getTranslatedAuthorName = (name: string, targetLang: string, isAdmin?: boolean): string => {
   if (isAdmin || name.includes('Администратор') || name.includes('Admin') || name.includes('مسؤول') || name.includes('管理者') || name.includes('管理员')) {
-    return ADMIN_NAME_TRANSLATIONS[targetLang] || ADMIN_NAME_TRANSLATIONS['ru'];
+    return ADMIN_NAME_TRANSLATIONS[targetLang] || ADMIN_NAME_TRANSLATIONS['en'] || ADMIN_NAME_TRANSLATIONS['ru'];
   }
   if (COMMON_NAME_TRANSLATIONS[name] && COMMON_NAME_TRANSLATIONS[name][targetLang]) {
     return COMMON_NAME_TRANSLATIONS[name][targetLang];
@@ -364,7 +379,7 @@ export const getTranslatedCategory = (categoryStr: string | undefined, targetLan
   for (const catKey of Object.keys(CATEGORIES)) {
     const catObj = CATEGORIES[catKey];
     if (Object.values(catObj).some((v) => v === categoryStr)) {
-      return catObj[targetLang] || catObj['ru'] || categoryStr;
+      return catObj[targetLang] || catObj['en'] || catObj['ru'] || categoryStr;
     }
   }
   return categoryStr;
@@ -920,6 +935,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
   const [isAdminMode, setIsAdminMode] = useState<boolean>(isUserOwnerAdmin);
   const [showAdminModal, setShowAdminModal] = useState<boolean>(false);
   const [adminPasswordInput, setAdminPasswordInput] = useState<string>('');
+  const [adminAuthError, setAdminAuthError] = useState<string>('');
 
   // Expand comment section per review
   const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
@@ -1212,11 +1228,15 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
       setIsAdminMode(true);
       setShowAdminModal(false);
       setAdminPasswordInput('');
+      setAdminAuthError('');
       playSound('fanfare');
       setToast('Вход выполнен! Подтверждены права Администратора DuoWindo6601 👑');
     } else {
       playSound('wrong');
-      setToast('Ограничение доступа! Права администратора принадлежат владельцам.');
+      setAdminAuthError(
+        'Доступ запрещен: У вас нет доступа к этой администрации. Обратитесь к администратору вашей учетной записи, чтобы запросить доступ.\nAccess is denied: You do not have access to this administration. Contact your account administrator to request access.'
+      );
+      setToast('🛑 Доступ запрещен / Access is denied');
     }
   };
 
@@ -1465,7 +1485,30 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
           className="text-gray-400 hover:text-white flex items-center font-bold text-sm md:text-base transition-colors"
         >
           <CloseIcon className="w-6 h-6 mr-1" />
-          <span>{currentLang === 'ru' ? 'Назад' : currentLang === 'en' ? 'Back' : currentLang === 'de' ? 'Zurück' : currentLang === 'fr' ? 'Retour' : currentLang === 'es' ? 'Volver' : currentLang === 'ja' ? '戻る' : currentLang === 'zh' ? '返回' : 'رجوع'}</span>
+          <span>{
+  currentLang === 'en' ? 'Back' :
+  currentLang === 'de' ? 'Zurück' :
+  currentLang === 'fr' ? 'Retour' :
+  currentLang === 'es' ? 'Volver' :
+  currentLang === 'ja' ? '戻る' :
+  currentLang === 'zh' ? '返回' :
+  currentLang === 'ar' ? 'رجوع' :
+  currentLang === 'pt' ? 'Voltar' :
+  currentLang === 'it' ? 'Indietro' :
+  currentLang === 'tr' ? 'Geri' :
+  currentLang === 'ko' ? '뒤로' :
+  currentLang === 'hi' ? 'वापस' :
+  currentLang === 'pl' ? 'Wstecz' :
+  currentLang === 'id' ? 'Kembali' :
+  currentLang === 'bn' ? 'ফিরে যান' :
+  currentLang === 'th' ? 'ย้อนกลับ' :
+  currentLang === 'vi' ? 'Quay lại' :
+  currentLang === 'kk' ? 'Артқа' :
+  currentLang === 'uz' ? 'Orqaga' :
+  currentLang === 'hy' ? 'Հետ' :
+  currentLang === 'ka' ? 'უკან' :
+  currentLang === 'az' ? 'Geri' : 'Назад'
+}</span>
         </button>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -1506,12 +1549,50 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
             <span className="text-3xl shrink-0">🕵️</span>
             <div>
               <h4 className="text-xs font-black text-amber-300 uppercase tracking-wider">
-                {currentLang === 'ru' ? 'Режим Инкогнито — Отзывы и Комментарии' : 'Incognito Mode — Reviews & Comments'}
+                {
+                  {
+                    ru: 'Режим Инкогнито — Отзывы и Комментарии',
+                    en: 'Incognito Mode — Reviews & Comments',
+                    pt: 'Modo Incógnito — Avaliações e Comentários',
+                    it: 'Modalità Incognito — Recensioni e Commenti',
+                    tr: 'Gizli Mod — Değerlendirmeler ve Yorumlar',
+                    ko: '시크릿 모드 — 리뷰 및 댓글',
+                    hi: 'इंकॉग्निटो मोड — समीक्षाएँ और टिप्पणियाँ',
+                    pl: 'Tryb Incognito — Recenzje i Komentarze',
+                    id: 'Mode Penyamaran — Ulasan & Komentar',
+                    bn: 'ছদ্মবেশী মোড — পর্যালোচনা এবং মন্তব্য',
+                    th: 'โหมดไม่ระบุตัวตน — รีวิวและความคิดเห็น',
+                    vi: 'Chế Độ Ẩn Danh — Đánh Giá & Bình Luận',
+                    kk: 'Инкогнито режимі — Пікірлер мен түсініктемелер',
+                    uz: 'Inkognito rejimi — Sharhlar va izohlar',
+                    hy: 'Ինկոգնիտո ռեժիմ — Ակնարկներ և մեկնաբանություններ',
+                    ka: 'ინკოგნიტო რეჟიმი — მიმოხილვები და კომენტარები',
+                    az: 'İnkognito rejimi — Rəylər və şərhlər'
+                  }[currentLang] || (currentLang === 'ru' ? 'Режим Инкогнито — Отзывы и Комментарии' : 'Incognito Mode — Reviews & Comments')
+                }
               </h4>
               <p className="text-[11px] text-amber-200/90 font-medium leading-tight mt-0.5">
-                {currentLang === 'ru'
-                  ? 'Публикация официальных отзывов и ответов в ветках требует аккаунта. Локальные отзывы сохраняются в текущей сессии.'
-                  : 'Posting official verified reviews and comments requires an account. Local drafts are stored in current session.'}
+                {
+                  {
+                    ru: 'Публикация официальных отзывов и ответов в ветках требует аккаунта. Локальные отзывы сохраняются в текущей сессии.',
+                    en: 'Posting official verified reviews and comments requires an account. Local drafts are stored in current session.',
+                    pt: 'Publicar avaliações oficiais exige uma conta. Rascunhos locais são salvos na sessão atual.',
+                    it: 'Pubblicare recensioni ufficiali richiede un account. Le bozze locali sono salvate nella sessione corrente.',
+                    tr: 'Resmi değerlendirmeler yayınlamak bir hesap gerektirir. Yerel taslaklar mevcut oturumda saklanır.',
+                    ko: '공식 리뷰 게시에는 계정이 필요합니다. 로컬 초안은 현재 세션에 저장됩니다.',
+                    hi: 'आधिकारिक समीक्षाएं पोस्ट करने के लिए एक खाता आवश्यक है।',
+                    pl: 'Publikowanie oficjalnych recenzji wymaga konta. Lokalne wersje robocze są zapisywane w bieżącej sesji.',
+                    id: 'Menerbitkan ulasan resmi memerlukan akun. Draf lokal disimpan dalam sesi saat ini.',
+                    bn: 'অফিসিয়াল পর্যালোচনা পোস্ট করতে একটি অ্যাকাউন্ট প্রয়োজন।',
+                    th: 'การโพสต์รีวิวอย่างเป็นทางการต้องใช้บัญชี',
+                    vi: 'Đăng đánh giá chính thức cần có tài khoản.',
+                    kk: 'Ресми пікірлерді жариялау тіркелгіні талап етеді.',
+                    uz: 'Rasmiy sharhlarni chop etish hisobni talab qiladi.',
+                    hy: 'Պաշտոնական ակնարկներ հրապարակելու համար պահանջվում է հաշիվ:',
+                    ka: 'ოფიციალური მიმოხილვების გამოქვეყნებას სჭირდება ანგარიში.',
+                    az: 'Rəsmi rəylər dərc etmək üçün hesab tələb olunur.'
+                  }[currentLang] || (currentLang === 'ru' ? 'Публикация официальных отзывов и ответов в ветках требует аккаунта. Локальные отзывы сохраняются в текущей сессии.' : 'Posting official verified reviews and comments requires an account. Local drafts are stored in current session.')
+                }
               </p>
             </div>
           </div>
@@ -1522,7 +1603,13 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
                 className="flex-1 sm:flex-initial px-3 py-2 bg-amber-900/90 hover:bg-amber-800 text-amber-200 text-xs font-bold rounded-xl border border-amber-500/50 whitespace-nowrap shadow-md cursor-pointer flex items-center justify-center space-x-1"
               >
                 <span>🚫</span>
-                <span>{currentLang === 'ru' ? 'Ограничения (8)' : 'Restrictions (8)'}</span>
+                <span>
+                  {
+                    {
+                      ru: 'Ограничения (8)', en: 'Restrictions (8)', pt: 'Restrições (8)', it: 'Restrizioni (8)', tr: 'Kısıtlamalar (8)', ko: '제한 사항 (8)', hi: 'प्रतिबंध (8)', pl: 'Ograniczenia (8)', id: 'Pembatasan (8)', bn: 'সীমাবদ্ধতা (৮)', th: 'ข้อจำกัด (8)', vi: 'Hạn Chế (8)', kk: 'Шектеулер (8)', uz: 'Cheklovlar (8)', hy: 'Սահմանափակումներ (8)', ka: 'შეზღუდვები (8)', az: 'Məhdudiyyətlər (8)'
+                    }[currentLang] || (currentLang === 'ru' ? 'Ограничения (8)' : 'Restrictions (8)')
+                  }
+                </span>
               </button>
             )}
             {onOpenRegister && (
@@ -1531,7 +1618,13 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
                 className="flex-1 sm:flex-initial px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl border-b-2 border-emerald-800 whitespace-nowrap shadow-md cursor-pointer flex items-center justify-center space-x-1"
               >
                 <span>✨</span>
-                <span>{currentLang === 'ru' ? 'Регистрация' : 'Register'}</span>
+                <span>
+                  {
+                    {
+                      ru: 'Регистрация', en: 'Register', pt: 'Registrar', it: 'Registrati', tr: 'Kayıt Ol', ko: '회원가입', hi: 'पंजीकरण', pl: 'Zarejestruj się', id: 'Daftar', bn: 'নিবন্ধন', th: 'ลงทะเบียน', vi: 'Đăng Ký', kk: 'Тіркелу', uz: 'Ro\'yxatdan o\'tish', hy: 'Գրանցվել', ka: 'რეგისტრაცია', az: 'Qeydiyyat'
+                    }[currentLang] || (currentLang === 'ru' ? 'Регистрация' : 'Register')
+                  }
+                </span>
               </button>
             )}
           </div>
@@ -2482,15 +2575,15 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
           <div className="bg-gradient-to-br from-gray-900 via-gray-850 to-gray-900 border-2 border-amber-500/60 rounded-3xl p-4 md:p-5 mb-5 shadow-2xl relative overflow-hidden">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
               <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500/25 to-yellow-500/15 flex items-center justify-center text-2xl border border-amber-500/40 shadow-inner shrink-0">
-                  🔒
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500/25 to-teal-500/15 flex items-center justify-center text-2xl border border-emerald-500/40 shadow-inner shrink-0">
+                  🎉
                 </div>
                 <div>
-                  <h3 className="font-black text-sm md:text-base text-amber-300 uppercase tracking-wide flex items-center gap-1.5 flex-wrap">
-                    <span>Отзывы: Заблокированные языки и доступны для переключения</span>
+                  <h3 className="font-black text-sm md:text-base text-emerald-300 uppercase tracking-wide flex items-center gap-1.5 flex-wrap">
+                    <span>Отзывы: Языки мира, стран СНГ и раздел «Письмо» — Открыты с 1 ноября 2026 г.</span>
                   </h3>
                   <p className="text-[11px] text-gray-300 leading-snug">
-                    15 языков заблокированы до 1 ноября 2026 г. • 8 языков доступны для мгновенного переключения
+                    15 языков и раздел «Письмо» официально открыты • Доступны для мгновенного переключения интерфейса
                   </p>
                 </div>
               </div>
@@ -2563,31 +2656,31 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
                   <div className="space-y-3">
                     {/* CIS List */}
                     <div>
-                      <div className="text-[11px] font-black uppercase tracking-wider text-amber-300 flex items-center justify-between mb-1.5 pb-1 border-b border-amber-500/20">
+                      <div className="text-[11px] font-black uppercase tracking-wider text-emerald-300 flex items-center justify-between mb-1.5 pb-1 border-b border-emerald-500/20">
                         <span className="flex items-center gap-1.5">
                           <span>🏛️</span>
-                          <span>Заблокированные языки мира (5 стран СНГ):</span>
+                          <span>Языки мира и стран СНГ (5 стран):</span>
                         </span>
-                        <span className="text-[10px] text-amber-400 font-bold bg-amber-500/20 px-2 py-0.5 rounded-md">
-                          Раздел Письмо Будут доступ 1 ноября 2026 год
+                        <span className="text-[10px] text-emerald-300 font-bold bg-emerald-500/20 px-2 py-0.5 rounded-md">
+                          ✅ Раздел «Письмо» открыт (1 ноября 2026 год)
                         </span>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
                         {[
-                          { label: 'Казахстан (Қазақша) — Казахстан (казахский — выбран)', flag: '🇰🇿' },
+                          { label: 'Казахстан (Қазақша) — Казахстан (казахский)', flag: '🇰🇿' },
                           { label: 'Узбекистан (Oʻzbekcha) — Узбекистан (узбекский)', flag: '🇺🇿' },
                           { label: 'Армения (Հայերեն) — Армения (армянский)', flag: '🇦🇲' },
                           { label: 'Грузия (ქართული) — Грузия (грузинский)', flag: '🇬🇪' },
                           { label: 'Азербайджан (Azərbaycan) — Азербайджан (азербайджанский)', flag: '🇦🇿' },
                         ].map((item, idx) => (
-                          <div key={idx} className="p-2 rounded-xl bg-gray-900/80 border border-amber-500/30 flex items-center justify-between">
+                          <div key={idx} className="p-2 rounded-xl bg-gray-900/80 border border-emerald-500/30 flex items-center justify-between">
                             <div className="flex items-center gap-2 truncate">
                               <span className="text-base">{item.flag}</span>
-                              <span className="font-bold text-amber-100 truncate text-[11px]">
-                                🔒 {item.label}
+                              <span className="font-bold text-emerald-100 truncate text-[11px]">
+                                ✨ {item.label}
                               </span>
                             </div>
-                            <span className="text-xs">🔒</span>
+                            <span className="text-xs text-emerald-400">✓</span>
                           </div>
                         ))}
                       </div>
@@ -2595,12 +2688,12 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
 
                     {/* World 10 List */}
                     <div>
-                      <div className="text-[11px] font-black uppercase tracking-wider text-amber-300 mb-1.5 pb-1 border-b border-amber-500/20 flex items-center justify-between">
+                      <div className="text-[11px] font-black uppercase tracking-wider text-emerald-300 mb-1.5 pb-1 border-b border-emerald-500/20 flex items-center justify-between">
                         <span className="flex items-center gap-1.5">
                           <span>🌍</span>
-                          <span>10 заблокированных языков мира:</span>
+                          <span>10 языков мира — Открыты с 1 ноября 2026 года:</span>
                         </span>
-                        <span className="text-[10px] text-amber-400 font-bold lowercase">🔒 релиз 1 ноября 2026</span>
+                        <span className="text-[10px] text-emerald-300 font-bold lowercase">✅ открыто 1 ноября 2026</span>
                       </div>
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 text-xs">
                         {[
@@ -3161,11 +3254,28 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
               <input
                 type="password"
                 value={adminPasswordInput}
-                onChange={(e) => setAdminPasswordInput(e.target.value)}
+                onChange={(e) => { setAdminPasswordInput(e.target.value); setAdminAuthError(''); }}
                 placeholder="Ключ Администратора"
                 className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500"
                 autoFocus
               />
+
+              {adminAuthError && (
+                <div className="p-3 bg-red-950/90 border border-red-500 rounded-2xl text-left space-y-1.5 animate-in fade-in">
+                  <div className="flex items-center space-x-1.5 text-red-400 font-black text-xs uppercase">
+                    <span>🛑</span>
+                    <span>Доступ запрещен / Access is denied</span>
+                  </div>
+                  <div className="text-[11px] text-gray-200 font-medium space-y-1">
+                    <p className="font-bold text-white">У вас нет доступа к этой администрации.</p>
+                    <p className="text-red-200/90">Обратитесь к администратору вашей учетной записи, чтобы запросить доступ.</p>
+                    <div className="border-t border-red-500/30 pt-1 mt-1 text-[10px]">
+                      <p className="font-bold text-white">You do not have access to this administration.</p>
+                      <p className="text-red-200/90">Contact your account administrator to request access.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-2 justify-end pt-2">
                 <button

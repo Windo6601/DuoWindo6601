@@ -19,7 +19,7 @@ export const TIER_AI_CONFIG: Record<SubscriptionTier, AiTierInfo> = {
     features: [
       '250 ИИ-запросов в день (Gemini API Key)',
       'Базовая проверка упражнений и переводчик',
-      'Стандартная озвучка вопросов'
+      'Fish Audio: model s2.1-pro-free (Доступ Бесплатно)'
     ]
   },
   super: {
@@ -31,7 +31,7 @@ export const TIER_AI_CONFIG: Record<SubscriptionTier, AiTierInfo> = {
     features: [
       '1000 ИИ-запросов в день (Приоритетный Gemini API Key)',
       'Без рекламы & Бесконечная энергия',
-      'Ускоренное генеративное обучение',
+      'Fish Audio (Платно): drama-3, s2.1-pro, s2-pro',
       'Интерактивный Ролевой ИИ-Чат'
     ]
   },
@@ -44,7 +44,7 @@ export const TIER_AI_CONFIG: Record<SubscriptionTier, AiTierInfo> = {
     features: [
       '5000 ИИ-запросов в день (Максимальный Gemini API Key Pro)',
       'Все функции Super + Углубленный ИИ-Разбор ответов',
-      'Глубокий анализ шахматных партий ИИ',
+      'Fish Audio (Платно): drama-3, s2.1-pro, s2-pro',
       'Грамматическая коррекция речи в реальном времени'
     ]
   }
@@ -78,32 +78,44 @@ export interface RoleApiKeyDetails {
   maskedKey: string;
 }
 
+export const DEFAULT_SYSTEM_GEMINI_KEY = '';
+
 export function getAdminApiKeyDetails(): RoleApiKeyDetails {
+  const defaultDetails: RoleApiKeyDetails = {
+    key: '',
+    type: 'free',
+    enabled: false,
+    isSet: false,
+    maskedKey: 'Server Env Proxy'
+  };
+
   if (typeof window === 'undefined') {
-    return { key: '', type: 'free', enabled: false, isSet: false, maskedKey: '' };
+    return defaultDetails;
   }
   try {
-    const rawKey = localStorage.getItem(ADMIN_API_KEY_STORAGE) || '';
+    const rawKey = localStorage.getItem(ADMIN_API_KEY_STORAGE);
     const rawType = (localStorage.getItem(ADMIN_API_KEY_TYPE_STORAGE) || 'free') as 'free' | 'paid';
     const rawEnabled = localStorage.getItem(ADMIN_API_KEY_ENABLED_STORAGE);
     const enabled = rawEnabled !== 'false';
-    const trimmed = rawKey.trim();
-    if (trimmed.length > 5) {
-      const masked = trimmed.length > 8 
-        ? `${trimmed.substring(0, 6)}••••${trimmed.substring(trimmed.length - 4)}` 
-        : '••••••••';
-      return {
-        key: trimmed,
-        type: rawType === 'paid' ? 'paid' : 'free',
-        enabled,
-        isSet: true,
-        maskedKey: masked
-      };
+    if (rawKey !== null) {
+      const trimmed = rawKey.trim();
+      if (trimmed.length > 5) {
+        const masked = trimmed.length > 8 
+          ? `${trimmed.substring(0, 6)}••••${trimmed.substring(trimmed.length - 4)}` 
+          : '••••••••';
+        return {
+          key: trimmed,
+          type: rawType === 'paid' ? 'paid' : 'free',
+          enabled,
+          isSet: true,
+          maskedKey: masked
+        };
+      }
     }
   } catch (e) {
     console.warn("getAdminApiKeyDetails error:", e);
   }
-  return { key: '', type: 'free', enabled: false, isSet: false, maskedKey: '' };
+  return defaultDetails;
 }
 
 export function saveAdminApiKey(key: string, type: 'free' | 'paid', enabled: boolean = true): void {

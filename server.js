@@ -120,17 +120,21 @@ const server = http.createServer((req, res) => {
           return;
         }
 
-        const fishApiKey = process.env.FISH_AUDIO_API_KEY || 'sk-fish-4AQDQGlpw6stJiyg5JTTJabhtkgPpmwBTu_Gveo7DMI';
+        const envFishKey = (process.env.FISH_AUDIO_API_KEY || '').trim();
+        const fishApiKey = (envFishKey && envFishKey.startsWith('sk-fish-'))
+          ? envFishKey
+          : 'sk-fish-gG4zvIytNwA_ZIITYYfyVi_-W1BJHbizUFxduVOmJGE';
         const response = await fetch('https://api.fish.audio/v1/tts', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${fishApiKey}`,
             'Content-Type': 'application/json',
-            'model': 's2.1-pro-free'
+            'model': parsed.model || 's2.1-pro-free'
           },
           body: JSON.stringify({
             text,
-            format: parsed.format || 'mp3'
+            format: parsed.format || 'mp3',
+            model: parsed.model || 's2.1-pro-free'
           })
         });
 

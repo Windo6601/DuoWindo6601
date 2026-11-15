@@ -509,49 +509,198 @@ export interface SpeakerLanguageOption {
   name: string;
   flagCode: string;
   englishName: string;
+  ruGenitive?: string;
+  ruAccusative?: string;
 }
 
-export const SPEAKER_LANGUAGES: SpeakerLanguageOption[] = [
-  { code: 'ru', name: 'Русский', flagCode: 'ru', englishName: 'Russian' },
-  { code: 'en', name: 'English', flagCode: 'us', englishName: 'English' },
-  { code: 'es', name: 'Español', flagCode: 'es', englishName: 'Spanish' },
-  { code: 'de', name: 'Deutsch', flagCode: 'de', englishName: 'German' },
-  { code: 'fr', name: 'Français', flagCode: 'fr', englishName: 'French' },
-  { code: 'pt', name: 'Português', flagCode: 'br', englishName: 'Portuguese' },
-  { code: 'zs', name: '中文', flagCode: 'cn', englishName: 'Chinese (Simplified)' },
-  { code: 'ja', name: '日本語', flagCode: 'jp', englishName: 'Japanese' },
-  { code: 'ar', name: 'العربية', flagCode: 'sa', englishName: 'Arabic' },
-  { code: 'it', name: 'Italiano', flagCode: 'it', englishName: 'Italian' },
-  { code: 'tr', name: 'Türkçe', flagCode: 'tr', englishName: 'Turkish' },
-  { code: 'ko', name: '한국어', flagCode: 'kr', englishName: 'Korean' },
-  { code: 'hi', name: 'हिन्दी', flagCode: 'in', englishName: 'Hindi' },
-  { code: 'pl', name: 'Polski', flagCode: 'pl', englishName: 'Polish' },
-  { code: 'id', name: 'Bahasa Indonesia', flagCode: 'id', englishName: 'Indonesian' },
-  { code: 'vi', name: 'Tiếng Việt', flagCode: 'vn', englishName: 'Vietnamese' },
-  { code: 'bn', name: 'বাংলা', flagCode: 'bd', englishName: 'Bengali' },
-  { code: 'th', name: 'ไทย', flagCode: 'th', englishName: 'Thai' },
+export const SPEAKER_LANGUAGES_31: SpeakerLanguageOption[] = [
+  { code: 'ru', name: 'Русский', flagCode: 'ru', englishName: 'Russian', ruGenitive: 'русский', ruAccusative: 'русский' },
+  { code: 'uk', name: 'Українська', flagCode: 'ua', englishName: 'Ukrainian', ruGenitive: 'украинский', ruAccusative: 'украинский' },
+  { code: 'en', name: 'English', flagCode: 'us', englishName: 'English', ruGenitive: 'английский', ruAccusative: 'английский' },
+  { code: 'ar', name: 'العربية', flagCode: 'sa', englishName: 'Arabic', ruGenitive: 'арабский', ruAccusative: 'арабский' },
+  { code: 'bn', name: 'বাংলা', flagCode: 'bd', englishName: 'Bengali', ruGenitive: 'бенгальский', ruAccusative: 'бенгальский' },
+  { code: 'zh', name: '中文', flagCode: 'cn', englishName: 'Chinese (Simplified)', ruGenitive: 'китайский', ruAccusative: 'китайский' },
+  { code: 'cs', name: 'Čeština', flagCode: 'cz', englishName: 'Czech', ruGenitive: 'чешский', ruAccusative: 'чешский' },
+  { code: 'nl', name: 'Nederlands', flagCode: 'nl', englishName: 'Dutch', ruGenitive: 'нидерландский', ruAccusative: 'нидерландский' },
+  { code: 'fr', name: 'Français', flagCode: 'fr', englishName: 'French', ruGenitive: 'французский', ruAccusative: 'французский' },
+  { code: 'de', name: 'Deutsch', flagCode: 'de', englishName: 'German', ruGenitive: 'немецкий', ruAccusative: 'немецкий' },
+  { code: 'el', name: 'Ελληνικά', flagCode: 'gr', englishName: 'Greek', ruGenitive: 'греческий', ruAccusative: 'греческий' },
+  { code: 'hi', name: 'हिन्दी', flagCode: 'in', englishName: 'Hindi', ruGenitive: 'хинди', ruAccusative: 'хинди' },
+  { code: 'hu', name: 'Magyar', flagCode: 'hu', englishName: 'Hungarian', ruGenitive: 'венгерский', ruAccusative: 'венгерский' },
+  { code: 'id', name: 'Bahasa Indonesia', flagCode: 'id', englishName: 'Indonesian', ruGenitive: 'индонезийский', ruAccusative: 'индонезийский' },
+  { code: 'ja', name: '日本語', flagCode: 'jp', englishName: 'Japanese', ruGenitive: 'японский', ruAccusative: 'японский' },
+  { code: 'kn', name: 'ಕನ್ನಡ', flagCode: 'in', englishName: 'Kannada', ruGenitive: 'каннада', ruAccusative: 'каннада' },
+  { code: 'ko', name: '한국어', flagCode: 'kr', englishName: 'Korean', ruGenitive: 'корейский', ruAccusative: 'корейский' },
+  { code: 'mr', name: 'मराठी', flagCode: 'in', englishName: 'Marathi', ruGenitive: 'маратхи', ruAccusative: 'маратхи' },
+  { code: 'pl', name: 'Polski', flagCode: 'pl', englishName: 'Polish', ruGenitive: 'польский', ruAccusative: 'польский' },
+  { code: 'pt', name: 'Português', flagCode: 'br', englishName: 'Portuguese', ruGenitive: 'португальский', ruAccusative: 'португальский' },
+  { code: 'pa', name: 'ਪੰਜਾਬੀ', flagCode: 'in', englishName: 'Punjabi', ruGenitive: 'панджаби', ruAccusative: 'панджаби' },
+  { code: 'ro', name: 'Română', flagCode: 'ro', englishName: 'Romanian', ruGenitive: 'румынский', ruAccusative: 'румынский' },
+  { code: 'es', name: 'Español', flagCode: 'es', englishName: 'Spanish', ruGenitive: 'испанский', ruAccusative: 'испанский' },
+  { code: 'sv', name: 'Svenska', flagCode: 'se', englishName: 'Swedish', ruGenitive: 'шведский', ruAccusative: 'шведский' },
+  { code: 'tl', name: 'Tagalog', flagCode: 'ph', englishName: 'Tagalog', ruGenitive: 'тагальский', ruAccusative: 'тагальский' },
+  { code: 'ta', name: 'தமிழ்', flagCode: 'in', englishName: 'Tamil', ruGenitive: 'тамильский', ruAccusative: 'тамильский' },
+  { code: 'te', name: 'తెలుగు', flagCode: 'in', englishName: 'Telugu', ruGenitive: 'телугу', ruAccusative: 'телугу' },
+  { code: 'th', name: 'ไทย', flagCode: 'th', englishName: 'Thai', ruGenitive: 'тайский', ruAccusative: 'тайский' },
+  { code: 'tr', name: 'Türkçe', flagCode: 'tr', englishName: 'Turkish', ruGenitive: 'турецкий', ruAccusative: 'турецкий' },
+  { code: 'ur', name: 'اردو', flagCode: 'pk', englishName: 'Urdu', ruGenitive: 'урду', ruAccusative: 'урду' },
+  { code: 'vi', name: 'Tiếng Việt', flagCode: 'vn', englishName: 'Vietnamese', ruGenitive: 'вьетнамский', ruAccusative: 'вьетнамский' },
 ];
 
+export const SPEAKER_LANGUAGES = SPEAKER_LANGUAGES_31;
+
+export interface NonLanguageCourse {
+  id: string;
+  name: string;
+  localNameRu: string;
+  localNameEn: string;
+  descriptionRu: string;
+  descriptionEn: string;
+  icon: string;
+  symbol: string;
+  themeColor: string;
+  themeBorder: string;
+  mascotVariant: 'math' | 'music' | 'chess' | 'default';
+  learners: string;
+  tagRu: string;
+  tagEn: string;
+}
+
+export const NON_LANGUAGE_COURSES: NonLanguageCourse[] = [
+  {
+    id: 'coding',
+    name: 'Programming',
+    localNameRu: 'Программирование',
+    localNameEn: 'Programming',
+    descriptionRu: 'Lua, Swift (iOS/macOS), Kotlin/Java/C++, этапы разработки и сборка APK',
+    descriptionEn: 'Lua, Swift (iOS/macOS), Kotlin/Java/C++, app lifecycle & APK builds',
+    icon: '💻',
+    symbol: '</>',
+    themeColor: 'bg-indigo-600',
+    themeBorder: 'border-indigo-800',
+    mascotVariant: 'default',
+    learners: '5.2M',
+    tagRu: 'Не язык',
+    tagEn: 'Not a language'
+  },
+  {
+    id: 'math',
+    name: 'Mathematics',
+    localNameRu: 'Математика',
+    localNameEn: 'Math',
+    descriptionRu: 'Курс не является языком • Точные науки',
+    descriptionEn: 'Not a language course • Exact sciences & logic',
+    icon: '📐',
+    symbol: 'Σ',
+    themeColor: 'bg-duo-blue',
+    themeBorder: 'border-duo-blueDark',
+    mascotVariant: 'math',
+    learners: '12M',
+    tagRu: 'Не язык',
+    tagEn: 'Not a language'
+  },
+  {
+    id: 'music',
+    name: 'Music',
+    localNameRu: 'Музыка',
+    localNameEn: 'Music',
+    descriptionRu: 'Курс не является языком • Ноты и ритм',
+    descriptionEn: 'Not a language course • Notes, rhythm & ear',
+    icon: '🎵',
+    symbol: '♫',
+    themeColor: 'bg-pink-600',
+    themeBorder: 'border-pink-800',
+    mascotVariant: 'music',
+    learners: '9.4M',
+    tagRu: 'Не язык',
+    tagEn: 'Not a language'
+  },
+  {
+    id: 'chess',
+    name: 'Chess',
+    localNameRu: 'Шахматы',
+    localNameEn: 'Chess',
+    descriptionRu: 'Курс не является языком • Навык/Игра',
+    descriptionEn: 'Not a language course • Skill, strategy & game',
+    icon: '♟️',
+    symbol: '♔',
+    themeColor: 'bg-slate-700',
+    themeBorder: 'border-slate-900',
+    mascotVariant: 'chess',
+    learners: '6.1M',
+    tagRu: 'Не язык',
+    tagEn: 'Not a language'
+  },
+  {
+    id: 'art',
+    name: 'Art & Calligraphy',
+    localNameRu: 'Рисование и Каллиграфия',
+    localNameEn: 'Art & Drawing',
+    descriptionRu: 'Курс не является языком • Творчество',
+    descriptionEn: 'Not a language course • Creativity & drawing skills',
+    icon: '🎨',
+    symbol: '🎨',
+    themeColor: 'bg-amber-600',
+    themeBorder: 'border-amber-800',
+    mascotVariant: 'default',
+    learners: '3.5M',
+    tagRu: 'Не язык',
+    tagEn: 'Not a language'
+  }
+];
+
+export const PROGRAMMING_COURSE_ITEM = {
+  id: 'coding',
+  name: 'Programming',
+  localNameRu: 'Программирование',
+  localNameEn: 'Programming',
+  descriptionRu: 'Lua, Swift (iOS/macOS), Kotlin/Java/C++, этапы разработки и сборка APK',
+  descriptionEn: 'Lua, Swift (iOS/macOS), Kotlin/Java/C++, app lifecycle & APK builds',
+  icon: '💻',
+  symbol: '</>',
+  themeColor: 'bg-indigo-600',
+  themeBorder: 'border-indigo-800',
+  mascotVariant: 'default' as const,
+  learners: '5.2M',
+  tagRu: 'Не язык',
+  tagEn: 'Not a language'
+};
+
+
 export const LANGUAGE_TRANSLATIONS: Record<string, Record<string, string>> = {
-  'English': { ru: 'Английский', en: 'English', de: 'Englisch', fr: 'Anglais', es: 'Inglés', ja: '英語', zh: '英语', ar: 'الإنجليزية' },
-  'Spanish': { ru: 'Испанский', en: 'Spanish', de: 'Spanisch', fr: 'Espagnol', es: 'Español', ja: 'スペイン語', zh: '西班牙语', ar: 'الإسبانية' },
-  'French': { ru: 'Французский', en: 'French', de: 'Französisch', fr: 'Français', es: 'Francés', ja: 'フランス語', zh: '法语', ar: 'الفرنسية' },
-  'German': { ru: 'Немецкий', en: 'German', de: 'Deutsch', fr: 'Allemand', es: 'Alemán', ja: 'ドイツ語', zh: '德语', ar: 'الألمانية' },
-  'Japanese': { ru: 'Японский', en: 'Japanese', de: 'Japanisch', fr: 'Japonais', es: 'Japonés', ja: '日本語', zh: '日语', ar: 'اليابانية' },
-  'Italian': { ru: 'Итальянский', en: 'Italian', de: 'Italienisch', fr: 'Italien', es: 'Italiano', ja: 'イタリア語', zh: '意大利语', ar: 'الإيطالية' },
-  'Korean': { ru: 'Корейский', en: 'Korean', de: 'Koreanisch', fr: 'Coréen', es: 'Coreano', ja: '韓国語', zh: '韩语', ar: 'الكورية' },
-  'Chinese (Simplified)': { ru: 'Китайский (упрощённый)', en: 'Chinese (Simplified)', de: 'Chinesisch (Vereinfacht)', fr: 'Chinois (simplifié)', es: 'Chino (simplificado)', ja: '中国語（簡体字）', zh: '中文（简体）', ar: 'الصينية (المبسطة)' },
-  'Chinese (Cantonese)': { ru: 'Кантонский', en: 'Chinese (Cantonese)', de: 'Kantonesisch', fr: 'Cantonais', es: 'Cantonés', ja: '広東語', zh: '粤语', ar: 'الكانتونية' },
-  'Russian': { ru: 'Русский', en: 'Russian', de: 'Russisch', fr: 'Russe', es: 'Ruso', ja: 'ロシア語', zh: '俄语', ar: 'الروسية' },
-  'Arabic': { ru: 'Арабский', en: 'Arabic', de: 'Arabisch', fr: 'Arabe', es: 'Árabe', ja: 'アラビア語', zh: '阿拉伯语', ar: 'العربية' },
-  'Portuguese': { ru: 'Португальский', en: 'Portuguese', de: 'Portugiesisch', fr: 'Portugais', es: 'Portugués', ja: 'ポルトガル語', zh: '葡萄牙语', ar: 'البرتغالية' },
-  'Turkish': { ru: 'Турецкий', en: 'Turkish', de: 'Türkisch', fr: 'Turc', es: 'Turco', ja: 'トルコ語', zh: '土耳其语', ar: 'التركية' },
-  'Hindi': { ru: 'Хинди', en: 'Hindi', de: 'Hindi', fr: 'Hindi', es: 'Hindi', ja: 'ヒンディー語', zh: '印地语', ar: 'الهندية' },
-  'Indonesian': { ru: 'Индонезийский', en: 'Indonesian', de: 'Indonesisch', fr: 'Indonésien', es: 'Indonesio', ja: 'インドネシア語', zh: '印尼语', ar: 'الإندونيسية' },
-  'Vietnamese': { ru: 'Вьетнамский', en: 'Vietnamese', de: 'Vietnamesisch', fr: 'Vietnamien', es: 'Vietnamita', ja: 'ベトナム語', zh: '越南语', ar: 'الفيتنامية' },
-  'Polish': { ru: 'Польский', en: 'Polish', de: 'Polnisch', fr: 'Polonais', es: 'Polaco', ja: 'ポーランド語', zh: '波兰语', ar: 'البولندية' },
-  'Bengali': { ru: 'Бенгальский', en: 'Bengali', de: 'Bengalisch', fr: 'Bengali', es: 'Bengalí', ja: 'ベンガル語', zh: '孟加拉语', ar: 'البنغالية' },
-  'Thai': { ru: 'Тайский', en: 'Thai', de: 'Thailändisch', fr: 'Thaï', es: 'Tailandés', ja: 'タイ語', zh: '泰语', ar: 'التايلاندية' },
+  'English': { ru: 'Английский', en: 'English', de: 'Englisch', fr: 'Anglais', es: 'Inglés', ja: '英語', zh: '英语', ar: 'الإنجليزية', uk: 'Англійська' },
+  'Spanish': { ru: 'Испанский', en: 'Spanish', de: 'Spanisch', fr: 'Espagnol', es: 'Español', ja: 'スペイン語', zh: '西班牙语', ar: 'الإسبانية', uk: 'Іспанська' },
+  'French': { ru: 'Французский', en: 'French', de: 'Französisch', fr: 'Français', es: 'Francés', ja: 'フランス語', zh: '法语', ar: 'الفرنسية', uk: 'Французька' },
+  'German': { ru: 'Немецкий', en: 'German', de: 'Deutsch', fr: 'Allemand', es: 'Alemán', ja: 'ドイツ語', zh: '德语', ar: 'الألمانية', uk: 'Німецька' },
+  'Japanese': { ru: 'Японский', en: 'Japanese', de: 'Japanisch', fr: 'Japonais', es: 'Japonés', ja: '日本語', zh: '日语', ar: 'اليابانية', uk: 'Японська' },
+  'Italian': { ru: 'Итальянский', en: 'Italian', de: 'Italienisch', fr: 'Italien', es: 'Italiano', ja: 'イタリア語', zh: '意大利语', ar: 'الإيطالية', uk: 'Італійська' },
+  'Korean': { ru: 'Корейский', en: 'Korean', de: 'Koreanisch', fr: 'Coréen', es: 'Coreano', ja: '韓国語', zh: '韩语', ar: 'الكورية', uk: 'Корейська' },
+  'Chinese (Simplified)': { ru: 'Китайский (упрощённый)', en: 'Chinese (Simplified)', de: 'Chinesisch (Vereinfacht)', fr: 'Chinois (simplifié)', es: 'Chino (simplificado)', ja: '中国語（簡体字）', zh: '中文（简体）', ar: 'الصينية (المبسطة)', uk: 'Китайська' },
+  'Chinese (Cantonese)': { ru: 'Кантонский', en: 'Chinese (Cantonese)', de: 'Kantonesisch', fr: 'Cantonais', es: 'Cantonés', ja: '広東語', zh: '粤语', ar: 'الكانتونية', uk: 'Кантонська' },
+  'Russian': { ru: 'Русский', en: 'Russian', de: 'Russisch', fr: 'Russe', es: 'Ruso', ja: 'ロシア語', zh: '俄语', ar: 'الروسية', uk: 'Російська' },
+  'Ukrainian': { ru: 'Украинский', en: 'Ukrainian', de: 'Ukrainisch', fr: 'Ukrainien', es: 'Ucraniano', ja: 'ウクライナ語', zh: '乌克兰语', ar: 'الأوكرانية', uk: 'Українська' },
+  'Arabic': { ru: 'Арабский', en: 'Arabic', de: 'Arabisch', fr: 'Arabe', es: 'Árabe', ja: 'アラビア語', zh: '阿拉伯语', ar: 'العربية', uk: 'Арабська' },
+  'Portuguese': { ru: 'Португальский', en: 'Portuguese', de: 'Portugiesisch', fr: 'Portugais', es: 'Portugués', ja: 'ポルトガル語', zh: '葡萄牙语', ar: 'البرتغالية', uk: 'Португальська' },
+  'Turkish': { ru: 'Турецкий', en: 'Turkish', de: 'Türkisch', fr: 'Turc', es: 'Turco', ja: 'トルコ語', zh: '土耳其语', ar: 'التركية', uk: 'Турецька' },
+  'Hindi': { ru: 'Хинди', en: 'Hindi', de: 'Hindi', fr: 'Hindi', es: 'Hindi', ja: 'ヒンディー語', zh: '印地语', ar: 'الهندية', uk: 'Хінді' },
+  'Indonesian': { ru: 'Индонезийский', en: 'Indonesian', de: 'Indonesisch', fr: 'Indonésien', es: 'Indonesio', ja: 'インドネシア語', zh: '印尼语', ar: 'الإندونيسية', uk: 'Індонезійська' },
+  'Vietnamese': { ru: 'Вьетнамский', en: 'Vietnamese', de: 'Vietnamesisch', fr: 'Vietnamien', es: 'Vietnamita', ja: 'ベトナム語', zh: '越南语', ar: 'الفيتنامية', uk: 'Вʼєтнамська' },
+  'Polish': { ru: 'Польский', en: 'Polish', de: 'Polnisch', fr: 'Polonais', es: 'Polaco', ja: 'ポーランド語', zh: '波兰语', ar: 'البولندية', uk: 'Польська' },
+  'Bengali': { ru: 'Бенгальский', en: 'Bengali', de: 'Bengalisch', fr: 'Bengali', es: 'Bengalí', ja: 'ベンガル語', zh: '孟加拉语', ar: 'البنغالية', uk: 'Бенгальська' },
+  'Thai': { ru: 'Тайский', en: 'Thai', de: 'Thailändisch', fr: 'Thaï', es: 'Tailandés', ja: 'タイ語', zh: '泰语', ar: 'التايلاندية', uk: 'Тайська' },
+  'Czech': { ru: 'Чешский', en: 'Czech', de: 'Tschechisch', fr: 'Tchèque', es: 'Checo', ja: 'チェコ語', zh: '捷克语', ar: 'التشيكية', uk: 'Чеська' },
+  'Dutch': { ru: 'Нидерландский', en: 'Dutch', de: 'Niederländisch', fr: 'Néerlandais', es: 'Neerlandés', ja: 'オランダ語', zh: '荷兰语', ar: 'الهولندية', uk: 'Нідерландська' },
+  'Greek': { ru: 'Греческий', en: 'Greek', de: 'Griechisch', fr: 'Grec', es: 'Griego', ja: 'ギリシャ語', zh: '希腊语', ar: 'اليونانية', uk: 'Грецька' },
+  'Hungarian': { ru: 'Венгерский', en: 'Hungarian', de: 'Ungarisch', fr: 'Hongrois', es: 'Húngaro', ja: 'ハンガリー語', zh: '匈牙利语', ar: 'المجرية', uk: 'Угорська' },
+  'Kannada': { ru: 'Каннада', en: 'Kannada', de: 'Kannada', fr: 'Kannada', es: 'Canarés', ja: 'カンナダ語', zh: '卡纳达语', ar: 'الكنادية', uk: 'Каннада' },
+  'Marathi': { ru: 'Маратхи', en: 'Marathi', de: 'Marathi', fr: 'Marathi', es: 'Maratí', ja: 'マラーティー語', zh: '马拉地语', ar: 'الماراثية', uk: 'Маратхі' },
+  'Punjabi': { ru: 'Панджаби', en: 'Punjabi', de: 'Panjabi', fr: 'Pendjabi', es: 'Panyabí', ja: 'パンジャブ語', zh: '旁遮普语', ar: 'البنجابية', uk: 'Пенджабська' },
+  'Romanian': { ru: 'Румынский', en: 'Romanian', de: 'Rumänisch', fr: 'Roumain', es: 'Rumano', ja: 'ルーマニア語', zh: '罗马尼亚语', ar: 'الرومانية', uk: 'Румунська' },
+  'Swedish': { ru: 'Шведский', en: 'Swedish', de: 'Schwedisch', fr: 'Suédois', es: 'Sueco', ja: 'スウェーデン語', zh: '瑞典语', ar: 'السويدية', uk: 'Шведська' },
+  'Tagalog': { ru: 'Тагальский', en: 'Tagalog', de: 'Tagalog', fr: 'Tagalog', es: 'Tagalo', ja: 'タガログ語', zh: '他加禄语', ar: 'التاغالوغية', uk: 'Тагальська' },
+  'Tamil': { ru: 'Тамильский', en: 'Tamil', de: 'Tamil', fr: 'Tamoul', es: 'Tamil', ja: 'タミル語', zh: '泰米尔语', ar: 'التاميلية', uk: 'Тамільська' },
+  'Telugu': { ru: 'Телугу', en: 'Telugu', de: 'Telugu', fr: 'Télougou', es: 'Telugu', ja: 'テルグ語', zh: '泰卢固语', ar: 'التيلوغوية', uk: 'Телугу' },
+  'Urdu': { ru: 'Урду', en: 'Urdu', de: 'Urdu', fr: 'Ourdou', es: 'Urdu', ja: 'ウルドゥー語', zh: '乌尔都语', ar: 'الأردية', uk: 'Урду' },
   'High Valyrian': { ru: 'Высокий валирийский', en: 'High Valyrian', de: 'Hoch-Valyrisch', fr: 'Haut valyrien', es: 'Alto valyrio', ja: '高ヴァリリア語', zh: '高瓦雷利亚语', ar: 'الفاليرية العليا' },
   'Klingon': { ru: 'Клингонский', en: 'Klingon', de: 'Klingonisch', fr: 'Klingon', es: 'Klingon', ja: 'クリンゴン語', zh: '克林贡语', ar: 'الكلينغونية' },
   'Yiddish': { ru: 'Идиш', en: 'Yiddish', de: 'Jiddisch', fr: 'Yiddish', es: 'Yidis', ja: 'イディッシュ語', zh: '意第绪语', ar: 'اليديشية' }
@@ -589,11 +738,118 @@ export function getLocalizedCatalogTitle(item: DuoWindo6601CatalogItem, targetLa
   if (targetLang === 'ar') {
     return `${learning} (للناطقين ب${from})`;
   }
+  if (targetLang === 'uk') {
+    return `${learning} (з ${from.toLowerCase()})`;
+  }
   return `${learning} from ${from}`;
 }
 
+// Fallback high-quality course blueprints for languages where official Duolingo catalog has sparse entries
+const GENERATED_SPEAKER_COURSES: Record<string, { learningLang: string; learningName: string; flag: string; learners: number }[]> = {
+  uk: [
+    { learningLang: 'en', learningName: 'English', flag: 'us', learners: 8420000 },
+    { learningLang: 'es', learningName: 'Spanish', flag: 'es', learners: 2150000 },
+    { learningLang: 'de', learningName: 'German', flag: 'de', learners: 3410000 },
+    { learningLang: 'fr', learningName: 'French', flag: 'fr', learners: 1850000 },
+    { learningLang: 'pl', learningName: 'Polish', flag: 'pl', learners: 4950000 },
+    { learningLang: 'it', learningName: 'Italian', flag: 'it', learners: 920000 },
+  ],
+  cs: [
+    { learningLang: 'en', learningName: 'English', flag: 'us', learners: 4120000 },
+    { learningLang: 'de', learningName: 'German', flag: 'de', learners: 1850000 },
+    { learningLang: 'es', learningName: 'Spanish', flag: 'es', learners: 890000 },
+    { learningLang: 'fr', learningName: 'French', flag: 'fr', learners: 620000 },
+  ],
+  nl: [
+    { learningLang: 'en', learningName: 'English', flag: 'us', learners: 6180000 },
+    { learningLang: 'fr', learningName: 'French', flag: 'fr', learners: 2950000 },
+    { learningLang: 'es', learningName: 'Spanish', flag: 'es', learners: 2430000 },
+    { learningLang: 'de', learningName: 'German', flag: 'de', learners: 3120000 },
+    { learningLang: 'it', learningName: 'Italian', flag: 'it', learners: 980000 },
+  ],
+  el: [
+    { learningLang: 'en', learningName: 'English', flag: 'us', learners: 3850000 },
+    { learningLang: 'fr', learningName: 'French', flag: 'fr', learners: 950000 },
+    { learningLang: 'de', learningName: 'German', flag: 'de', learners: 1100000 },
+    { learningLang: 'es', learningName: 'Spanish', flag: 'es', learners: 760000 },
+  ],
+  hu: [
+    { learningLang: 'en', learningName: 'English', flag: 'us', learners: 4890000 },
+    { learningLang: 'de', learningName: 'German', flag: 'de', learners: 2410000 },
+    { learningLang: 'es', learningName: 'Spanish', flag: 'es', learners: 810000 },
+    { learningLang: 'fr', learningName: 'French', flag: 'fr', learners: 540000 },
+  ],
+  kn: [
+    { learningLang: 'en', learningName: 'English', flag: 'us', learners: 5120000 },
+    { learningLang: 'hi', learningName: 'Hindi', flag: 'in', learners: 3200000 },
+  ],
+  mr: [
+    { learningLang: 'en', learningName: 'English', flag: 'us', learners: 7240000 },
+    { learningLang: 'hi', learningName: 'Hindi', flag: 'in', learners: 4100000 },
+  ],
+  pa: [
+    { learningLang: 'en', learningName: 'English', flag: 'us', learners: 5930000 },
+    { learningLang: 'hi', learningName: 'Hindi', flag: 'in', learners: 2850000 },
+  ],
+  ro: [
+    { learningLang: 'en', learningName: 'English', flag: 'us', learners: 5320000 },
+    { learningLang: 'fr', learningName: 'French', flag: 'fr', learners: 1640000 },
+    { learningLang: 'de', learningName: 'German', flag: 'de', learners: 1410000 },
+    { learningLang: 'es', learningName: 'Spanish', flag: 'es', learners: 1290000 },
+    { learningLang: 'it', learningName: 'Italian', flag: 'it', learners: 1150000 },
+  ],
+  sv: [
+    { learningLang: 'en', learningName: 'English', flag: 'us', learners: 4950000 },
+    { learningLang: 'es', learningName: 'Spanish', flag: 'es', learners: 2420000 },
+    { learningLang: 'fr', learningName: 'French', flag: 'fr', learners: 1780000 },
+    { learningLang: 'de', learningName: 'German', flag: 'de', learners: 2150000 },
+    { learningLang: 'it', learningName: 'Italian', flag: 'it', learners: 890000 },
+  ],
+  tl: [
+    { learningLang: 'en', learningName: 'English', flag: 'us', learners: 9840000 },
+    { learningLang: 'es', learningName: 'Spanish', flag: 'es', learners: 2130000 },
+    { learningLang: 'ja', learningName: 'Japanese', flag: 'jp', learners: 1980000 },
+    { learningLang: 'ko', learningName: 'Korean', flag: 'kr', learners: 1750000 },
+  ],
+  ta: [
+    { learningLang: 'en', learningName: 'English', flag: 'us', learners: 8640000 },
+    { learningLang: 'hi', learningName: 'Hindi', flag: 'in', learners: 3410000 },
+  ],
+  te: [
+    { learningLang: 'en', learningName: 'English', flag: 'us', learners: 7120000 },
+    { learningLang: 'hi', learningName: 'Hindi', flag: 'in', learners: 2950000 },
+  ],
+  ur: [
+    { learningLang: 'en', learningName: 'English', flag: 'us', learners: 8910000 },
+    { learningLang: 'ar', learningName: 'Arabic', flag: 'sa', learners: 4230000 },
+    { learningLang: 'tr', learningName: 'Turkish', flag: 'tr', learners: 1650000 },
+  ],
+};
+
 export function getCoursesForSpeaker(fromLangCode: string): DuoWindo6601CatalogItem[] {
   const code = fromLangCode === 'zh' ? 'zs' : fromLangCode;
-  return DUOWINDO6601_OFFICIAL_CATALOG.filter(item => item.fromLanguage === code);
+  const official = DUOWINDO6601_OFFICIAL_CATALOG.filter(item => item.fromLanguage === code || item.fromLanguage === fromLangCode);
+  if (official.length > 0) return official;
+
+  const sp = SPEAKER_LANGUAGES_31.find(s => s.code === fromLangCode || (fromLangCode === 'zs' && s.code === 'zh'));
+  const fallbackList = GENERATED_SPEAKER_COURSES[fromLangCode] || [
+    { learningLang: 'en', learningName: 'English', flag: 'us', learners: 5200000 },
+    { learningLang: 'es', learningName: 'Spanish', flag: 'es', learners: 2100000 },
+    { learningLang: 'fr', learningName: 'French', flag: 'fr', learners: 1500000 },
+    { learningLang: 'de', learningName: 'German', flag: 'de', learners: 1350000 },
+  ];
+
+  const speakerName = sp?.englishName || fromLangCode;
+  return fallbackList.map((f, idx) => ({
+    itemId: `gen-${fromLangCode}-${f.learningLang}-${idx}`,
+    title: `${f.learningName} from ${speakerName}`,
+    learningLanguage: f.learningLang,
+    fromLanguage: fromLangCode,
+    learningLanguageName: f.learningName,
+    fromLanguageName: speakerName,
+    numLearners: f.learners,
+    flagCode: f.flag
+  }));
 }
+
 

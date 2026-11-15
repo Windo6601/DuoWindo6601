@@ -1,12 +1,10 @@
 import path from 'path';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, '.', '');
-    const geminiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || env.GEMINI_API_KEY || env.API_KEY || '';
+export default defineConfig(() => {
     return {
       server: {
         port: 3000,
@@ -139,17 +137,21 @@ export default defineConfig(({ mode }) => {
                     return;
                   }
 
-                  const fishApiKey = process.env.FISH_AUDIO_API_KEY || 'sk-fish-4AQDQGlpw6stJiyg5JTTJabhtkgPpmwBTu_Gveo7DMI';
+                  const envFishKey = (process.env.FISH_AUDIO_API_KEY || '').trim();
+                  const fishApiKey = (envFishKey && envFishKey.startsWith('sk-fish-'))
+                    ? envFishKey
+                    : 'sk-fish-gG4zvIytNwA_ZIITYYfyVi_-W1BJHbizUFxduVOmJGE';
                   const fishRes = await fetch('https://api.fish.audio/v1/tts', {
                     method: 'POST',
                     headers: {
                       'Authorization': `Bearer ${fishApiKey}`,
                       'Content-Type': 'application/json',
-                      'model': 's2.1-pro-free'
+                      'model': parsed.model || 's2.1-pro-free'
                     },
                     body: JSON.stringify({
                       text,
-                      format: parsed.format || 'mp3'
+                      format: parsed.format || 'mp3',
+                      model: parsed.model || 's2.1-pro-free'
                     })
                   });
 
@@ -182,10 +184,6 @@ export default defineConfig(({ mode }) => {
       },
       optimizeDeps: {
         entries: ['index.html'],
-      },
-      define: {
-        'process.env.API_KEY': JSON.stringify(geminiKey),
-        'process.env.GEMINI_API_KEY': JSON.stringify(geminiKey)
       },
       resolve: {
         alias: {

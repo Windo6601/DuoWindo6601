@@ -17,7 +17,7 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="alternate icon" type="image/png" href="/favicon.png" />
-    <link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@400;600;700;800;900&family=Almarai:wght@400;700;800&family=Amiri:ital,wght@0,400;0,700;1,400;1,700&family=Cairo:wght@400;600;700;800;900&family=Lexend:wght@400;500;600;700;800;900&family=M+PLUS+Rounded+1c:wght@400;500;700;800;900&family=Ma+Shan+Zheng&family=Montserrat:wght@400;500;600;700;800;900&family=Noto+Sans+Arabic:wght@400;600;700;800;900&family=Noto+Sans+Hebrew:wght@400;600;700;800&family=Noto+Sans+JP:wght@400;500;700;900&family=Noto+Sans+SC:wght@400;500;700;900&family=Noto+Serif+SC:wght@400;700&family=Nunito:wght@400;600;700;800&family=Rubik:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&family=ZCOOL+KuaiLe&family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@100;200;300;400;500;600;700;800;900&family=Almarai:wght@400;700;800&family=Amiri:ital,wght@0,400;0,700;1,400;1,700&family=Cairo:wght@400;600;700;800;900&family=Lexend:wght@400;500;600;700;800;900&family=M+PLUS+Rounded+1c:wght@400;500;700;800;900&family=Ma+Shan+Zheng&family=Montserrat:wght@400;500;600;700;800;900&family=Noto+Sans+Arabic:wght@400;600;700;800;900&family=Noto+Sans+Hebrew:wght@400;600;700;800&family=Noto+Sans+JP:wght@400;500;700;900&family=Noto+Sans+SC:wght@400;500;700;900&family=Noto+Serif+SC:wght@400;700&family=Nunito:wght@400;600;700;800&family=Rubik:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&family=ZCOOL+KuaiLe&family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap" rel="stylesheet">
     <!-- International & Script Fonts: Korean, Hindi, Bengali, Thai, Portuguese, Italian, Turkish, Polish, Indonesian -->
     <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Hind+Siliguri:wght@400;600;700&family=Kanit:wght@400;600;700;800&family=Noto+Sans+Bengali:wght@400;600;700;900&family=Noto+Sans+Devanagari:wght@400;600;700;900&family=Noto+Sans+KR:wght@400;500;700;900&family=Noto+Sans+Thai:wght@400;600;700;900&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -33,6 +33,55 @@
         font-family: 'DIN Next Rounded';
         src: url('https://db.onlinewebfonts.com/t/20e8b15d2a6a12c44431e77e2017367c.woff2') format('woff2');
         font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+      }
+      /* Alexandria Font-Family V 5.013 (by Mai El Guebara - github.com/Gue3bara/Alexandria) */
+      @font-face {
+        font-family: 'Alexandria';
+        src: url('/fonts/alexandria/Alexandria-Regular.woff2') format('woff2'),
+             local('Alexandria Regular'), local('Alexandria-Regular');
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Alexandria';
+        src: url('/fonts/alexandria/Alexandria-Medium.woff2') format('woff2'),
+             local('Alexandria Medium'), local('Alexandria-Medium');
+        font-weight: 500;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Alexandria';
+        src: url('/fonts/alexandria/Alexandria-SemiBold.woff2') format('woff2'),
+             local('Alexandria SemiBold'), local('Alexandria-SemiBold');
+        font-weight: 600;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Alexandria';
+        src: url('/fonts/alexandria/Alexandria-Bold.woff2') format('woff2'),
+             local('Alexandria Bold'), local('Alexandria-Bold');
+        font-weight: 700;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Alexandria';
+        src: url('/fonts/alexandria/Alexandria-ExtraBold.woff2') format('woff2'),
+             local('Alexandria ExtraBold'), local('Alexandria-ExtraBold');
+        font-weight: 800;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Alexandria';
+        src: url('/fonts/alexandria/Alexandria-Black.woff2') format('woff2'),
+             local('Alexandria Black'), local('Alexandria-Black');
+        font-weight: 900;
         font-style: normal;
         font-display: swap;
       }
@@ -119,11 +168,12 @@
       [data-arabic-font="alexandria"] .lang-ar,
       [data-arabic-font="alexandria"] [data-course-script="arabic"],
       .font-arabic-alexandria {
-        font-family: 'Alexandria', 'Montserrat', sans-serif !important;
+        font-family: 'Alexandria', 'Cairo', 'Noto Sans Arabic', sans-serif !important;
+        letter-spacing: normal;
       }
-      [data-arabic-font="alexandria"] h1, [data-arabic-font="alexandria"] .text-h1 { font-size: 28px !important; font-weight: 400 !important; }
-      [data-arabic-font="alexandria"] h2, [data-arabic-font="alexandria"] .text-h2 { font-size: 22px !important; font-weight: 400 !important; }
-      [data-arabic-font="alexandria"] h3, [data-arabic-font="alexandria"] .text-h3 { font-size: 18px !important; font-weight: 400 !important; }
+      .font-family-alexandria {
+        font-family: 'Alexandria', 'Cairo', sans-serif !important;
+      }
       .font-hebrew {
         font-family: 'Rubik', 'Noto Sans Hebrew', sans-serif !important;
       }
@@ -294,6 +344,10 @@
     </style>
 
 <link rel="stylesheet" href="/index.css">
+    <!-- Google reCAPTCHA API -->
+    <script src="https://www.google.com/recaptcha/api.js?render=explicit" async defer></script>
+    <!-- Stripe Buy Button Script -->
+    <script async src="https://js.stripe.com/v3/buy-button.js"></script>
 </head>
   <body>
     <noscript>
