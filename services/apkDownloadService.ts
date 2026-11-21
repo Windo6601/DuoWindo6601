@@ -8,6 +8,8 @@
  * - "Не удалось обработать пакет" (Parse Error / bad manifest)
  */
 
+import { resolveApiUrl } from './nativeBridge';
+
 export interface ApkMetadata {
   filename: string;
   packageName: string;
@@ -117,7 +119,7 @@ export const APK_TROUBLESHOOTING_STEPS: ApkTroubleshootingStep[] = [
  */
 export function downloadDebugApk(filename: string = 'app-debug.apk'): ApkMetadata {
   const builtAt = new Date().toLocaleString();
-  const directUrl = '/api/download-apk';
+  const directUrl = resolveApiUrl('/api/download-apk');
 
   const a = document.createElement('a');
   a.href = directUrl;
@@ -129,11 +131,11 @@ export function downloadDebugApk(filename: string = 'app-debug.apk'): ApkMetadat
 
   return {
     filename,
-    packageName: 'com.duowindo.app',
+    packageName: 'com.duowindo6601.app',
     versionName: '1.0.4',
     versionCode: 104,
-    minSdkVersion: 21,
-    targetSdkVersion: 34,
+    minSdkVersion: 24,
+    targetSdkVersion: 36,
     buildType: 'debug',
     builtAt,
     fileSizeBytes: 8616,

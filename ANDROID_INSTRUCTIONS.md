@@ -16,9 +16,9 @@
 ---
 
 ## 🛠️ Системные требования
-1. **Node.js** (версии 18 или новее)
-2. **Android Studio** (с установленным Android SDK и виртуальным устройством/эмулятором)
-3. Установленный **Java Development Kit (JDK)** 17 (требуется для сборки Android проектов)
+1. **Node.js** (версии 22 или новее)
+2. **Android Studio** (с установленным Android SDK API 35 и виртуальным устройством/эмулятором)
+3. Установленный **Java Development Kit (JDK)** 17 или 21 (совместимо с GitHub Actions JDK 17 и Android Gradle Plugin 8.7)
 
 ---
 

@@ -3,6 +3,18 @@
 	"appName": "DuoWindo6601",
 	"webDir": "dist",
 	"server": {
-		"androidScheme": "https"
+		"androidScheme": "https",
+		"cleartext": true,
+		"allowNavigation": [
+			"*.run.app",
+			"*.ai.studio",
+			"aistudio.google.com",
+			"generativelanguage.googleapis.com"
+		]
+	},
+	"android": {
+		"allowMixedContent": true,
+		"captureInput": true,
+		"webContentsDebuggingEnabled": true
 	}
 }

@@ -1,6 +1,8 @@
 
+import { GoogleGenAI } from "@google/genai";
 import { Exercise, AdventureScenario, RoleplayMessage } from "../types";
 import { playKlingonSpeech } from "./klingonSpeechService";
+import { resolveApiUrl, resolveWsUrl } from "./nativeBridge";
 import { 
   getTodayAiUsage, 
   recordAiUsage, 
@@ -79,7 +81,72 @@ const sanitizeKey = (k: string): string => {
   return k.replace(/\s+/g, '');
 };
 
-export const DEFAULT_FALLBACK_GEMINI_KEY = '';
+export const DEFAULT_FALLBACK_GEMINI_KEY = (
+  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_GEMINI_API_KEY) ||
+  'AQ.Ab8RN6IQIn-mUHgR1BxMRDNo1Ylta9NTdBqZQ2dzG1VBmbxdbg'
+).trim();
+
+const DIRECT_MODEL_FALLBACKS: Record<string, string[]> = {
+  'gemini-4-hydrogen': ['gemini-2.5-flash', 'gemini-2.0-flash'],
+  'gemini-4-argon': ['gemini-2.5-pro', 'gemini-2.5-flash'],
+  'gemini-3.1-flash-lite': ['gemini-2.5-flash', 'gemini-2.0-flash'],
+  'gemini-3.8-flash-lite-tts': ['gemini-2.5-flash-preview-tts'],
+};
+
+function getDirectSdkModelChain(requestedModel?: string): string[] {
+  const clean = (requestedModel || MODEL_FREE).trim();
+  const mapped = DIRECT_MODEL_FALLBACKS[clean] || [];
+  return Array.from(new Set([clean, ...mapped, 'gemini-2.5-flash', 'gemini-2.0-flash'].filter(Boolean)));
+}
+
+async function callDirectGeminiFallback(params: {
+  model?: string;
+  contents?: any;
+  prompt?: string;
+  config?: any;
+  systemInstruction?: string;
+  apiKey: string;
+}): Promise<ServerGeminiResponse> {
+  const ai = new GoogleGenAI({ apiKey: params.apiKey });
+  const effectiveContents = params.contents || (params.prompt ? String(params.prompt) : '');
+  const models = getDirectSdkModelChain(params.model);
+  let lastErr: any = null;
+
+  for (const candidateModel of models) {
+    try {
+      const cfg: any = { ...(params.config || {}) };
+      if (params.systemInstruction) {
+        cfg.systemInstruction = params.systemInstruction;
+      }
+      if (!candidateModel.startsWith('gemini-4') && cfg.thinkingConfig && 'thinkingLevel' in cfg.thinkingConfig) {
+        delete cfg.thinkingConfig;
+      }
+      const response: any = await ai.models.generateContent({
+        model: candidateModel,
+        contents: effectiveContents,
+        config: Object.keys(cfg).length > 0 ? cfg : undefined,
+      });
+      const text = response?.text ?? response?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+      const parsedData =
+        cfg.responseMimeType === 'application/json' ||
+        text.trim().startsWith('{') ||
+        text.trim().startsWith('[') ||
+        text.trim().startsWith('```')
+          ? extractJsonSafe(text)
+          : undefined;
+      return {
+        ok: true,
+        text,
+        data: parsedData,
+        candidates: response?.candidates,
+        usageMetadata: response?.usageMetadata,
+      };
+    } catch (err: any) {
+      lastErr = err;
+    }
+  }
+  throw lastErr || new Error('Direct Gemini SDK call failed');
+}
 
 export interface ActiveApiKeyInfo {
   source: 'admin' | 'dev' | 'custom' | 'system' | 'none';
@@ -151,7 +218,7 @@ export const getApiKey = (): string => {
       console.warn("Error resolving Gemini API key:", e);
     }
   }
-  return '';
+  return sanitizeKey(DEFAULT_FALLBACK_GEMINI_KEY);
 };
 
 export interface ServerGeminiCandidate {
@@ -197,35 +264,57 @@ export async function callServerGemini(params: {
     headers['x-goog-api-key'] = customKey;
   }
 
-  const res = await fetch('/api/gemini/generate', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      model: params.model,
-      contents: params.contents,
-      prompt: params.prompt,
-      config: params.config,
-      systemInstruction: params.systemInstruction,
-    }),
-  });
+  try {
+    const res = await fetch(resolveApiUrl('/api/gemini/generate'), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: params.model,
+        contents: params.contents,
+        prompt: params.prompt,
+        config: params.config,
+        systemInstruction: params.systemInstruction,
+      }),
+    });
 
-  const body = await res.json().catch(() => ({}));
+    const body = await res.json().catch(() => ({}));
 
-  if (!res.ok || body.error) {
-    const errorMsg = body.error?.message || `Gemini server request failed with status ${res.status}`;
-    const err: any = new Error(errorMsg);
-    err.status = res.status;
-    err.code = body.error?.code;
-    throw err;
+    if (!res.ok || body.error) {
+      const errorMsg = body.error?.message || `Gemini server request failed with status ${res.status}`;
+      const err: any = new Error(errorMsg);
+      err.status = res.status;
+      err.code = body.error?.code;
+      throw err;
+    }
+
+    const candidateText = body.candidates?.[0]?.content?.parts?.[0]?.text;
+    const resolvedText = body.text ?? candidateText ?? '';
+
+    return {
+      ...body,
+      text: resolvedText,
+    };
+  } catch (serverErr: any) {
+    const fallbackKey = customKey || DEFAULT_FALLBACK_GEMINI_KEY;
+    const status = Number(serverErr?.status || 0);
+    const shouldFallbackDirect =
+      fallbackKey &&
+      fallbackKey !== 'SYSTEM_FREE_TRAFFIC' &&
+      !fallbackKey.includes('••••') &&
+      (status === 0 || status === 404 || status >= 500 || String(serverErr?.message || '').includes('Failed to fetch'));
+
+    if (shouldFallbackDirect) {
+      try {
+        return await callDirectGeminiFallback({
+          ...params,
+          apiKey: fallbackKey,
+        });
+      } catch {
+        // Fall through to original serverErr if direct call also fails
+      }
+    }
+    throw serverErr;
   }
-
-  const candidateText = body.candidates?.[0]?.content?.parts?.[0]?.text;
-  const resolvedText = body.text ?? candidateText ?? '';
-
-  return {
-    ...body,
-    text: resolvedText,
-  };
 }
 
 /**
@@ -247,13 +336,34 @@ export async function* generateContentStream(params: {
     headers['x-goog-api-key'] = customKey;
   }
 
-  const res = await fetch('/api/gemini/stream', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(params),
-  });
+  let res: Response;
+  try {
+    res = await fetch(resolveApiUrl('/api/gemini/stream'), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(params),
+    });
+  } catch (streamNetErr: any) {
+    const fallbackKey = customKey || DEFAULT_FALLBACK_GEMINI_KEY;
+    if (fallbackKey && fallbackKey !== 'SYSTEM_FREE_TRAFFIC' && !fallbackKey.includes('••••')) {
+      const directRes = await callDirectGeminiFallback({ ...params, apiKey: fallbackKey });
+      if (directRes.text) {
+        yield { text: directRes.text };
+      }
+      return;
+    }
+    throw streamNetErr;
+  }
 
   if (!res.ok) {
+    const fallbackKey = customKey || DEFAULT_FALLBACK_GEMINI_KEY;
+    if ((res.status === 404 || res.status >= 500) && fallbackKey && fallbackKey !== 'SYSTEM_FREE_TRAFFIC' && !fallbackKey.includes('••••')) {
+      const directRes = await callDirectGeminiFallback({ ...params, apiKey: fallbackKey });
+      if (directRes.text) {
+        yield { text: directRes.text };
+      }
+      return;
+    }
     const errData = await res.json().catch(() => ({}));
     throw new Error(errData.error?.message || `Stream request failed: ${res.status}`);
   }
@@ -315,9 +425,7 @@ export function connectLiveApi(options: {
   onClose?: () => void;
   onOpen?: () => void;
 }): LiveApiConnection {
-  const protocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = typeof window !== 'undefined' && window.location.host ? window.location.host : 'localhost:3000';
-  const wsUrl = `${protocol}//${host}/api/gemini/live`;
+  const wsUrl = resolveWsUrl('/api/gemini/live');
   const socket = new WebSocket(wsUrl);
 
   socket.onopen = () => {
@@ -877,7 +985,7 @@ export const speakWithGrokAudio = async (text: string, lang: string = 'ru', slow
   let arrayBuffer = grokAudioCache.get(cacheKey);
 
   if (!arrayBuffer) {
-    const res = await fetch('/api/tts/grok', {
+    const res = await fetch(resolveApiUrl('/api/tts/grok'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -955,7 +1063,7 @@ export const speakWithFishAudio = async (
       headers['x-fish-api-key'] = adminFishCfg.customApiKey;
     }
 
-    const res = await fetch('/api/tts/fish', {
+    const res = await fetch(resolveApiUrl('/api/tts/fish'), {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -1058,7 +1166,7 @@ export const speakText = async (
       headers['x-goog-api-key'] = customKey;
     }
 
-    const res = await fetch('/api/gemini/tts', {
+    const res = await fetch(resolveApiUrl('/api/gemini/tts'), {
       method: 'POST',
       headers,
       body: JSON.stringify({ text: cleanText, voiceName: normalizedVoice }),
@@ -3285,7 +3393,7 @@ export const pingGeminiApi = async (customKeyToTest?: string): Promise<{ ok: boo
       headers['x-goog-api-key'] = customKey;
     }
 
-    const res = await fetch('/api/gemini/ping', {
+    const res = await fetch(resolveApiUrl('/api/gemini/ping'), {
       method: 'GET',
       headers,
       signal: controller.signal,
@@ -3303,12 +3411,49 @@ export const pingGeminiApi = async (customKeyToTest?: string): Promise<{ ok: boo
       };
     }
 
+    const fallbackKey = customKey || DEFAULT_FALLBACK_GEMINI_KEY;
+    if ((res.status === 404 || res.status >= 500) && fallbackKey && fallbackKey !== 'SYSTEM_FREE_TRAFFIC' && !fallbackKey.includes('••••')) {
+      try {
+        const directRes = await callDirectGeminiFallback({
+          prompt: 'Reply with the single word: ONLINE',
+          apiKey: fallbackKey,
+        });
+        if (directRes.text) {
+          return {
+            ok: true,
+            message: 'Gemini API Онлайн (Direct SDK)!',
+            latencyMs: Date.now() - startTime,
+          };
+        }
+      } catch {
+        // Ignore fallback failure and report original error
+      }
+    }
+
     return {
       ok: false,
       message: data.message || data.error?.message || `Ошибка сервера Gemini (${res.status})`,
       latencyMs,
     };
   } catch (err: any) {
+    const fallbackKey = customKey || DEFAULT_FALLBACK_GEMINI_KEY;
+    if (fallbackKey && fallbackKey !== 'SYSTEM_FREE_TRAFFIC' && !fallbackKey.includes('••••') && !(typeof navigator !== 'undefined' && !navigator.onLine)) {
+      try {
+        const directRes = await callDirectGeminiFallback({
+          prompt: 'Reply with the single word: ONLINE',
+          apiKey: fallbackKey,
+        });
+        if (directRes.text) {
+          return {
+            ok: true,
+            message: 'Gemini API Онлайн (Direct SDK)!',
+            latencyMs: Date.now() - startTime,
+          };
+        }
+      } catch {
+        // Ignore fallback failure
+      }
+    }
     const latencyMs = Date.now() - startTime;
     if (isNetworkDisconnectError(err)) {
       return {

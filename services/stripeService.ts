@@ -1,3 +1,5 @@
+import { resolveApiUrl } from './nativeBridge';
+
 export interface StripePlan {
   id: string;
   name: string;
@@ -40,7 +42,7 @@ export interface StripeApiStatus {
 
 export const getStripeConfig = async (): Promise<StripeConfig | null> => {
   try {
-    const res = await fetch('/api/stripe/config');
+    const res = await fetch(resolveApiUrl('/api/stripe/config'));
     if (!res.ok) return null;
     return await res.json();
   } catch (e) {
@@ -51,7 +53,7 @@ export const getStripeConfig = async (): Promise<StripeConfig | null> => {
 
 export const getStripeApiStatus = async (): Promise<StripeApiStatus | null> => {
   try {
-    const res = await fetch('/api/stripe/status', { cache: 'no-store' });
+    const res = await fetch(resolveApiUrl('/api/stripe/status'), { cache: 'no-store' });
     if (!res.ok) return null;
     return await res.json();
   } catch (e) {
@@ -101,7 +103,7 @@ export const createStripeCheckout = async (params: {
   username?: string;
 }): Promise<{ url?: string; sessionId?: string; error?: string }> => {
   try {
-    const res = await fetch('/api/stripe/create-checkout-session', {
+    const res = await fetch(resolveApiUrl('/api/stripe/create-checkout-session'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -128,7 +130,7 @@ export const createStripeGemsCheckout = async (params: {
   username?: string;
 }): Promise<{ url?: string; sessionId?: string; error?: string }> => {
   try {
-    const res = await fetch('/api/stripe/create-checkout-session', {
+    const res = await fetch(resolveApiUrl('/api/stripe/create-checkout-session'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -157,7 +159,7 @@ export const cancelStripeSubscription = async (params: {
   reason?: string;
 }): Promise<{ success: boolean; message: string; canceledAt?: string }> => {
   try {
-    const res = await fetch('/api/stripe/cancel-subscription', {
+    const res = await fetch(resolveApiUrl('/api/stripe/cancel-subscription'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -188,7 +190,7 @@ export const openStripePortal = async (params: {
   email?: string;
 }): Promise<{ url?: string; error?: string }> => {
   try {
-    const res = await fetch('/api/stripe/customer-portal', {
+    const res = await fetch(resolveApiUrl('/api/stripe/customer-portal'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -209,7 +211,7 @@ export const openStripePortal = async (params: {
 
 export const checkStripeSession = async (sessionId: string) => {
   try {
-    const res = await fetch(`/api/stripe/session-status/${encodeURIComponent(sessionId)}`);
+    const res = await fetch(resolveApiUrl(`/api/stripe/session-status/${encodeURIComponent(sessionId)}`));
     if (!res.ok) return null;
     return await res.json();
   } catch {

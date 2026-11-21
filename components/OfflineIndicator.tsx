@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { resolveApiUrl } from '../services/nativeBridge';
+import { pingGeminiApi } from '../services/geminiService';
 
 export function useOnlineStatus() {
   const [isOnline, setIsOnline] = useState(
@@ -33,17 +35,22 @@ export const OfflineIndicator: React.FC<{ isRu?: boolean }> = ({ isRu = true }) 
   const handleRetryConnection = useCallback(async () => {
     setChecking(true);
     try {
-      const res = await fetch(`/api/server-info?t=${Date.now()}`, {
+      const res = await fetch(resolveApiUrl(`/api/server-info?t=${Date.now()}`), {
         method: 'GET',
         cache: 'no-store',
       });
       if (res.ok) {
         setManualOnline(true);
-      } else {
-        setManualOnline(false);
+        return;
       }
     } catch {
-      setManualOnline(false);
+      // Fallback check via Gemini API ping if server-info is unreachable
+    }
+    try {
+      const ping = await pingGeminiApi();
+      setManualOnline(ping.ok || (typeof navigator !== 'undefined' ? navigator.onLine : false));
+    } catch {
+      setManualOnline(typeof navigator !== 'undefined' ? navigator.onLine : false);
     } finally {
       setChecking(false);
     }

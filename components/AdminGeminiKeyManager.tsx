@@ -15,6 +15,7 @@ import {
 } from '../services/aiLimitManager';
 import { getActiveApiKeyInfo, pingGeminiApi } from '../services/geminiService';
 import { getJulesApiStatus, listJulesSources, JulesStatusResponse } from '../services/julesService';
+import { resolveApiUrl } from '../services/nativeBridge';
 import { db, auth } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { GoogleRecaptcha } from './GoogleRecaptcha';
@@ -369,7 +370,7 @@ export const AdminGeminiKeyManager: React.FC<AdminGeminiKeyManagerProps> = ({
     setMcpTestResult(null);
     const start = performance.now();
     try {
-      const res = await fetch('/api/mcp/status');
+      const res = await fetch(resolveApiUrl('/api/mcp/status'));
       const latencyMs = Math.round(performance.now() - start);
       if (res.ok) {
         const data = await res.json();
@@ -444,13 +445,13 @@ export const AdminGeminiKeyManager: React.FC<AdminGeminiKeyManagerProps> = ({
   // Reset MCP Key to Default
   const handleResetMcpKey = () => {
     playSound?.('click');
-    const defaultKey = '';
+    const defaultKey = 'rnd_yJ0QbFmEPVzGFlD6OwWG4o8Rg6t8';
     setMcpKeyInput(defaultKey);
     setMcpEnabled(true);
     setJulesDebugEnabled(true);
     saveMcpConfig(true, defaultKey, true);
     setMcpConfig(getMcpConfig());
-    triggerToast({ message: 'Ключ Render MCP сброшен!', type: 'info', icon: '🔄' });
+    triggerToast({ message: 'Ключ Render MCP сброшен к стандартному!', type: 'info', icon: '🔄' });
   };
 
   // Run full latency diagnostics

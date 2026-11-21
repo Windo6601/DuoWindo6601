@@ -1,3 +1,5 @@
+import { resolveApiUrl } from './nativeBridge';
+
 export interface JulesStatusResponse {
   configured: boolean;
   endpoint: string;
@@ -37,7 +39,7 @@ export interface JulesSessionPayload {
 }
 
 export async function getJulesApiStatus(): Promise<JulesStatusResponse> {
-  const res = await fetch('/api/jules/status');
+  const res = await fetch(resolveApiUrl('/api/jules/status'));
   if (!res.ok) {
     throw new Error(`HTTP ${res.status}`);
   }
@@ -45,7 +47,7 @@ export async function getJulesApiStatus(): Promise<JulesStatusResponse> {
 }
 
 export async function listJulesSources(): Promise<JulesSourcesResponse> {
-  const res = await fetch('/api/jules/sources');
+  const res = await fetch(resolveApiUrl('/api/jules/sources'));
   const data = await res.json();
   if (!res.ok) {
     throw new Error(data?.error?.message || `HTTP ${res.status}`);
@@ -54,7 +56,7 @@ export async function listJulesSources(): Promise<JulesSourcesResponse> {
 }
 
 export async function createJulesSession(payload: JulesSessionPayload): Promise<unknown> {
-  const res = await fetch('/api/jules/sessions', {
+  const res = await fetch(resolveApiUrl('/api/jules/sessions'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),

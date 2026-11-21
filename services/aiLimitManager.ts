@@ -583,6 +583,10 @@ export function triggerAiLimitModal(status?: AiUsageStatus) {
 export const MCP_ENABLED_STORAGE = 'duowindo_mcp_enabled';
 export const RENDER_MCP_API_KEY_STORAGE = 'duowindo_render_mcp_api_key';
 export const JULES_DEBUG_ENABLED_STORAGE = 'duowindo_jules_debug_enabled';
+export const DEFAULT_RENDER_MCP_API_KEY = (
+  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_RENDER_MCP_API_KEY) ||
+  'rnd_yJ0QbFmEPVzGFlD6OwWG4o8Rg6t8'
+).trim();
 
 export interface McpConfig {
   enabled: boolean;
@@ -596,9 +600,9 @@ export function getMcpConfig(): McpConfig {
   if (typeof window === 'undefined') {
     return {
       enabled: true,
-      renderApiKey: '',
+      renderApiKey: DEFAULT_RENDER_MCP_API_KEY,
       julesDebugEnabled: true,
-      maskedKey: '••••••••',
+      maskedKey: 'rnd_yJ0Q••••6t8',
       mcpServerUrl: 'https://api.render.com/v1/mcp'
     };
   }
@@ -608,7 +612,7 @@ export function getMcpConfig(): McpConfig {
     const rawJules = localStorage.getItem(JULES_DEBUG_ENABLED_STORAGE);
     const julesDebugEnabled = rawJules !== 'false';
     const storedKey = localStorage.getItem(RENDER_MCP_API_KEY_STORAGE);
-    const key = (storedKey && storedKey.trim()) ? storedKey.trim() : '';
+    const key = (storedKey && storedKey.trim()) ? storedKey.trim() : DEFAULT_RENDER_MCP_API_KEY;
     const masked = key.length > 8
       ? `${key.substring(0, 8)}••••${key.substring(key.length - 4)}`
       : '••••••••';
@@ -623,9 +627,9 @@ export function getMcpConfig(): McpConfig {
     console.warn("getMcpConfig error:", e);
     return {
       enabled: true,
-      renderApiKey: '',
+      renderApiKey: DEFAULT_RENDER_MCP_API_KEY,
       julesDebugEnabled: true,
-      maskedKey: '••••••••',
+      maskedKey: 'rnd_yJ0Q••••6t8',
       mcpServerUrl: 'https://api.render.com/v1/mcp'
     };
   }

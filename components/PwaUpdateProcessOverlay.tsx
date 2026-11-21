@@ -8,6 +8,7 @@ import {
   InstalledPwaPatchInfo,
 } from '../services/pwaUpdateService';
 import { playSound } from '../services/audioService';
+import { resolveApiUrl } from '../services/nativeBridge';
 import { CheckCircleIcon, ShieldIcon, WarningIcon } from './Icons';
 
 interface PwaUpdateProcessOverlayProps {
@@ -118,7 +119,7 @@ export const PwaUpdateProcessOverlay: React.FC<PwaUpdateProcessOverlayProps> = (
 
       // Verify connectivity lightly against backend (non-fatal if static CDN)
       try {
-        await fetch(`/api/server-info?t=${Date.now()}`, { cache: 'no-store' });
+        await fetch(resolveApiUrl(`/api/server-info?t=${Date.now()}`), { cache: 'no-store' });
       } catch {
         if (typeof navigator !== 'undefined' && !navigator.onLine) {
           if (!cancelled && mountedRef.current) {

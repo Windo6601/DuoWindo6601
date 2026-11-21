@@ -1,11 +1,31 @@
 import path from 'path';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-export default defineConfig(() => {
+export default defineConfig(({ mode }) => {
+    const env = loadEnv(mode, process.cwd(), '');
+    const resolvedGeminiKey = (
+      env.GEMINI_API_KEY ||
+      env.VITE_GEMINI_API_KEY ||
+      process.env.GEMINI_API_KEY ||
+      process.env.VITE_GEMINI_API_KEY ||
+      'AQ.Ab8RN6IQIn-mUHgR1BxMRDNo1Ylta9NTdBqZQ2dzG1VBmbxdbg'
+    ).trim();
+    const resolvedRenderMcpKey = (
+      env.RENDER_MCP_API_KEY ||
+      env.VITE_RENDER_MCP_API_KEY ||
+      process.env.RENDER_MCP_API_KEY ||
+      process.env.VITE_RENDER_MCP_API_KEY ||
+      'rnd_yJ0QbFmEPVzGFlD6OwWG4o8Rg6t8'
+    ).trim();
+
     return {
+      define: {
+        'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify(resolvedGeminiKey),
+        'import.meta.env.VITE_RENDER_MCP_API_KEY': JSON.stringify(resolvedRenderMcpKey),
+      },
       server: {
         port: 3000,
         host: '0.0.0.0',
@@ -75,6 +95,7 @@ export default defineConfig(() => {
           workbox: {
             maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
             globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+            globIgnores: ['**/assets/aistudio/**', '**/*.apk', '**/*.zip'],
             runtimeCaching: [
               {
                 urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

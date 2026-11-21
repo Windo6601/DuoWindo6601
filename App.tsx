@@ -88,6 +88,12 @@ import { ChessSettingsModal } from './components/ChessSettingsModal';
 import { ChessPieceTheme } from './components/ChessPieceIcon';
 import { ChessAnalysisScreen } from './components/ChessAnalysisScreen';
 import { ChessAutoTranslatorModal } from './components/ChessAutoTranslatorModal';
+import {
+  ensureCameraPermission,
+  ensureMicrophonePermission,
+  createSpeechRecognitionAdapter,
+  isNativeCapacitorApp
+} from './services/nativeBridge';
 import { triggerHapticFeedback } from './services/audioService';
 import { LettersScreen } from './components/LettersScreen';
 import { CIS_ALPHABET_DATA, AlphabetItem, AlphabetCategory as CISAlphabetCategory } from './services/alphabetData';
@@ -5519,33 +5525,52 @@ const getTodayChallenge = () => {
     }
   }, [user, playSound]);
 
-  // Video Call Effect
+  // Video Call Effect (requests Android/iOS runtime CAMERA permission first)
   useEffect(() => {
     let stream: MediaStream | null = null;
+    let cancelled = false;
     const startCamera = async () => {
       if (screen === AppScreen.VIDEO_CALL && videoCameraOn) {
         try {
-          stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          const camPerm = await ensureCameraPermission();
+          if (!camPerm) {
+            setToast(user.language === 'ru' ? '📷 Доступ к камере отклонён в разрешениях Android' : '📷 Camera permission denied');
+            return;
+          }
+          if (!navigator.mediaDevices?.getUserMedia) {
+            setToast(user.language === 'ru' ? '📷 Камера недоступна на этом устройстве' : '📷 Camera unavailable on this device');
+            return;
+          }
+          const mediaStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user' },
+            audio: false,
+          });
+          if (cancelled) {
+            mediaStream.getTracks().forEach(track => track.stop());
+            return;
+          }
+          stream = mediaStream;
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
           }
         } catch (err) {
           console.error("Camera access error", err);
-          setToast("Camera access denied");
+          setToast(user.language === 'ru' ? '📷 Нет доступа к камере — проверьте разрешение в настройках приложения' : '📷 Camera access denied');
         }
       }
     };
 
     if (screen === AppScreen.VIDEO_CALL && videoSelfViewOpen) {
-        startCamera();
+        void startCamera();
     }
 
     return () => {
+      cancelled = true;
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
     };
-  }, [screen, videoCameraOn, videoSelfViewOpen]);
+  }, [screen, videoCameraOn, videoSelfViewOpen, user.language]);
 
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(user)); }, [user]);
   useEffect(() => { localStorage.setItem('duo_course_id_6601', currentCourse.id); }, [currentCourse]);
@@ -5844,9 +5869,8 @@ const getTodayChallenge = () => {
   });
 
   useEffect(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
+    const recognition = createSpeechRecognitionAdapter();
+    if (recognition) {
         recognition.continuous = false;
         recognition.interimResults = true;
         recognition.maxAlternatives = 1;
@@ -6560,7 +6584,43 @@ const getTodayChallenge = () => {
     setScreen(AppScreen.ALPHABET);
   };
   const handleSkip = () => { playSound('click'); setToast(t('t_skip')); handleContinueAfterLesson(); };
-  const toggleRecording = () => { playSound('click'); if (isRecording) { setIsRecording(false); if (recognitionRef.current) recognitionRef.current.stop(); if (timerRef.current) clearTimeout(timerRef.current); if (currentExercise?.type === 'roleplay') setTimeout(() => { if (transcriptRef.current) handleRoleplaySend(transcriptRef.current); }, 500); else if (screen === AppScreen.VIDEO_CALL) setTimeout(() => { if (transcriptRef.current) handleVideoCallSend(transcriptRef.current); }, 500); else if (!recognitionRef.current) checkAnswer(currentExercise?.originalSentence); else setTimeout(() => checkAnswer(), 200); } else { transcriptRef.current = ""; if (recognitionRef.current) { setIsRecording(true); try { recognitionRef.current.start(); } catch (e) { console.error("Rec start error", e); setIsRecording(false); } } else { setIsRecording(false); setToast(user.language === 'ru' ? '🎙️ Голосовой ввод недоступен в этом браузере — введите ответ текстом' : '🎙️ Speech recognition unavailable in this browser — please type your response'); } } };
+  const toggleRecording = async () => {
+    playSound('click');
+    if (isRecording) {
+      setIsRecording(false);
+      if (recognitionRef.current) recognitionRef.current.stop();
+      if (timerRef.current) clearTimeout(timerRef.current);
+      if (currentExercise?.type === 'roleplay') {
+        setTimeout(() => { if (transcriptRef.current) handleRoleplaySend(transcriptRef.current); }, 500);
+      } else if (screen === AppScreen.VIDEO_CALL) {
+        setTimeout(() => { if (transcriptRef.current) handleVideoCallSend(transcriptRef.current); }, 500);
+      } else if (!recognitionRef.current) {
+        checkAnswer(currentExercise?.originalSentence);
+      } else {
+        setTimeout(() => checkAnswer(), 250);
+      }
+    } else {
+      transcriptRef.current = "";
+      const micGranted = await ensureMicrophonePermission();
+      if (!micGranted) {
+        setIsRecording(false);
+        setToast(user.language === 'ru' ? '🎙️ Разрешите доступ к микрофону в настройках приложения Android' : '🎙️ Please allow microphone permission in Android settings');
+        return;
+      }
+      if (recognitionRef.current) {
+        setIsRecording(true);
+        try {
+          recognitionRef.current.start();
+        } catch (e) {
+          console.error("Rec start error", e);
+          setIsRecording(false);
+        }
+      } else {
+        setIsRecording(false);
+        setToast(user.language === 'ru' ? '🎙️ Голосовой ввод недоступен в этом браузере — введите ответ текстом' : '🎙️ Speech recognition unavailable in this browser — please type your response');
+      }
+    }
+  };
   const upgradeSubscription = (tier: SubscriptionTier) => {
     if (isIncognitoUser) {
       playSound('wrong');

@@ -25,21 +25,21 @@ This repository is structured as a **hybrid workspace** supporting:
    ```
 
 ### 📱 Building the Android APK
-The Android build is configured directly at the root, allowing seamless compilation.
+The Android Gradle project lives in `android/`.
 1. Compile the web bundle:
    ```bash
    npm run build
    ```
-2. Sync compiled assets into the Android native module:
+2. Sync compiled assets and native Capacitor plugins into `android/`:
    ```bash
    npm run cap:sync
    ```
-3. Build the Debug APK using Gradle:
+3. Build the Debug APK using Gradle (requires JDK 21 and Android SDK):
    ```bash
-   ./gradlew assembleDebug
+   cd android && ./gradlew assembleDebug
    ```
    The compiled APK will be located at:  
-   `app/build/outputs/apk/debug/app-debug.apk`
+   `android/app/build/outputs/apk/debug/app-debug.apk`
 
 ---
 

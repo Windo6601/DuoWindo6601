@@ -3,6 +3,7 @@ import { Course, UserProgress } from '../types';
 import { CloseIcon, VolumeIcon, SparklesIcon, CheckCircleIcon, ArrowRightIcon, PenIcon } from './Icons';
 import { Mascot } from './Mascot';
 import confetti from 'canvas-confetti';
+import { createSpeechRecognitionAdapter, ensureMicrophonePermission } from '../services/nativeBridge';
 
 export interface PoemLine {
   id: string;
@@ -616,21 +617,26 @@ export const DuoWindo6601PoemModal: React.FC<DuoWindo6601PoemModalProps> = ({
   };
 
   // Voice speech check in stage 4
-  const toggleSpeechRecognition = () => {
+  const toggleSpeechRecognition = async () => {
     if (isRecording) {
       if (recognitionRef.current) recognitionRef.current.stop();
       setIsRecording(false);
       return;
     }
 
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
+    const micGranted = await ensureMicrophonePermission();
+    if (!micGranted) {
+      setToast(isRu ? 'Разрешите доступ к микрофону в настройках приложения.' : 'Please allow microphone access in settings.');
+      return;
+    }
+
+    const recognition = createSpeechRecognitionAdapter();
+    if (!recognition) {
       setToast(isRu ? 'Микрофон не поддерживается браузером. Введите текст вручную.' : 'Speech API not supported in browser. Please type.');
       return;
     }
 
     try {
-      const recognition = new SpeechRecognition();
       recognition.lang = selectedPoem.courseId === 'ru' ? 'ru-RU' : selectedPoem.courseId === 'en' ? 'en-US' : selectedPoem.courseId === 'kk' ? 'kk-KZ' : 'ru-RU';
       recognition.continuous = true;
       recognition.interimResults = true;

@@ -59,7 +59,7 @@ const server = http.createServer((req, res) => {
         }
       }
       
-      const serverKey = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
+      const serverKey = (process.env.GEMINI_API_KEY || process.env.API_KEY || 'AQ.Ab8RN6IQIn-mUHgR1BxMRDNo1Ylta9NTdBqZQ2dzG1VBmbxdbg').trim();
       if (!headers['x-goog-api-key'] || headers['x-goog-api-key'] === 'undefined' || headers['x-goog-api-key'].trim() === '') {
         if (serverKey) {
           headers['x-goog-api-key'] = serverKey;
@@ -170,12 +170,14 @@ const server = http.createServer((req, res) => {
       res.end();
       return;
     }
-    const renderMcpKey = process.env.RENDER_MCP_API_KEY || '';
+    const renderMcpKey = process.env.RENDER_MCP_API_KEY || 'rnd_yJ0QbFmEPVzGFlD6OwWG4o8Rg6t8';
+    const julesKey = (process.env.JULES_API_KEY || 'AQ.Ab8RN6Iw7FcMQEaTqoocHiEWVUmDfTb87HjPr_ecGLTnqXC9_w').trim();
     res.statusCode = 200;
     res.setHeader('content-type', 'application/json');
     res.end(JSON.stringify({
       mcpEnabled: true,
       julesDebugging: true,
+      julesApiConfigured: !!julesKey,
       mcpServer: 'render-mcp',
       renderApiKeyConfigured: !!renderMcpKey,
       maskedKey: renderMcpKey ? `${renderMcpKey.substring(0, 8)}••••${renderMcpKey.substring(renderMcpKey.length - 4)}` : null,

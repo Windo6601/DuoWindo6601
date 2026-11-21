@@ -1,7 +1,10 @@
 {
   "name": "DuoWindo6601",
   "description": "A gamified language learning app featuring an interactive mascot, learning path, AI video calls, regional courses, and multi-language support (EN, DE, FR, ES, JA, ZH, RU, AR).",
-  "requestFramePermissions": [],
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ]

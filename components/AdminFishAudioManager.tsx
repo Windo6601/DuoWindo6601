@@ -10,6 +10,7 @@ import {
 } from '../services/fishAudioConfig';
 import { auth, db } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore';
+import { resolveApiUrl } from '../services/nativeBridge';
 
 interface AdminFishAudioManagerProps {
   user: UserProgress;
@@ -90,7 +91,7 @@ export const AdminFishAudioManager: React.FC<AdminFishAudioManagerProps> = ({
         headers['x-fish-api-key'] = config.customApiKey;
       }
 
-      const res = await fetch('/api/tts/fish', {
+      const res = await fetch(resolveApiUrl('/api/tts/fish'), {
         method: 'POST',
         headers,
         body: JSON.stringify({

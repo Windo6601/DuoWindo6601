@@ -9,7 +9,7 @@ Features:
 - Binary resources.arsc table
 - Valid OpenSSL RSA-2048 X.509 certificate & DER-encoded PKCS#7 signed CERT.RSA
 - Base64 SHA-1 and SHA-256 digests in MANIFEST.MF and CERT.SF
-- Package: com.duowindo.app, Version: 1.0.4 (Build 6601)
+- Package: com.duowindo6601.app, Version: 1.0.4 (Build 6601)
 """
 
 import struct
@@ -29,7 +29,7 @@ def make_valid_axml():
         'manifest',
         'http://schemas.android.com/apk/res/android',
         'package',
-        'com.duowindo.app',
+        'com.duowindo6601.app',
         'versionCode',
         'versionName',
         '1.0.4',
@@ -160,7 +160,7 @@ def make_valid_axml():
     return header + str_pool_chunk + res_map_chunk + body
 
 def make_valid_dex():
-    strings = ['Lcom/duowindo/app/MainActivity;', 'Ljava/lang/Object;', 'MainActivity.java']
+    strings = ['Lcom/duowindo6601/app/MainActivity;', 'Ljava/lang/Object;', 'MainActivity.java']
     str_data_bytes = bytearray()
     str_data_offsets = []
     for s in strings:
@@ -228,7 +228,7 @@ def make_valid_dex():
 def make_resources_arsc():
     str_pool = struct.pack('<HHIIIIII', 0x0001, 28, 28, 0, 0, 0, 28, 0)
     pkg_id = 0x7F
-    pkg_name = 'com.duowindo.app'.encode('utf-16le').ljust(256, b'\x00')
+    pkg_name = 'com.duowindo6601.app'.encode('utf-16le').ljust(256, b'\x00')
     
     type_strings = ['', 'string']
     type_pool = bytearray()
@@ -307,7 +307,7 @@ def generate_apk(output_paths):
     built_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     build_info = json.dumps({
         "app": "DuoWindo6601",
-        "package": "com.duowindo.app",
+        "package": "com.duowindo6601.app",
         "versionName": "1.0.4",
         "versionCode": 104,
         "minSdkVersion": 21,
@@ -323,7 +323,7 @@ def generate_apk(output_paths):
     
     readme = (
         "DuoWindo6601 • Android Debug APK\n"
-        "Пакет: com.duowindo.app\n"
+        "Пакет: com.duowindo6601.app\n"
         "Версия: 1.0.4 (Сборка 6601)\n"
         "minSdkVersion: 21 (Android 5.0 - 15)\n\n"
         "ВАЖНО: Apple / iOS не поддерживает файлы APK!\n"
