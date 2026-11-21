@@ -3,6 +3,7 @@ import { UserProgress } from '../types';
 import {
   FISH_AUDIO_MODELS,
   FishModelSpec,
+  DEFAULT_FISH_REFERENCE_ID,
   canUserAccessFishModel,
   getAdminFishConfig,
 } from '../services/fishAudioConfig';
@@ -90,10 +91,15 @@ export const ShopFishModelsSection: React.FC<ShopFishModelsSectionProps> = ({
     playSound('click');
     setTestingModel(spec.id);
     try {
+      const sampleLang = isRu ? 'ru' : 'en';
       const sampleText = isRu
         ? `Привет! Это голосовая модель ${spec.label} в DuoWindo6601.`
         : `Hello! This is Fish Audio ${spec.label} in DuoWindo6601.`;
-      await speakWithFishAudio(sampleText, user.language || 'ru', false, spec.id, fishConfig.defaultReferenceId);
+      const customRef =
+        fishConfig.defaultReferenceId && fishConfig.defaultReferenceId !== DEFAULT_FISH_REFERENCE_ID
+          ? fishConfig.defaultReferenceId
+          : undefined;
+      await speakWithFishAudio(sampleText, sampleLang, false, spec.id, customRef);
     } catch (err: any) {
       setToast(err?.message || (isRu ? 'Не удалось воспроизвести пример' : 'Preview playback failed'));
     } finally {

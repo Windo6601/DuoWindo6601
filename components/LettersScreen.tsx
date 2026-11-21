@@ -25,6 +25,8 @@ import { LetterWordsLearning } from './LetterWordsLearning';
 import { SoundIllusionLab } from './SoundIllusionLab';
 import { AudioWhatHeardQuiz } from './AudioWhatHeardQuiz';
 import { stopActiveIllusion } from '../services/soundIllusionService';
+import { tlhToPIqaD } from '../services/klingonDictionaryService';
+import { downloadKlingonAudioFile } from '../services/klingonSpeechService';
 
 interface LettersScreenProps {
   currentCourse: Course;
@@ -798,8 +800,11 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
     handleContinueExercise();
   };
 
-  // Format Dual Case for card (e.g. "А а", "Б б", or standard for non-cased scripts)
+  // Format Dual Case for card (keep Klingon case-sensitive characters single, e.g. Q vs q)
   const formatLetterDisplay = (char: string) => {
+    if (currentCourse.id === 'tlh') {
+      return char;
+    }
     if (char.length === 1 && char.toUpperCase() !== char.toLowerCase()) {
       return `${char.toUpperCase()} ${char.toLowerCase()}`;
     }
@@ -1408,13 +1413,16 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                           triggerHapticFeedback('light');
                           setSelectedOptionId(opt.id);
                         }}
-                        className={`h-28 sm:h-32 rounded-3xl flex items-center justify-center font-black px-3 text-center break-words ${opt.text.length > 3 ? 'text-xl sm:text-2xl' : 'text-3xl sm:text-4xl'} transition-all border-b-4 active:border-b-2 active:translate-y-0.5 cursor-pointer ${
+                        className={`h-28 sm:h-32 rounded-3xl flex flex-col items-center justify-center font-black px-3 text-center break-words ${opt.text.length > 3 ? 'text-xl sm:text-2xl' : 'text-3xl sm:text-4xl'} transition-all border-b-4 active:border-b-2 active:translate-y-0.5 cursor-pointer ${getScriptFontClass(currentCourse.id)} ${
                           isSelected
                             ? 'bg-[#182329] border-duo-blue ring-4 ring-duo-blue/30 text-duo-blue'
                             : 'bg-[#182329] border-gray-800 hover:border-gray-700 text-white hover:bg-[#1E2B33]'
                         }`}
                       >
-                        {opt.text}
+                        <span>{opt.text}</span>
+                        {currentCourse.id === 'tlh' && (
+                          <span className="font-piqad text-base text-purple-300 mt-1">{tlhToPIqaD(opt.text)}</span>
+                        )}
                       </button>
                     );
                   })}
@@ -1821,6 +1829,43 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                 </div>
               </div>
             )}
+            {/* Klingon Client Speech, Font & Audio File Bar */}
+            {currentCourse.id === 'tlh' && lettersSectionTab === 'letters' && (
+              <div className="w-full max-w-lg mt-4 p-3.5 bg-[#182329] border border-purple-500/40 rounded-2xl flex flex-col gap-2.5 shadow-lg text-left">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🖖</span>
+                    <span className="text-xs font-black text-purple-300 uppercase tracking-wider">
+                      {user.language !== 'en' ? 'Клиентский Speech + pIqaD (tlh)' : 'Client Speech + pIqaD (tlh)'}
+                    </span>
+                  </div>
+                  <span className="font-piqad text-sm px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-200 border border-purple-500/30">
+                    {tlhToPIqaD('tlhIngan Hol')}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handlePlayLetterAudio('nuqneH, Qapla’')}
+                    className="flex-1 min-w-[140px] py-2 px-3 rounded-xl bg-purple-600/80 hover:bg-purple-500 text-white text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                  >
+                    <VolumeIcon className="w-4 h-4" />
+                    <span>{user.language !== 'en' ? 'Тест Speech (nuqneH)' : 'Test Speech (nuqneH)'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playSound('click');
+                      void downloadKlingonAudioFile('nuqneH, Qapla’');
+                    }}
+                    className="py-2 px-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-emerald-300 border border-emerald-500/40 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                  >
+                    <span>💾</span>
+                    <span>{user.language !== 'en' ? 'Аудио-файл' : 'Audio File'}</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {lettersSectionTab === 'words' && (
@@ -1905,6 +1950,11 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                         }`}>
                           {formatLetterDisplay(item.char)}
                         </span>
+                        {currentCourse.id === 'tlh' && (
+                          <span className="font-piqad text-sm text-purple-300 mt-0.5">
+                            {tlhToPIqaD(item.char)}
+                          </span>
+                        )}
                         
                         {/* Romanization / Sound transcription */}
                         <span className={`text-[11px] sm:text-xs font-bold mt-0.5 tracking-tight ${
@@ -1967,22 +2017,44 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
 
               {/* Word Example */}
               {selectedLetter.word && (
-                <div className="bg-[#182329] border border-gray-800 rounded-2xl p-3 mb-4 flex items-center justify-between">
+                <div className="bg-[#182329] border border-gray-800 rounded-2xl p-3 mb-4 flex items-center justify-between gap-2">
                   <div>
                     <span className="text-xs font-bold text-gray-400 block uppercase">
                       {user.language !== 'en' ? 'Пример слова' : 'Example Word'}
                     </span>
-                    <span className="text-base font-black text-duo-green">{selectedLetter.word}</span>
+                    <span className={`text-base font-black text-duo-green ${getScriptFontClass(currentCourse.id)}`}>
+                      {selectedLetter.word}
+                    </span>
+                    {currentCourse.id === 'tlh' && (
+                      <span className="font-piqad text-sm text-purple-300 ml-2">
+                        {tlhToPIqaD(selectedLetter.word)}
+                      </span>
+                    )}
                     {selectedLetter.translation && (
                       <span className="text-xs font-medium text-gray-400 ml-2">({selectedLetter.translation})</span>
                     )}
                   </div>
-                  <button
-                    onClick={() => handlePlayLetterAudio(selectedLetter.word || selectedLetter.char)}
-                    className="p-2.5 bg-gray-800 hover:bg-duo-blue text-gray-300 hover:text-white rounded-xl transition-colors cursor-pointer"
-                  >
-                    <VolumeIcon className="w-5 h-5" />
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    {currentCourse.id === 'tlh' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playSound('click');
+                          void downloadKlingonAudioFile(selectedLetter.word || selectedLetter.char);
+                        }}
+                        className="p-2.5 bg-gray-800 hover:bg-emerald-700 text-emerald-300 hover:text-white rounded-xl transition-colors cursor-pointer text-xs font-black"
+                        title={user.language !== 'en' ? 'Скачать аудио-файл клингонский' : 'Download Klingon audio file'}
+                      >
+                        💾
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handlePlayLetterAudio(selectedLetter.word || selectedLetter.char)}
+                      className="p-2.5 bg-gray-800 hover:bg-duo-blue text-gray-300 hover:text-white rounded-xl transition-colors cursor-pointer"
+                    >
+                      <VolumeIcon className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
               )}
 

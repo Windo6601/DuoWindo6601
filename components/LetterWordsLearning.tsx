@@ -8,6 +8,8 @@ import {
   WordQuizExercise 
 } from '../services/wordsLearningService';
 import { playSound, triggerHapticFeedback } from '../services/audioService';
+import { tlhToPIqaD } from '../services/klingonDictionaryService';
+import { downloadKlingonAudioFile } from '../services/klingonSpeechService';
 
 interface LetterWordsLearningProps {
   currentCourse: Course;
@@ -27,6 +29,7 @@ export const LetterWordsLearning: React.FC<LetterWordsLearningProps> = ({
   isLightMode = false,
 }) => {
   const isRu = (user.language || 'ru') !== 'en';
+  const isKlingon = currentCourse.id === 'tlh';
   const difficultyLevel: 'easy' | 'hard' = user.difficultyLevel === 'hard' ? 'hard' : 'easy';
   const words = useMemo(() => getCourseLetterWords(currentCourse.id), [currentCourse.id]);
   const [selectedWord, setSelectedWord] = useState<LetterWordItem | null>(null);
@@ -226,9 +229,14 @@ export const LetterWordsLearning: React.FC<LetterWordsLearningProps> = ({
             </div>
 
             <div className="mt-3 space-y-1">
-              <h3 className="text-lg font-black text-white group-hover:text-emerald-300 transition-colors">
+              <h3 className={`text-lg font-black text-white group-hover:text-emerald-300 transition-colors ${isKlingon ? 'font-klingon' : ''}`}>
                 {item.word}
               </h3>
+              {isKlingon && (
+                <div className="font-piqad text-sm text-purple-300">
+                  {tlhToPIqaD(item.word)}
+                </div>
+              )}
               {item.translit && item.translit !== item.word && (
                 <div className="text-[11px] font-mono text-gray-400">
                   [{item.translit}]
@@ -268,9 +276,12 @@ export const LetterWordsLearning: React.FC<LetterWordsLearningProps> = ({
                 <span className="text-[10px] uppercase font-black tracking-widest text-emerald-400">
                   {isRu ? `Слово на букву «${selectedWord.char}»` : `Word on letter "${selectedWord.char}"`}
                 </span>
-                <h3 className="text-2xl font-black text-white">
+                <h3 className={`text-2xl font-black text-white ${isKlingon ? 'font-klingon' : ''}`}>
                   {selectedWord.word}
                 </h3>
+                {isKlingon && (
+                  <p className="font-piqad text-base text-purple-300">{tlhToPIqaD(selectedWord.word)}</p>
+                )}
                 <p className="text-xs text-gray-300 font-bold">
                   {isRu ? selectedWord.translationRu : selectedWord.translationEn}
                 </p>
@@ -286,7 +297,7 @@ export const LetterWordsLearning: React.FC<LetterWordsLearningProps> = ({
                 {selectedWord.lettersBreakdown.map((ltr, idx) => (
                   <span
                     key={idx}
-                    className="w-8 h-8 rounded-xl bg-gray-800 border border-gray-700 text-white font-black text-sm flex items-center justify-center shadow-sm"
+                    className={`min-w-8 h-8 px-2 rounded-xl bg-gray-800 border border-gray-700 text-white font-black text-sm flex items-center justify-center shadow-sm ${isKlingon ? 'font-klingon' : ''}`}
                   >
                     {ltr}
                   </span>
@@ -295,23 +306,36 @@ export const LetterWordsLearning: React.FC<LetterWordsLearningProps> = ({
             </div>
 
             {/* Audio Controls */}
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className={`grid ${isKlingon ? 'grid-cols-3' : 'grid-cols-2'} gap-2.5`}>
               <button
                 type="button"
                 onClick={() => handlePlayAudio(selectedWord.word, false)}
-                className="py-3 px-4 bg-duo-blue hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider rounded-2xl flex items-center justify-center gap-2 shadow-md cursor-pointer"
+                className="py-3 px-3 bg-duo-blue hover:brightness-110 active:scale-95 text-white font-black text-xs uppercase tracking-wider rounded-2xl flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
               >
                 <VolumeIcon className="w-4 h-4" />
-                <span>{isRu ? 'Нормально' : 'Normal'}</span>
+                <span>{isRu ? 'Обычн.' : 'Normal'}</span>
               </button>
               <button
                 type="button"
                 onClick={() => handlePlayAudio(selectedWord.word, true)}
-                className="py-3 px-4 bg-gray-800 hover:bg-gray-700 text-gray-200 font-black text-xs uppercase tracking-wider rounded-2xl border border-gray-700 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                className="py-3 px-3 bg-gray-800 hover:bg-gray-700 text-gray-200 font-black text-xs uppercase tracking-wider rounded-2xl border border-gray-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
               >
                 <span>🐢</span>
-                <span>{isRu ? 'Медленно' : 'Slow'}</span>
+                <span>{isRu ? 'Медл.' : 'Slow'}</span>
               </button>
+              {isKlingon && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    playSound('click');
+                    void downloadKlingonAudioFile(selectedWord.word);
+                  }}
+                  className="py-3 px-3 bg-emerald-950/80 hover:bg-emerald-800 text-emerald-200 font-black text-xs uppercase tracking-wider rounded-2xl border border-emerald-500/40 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <span>💾</span>
+                  <span>{isRu ? 'Файл' : 'File'}</span>
+                </button>
+              )}
             </div>
 
             {/* Start Practice button */}
@@ -377,7 +401,7 @@ export const LetterWordsLearning: React.FC<LetterWordsLearningProps> = ({
                         key={`${t.id}_${idx}`}
                         type="button"
                         onClick={() => handleRemoveTile(idx)}
-                        className="w-10 h-10 rounded-xl bg-duo-green text-white font-black text-base flex items-center justify-center shadow-md cursor-pointer hover:bg-red-500 transition-colors"
+                        className={`min-w-10 h-10 px-2 rounded-xl bg-duo-green text-white font-black text-base flex items-center justify-center shadow-md cursor-pointer hover:bg-red-500 transition-colors ${isKlingon ? 'font-klingon' : ''}`}
                         title={isRu ? 'Удалить букву' : 'Remove letter'}
                       >
                         {t.letter}
@@ -396,7 +420,7 @@ export const LetterWordsLearning: React.FC<LetterWordsLearningProps> = ({
                         type="button"
                         disabled={isUsed || quizFeedback !== 'idle'}
                         onClick={() => handleTileClick(t)}
-                        className={`w-11 h-11 rounded-2xl font-black text-base flex items-center justify-center transition-all cursor-pointer border-b-4 ${
+                        className={`min-w-11 h-11 px-2.5 rounded-2xl font-black text-base flex items-center justify-center transition-all cursor-pointer border-b-4 ${isKlingon ? 'font-klingon' : ''} ${
                           isUsed
                             ? 'opacity-20 bg-gray-800 text-gray-500 border-gray-900 pointer-events-none'
                             : 'bg-gray-800 hover:bg-gray-700 text-white border-gray-900 active:translate-y-1 active:border-b-0 shadow-md'
@@ -441,7 +465,12 @@ export const LetterWordsLearning: React.FC<LetterWordsLearningProps> = ({
                       }`}
                     >
                       <div>
-                        <span className="font-black text-base block">{opt.text}</span>
+                        <span className={`font-black text-base block ${isKlingon && activeQuizExercise.type === 'listen_word' ? 'font-klingon' : ''}`}>
+                          {opt.text}
+                        </span>
+                        {isKlingon && activeQuizExercise.type === 'listen_word' && (
+                          <span className="font-piqad text-xs text-purple-300 block">{tlhToPIqaD(opt.text)}</span>
+                        )}
                         {opt.sub && <span className="text-xs text-gray-400 font-normal">{opt.sub}</span>}
                       </div>
                       {isSelected && (

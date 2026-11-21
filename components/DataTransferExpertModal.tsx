@@ -531,8 +531,8 @@ export const DataTransferExpertModal: React.FC<DataTransferExpertModalProps> = (
               ) : (
                 <div className="p-3 bg-amber-950/40 border border-amber-500/40 rounded-xl text-xs text-amber-300 font-medium">
                   {isRu
-                    ? 'Вы находитесь в Режиме Инкогнито или локальном режиме. Воспользуйтесь вкладкой «Экспорт пакета» для скачивания файла миграции или выполните Полный Вход в Профиле.'
-                    : 'You are in Incognito or offline mode. Use the "Export Bundle" tab to download your migration file or perform Full Sign-In in Profile.'}
+                    ? 'Вы находитесь в Режиме Инкогнито или гостевом режиме. Воспользуйтесь вкладкой «Экспорт пакета» для скачивания файла миграции или выполните Полный Вход в Профиле.'
+                    : 'You are in Incognito or guest mode. Use the "Export Bundle" tab to download your migration file or perform Full Sign-In in Profile.'}
                 </div>
               )}
             </div>

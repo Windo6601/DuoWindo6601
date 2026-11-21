@@ -28,38 +28,94 @@ export const OfflineIndicator: React.FC<{ isRu?: boolean }> = ({ isRu = true }) 
   const [checking, setChecking] = useState(false);
   const [manualOnline, setManualOnline] = useState<boolean>(browserOnline);
 
-  useEffect(() => {
-    setManualOnline(browserOnline);
-  }, [browserOnline]);
-
-  const handleRetryConnection = useCallback(async () => {
-    setChecking(true);
+  const verifyServerConnectivity = useCallback(async (timeoutMs: number = 5000): Promise<boolean> => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return false;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const res = await fetch(resolveApiUrl(`/api/server-info?t=${Date.now()}`), {
         method: 'GET',
         cache: 'no-store',
+        signal: controller.signal,
       });
       if (res.ok) {
-        setManualOnline(true);
-        return;
+        const data = await res.json().catch(() => null);
+        if (data?.ok !== false) {
+          return true;
+        }
       }
     } catch {
-      // Fallback check via Gemini API ping if server-info is unreachable
+      // Fall back to Gemini API ping if server-info is unreachable (e.g., Android APK direct mode)
+    } finally {
+      clearTimeout(timer);
     }
+
     try {
       const ping = await pingGeminiApi();
-      setManualOnline(ping.ok || (typeof navigator !== 'undefined' ? navigator.onLine : false));
+      return Boolean(ping.ok || (typeof navigator !== 'undefined' ? navigator.onLine : false));
     } catch {
-      setManualOnline(typeof navigator !== 'undefined' ? navigator.onLine : false);
+      return typeof navigator !== 'undefined' ? navigator.onLine : false;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!browserOnline) {
+      setManualOnline(false);
+      return;
+    }
+    setManualOnline(true);
+    void verifyServerConnectivity(5000).then((ok) => {
+      if (!ok && typeof navigator !== 'undefined' && !navigator.onLine) {
+        setManualOnline(false);
+      }
+    });
+  }, [browserOnline, verifyServerConnectivity]);
+
+  useEffect(() => {
+    const handleNetworkOffline = () => {
+      setManualOnline(false);
+    };
+    const handleNetworkOnline = () => {
+      setManualOnline(true);
+    };
+    window.addEventListener('duowindo_network_offline', handleNetworkOffline);
+    window.addEventListener('duowindo_network_online', handleNetworkOnline);
+    return () => {
+      window.removeEventListener('duowindo_network_offline', handleNetworkOffline);
+      window.removeEventListener('duowindo_network_online', handleNetworkOnline);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (!manualOnline) {
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prevOverflow;
+      };
+    }
+  }, [manualOnline]);
+
+  const handleRetryConnection = useCallback(async () => {
+    setChecking(true);
+    try {
+      const ok = await verifyServerConnectivity(6000);
+      setManualOnline(ok);
+      if (ok && typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('duowindo_network_online'));
+      }
     } finally {
       setChecking(false);
     }
-  }, []);
+  }, [verifyServerConnectivity]);
 
   if (manualOnline) return null;
 
   return (
-    <div className="fixed inset-0 z-[300] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[300] bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div className="bg-duo-card border-2 border-red-500/70 rounded-3xl max-w-md w-full p-6 sm:p-8 text-center shadow-2xl space-y-5 text-white">
         <div className="w-16 h-16 mx-auto rounded-2xl bg-red-500/20 border-2 border-red-500/50 flex items-center justify-center text-3xl shadow-inner">
           📡

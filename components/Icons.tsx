@@ -372,4 +372,23 @@ export const MoonIcon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
+export const HeadphonesRadioIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg viewBox="0 0 100 100" className={className} fill="none" aria-hidden="true">
+    {/* Outer headband arch */}
+    <path
+      d="M23 56V46C23 30.5 35 19 50 19C65 19 77 30.5 77 46V56"
+      stroke="white"
+      strokeWidth="9.5"
+      strokeLinecap="round"
+    />
+    {/* Left earcup */}
+    <rect x="17" y="47" width="22" height="34" rx="11" fill="white" />
+    <rect x="26" y="49" width="11.5" height="30" rx="5.75" fill="#2A729B" />
+    {/* Right earcup */}
+    <rect x="61" y="47" width="22" height="34" rx="11" fill="white" />
+    <rect x="62.5" y="49" width="11.5" height="30" rx="5.75" fill="#2A729B" />
+  </svg>
+);
+
+
 

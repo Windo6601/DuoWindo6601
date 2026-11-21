@@ -13,6 +13,16 @@ import {
   handleGeminiPing,
   setupLiveApiWebSocket,
 } from './services/serverGemini.ts';
+import {
+  FISH_NATIVE_LANGS,
+  getFishReferenceIdForLang,
+} from './services/fishAudioConfig.ts';
+import {
+  GTTS_SUPPORTED_LANGS,
+  normalizeCourseLangCode,
+  resolveGoogleTtsLang,
+  resolvePhoneticTtsTarget,
+} from './services/multilingualTtsHelper.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -142,6 +152,84 @@ app.use('/api/gemini-proxy', express.raw({ type: '*/*', limit: '50mb' }), async 
   }
 });
 
+// Native Google Translate TTS Helper (supports 33 languages including la, sv, no, is, et, lv, lt, eu, uk, fi, hu, he)
+async function fetchGoogleTranslateTtsAudio(rawText: string, rawLang: string): Promise<Buffer | null> {
+  const gttsTarget = resolveGoogleTtsLang(rawLang);
+  const phoneticFallback = !gttsTarget ? resolvePhoneticTtsTarget(rawText, rawLang, GTTS_SUPPORTED_LANGS) : null;
+  const tl = gttsTarget ? gttsTarget.tl : (phoneticFallback && GTTS_SUPPORTED_LANGS.has(phoneticFallback.lang) ? (phoneticFallback.lang === 'zh' ? 'zh-CN' : phoneticFallback.lang) : null);
+  const textToSpeak = gttsTarget ? rawText : (phoneticFallback ? phoneticFallback.text : rawText);
+  if (!tl || !textToSpeak.trim()) return null;
+
+  const chunks: string[] = [];
+  let remaining = textToSpeak.trim();
+  while (remaining.length > 0) {
+    if (remaining.length <= 180) {
+      chunks.push(remaining);
+      break;
+    }
+    let splitIdx = remaining.lastIndexOf(' ', 180);
+    if (splitIdx <= 0) splitIdx = 180;
+    chunks.push(remaining.slice(0, splitIdx).trim());
+    remaining = remaining.slice(splitIdx).trim();
+  }
+
+  const buffers: Buffer[] = [];
+  for (const chunk of chunks.slice(0, 6)) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    try {
+      const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${encodeURIComponent(tl)}&q=${encodeURIComponent(chunk)}`;
+      const r = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+          'Referer': 'https://translate.google.com/',
+        },
+        signal: controller.signal,
+      });
+      if (!r.ok) return null;
+      const buf = Buffer.from(await r.arrayBuffer());
+      if (buf.length < 128) return null;
+      buffers.push(buf);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  return buffers.length > 0 ? Buffer.concat(buffers) : null;
+}
+
+// Multilingual Google TTS Endpoint (for languages/Beta courses without local browser voice)
+app.post('/api/tts/google', express.json(), async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+  const { text, lang = 'en' } = req.body || {};
+  if (!text || typeof text !== 'string') {
+    res.status(400).json({ error: { message: 'Text is required' } });
+    return;
+  }
+  const normalizedLang = normalizeCourseLangCode(String(lang || ''));
+  if (normalizedLang === 'tlh') {
+    res.status(400).json({ error: { message: 'Klingon speech is served via /api/tts/klingon or client synthesizer' } });
+    return;
+  }
+  try {
+    const audioBuf = await fetchGoogleTranslateTtsAudio(text, normalizedLang);
+    if (!audioBuf) {
+      res.status(404).json({ error: { message: `No GTTS audio for language ${normalizedLang}` } });
+      return;
+    }
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('X-TTS-Lang', normalizedLang);
+    res.send(audioBuf);
+  } catch (err: any) {
+    res.status(502).json({ error: { message: err?.message || 'Google TTS proxy failed' } });
+  }
+});
+
 // Fish Audio TTS API Proxy
 app.post('/api/tts/fish', express.json(), async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -158,6 +246,38 @@ app.post('/api/tts/fish', express.json(), async (req, res) => {
     res.status(400).json({ error: { message: 'Text is required' } });
     return;
   }
+
+  const normalizedLang = normalizeCourseLangCode(String(lang || ''));
+  if (normalizedLang === 'tlh') {
+    res.status(400).json({ error: { message: 'Klingon speech is served via /api/tts/klingon or client synthesizer' } });
+    return;
+  }
+
+  // For languages without a native Fish Audio voice that ARE natively supported by Google TTS
+  // (e.g. Latin 'la', Icelandic 'is', Estonian 'et', Latvian 'lv', Lithuanian 'lt', Basque 'eu'),
+  // prefer authentic native TTS first so they never sound English.
+  if (!FISH_NATIVE_LANGS.has(normalizedLang) && GTTS_SUPPORTED_LANGS.has(normalizedLang)) {
+    const nativeGttsBuf = await fetchGoogleTranslateTtsAudio(text, normalizedLang);
+    if (nativeGttsBuf) {
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('X-Fish-Model-Used', `native-gtts-${normalizedLang}`);
+      res.setHeader('X-Fish-Voice-Lang', normalizedLang);
+      res.send(nativeGttsBuf);
+      return;
+    }
+  }
+
+  // Route non-native Fish languages (eo, hv, yi, tt, cv, be, kk, uz, ky, az, tk, tg, hy, ka)
+  // through phonetic normalization + matching native Fish Audio voice (never English!).
+  const routed = FISH_NATIVE_LANGS.has(normalizedLang)
+    ? { lang: normalizedLang, text }
+    : resolvePhoneticTtsTarget(text, normalizedLang, FISH_NATIVE_LANGS);
+
+  const effectiveRefId = getFishReferenceIdForLang(
+    routed.lang,
+    undefined,
+    typeof reference_id === 'string' ? reference_id : undefined
+  );
 
   const envFishKey = (process.env.FISH_AUDIO_API_KEY || '').trim();
   const customHeaderKey = String(req.headers['x-fish-api-key'] || '').trim();
@@ -180,7 +300,7 @@ app.post('/api/tts/fish', express.json(), async (req, res) => {
           'model': fishModel,
         },
         body: JSON.stringify({
-          text,
+          text: routed.text,
           format: format || 'mp3',
           model: fishModel,
           normalize: true,
@@ -188,7 +308,7 @@ app.post('/api/tts/fish', express.json(), async (req, res) => {
           top_p: 0.5,
           temperature: 0.1,
           repetition_penalty: 1.2,
-          ...(reference_id ? { reference_id } : {})
+          ...(effectiveRefId ? { reference_id: effectiveRefId } : {})
         }),
         signal: controller.signal,
       });
@@ -217,6 +337,7 @@ app.post('/api/tts/fish', express.json(), async (req, res) => {
 
     res.setHeader('Content-Type', fishRes.headers.get('content-type') || 'audio/mpeg');
     res.setHeader('X-Fish-Model-Used', usedModel);
+    res.setHeader('X-Fish-Voice-Lang', routed.lang);
     const arrayBuffer = await fishRes.arrayBuffer();
     res.send(Buffer.from(arrayBuffer));
   } catch (err: any) {
@@ -277,6 +398,94 @@ app.post('/api/tts/grok', express.json(), async (req, res) => {
   } catch (err: any) {
     console.error('[Grok TTS Proxy Exception]:', err);
     res.status(502).json({ error: { message: err?.message || 'Grok TTS proxy failed' } });
+  }
+});
+
+// Klingon Audio-File & Sentence Player Proxy (hol.kag.org/sentence/)
+const klingonAudioCache = new Map<string, { buffer: Buffer; filename: string }>();
+
+app.get('/api/tts/klingon', async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const rawText = String(req.query.text || '').trim();
+  const forceDownload = req.query.download === '1' || req.query.download === 'true';
+
+  if (!rawText || rawText.length > 240) {
+    res.status(400).json({ ok: false, error: 'Valid Klingon text is required', fallback: 'client' });
+    return;
+  }
+
+  // Normalize curly apostrophes to straight apostrophe used by hol.kag.org
+  const normalizedSent = rawText.replace(/’/g, "'").replace(/\s+/g, ' ').trim();
+  const cacheKey = normalizedSent.toLowerCase();
+  const safeSlug = normalizedSent.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'klingon';
+
+  const sendCachedAudio = (entry: { buffer: Buffer; filename: string }) => {
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('X-Klingon-Audio-Source', 'hol.kag.org');
+    if (forceDownload) {
+      res.setHeader('Content-Disposition', `attachment; filename="${entry.filename}"`);
+    }
+    res.send(entry.buffer);
+  };
+
+  const cached = klingonAudioCache.get(cacheKey);
+  if (cached) {
+    sendCachedAudio(cached);
+    return;
+  }
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    const pageUrl = `https://hol.kag.org/sentence/?sent=${encodeURIComponent(normalizedSent)}`;
+    const pageRes = await fetch(pageUrl, {
+      headers: { 'User-Agent': 'DuoWindo6601/1.0 (+https://hol.kag.org)' },
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!pageRes.ok) {
+      res.status(404).json({ ok: false, fallback: 'client' });
+      return;
+    }
+
+    const html = await pageRes.text();
+    const match = html.match(/\/media\/tts\/audio_[a-zA-Z0-9_-]+\.mp3/);
+    if (!match) {
+      res.status(404).json({ ok: false, fallback: 'client' });
+      return;
+    }
+
+    const audioController = new AbortController();
+    const audioTimer = setTimeout(() => audioController.abort(), 5000);
+    const mp3Res = await fetch(`https://hol.kag.org${match[0]}`, {
+      headers: { 'User-Agent': 'DuoWindo6601/1.0' },
+      signal: audioTimer.signal,
+    });
+    clearTimeout(audioTimer);
+
+    if (!mp3Res.ok) {
+      res.status(404).json({ ok: false, fallback: 'client' });
+      return;
+    }
+
+    const buf = Buffer.from(await mp3Res.arrayBuffer());
+    if (buf.length < 256) {
+      res.status(404).json({ ok: false, fallback: 'client' });
+      return;
+    }
+
+    const filename = `klingon_${safeSlug}.mp3`;
+    if (klingonAudioCache.size > 150) {
+      const oldestKey = klingonAudioCache.keys().next().value;
+      if (oldestKey) klingonAudioCache.delete(oldestKey);
+    }
+    const entry = { buffer: buf, filename };
+    klingonAudioCache.set(cacheKey, entry);
+    sendCachedAudio(entry);
+  } catch (err: any) {
+    res.status(404).json({ ok: false, fallback: 'client', reason: err?.message || 'hol_unavailable' });
   }
 });
 

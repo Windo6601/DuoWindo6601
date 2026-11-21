@@ -79,13 +79,13 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
             <div>
               <h4 className="text-white font-black text-sm uppercase tracking-wider flex items-center gap-2 flex-wrap">
                 <span>{isRu ? 'Установить DuoWindo6601 PWA' : 'Install DuoWindo6601 PWA'}</span>
-                <span className="bg-emerald-500 text-[10px] text-white px-2 py-0.5 rounded-full font-black uppercase">Автономно</span>
+                <span className="bg-emerald-500 text-[10px] text-white px-2 py-0.5 rounded-full font-black uppercase">{isRu ? 'Онлайн PWA' : 'Online PWA'}</span>
               </h4>
               <div className="flex flex-wrap items-center gap-2 mt-1">
                 <p className="text-xs text-blue-200 font-bold">
                   {isRu 
-                    ? 'ПК и мобильный браузер: запуск без адресной строки и офлайн-кэш' 
-                    : 'Desktop & Mobile: standalone window, fast launch and offline support'}
+                    ? 'ПК и мобильный браузер: быстрый запуск без адресной строки (без VPN и с VPN)' 
+                    : 'Desktop & Mobile: standalone window, fast launch (works with & without VPN)'}
                 </p>
                 {onOpenReviews && (
                   <button
@@ -149,7 +149,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
       <button
         type="button"
         onClick={handleInstallClick}
-        title={isRu ? "Установить автономное PWA приложение" : "Install Standalone PWA App"}
+        title={isRu ? "Установить PWA приложение DuoWindo6601" : "Install DuoWindo6601 PWA App"}
         className={`inline-flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:brightness-110 active:scale-95 text-white font-black text-xs px-3.5 py-2 rounded-xl border-b-2 border-blue-800 shadow-md transition-all uppercase tracking-wider cursor-pointer ${className}`}
       >
         <img src="/100042597.svg" alt="PWA" className="w-4 h-4 rounded-sm" />
@@ -222,7 +222,7 @@ export const PWAInstructionModal: React.FC<{
               {isRu ? 'Установка DuoWindo6601' : 'Install DuoWindo6601'}
             </h3>
             <p className="text-xs text-blue-300 font-bold uppercase tracking-wider">
-              {isRu ? 'Автономное PWA-приложение' : 'Standalone Progressive Web App'}
+              {isRu ? 'PWA-приложение (Онлайн • Без VPN и с VPN)' : 'Progressive Web App (Online • Works with & without VPN)'}
             </p>
           </div>
           <button 
@@ -358,7 +358,7 @@ export const PWAInstructionModal: React.FC<{
               </div>
               <div className="flex items-start gap-1.5">
                 <span className="text-emerald-400 font-bold">✓</span>
-                <span><strong>{isRu ? 'Service Worker & Манифест:' : 'Service Worker & Manifest:'}</strong> {isRu ? 'манифест и офлайн-кэш активны.' : 'manifest and offline cache are active.'}</span>
+                <span><strong>{isRu ? 'Service Worker & Манифест:' : 'Service Worker & Manifest:'}</strong> {isRu ? 'манифест и Service Worker активны (работает онлайн).' : 'manifest and Service Worker are active (online mode).'}</span>
               </div>
               <div className="flex items-start gap-1.5">
                 <span className="text-emerald-400 font-bold">✓</span>

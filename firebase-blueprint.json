@@ -37,6 +37,9 @@
         "dailyAiRequestsCount": { "type": "integer", "description": "Number of Gemini API requests used today" },
         "bonusAiRequests": { "type": "integer", "description": "Bonus Gemini API requests purchased or gifted" },
         "lastAiRequestDate": { "type": "string", "description": "Date YYYY-MM-DD of last Gemini API request" },
+        "isBetaTester": { "type": "boolean", "description": "Whether the user has joined DuoWindo6601 App Beta Testing" },
+        "betaJoinedAt": { "type": "string", "format": "date-time", "description": "Timestamp when user joined app beta testing" },
+        "betaTestedCourses": { "type": "array", "description": "Course IDs tested during beta" },
         "createdAt": { "type": "string", "format": "date-time", "description": "Profile creation timestamp" },
         "updatedAt": { "type": "string", "format": "date-time", "description": "Profile last update timestamp" }
       },

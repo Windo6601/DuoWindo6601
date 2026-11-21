@@ -1,13 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  AVAILABLE_DICTIONARY_PACKS, 
-  OfflineDictionaryPack, 
-  getDownloadedDictionaries, 
-  saveDownloadedDictionaries,
-  translateOffline
-} from '../services/offlineDictionaryService';
-import { translateText } from '../services/geminiService';
-import { VolumeIcon, BookIcon, CloseIcon } from './Icons';
+import { translateText, OFFLINE_INTERNET_REQUIRED_MESSAGE, isNetworkDisconnectError, notifyNetworkOffline } from '../services/geminiService';
+import { VolumeIcon, CloseIcon } from './Icons';
 
 interface TranslatorScreenProps {
   userLanguage: string;
@@ -67,21 +60,11 @@ export const TranslatorScreen: React.FC<TranslatorScreenProps> = ({
   const [inputText, setInputText] = useState<string>('');
   const [outputText, setOutputText] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [forceOffline, setForceOffline] = useState<boolean>(false);
   const [isSwapping, setIsSwapping] = useState<boolean>(false);
   const [translationSourceInfo, setTranslationSourceInfo] = useState<string>('');
 
   // Quick switch assign mode: whether tapping top ribbon sets Target or Source
   const [ribbonAssignMode, setRibbonAssignMode] = useState<'target' | 'source'>('target');
-
-  // Offline dictionaries state
-  const [downloadedDicts, setDownloadedDicts] = useState<string[]>(() => getDownloadedDictionaries());
-  const [downloadProgress, setDownloadProgress] = useState<Record<string, number>>({});
-  const [isDownloadingAll, setIsDownloadingAll] = useState<boolean>(false);
-
-  // Search & filter states for offline dictionaries
-  const [dictionarySearch, setDictionarySearch] = useState<string>('');
-  const [dictionaryFilter, setDictionaryFilter] = useState<'all' | 'downloaded' | 'available'>('all');
 
   // Selector modal states
   const [showSourceSelector, setShowSourceSelector] = useState<boolean>(false);
@@ -99,9 +82,13 @@ export const TranslatorScreen: React.FC<TranslatorScreenProps> = ({
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    window.addEventListener('duowindo_network_online', handleOnline);
+    window.addEventListener('duowindo_network_offline', handleOffline);
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('duowindo_network_online', handleOnline);
+      window.removeEventListener('duowindo_network_offline', handleOffline);
     };
   }, []);
 
@@ -198,7 +185,7 @@ export const TranslatorScreen: React.FC<TranslatorScreenProps> = ({
     }
   };
 
-  // Perform translation (Online AI with auto-fallback to Offline Dictionary, or Forced Offline Dictionary)
+  // Perform online Gemini AI translation (works without VPN and with VPN)
   const handleTranslate = async (
     textToTranslate: string = inputText,
     overrideTarget: string = targetLang,
@@ -207,195 +194,57 @@ export const TranslatorScreen: React.FC<TranslatorScreenProps> = ({
     const cleanText = textToTranslate.trim();
     if (!cleanText) return;
 
+    if (!isNetworkOnline || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      notifyNetworkOffline();
+      setToast(
+        isRu
+          ? `📡 ${OFFLINE_INTERNET_REQUIRED_MESSAGE}`
+          : '📡 No internet connection. DuoWindo6601 requires internet. Turn on Wi-Fi or mobile data and try again.'
+      );
+      playSound('wrong');
+      return;
+    }
+
     playSound('click');
     setIsLoading(true);
 
     const targetOpt = TRANSLATION_LANGUAGES.find(l => l.code === overrideTarget) || getTargetOption();
     const sourceOpt = TRANSLATION_LANGUAGES.find(l => l.code === overrideSource) || getSourceOption();
-    const isTargetDownloaded = downloadedDicts.includes(overrideTarget);
-    const shouldUseOffline = forceOffline || !isNetworkOnline;
 
-    if (shouldUseOffline) {
-      // Offline translation mode
-      setTimeout(() => {
-        if (!isTargetDownloaded) {
-          setToast(
-            isRu
-              ? `⚠️ Офлайн-словарь для «${getLangName(overrideTarget)}» ещё не скачан! Скачайте его ниже в разделе «Словари без интернета».`
-              : `⚠️ Offline dictionary for "${getLangName(overrideTarget)}" is not downloaded yet! Download it below.`
-          );
-        }
-
-        const offlineRes = translateOffline(cleanText, overrideSource, overrideTarget);
-        setOutputText(offlineRes.translation);
-        setTranslationSourceInfo(
-          isRu
-            ? `💾 Офлайн-перевод (Словарь DuoWindo6601 • ${offlineRes.dictionaryUsed})`
-            : `💾 Offline Translation (DuoWindo6601 Dictionary • ${offlineRes.dictionaryUsed})`
-        );
-        playSound('success');
-        setIsLoading(false);
-      }, 300);
-      return;
-    }
-
-    // Online Gemini AI translation with graceful offline fallback
     try {
       const targetLangName = isRu ? targetOpt.nameRu : targetOpt.nameEn;
       const sourceLangName = isRu ? sourceOpt.nameRu : sourceOpt.nameEn;
       const res = await translateText(cleanText, targetLangName, sourceLangName);
-      
+
       setOutputText(res);
       setTranslationSourceInfo(
-        isRu 
-          ? `🌐 Онлайн-перевод (DuoWindo6601 Gemini AI)`
-          : `🌐 Online Translation (DuoWindo6601 Gemini AI)`
-      );
-      playSound('success');
-    } catch (err) {
-      console.warn('Gemini translate failed, using offline dictionary fallback:', err);
-      const offlineRes = translateOffline(cleanText, overrideSource, overrideTarget);
-      setOutputText(offlineRes.translation);
-      setTranslationSourceInfo(
         isRu
-          ? `💾 Офлайн-перевод (Резервный словарь без интернета)`
-          : `💾 Offline Translation (Backup offline dictionary)`
+          ? '🌐 Онлайн-перевод (DuoWindo6601 Gemini AI • Без VPN и с VPN)'
+          : '🌐 Online Translation (DuoWindo6601 Gemini AI • With & Without VPN)'
       );
       playSound('success');
+    } catch (err: any) {
+      const offlineErr =
+        isNetworkDisconnectError(err) ||
+        String(err?.message || '').includes('Нет подключения к интернету');
+      if (offlineErr) {
+        notifyNetworkOffline();
+        setToast(
+          isRu
+            ? `📡 ${OFFLINE_INTERNET_REQUIRED_MESSAGE}`
+            : '📡 No internet connection. DuoWindo6601 requires internet. Turn on Wi-Fi or mobile data and try again.'
+        );
+      } else {
+        setToast(
+          err?.message ||
+            (isRu ? '⚠️ Ошибка онлайн-перевода Gemini AI. Попробуйте снова.' : '⚠️ Online Gemini AI translation error. Please try again.')
+        );
+      }
+      playSound('wrong');
     } finally {
       setIsLoading(false);
     }
   };
-
-  // Simulated live download of a dictionary pack with realistic progress bar
-  const handleDownloadDictionary = (pack: OfflineDictionaryPack, andSwitchToTarget: boolean = false) => {
-    if (downloadProgress[pack.id] !== undefined) return;
-
-    playSound('click');
-    setToast(
-      isRu 
-        ? `📥 Начало скачивания офлайн-словаря: ${pack.languageNameRu} (${pack.sizeMb} МБ)...` 
-        : `📥 Downloading offline dictionary: ${pack.languageNameEn} (${pack.sizeMb} MB)...`
-    );
-
-    if (andSwitchToTarget) {
-      setTargetLang(pack.id);
-      topTranslatorRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-
-    setDownloadProgress(prev => ({ ...prev, [pack.id]: 5 }));
-
-    let current = 5;
-    const interval = setInterval(() => {
-      current += Math.floor(Math.random() * 18) + 12;
-      if (current >= 100) {
-        clearInterval(interval);
-        setDownloadProgress(prev => {
-          const next = { ...prev };
-          delete next[pack.id];
-          return next;
-        });
-        setDownloadedDicts(prev => {
-          const updated = Array.from(new Set([...prev, pack.id]));
-          saveDownloadedDictionaries(updated);
-          return updated;
-        });
-        playSound('streak_update');
-        setToast(
-          isRu 
-            ? `✅ Словарь «${pack.languageNameRu}» (${pack.sizeMb} МБ) успешно сохранён в память устройства! Теперь доступен без интернета.` 
-            : `✅ "${pack.languageNameEn}" dictionary (${pack.sizeMb} MB) saved! Ready for offline use.`
-        );
-      } else {
-        setDownloadProgress(prev => ({ ...prev, [pack.id]: current }));
-      }
-    }, 160);
-  };
-
-  // Delete downloaded dictionary
-  const handleDeleteDictionary = (pack: OfflineDictionaryPack) => {
-    playSound('click');
-    setDownloadedDicts(prev => {
-      const updated = prev.filter(id => id !== pack.id);
-      saveDownloadedDictionaries(updated);
-      return updated;
-    });
-    setToast(
-      isRu 
-        ? `🗑️ Словарь «${pack.languageNameRu}» удален из памяти устройства` 
-        : `🗑️ "${pack.languageNameEn}" dictionary removed from device storage`
-    );
-  };
-
-  // Download all available dictionaries
-  const handleDownloadAll = () => {
-    const unDownloaded = AVAILABLE_DICTIONARY_PACKS.filter(p => !downloadedDicts.includes(p.id));
-    if (unDownloaded.length === 0) {
-      setToast(isRu ? 'Все словари уже скачаны на ваше устройство!' : 'All dictionaries are already downloaded!');
-      return;
-    }
-
-    playSound('select');
-    setIsDownloadingAll(true);
-    setToast(
-      isRu 
-        ? `📥 Скачивание всех словарей (${unDownloaded.length} пакетов)...` 
-        : `📥 Downloading all dictionaries (${unDownloaded.length} packs)...`
-    );
-
-    unDownloaded.forEach((p, index) => {
-      setTimeout(() => {
-        handleDownloadDictionary(p);
-        if (index === unDownloaded.length - 1) {
-          setIsDownloadingAll(false);
-        }
-      }, index * 350);
-    });
-  };
-
-  // Clear all downloaded dictionaries
-  const handleClearAllDictionaries = () => {
-    playSound('click');
-    const confirmed = window.confirm(
-      isRu 
-        ? 'Вы уверены, что хотите удалить все скачанные офлайн-словари из памяти устройства?' 
-        : 'Are you sure you want to remove all offline dictionaries from device storage?'
-    );
-    if (!confirmed) return;
-
-    // Reset to defaults
-    const reset = ['ru', 'en'];
-    setDownloadedDicts(reset);
-    saveDownloadedDictionaries(reset);
-    setToast(isRu ? '🗑️ Кэш словарей очищен. Оставлены базовые RU и EN.' : '🗑️ Cache cleared. Core RU and EN retained.');
-  };
-
-  // Calculate memory storage used
-  const totalStorageUsedMb = AVAILABLE_DICTIONARY_PACKS
-    .filter(p => downloadedDicts.includes(p.id))
-    .reduce((sum, p) => sum + p.sizeMb, 0)
-    .toFixed(1);
-
-  // Filtered dictionary packs
-  const filteredDictionaryPacks = AVAILABLE_DICTIONARY_PACKS.filter(pack => {
-    const matchesSearch = 
-      pack.languageNameRu.toLowerCase().includes(dictionarySearch.toLowerCase()) ||
-      pack.languageNameEn.toLowerCase().includes(dictionarySearch.toLowerCase()) ||
-      pack.countryNameRu.toLowerCase().includes(dictionarySearch.toLowerCase()) ||
-      pack.countryNameEn.toLowerCase().includes(dictionarySearch.toLowerCase()) ||
-      pack.nativeName.toLowerCase().includes(dictionarySearch.toLowerCase()) ||
-      pack.id.toLowerCase().includes(dictionarySearch.toLowerCase());
-
-    if (!matchesSearch) return false;
-
-    if (dictionaryFilter === 'downloaded') {
-      return downloadedDicts.includes(pack.id);
-    }
-    if (dictionaryFilter === 'available') {
-      return !downloadedDicts.includes(pack.id);
-    }
-    return true;
-  });
 
   return (
     <div className="fixed inset-0 z-[100] bg-duo-dark overflow-y-auto no-scrollbar font-din select-none pb-28">
@@ -412,34 +261,20 @@ export const TranslatorScreen: React.FC<TranslatorScreenProps> = ({
           </button>
 
           <div className="flex items-center space-x-2">
-            {/* OFFLINE MODE TOGGLE */}
-            <button
-              onClick={() => {
-                playSound('click');
-                const nextState = !forceOffline;
-                setForceOffline(nextState);
-                setToast(
-                  nextState
-                    ? (isRu ? '💾 Офлайн-режим перевода включен! Перевод выполняется через локальные словари.' : '💾 Offline translation mode enabled! Using local dictionaries.')
-                    : (isRu ? '🌐 Офлайн-режим выключен. Используется Gemini AI.' : '🌐 Offline mode disabled. Using Gemini AI.')
-                );
-              }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center space-x-1.5 border transition-all cursor-pointer ${
-                forceOffline || !isNetworkOnline
-                  ? 'bg-amber-950/80 border-amber-500/60 text-amber-300 shadow-md'
-                  : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-750'
+            <div
+              className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center space-x-1.5 border ${
+                !isNetworkOnline
+                  ? 'bg-red-950/80 border-red-500/60 text-red-300 shadow-md'
+                  : 'bg-emerald-950/70 border-emerald-500/40 text-emerald-300'
               }`}
-              title={isRu ? 'Включить принудительный перевод через офлайн-словари' : 'Toggle offline dictionary translation'}
             >
-              <span>{forceOffline || !isNetworkOnline ? '💾' : '🌐'}</span>
+              <span>{!isNetworkOnline ? '📡' : '🌐'}</span>
               <span>
-                {!isNetworkOnline 
-                  ? (isRu ? 'Нет сети (Офлайн)' : 'Offline (No network)') 
-                  : forceOffline 
-                    ? (isRu ? 'Режим: Офлайн-словари' : 'Mode: Offline Dicts') 
-                    : (isRu ? 'Режим: Gemini AI' : 'Mode: Gemini AI')}
+                {!isNetworkOnline
+                  ? (isRu ? 'Нет подключения к интернету' : 'No Internet')
+                  : (isRu ? 'Gemini AI Онлайн • Без VPN и с VPN' : 'Gemini AI Online • VPN & No-VPN')}
               </span>
-            </button>
+            </div>
           </div>
         </div>
 
@@ -454,14 +289,14 @@ export const TranslatorScreen: React.FC<TranslatorScreenProps> = ({
                 <h1 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight">
                   {isRu ? 'Переводчик DuoWindo6601' : 'DuoWindo6601 Translator'}
                 </h1>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                  {isRu ? 'Офлайн-словари 💾' : 'Offline Dictionaries 💾'}
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-sky-500/20 text-sky-300 border border-sky-500/40">
+                  {isRu ? 'Gemini AI Онлайн 🌐' : 'Gemini AI Online 🌐'}
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-gray-300 font-bold mt-1">
                 {isRu 
-                  ? 'Приключайте языки стран перевода ⇄ и переводите без интернета с помощью скачанных словарей' 
-                  : 'Switch country languages for translation ⇄ and translate offline using downloaded dictionaries'}
+                  ? 'Переключайте языки стран ⇄ и переводите через Gemini AI • Работает без VPN и использует VPN'
+                  : 'Switch country languages ⇄ and translate via Gemini AI • Works without VPN and with VPN'}
               </p>
             </div>
           </div>
@@ -512,7 +347,6 @@ export const TranslatorScreen: React.FC<TranslatorScreenProps> = ({
             {TRANSLATION_LANGUAGES.map(lang => {
               const isSelectedTarget = targetLang === lang.code;
               const isSelectedSource = sourceLang === lang.code;
-              const isDownloaded = downloadedDicts.includes(lang.code);
 
               let activeBorder = 'border-gray-700/80 hover:border-gray-500';
               let activeBg = 'bg-gray-800/90 text-gray-200';
@@ -549,11 +383,6 @@ export const TranslatorScreen: React.FC<TranslatorScreenProps> = ({
 
                   {/* Badges */}
                   <div className="flex items-center space-x-1 pl-1">
-                    {isDownloaded && (
-                      <span className="text-[10px]" title={isRu ? 'Офлайн-словарь скачан' : 'Offline dictionary downloaded'}>
-                        💾
-                      </span>
-                    )}
                     {isSelectedTarget && (
                       <span className="w-2 h-2 rounded-full bg-emerald-400" title={isRu ? 'Текущий целевой язык' : 'Current target'}></span>
                     )}
@@ -599,24 +428,10 @@ export const TranslatorScreen: React.FC<TranslatorScreenProps> = ({
             </div>
 
             <div className="flex items-center space-x-2">
-              {downloadedDicts.includes(targetLang) ? (
-                <span className="text-[11px] font-black text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full flex items-center space-x-1">
-                  <span>💾</span>
-                  <span>{isRu ? 'Офлайн-словарь активен' : 'Offline Dict Active'}</span>
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const pack = AVAILABLE_DICTIONARY_PACKS.find(p => p.id === targetLang);
-                    if (pack) handleDownloadDictionary(pack);
-                  }}
-                  className="text-[11px] font-black text-amber-300 hover:text-white bg-amber-950/60 hover:bg-amber-900 border border-amber-500/40 px-2 py-0.5 rounded-full transition-all cursor-pointer flex items-center space-x-1"
-                >
-                  <span>📥</span>
-                  <span>{isRu ? 'Скачать для офлайна' : 'Download for offline'}</span>
-                </button>
-              )}
+              <span className="text-[11px] font-black text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2.5 py-0.5 rounded-full flex items-center space-x-1">
+                <span>🌐</span>
+                <span>{isRu ? 'Онлайн Gemini AI • Без VPN и с VPN' : 'Online Gemini AI • With & Without VPN'}</span>
+              </span>
             </div>
           </div>
 
@@ -761,11 +576,6 @@ export const TranslatorScreen: React.FC<TranslatorScreenProps> = ({
                     </div>
                   </div>
                   <div className="flex items-center space-x-1.5 shrink-0">
-                    {downloadedDicts.includes(targetLang) && (
-                      <span className="bg-emerald-950 text-emerald-400 text-[10px] font-black px-1.5 py-0.5 rounded border border-emerald-500/40">
-                        {isRu ? 'Офлайн ✅' : 'Offline ✅'}
-                      </span>
-                    )}
                     <span className="text-gray-400 group-hover:text-white transition-colors text-xs font-black">▼</span>
                   </div>
                 </button>
@@ -817,9 +627,6 @@ export const TranslatorScreen: React.FC<TranslatorScreenProps> = ({
                               </div>
                             </div>
                             <div className="flex items-center space-x-1.5">
-                              {downloadedDicts.includes(lang.code) && (
-                                <span className="text-[10px] bg-emerald-900/80 text-emerald-300 px-1.5 py-0.5 rounded">💾</span>
-                              )}
                               {targetLang === lang.code && <span className="text-xs">✓</span>}
                             </div>
                           </button>
@@ -969,335 +776,40 @@ export const TranslatorScreen: React.FC<TranslatorScreenProps> = ({
           )}
         </div>
 
-        {/* ============================================================== */}
-        {/* MAJOR SECTION: «СЛОВАРИ ДЛЯ ПЕРЕВОДА БЕЗ ИНТЕРНЕТА» (OFFLINE DICTIONARIES) */}
-        {/* ============================================================== */}
-        <div className="bg-gradient-to-b from-gray-900 via-gray-850 to-gray-900 border-2 border-emerald-500/50 rounded-3xl p-5 sm:p-6 md:p-8 shadow-2xl space-y-6">
-          
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-800 pb-5">
-            <div className="flex items-start space-x-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-2xl shadow-inner shrink-0">
-                💾
-              </div>
-              <div>
-                <div className="flex items-center space-x-2 flex-wrap">
-                  <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">
-                    {isRu ? 'Словари для перевода без интернета' : 'Offline Translation Dictionaries'}
-                  </h2>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                    PWA Офлайн
-                  </span>
-                </div>
-                <p className="text-xs sm:text-sm text-gray-300 font-bold mt-1">
-                  {isRu 
-                    ? 'Скачивайте словари стран на устройство и приключайте язык перевода для работы без интернета в поездках и при слабой связи.'
-                    : 'Download country dictionaries to device and switch translation languages offline while traveling.'}
-                </p>
-              </div>
-            </div>
-
-            {/* BULK ACTION: DOWNLOAD ALL */}
-            <div className="flex items-center space-x-2 shrink-0 self-start md:self-center">
-              <button
-                type="button"
-                onClick={handleDownloadAll}
-                disabled={isDownloadingAll}
-                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-xs uppercase tracking-wider rounded-2xl border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all flex items-center space-x-2 shadow-lg cursor-pointer"
-              >
-                <span>📥</span>
-                <span>{isRu ? 'Скачать все словари' : 'Download All Dictionaries'}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* STORAGE STATS & CACHE MANAGEMENT BAR */}
-          <div className="bg-black/50 border border-gray-800 p-3.5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-bold text-gray-300">
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="flex items-center space-x-1.5">
-                <span className="text-emerald-400">📦</span>
-                <span>{isRu ? 'Скачано словарей:' : 'Downloaded:'}</span>
-                <span className="text-white font-black">{downloadedDicts.length} / {AVAILABLE_DICTIONARY_PACKS.length}</span>
-              </div>
-              <div className="flex items-center space-x-1.5">
-                <span className="text-sky-400">💾</span>
-                <span>{isRu ? 'Память устройства:' : 'Storage Used:'}</span>
-                <span className="text-white font-black">{totalStorageUsedMb} МБ</span>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center space-x-2 text-[11px] text-gray-400">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>{isRu ? 'Кэш PWA DuoWindo6601' : 'PWA Cache Ready'}</span>
-              </div>
-              <button
-                type="button"
-                onClick={handleClearAllDictionaries}
-                className="text-[11px] text-gray-400 hover:text-rose-400 underline cursor-pointer"
-              >
-                {isRu ? 'Очистить кэш' : 'Clear cache'}
-              </button>
-            </div>
-          </div>
-
-          {/* SEARCH & FILTER CONTROLS */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-            {/* Search */}
-            <div className="relative flex-1">
-              <input
-                type="text"
-                value={dictionarySearch}
-                onChange={(e) => setDictionarySearch(e.target.value)}
-                placeholder={isRu ? "🔍 Поиск словаря по стране или языку..." : "🔍 Search dictionary by country or language..."}
-                className="w-full bg-gray-800 border-2 border-gray-700 focus:border-emerald-500 rounded-xl px-4 py-2 text-xs font-bold text-white placeholder-gray-500 focus:outline-none transition-colors"
-              />
-              {dictionarySearch && (
-                <button
-                  type="button"
-                  onClick={() => setDictionarySearch('')}
-                  className="absolute right-3 top-2.5 text-gray-400 hover:text-white text-xs font-bold"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-
-            {/* Filter tabs */}
-            <div className="flex items-center bg-gray-800 p-1 rounded-xl border border-gray-700 text-xs font-black shrink-0">
-              <button
-                type="button"
-                onClick={() => setDictionaryFilter('all')}
-                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-                  dictionaryFilter === 'all' ? 'bg-emerald-600 text-white shadow' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                {isRu ? 'Все словари' : 'All'} ({AVAILABLE_DICTIONARY_PACKS.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setDictionaryFilter('downloaded')}
-                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-                  dictionaryFilter === 'downloaded' ? 'bg-emerald-600 text-white shadow' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                {isRu ? 'Скачанные ✅' : 'Downloaded ✅'} ({downloadedDicts.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setDictionaryFilter('available')}
-                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-                  dictionaryFilter === 'available' ? 'bg-emerald-600 text-white shadow' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                {isRu ? 'Доступные 📥' : 'Available 📥'}
-              </button>
-            </div>
-          </div>
-
-          {/* GRID OF DICTIONARY PACKAGES */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredDictionaryPacks.map(pack => {
-              const isDownloaded = downloadedDicts.includes(pack.id);
-              const progress = downloadProgress[pack.id];
-              const isCurrentlyDownloading = progress !== undefined;
-              const isCurrentTarget = targetLang === pack.id;
-              const isCurrentSource = sourceLang === pack.id;
-
-              return (
-                <div
-                  key={pack.id}
-                  className={`p-4 sm:p-5 rounded-2xl border-2 transition-all flex flex-col justify-between space-y-3.5 relative overflow-hidden ${
-                    isCurrentTarget
-                      ? 'bg-gradient-to-br from-emerald-950/80 via-gray-850 to-gray-900 border-emerald-400 shadow-xl ring-2 ring-emerald-500/30'
-                      : isDownloaded 
-                        ? 'bg-gray-850/90 border-emerald-500/50 shadow-md' 
-                        : 'bg-gray-850/50 border-gray-700/70 hover:border-gray-600'
-                  }`}
-                >
-                  {/* Top card info */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center space-x-3 min-w-0">
-                      <img 
-                        src={`https://flagcdn.com/w80/${pack.countryCode}.png`} 
-                        alt="" 
-                        className="w-11 h-7.5 object-cover rounded-md shadow-sm shrink-0" 
-                      />
-                      <div className="min-w-0">
-                        <div className="flex items-center space-x-2">
-                          <h3 className="font-black text-sm sm:text-base text-white truncate">
-                            {isRu ? pack.languageNameRu : pack.languageNameEn}
-                          </h3>
-                          <span className="text-[10px] bg-gray-700 text-gray-300 font-black px-1.5 py-0.5 rounded uppercase shrink-0">
-                            {pack.sizeMb} МБ
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-gray-400 font-bold truncate">
-                          {isRu ? pack.countryNameRu : pack.countryNameEn} • {pack.nativeName}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Status badge */}
-                    {isDownloaded ? (
-                      <span className="bg-emerald-950/80 text-emerald-300 text-[10px] font-black px-2 py-1 rounded-full border border-emerald-500/40 shrink-0 flex items-center space-x-1">
-                        <span>✅</span>
-                        <span>{isRu ? 'Скачано' : 'Downloaded'}</span>
-                      </span>
-                    ) : (
-                      <span className="bg-gray-800 text-gray-400 text-[10px] font-black px-2 py-1 rounded-full border border-gray-700 shrink-0 flex items-center space-x-1">
-                        <span>📥</span>
-                        <span>{isRu ? 'Не скачано' : 'Not downloaded'}</span>
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Description */}
-                  <p className="text-xs text-gray-300 font-medium leading-relaxed">
-                    {isRu ? pack.descriptionRu : pack.descriptionEn}
-                  </p>
-
-                  {/* Word count & vocabulary topics */}
-                  <div className="text-[11px] text-gray-400 font-bold flex items-center justify-between border-t border-gray-800/80 pt-2">
-                    <span>📚 {pack.wordCount}</span>
-                    <span className="text-emerald-400 text-[10px] uppercase font-black tracking-wider">
-                      {isDownloaded ? (isRu ? 'Офлайн активен' : 'Offline Ready') : (isRu ? 'Офлайн пакет' : 'Offline Pack')}
-                    </span>
-                  </div>
-
-                  {/* DOWNLOAD PROGRESS BAR */}
-                  {isCurrentlyDownloading && (
-                    <div className="space-y-1.5 pt-1">
-                      <div className="flex justify-between text-[10px] font-black text-emerald-400">
-                        <span>{isRu ? 'Скачивание офлайн-словаря...' : 'Downloading pack...'}</span>
-                        <span>{progress}%</span>
-                      </div>
-                      <div className="w-full bg-gray-800 rounded-full h-2.5 overflow-hidden p-0.5 border border-emerald-500/30">
-                        <div 
-                          className="bg-emerald-500 h-full rounded-full transition-all duration-200" 
-                          style={{ width: `${progress}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* ACTION BUTTONS: "Приключить язык перевода" */}
-                  <div className="pt-2 border-t border-gray-800 flex flex-wrap items-center justify-between gap-2">
-                    {isDownloaded ? (
-                      <>
-                        {/* 1. PRIMARY BUTTON: «ПРИКЛЮЧИТЬ ЭТОТ ЯЗЫК ПЕРЕВОДА ⇄» */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            playSound('select');
-                            setTargetLang(pack.id);
-                            setToast(
-                              isRu 
-                                ? `⇄ Язык страны перевода приключен: ${pack.languageNameRu} (${pack.countryNameRu})!` 
-                                : `⇄ Translation language switched to: ${pack.languageNameEn} (${pack.countryNameEn})!`
-                            );
-                            topTranslatorRef.current?.scrollIntoView({ behavior: 'smooth' });
-                            if (inputText.trim()) {
-                              setTimeout(() => handleTranslate(inputText, pack.id), 200);
-                            }
-                          }}
-                          className={`flex-1 py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-1.5 cursor-pointer shadow-md ${
-                            isCurrentTarget
-                              ? 'bg-emerald-600 text-white border-2 border-emerald-300'
-                              : 'bg-emerald-950/90 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/50 hover:border-emerald-400'
-                          }`}
-                        >
-                          <span>⇄</span>
-                          <span>
-                            {isCurrentTarget 
-                              ? (isRu ? '✓ Приключен для перевода' : '✓ Active For Translation')
-                              : (isRu ? 'Приключить этот язык перевода' : 'Switch To This Language')}
-                          </span>
-                        </button>
-
-                        {/* 2. SECONDARY BUTTON: As source language */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            playSound('select');
-                            setSourceLang(pack.id);
-                            setToast(
-                              isRu 
-                                ? `📥 Исходный язык изменен на: ${pack.languageNameRu}!` 
-                                : `📥 Source language set to: ${pack.languageNameEn}!`
-                            );
-                            topTranslatorRef.current?.scrollIntoView({ behavior: 'smooth' });
-                          }}
-                          className={`py-2 px-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer ${
-                            isCurrentSource
-                              ? 'bg-sky-600 text-white'
-                              : 'bg-gray-800 hover:bg-gray-750 text-gray-300 border border-gray-700'
-                          }`}
-                          title={isRu ? 'Использовать как исходный язык (откуда)' : 'Use as source language'}
-                        >
-                          <span>{isCurrentSource ? '✓ Откуда' : '📥 Откуда'}</span>
-                        </button>
-
-                        {/* 3. DELETE BUTTON */}
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteDictionary(pack)}
-                          className="p-2.5 bg-gray-800 hover:bg-rose-950/60 text-gray-400 hover:text-rose-400 rounded-xl border border-gray-700 transition-all cursor-pointer"
-                          title={isRu ? 'Удалить словарь из памяти' : 'Delete dictionary'}
-                        >
-                          🗑️
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        {/* If NOT downloaded: DOWNLOAD BUTTON */}
-                        <button
-                          type="button"
-                          onClick={() => handleDownloadDictionary(pack)}
-                          disabled={isCurrentlyDownloading}
-                          className={`flex-1 py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-1.5 cursor-pointer ${
-                            isCurrentlyDownloading
-                              ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                              : 'bg-sky-600 hover:bg-sky-500 text-white border-b-2 border-sky-800 shadow-md active:translate-y-0.5'
-                          }`}
-                        >
-                          <span>📥</span>
-                          <span>{isRu ? `Скачать словарь (${pack.sizeMb} МБ)` : `Download (${pack.sizeMb} MB)`}</span>
-                        </button>
-
-                        {/* Fast "Приключить и скачать" */}
-                        <button
-                          type="button"
-                          onClick={() => handleDownloadDictionary(pack, true)}
-                          disabled={isCurrentlyDownloading}
-                          className="py-2.5 px-3 bg-emerald-900/60 hover:bg-emerald-800 text-emerald-300 border border-emerald-500/40 rounded-xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer"
-                          title={isRu ? 'Приключить язык перевода и скачать офлайн-словарь' : 'Switch target language & download'}
-                        >
-                          <span>⇄ Приключить</span>
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {filteredDictionaryPacks.length === 0 && (
-            <div className="bg-gray-800/60 border border-gray-700 rounded-2xl p-8 text-center space-y-2">
-              <span className="text-3xl block">🔍</span>
-              <p className="text-sm font-black text-gray-300">
-                {isRu ? 'Словари по вашему запросу не найдены' : 'No dictionaries match your search'}
+        {/* ONLINE LANGUAGES DIRECTORY (WORKS WITHOUT VPN AND WITH VPN) */}
+        <div className="bg-gray-900/80 border border-sky-500/30 rounded-3xl p-5 sm:p-6 shadow-xl space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h2 className="text-lg font-black text-white uppercase tracking-tight">
+                {isRu ? '🌐 Доступные языки онлайн-переводчика' : '🌐 Supported Online Translator Languages'}
+              </h2>
+              <p className="text-xs text-gray-400 font-bold">
+                {isRu
+                  ? 'Для перевода требуется подключение к интернету. Сервер работает без VPN и с VPN.'
+                  : 'Internet connection required for translation. Server works without VPN and with VPN.'}
               </p>
-              <button
-                type="button"
-                onClick={() => { setDictionarySearch(''); setDictionaryFilter('all'); }}
-                className="text-xs text-emerald-400 font-bold hover:underline"
-              >
-                {isRu ? 'Сбросить поиск и фильтры' : 'Reset search and filters'}
-              </button>
             </div>
-          )}
-
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+            {TRANSLATION_LANGUAGES.map((lang) => (
+              <button
+                key={lang.code}
+                type="button"
+                onClick={() => handleSwitchLanguage(lang.code, true)}
+                className={`p-3 rounded-2xl border text-left flex items-center space-x-2.5 transition-all cursor-pointer ${
+                  targetLang === lang.code
+                    ? 'bg-emerald-950/70 border-emerald-400 text-emerald-200'
+                    : 'bg-gray-850 border-gray-700/70 hover:border-sky-500/60 text-gray-200'
+                }`}
+              >
+                <img src={`https://flagcdn.com/w40/${lang.flagCode}.png`} alt="" className="w-6 h-4 rounded-xs object-cover shrink-0" />
+                <div className="min-w-0">
+                  <span className="text-xs font-black block truncate">{isRu ? lang.nameRu : lang.nameEn}</span>
+                  <span className="text-[10px] text-gray-400 font-bold block truncate">{isRu ? lang.countryRu : lang.countryEn}</span>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
 
       </div>

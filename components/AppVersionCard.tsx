@@ -4,6 +4,7 @@ import { SystemCompatibilityResult } from '../services/systemCompatibilityServic
 import {
   APP_NAME,
   APP_VERSION,
+  APP_BETA_VERSION,
   APP_PWA_CORE_VERSION,
   APP_BUILD_CODE,
   APP_RELEASE_DATE,
@@ -14,6 +15,7 @@ import {
   formatDiagnosticsReport
 } from '../services/appVersionService';
 import { CheckCircleIcon, ShieldIcon, SparklesIcon } from './Icons';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface AppVersionCardProps {
   user: UserProgress;
@@ -23,6 +25,7 @@ interface AppVersionCardProps {
   setToast: (msg: string | null) => void;
   onOpenSystemChecker: () => void;
   onOpenBetaCenter?: () => void;
+  onToggleBetaTesting?: (join: boolean) => void;
 }
 
 export const AppVersionCard: React.FC<AppVersionCardProps> = ({
@@ -32,9 +35,11 @@ export const AppVersionCard: React.FC<AppVersionCardProps> = ({
   playSound,
   setToast,
   onOpenSystemChecker,
-  onOpenBetaCenter
+  onOpenBetaCenter,
+  onToggleBetaTesting
 }) => {
   const isRu = user.language !== 'en';
+  const isBetaMember = Boolean(user.isBetaTester);
   const [activeTab, setActiveTab] = useState<'overview' | 'changelog' | 'diagnostics'>('overview');
   const [diagnostics, setDiagnostics] = useState<AppRuntimeDiagnostics | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -52,8 +57,8 @@ export const AppVersionCard: React.FC<AppVersionCardProps> = ({
           playSound('correct');
           setToast(
             isRu
-              ? `✅ ${APP_NAME} v${APP_VERSION}: целостность данных и среда проверены!`
-              : `✅ ${APP_NAME} v${APP_VERSION}: profile data & runtime verified!`
+              ? `✅ ${APP_NAME} v${APP_VERSION}: целостность данных и среда PWA проверены!`
+              : `✅ ${APP_NAME} v${APP_VERSION}: profile data & PWA runtime verified!`
           );
         }
       } finally {
@@ -90,6 +95,15 @@ export const AppVersionCard: React.FC<AppVersionCardProps> = ({
     }
   };
 
+  const formattedBetaJoinDate = React.useMemo(() => {
+    if (!user.betaJoinedAt) return null;
+    try {
+      return new Date(user.betaJoinedAt).toLocaleDateString(isRu ? 'ru-RU' : 'en-US');
+    } catch {
+      return null;
+    }
+  }, [user.betaJoinedAt, isRu]);
+
   const cardSurface = isLightMode
     ? 'bg-white border-2 border-indigo-200 text-slate-900'
     : 'bg-duo-card border-2 border-indigo-500/50 text-white';
@@ -99,7 +113,7 @@ export const AppVersionCard: React.FC<AppVersionCardProps> = ({
   const mutedText = isLightMode ? 'text-slate-600' : 'text-gray-400';
 
   return (
-    <div className={`${cardSurface} rounded-3xl p-5 sm:p-6 mb-6 shadow-xl space-y-5`}>
+    <div id="duowindo-app-version-card" className={`${cardSurface} rounded-3xl p-5 sm:p-6 mb-6 shadow-xl space-y-5`}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-700/30 pb-4">
         <div className="flex items-center space-x-3.5">
@@ -114,28 +128,148 @@ export const AppVersionCard: React.FC<AppVersionCardProps> = ({
               <span className="text-[11px] font-mono font-black px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
                 v{APP_VERSION} • {APP_PWA_CORE_VERSION}
               </span>
+              <span
+                className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider border ${
+                  isBetaMember
+                    ? 'bg-purple-500/25 text-purple-300 border-purple-400/50'
+                    : isLightMode
+                      ? 'bg-slate-100 text-slate-600 border-slate-300'
+                      : 'bg-gray-800 text-gray-300 border-gray-700'
+                }`}
+              >
+                {isBetaMember
+                  ? (isRu ? `🧪 Бета-канал (${APP_BETA_VERSION})` : `🧪 Beta (${APP_BETA_VERSION})`)
+                  : (isRu ? 'Стабильный релиз' : 'Stable Release')}
+              </span>
             </div>
             <p className={`text-xs font-bold mt-0.5 ${mutedText}`}>
               {isRu
-                ? `Сборка ${APP_BUILD_CODE} («${APP_CODENAME}») • Релиз ${APP_RELEASE_DATE} • Прогресс полностью совместим`
-                : `Build ${APP_BUILD_CODE} ("${APP_CODENAME}") • Released ${APP_RELEASE_DATE} • Progress fully compatible`}
+                ? `DuoWindo6601 Progressive Web App • Сборка ${APP_BUILD_CODE} («${APP_CODENAME}») • Релиз ${APP_RELEASE_DATE}`
+                : `DuoWindo6601 Progressive Web App • Build ${APP_BUILD_CODE} ("${APP_CODENAME}") • Released ${APP_RELEASE_DATE}`}
             </p>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => void runDiagnostics(true)}
-          disabled={isVerifying}
-          className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white font-black text-xs uppercase tracking-wider border-b-4 border-indigo-900 active:border-b-0 active:translate-y-0.5 transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer shrink-0"
-        >
-          <ShieldIcon className="w-4 h-4" />
-          <span>
-            {isVerifying
-              ? (isRu ? 'Проверка...' : 'Checking...')
-              : (isRu ? 'Проверить целостность' : 'Verify Integrity')}
-          </span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <PWAInstallButton isRu={isRu} variant="compact" />
+          <button
+            type="button"
+            onClick={() => void runDiagnostics(true)}
+            disabled={isVerifying}
+            className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white font-black text-xs uppercase tracking-wider border-b-4 border-indigo-900 active:border-b-0 active:translate-y-0.5 transition-all flex items-center justify-center gap-1.5 shadow-md cursor-pointer shrink-0"
+          >
+            <ShieldIcon className="w-4 h-4" />
+            <span>
+              {isVerifying
+                ? (isRu ? 'Проверка...' : 'Checking...')
+                : (isRu ? 'Проверить целостность' : 'Verify Integrity')}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* DEDICATED APP BETA TESTING OPT-IN / GATE CARD */}
+      <div
+        className={`rounded-2xl p-4 sm:p-5 border-2 transition-all space-y-3 ${
+          isBetaMember
+            ? isLightMode
+              ? 'bg-purple-50 border-purple-300 text-slate-900'
+              : 'bg-gradient-to-br from-purple-950/70 via-indigo-950/50 to-black/50 border-purple-500/60 text-white'
+            : isLightMode
+              ? 'bg-amber-50 border-amber-300 text-slate-900'
+              : 'bg-gradient-to-br from-slate-900 via-gray-900 to-black/70 border-amber-500/50 text-white'
+        }`}
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start space-x-3">
+            <div
+              className={`w-11 h-11 rounded-2xl flex items-center justify-center text-xl shrink-0 border ${
+                isBetaMember
+                  ? 'bg-purple-600/30 border-purple-400/50'
+                  : 'bg-amber-500/20 border-amber-500/40'
+              }`}
+            >
+              {isBetaMember ? '🧪' : '🔒'}
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="font-black text-sm sm:text-base uppercase tracking-wider">
+                  {isRu
+                    ? 'Бета-тестирование приложения DuoWindo6601'
+                    : 'DuoWindo6601 App Beta Testing'}
+                </h4>
+                <span
+                  className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase border ${
+                    isBetaMember
+                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                      : 'bg-rose-500/20 text-rose-400 border-rose-500/40'
+                  }`}
+                >
+                  {isBetaMember
+                    ? (isRu ? '✅ Вы присоединились' : '✅ Joined')
+                    : (isRu ? '🔒 Не присоединены' : '🔒 Not Joined')}
+                </span>
+              </div>
+              <p className={`text-xs font-semibold mt-1 leading-relaxed ${isBetaMember ? (isLightMode ? 'text-purple-900' : 'text-purple-100/90') : (isLightMode ? 'text-amber-900' : 'text-amber-200/90')}`}>
+                {isBetaMember
+                  ? (isRu
+                      ? `Вы участник бета-тестирования DuoWindo6601 Progressive Web App${formattedBetaJoinDate ? ` (с ${formattedBetaJoinDate})` : ''}. Все функции бета-тестирования доступны: Бета-Центр, 8 бета-курсов и ранние обновления PWA.`
+                      : `You are enrolled in DuoWindo6601 PWA Beta Testing${formattedBetaJoinDate ? ` (since ${formattedBetaJoinDate})` : ''}. All beta features, Beta Center, and 8 beta courses are unlocked.`)
+                  : (isRu
+                      ? 'Кто не присоединился к бета-тестированию приложения — функции бета-тестирования недоступны (Бета-Центр, бета-курсы языков, ранние функции PWA и тест-инструменты заблокированы).'
+                      : 'If you have not joined App Beta Testing, all beta testing features (Beta Center, beta courses, early PWA features, and tester tools) remain unavailable.')}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5 pt-1">
+          {!isBetaMember ? (
+            <button
+              type="button"
+              onClick={() => {
+                playSound('correct');
+                onToggleBetaTesting?.(true);
+              }}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-fuchsia-600 hover:brightness-110 text-white font-black text-xs uppercase tracking-wider border-b-4 border-purple-950 active:border-b-0 active:translate-y-0.5 transition-all flex items-center gap-2 shadow-lg cursor-pointer"
+            >
+              <span>🧪</span>
+              <span>
+                {isRu ? 'Присоединиться к бета-тестированию' : 'Join App Beta Testing'}
+              </span>
+            </button>
+          ) : (
+            <>
+              {onOpenBetaCenter && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    playSound('select');
+                    onOpenBetaCenter();
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:brightness-110 text-white font-black text-xs uppercase tracking-wider border-b-4 border-purple-950 active:border-b-0 active:translate-y-0.5 transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
+                >
+                  <span>🧪</span>
+                  <span>{isRu ? 'Открыть Бета-Центр' : 'Open Beta Center'}</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  playSound('click');
+                  onToggleBetaTesting?.(false);
+                }}
+                className={`px-3.5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider border transition-all cursor-pointer ${
+                  isLightMode
+                    ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-300'
+                    : 'bg-rose-950/50 hover:bg-rose-900/60 text-rose-300 border-rose-500/40'
+                }`}
+              >
+                {isRu ? 'Выйти из бета-тестирования' : 'Leave Beta Testing'}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Mode Switcher Tabs */}
@@ -176,7 +310,9 @@ export const AppVersionCard: React.FC<AppVersionCardProps> = ({
               <span className={`block text-[10px] font-bold uppercase ${mutedText}`}>
                 {isRu ? 'Версия ядра' : 'Core Version'}
               </span>
-              <span className="font-mono font-black text-sm text-emerald-400">v{APP_VERSION}</span>
+              <span className="font-mono font-black text-sm text-emerald-400">
+                v{APP_VERSION}
+              </span>
             </div>
             <div className={`${subSurface} p-3 rounded-2xl`}>
               <span className={`block text-[10px] font-bold uppercase ${mutedText}`}>
@@ -189,15 +325,15 @@ export const AppVersionCard: React.FC<AppVersionCardProps> = ({
                 {isRu ? 'Режим запуска' : 'Runtime Mode'}
               </span>
               <span className="font-black text-sm text-sky-400">
-                {diagnostics?.displayMode === 'standalone' ? 'PWA App' : 'Web Browser'}
+                {diagnostics?.displayMode === 'standalone' ? 'PWA Standalone' : 'PWA Web App'}
               </span>
             </div>
             <div className={`${subSurface} p-3 rounded-2xl`}>
               <span className={`block text-[10px] font-bold uppercase ${mutedText}`}>
-                {isRu ? 'База прогресса' : 'Profile Store'}
+                {isRu ? 'Канал бета-теста' : 'Beta Channel'}
               </span>
-              <span className="font-black text-sm text-amber-400">
-                {diagnostics?.progressKeyFound ? `${diagnostics.progressSizeKb} KB` : 'Active'}
+              <span className={`font-black text-sm ${isBetaMember ? 'text-purple-400' : 'text-amber-400'}`}>
+                {isBetaMember ? (isRu ? 'Подключён' : 'Active') : (isRu ? 'Недоступно' : 'Locked')}
               </span>
             </div>
           </div>
@@ -279,11 +415,11 @@ export const AppVersionCard: React.FC<AppVersionCardProps> = ({
             </span>
           </div>
           <div className="flex justify-between py-1 border-b border-gray-700/40">
-            <span className={mutedText}>{isRu ? 'Ключ прогресса DuoWindo6601:' : 'DuoWindo6601 Progress Key:'}</span>
-            <span className="font-mono font-bold text-emerald-400">
-              {diagnostics?.progressKeyFound
-                ? `OK (${diagnostics.progressSizeKb} KB)`
-                : (diagnostics?.localStorageHealthy ? 'LocalStorage OK' : 'Memory')}
+            <span className={mutedText}>{isRu ? 'Статус бета-тестирования:' : 'App Beta Testing:'}</span>
+            <span className={`font-bold ${isBetaMember ? 'text-purple-400' : 'text-rose-400'}`}>
+              {isBetaMember
+                ? (isRu ? 'Присоединён (Функции открыты)' : 'Joined (Unlocked)')
+                : (isRu ? 'Не присоединён (Функции недоступны)' : 'Not Joined (Locked)')}
             </span>
           </div>
           <div className="flex justify-between py-1">
@@ -327,16 +463,31 @@ export const AppVersionCard: React.FC<AppVersionCardProps> = ({
             <button
               type="button"
               onClick={() => {
+                if (!isBetaMember) {
+                  playSound('wrong');
+                  setToast(
+                    isRu
+                      ? '🔒 Функция бета-тестирования недоступна: сначала нажмите «Присоединиться к бета-тестированию»!'
+                      : '🔒 Beta testing is unavailable: join App Beta Testing above first!'
+                  );
+                  return;
+                }
                 playSound('click');
                 onOpenBetaCenter();
               }}
-              className={`px-3.5 py-2 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer border ${
-                isLightMode
-                  ? 'bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200'
-                  : 'bg-purple-950/50 hover:bg-purple-900/60 text-purple-300 border-purple-500/40'
+              className={`px-3.5 py-2 rounded-xl font-bold text-xs uppercase tracking-wider transition-all border ${
+                isBetaMember
+                  ? isLightMode
+                    ? 'bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200 cursor-pointer'
+                    : 'bg-purple-950/50 hover:bg-purple-900/60 text-purple-300 border-purple-500/40 cursor-pointer'
+                  : isLightMode
+                    ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                    : 'bg-gray-900 text-gray-500 border-gray-800 cursor-not-allowed'
               }`}
             >
-              🧪 {isRu ? 'Бета-Центр' : 'Beta Center'}
+              {isBetaMember
+                ? (isRu ? '🧪 Бета-Центр' : '🧪 Beta Center')
+                : (isRu ? '🔒 Бета-Центр (Недоступно)' : '🔒 Beta Center (Locked)')}
             </button>
           )}
         </div>

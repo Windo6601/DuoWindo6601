@@ -10,11 +10,13 @@ import {
   EarIcon, 
   PaletteIcon, 
   NewWordIcon,
-  PenIcon
+  PenIcon,
+  HeadphonesRadioIcon
 } from './Icons';
 import { DuoWindo6601StoriesModal } from './DuoWindo6601StoriesModal';
 import { DuoWindo6601MistakesModal } from './DuoWindo6601MistakesModal';
 import { DuoWindo6601PoemModal } from './DuoWindo6601PoemModal';
+import { DuoWindo6601RadioModal } from './DuoWindo6601RadioModal';
 import { ArabicNumeralsConverter } from './ArabicNumeralsConverter';
 
 interface DuoWindo6601PracticeHubProps {
@@ -65,12 +67,13 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
   const [isStoriesModalOpen, setIsStoriesModalOpen] = useState(false);
   const [isMistakesModalOpen, setIsMistakesModalOpen] = useState(false);
   const [isPoemModalOpen, setIsPoemModalOpen] = useState(false);
+  const [isRadioModalOpen, setIsRadioModalOpen] = useState(false);
   const [isArabicConverterOpen, setIsArabicConverterOpen] = useState(false);
 
   // Safe TTS fallback
   const handleSpeak = (text: string, courseId: string, slow?: boolean) => {
     if (speakText) {
-      speakText(text, courseId, slow);
+      return speakText(text, courseId, slow);
     }
   };
 
@@ -256,25 +259,27 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
             </div>
           </div>
 
-          {/* Row 4: Речь */}
-          <div
-            onClick={() => startTraining('speech')}
-            className="bg-[#182328] hover:bg-[#202f36] border-2 border-[#263843] hover:border-emerald-500/50 rounded-2xl md:rounded-3xl p-4 md:p-5 flex items-center justify-between transition-all cursor-pointer shadow-lg active:scale-[0.99] group"
-          >
-            <div className="space-y-0.5">
-              <h4 className="text-white font-black text-lg md:text-xl group-hover:text-emerald-300 transition-colors">
-                {t('speakingTitle') || (isRu ? 'Речь' : 'Speaking')}
-              </h4>
-              <p className="text-xs text-gray-400 font-bold">
-                {t('speakingDesc') || (isRu ? 'Говорите за DuoWindo6601 • Отрабатывайте чистое произношение' : 'Speak for DuoWindo6601 • Master pure pronunciation')}
-              </p>
-            </div>
+          {/* Row 4: Речь (скрыто только для курса Клингонского — сохранено для всех остальных языков) */}
+          {currentCourse.id !== 'tlh' && (
+            <div
+              onClick={() => startTraining('speech')}
+              className="bg-[#182328] hover:bg-[#202f36] border-2 border-[#263843] hover:border-emerald-500/50 rounded-2xl md:rounded-3xl p-4 md:p-5 flex items-center justify-between transition-all cursor-pointer shadow-lg active:scale-[0.99] group"
+            >
+              <div className="space-y-0.5">
+                <h4 className="text-white font-black text-lg md:text-xl group-hover:text-emerald-300 transition-colors">
+                  {t('speakingTitle') || (isRu ? 'Речь' : 'Speaking')}
+                </h4>
+                <p className="text-xs text-gray-400 font-bold">
+                  {t('speakingDesc') || (isRu ? 'Говорите за DuoWindo6601 • Отрабатывайте чистое произношение' : 'Speak for DuoWindo6601 • Master pure pronunciation')}
+                </p>
+              </div>
 
-            {/* Mint Green Microphone Icon */}
-            <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-[#20e3b2] flex items-center justify-center shadow-md shrink-0 group-hover:scale-105 transition-transform text-slate-950">
-              <span className="text-2xl">🎙️</span>
+              {/* Mint Green Microphone Icon */}
+              <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-[#20e3b2] flex items-center justify-center shadow-md shrink-0 group-hover:scale-105 transition-transform text-slate-950">
+                <span className="text-2xl">🎙️</span>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Row 5: Выучить стихотворение наизусть */}
           <div
@@ -501,20 +506,22 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
             </div>
           </button>
 
-          {/* 4. Речь (Говори за DuoWindo6601) */}
-          <button 
-            type="button"
-            onClick={() => startTraining('speech')} 
-            className="bg-duo-orange p-8 md:p-10 rounded-[2.5rem] border-b-8 border-orange-700 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center space-x-6 shadow-2xl cursor-pointer"
-          >
-            <div className="bg-white/20 p-4 md:p-5 rounded-3xl">
-              <MicIcon className="w-12 h-12 text-white" />
-            </div>
-            <div>
-              <h3 className="text-2xl md:text-3xl font-bold mb-1 text-white">{t('speech')}</h3>
-              <p className="opacity-80 font-bold uppercase tracking-widest text-xs text-white">{t('speakForDuo')}</p>
-            </div>
-          </button>
+          {/* 4. Речь (Говори за DuoWindo6601) — скрыто только для клингонского (tlh) */}
+          {currentCourse.id !== 'tlh' && (
+            <button 
+              type="button"
+              onClick={() => startTraining('speech')} 
+              className="bg-duo-orange p-8 md:p-10 rounded-[2.5rem] border-b-8 border-orange-700 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center space-x-6 shadow-2xl cursor-pointer"
+            >
+              <div className="bg-white/20 p-4 md:p-5 rounded-3xl">
+                <MicIcon className="w-12 h-12 text-white" />
+              </div>
+              <div>
+                <h3 className="text-2xl md:text-3xl font-bold mb-1 text-white">{t('speech')}</h3>
+                <p className="opacity-80 font-bold uppercase tracking-widest text-xs text-white">{t('speakForDuo')}</p>
+              </div>
+            </button>
+          )}
 
           {/* 5. Перевод (Практика чтения) */}
           <button 
@@ -667,6 +674,40 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
               <span>+35 XP</span>
             </div>
           </button>
+          {/* 11b. DuoWindo6601Radio — Подкасты на аудирование */}
+          <button
+            type="button"
+            onClick={() => {
+              playSound('click');
+              setIsRadioModalOpen(true);
+            }}
+            className="bg-gradient-to-r from-[#2D9EE0] to-[#1A78B8] p-8 md:p-10 rounded-[2.5rem] border-b-8 border-[#125688] text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center justify-between shadow-2xl cursor-pointer md:col-span-2 group"
+          >
+            <div className="flex items-center space-x-6">
+              <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-gradient-to-b from-[#66DBFF] to-[#42C6FA] border-b-4 border-[#1B89C2] flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform">
+                <HeadphonesRadioIcon className="w-11 h-11 md:w-12 md:h-12" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2 mb-1 flex-wrap">
+                  <h3 className="text-2xl md:text-3xl font-black text-white">
+                    DuoWindo6601Radio
+                  </h3>
+                  <span className="bg-sky-950 text-sky-200 text-[10px] px-2.5 py-0.5 rounded-md font-black border border-sky-300/40 uppercase">
+                    {isRu ? 'ПОДКАСТЫ' : 'PODCASTS'}
+                  </span>
+                </div>
+                <p className="opacity-95 font-bold text-xs md:text-sm text-sky-100">
+                  {isRu
+                    ? 'Короткие выпуски подкастов с DuoWindo6601, погружение в речь и проверка понимания'
+                    : 'Short podcast episodes with DuoWindo6601, speech immersion, and comprehension checks'}
+                </p>
+              </div>
+            </div>
+            <div className="bg-amber-400 text-slate-950 font-black text-xs px-3.5 py-2 rounded-xl uppercase tracking-wider shrink-0 hidden sm:flex items-center gap-1 shadow-md">
+              <span>🎧</span>
+              <span>+30 XP</span>
+            </div>
+          </button>
         </div>
 
         {/* 12. Своя тема генерации задач */}
@@ -729,6 +770,17 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
       <DuoWindo6601PoemModal
         isOpen={isPoemModalOpen}
         onClose={() => setIsPoemModalOpen(false)}
+        currentCourse={currentCourse}
+        user={user}
+        setUser={setUser}
+        playSound={playSound}
+        setToast={setToast}
+        speakText={handleSpeak}
+      />
+
+      <DuoWindo6601RadioModal
+        isOpen={isRadioModalOpen}
+        onClose={() => setIsRadioModalOpen(false)}
         currentCourse={currentCourse}
         user={user}
         setUser={setUser}

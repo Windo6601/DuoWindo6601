@@ -14,12 +14,14 @@ interface PwaUpdateSecuritySectionProps {
   systemInfo: SystemCompatibilityResult;
   onOpenSystemChecker: () => void;
   lang?: string;
+  isBetaTester?: boolean;
 }
 
 export const PwaUpdateSecuritySection: React.FC<PwaUpdateSecuritySectionProps> = ({
   systemInfo,
   onOpenSystemChecker,
-  lang = 'ru'
+  lang = 'ru',
+  isBetaTester = false
 }) => {
   const isRu = lang !== 'en'; // Multi-lang support enabled
   const isModern = systemInfo.pwaUpdateSupported;
@@ -393,6 +395,14 @@ export const PwaUpdateSecuritySection: React.FC<PwaUpdateSecuritySectionProps> =
               <span className="text-gray-400">{isRu ? 'Сервис-воркер (Service Worker):' : 'Service Worker:'}</span>
               <span className={`font-bold ${isModern ? 'text-emerald-400' : 'text-red-400'}`}>
                 {isModern ? 'Workbox 7 (Активен)' : 'Не поддерживается (Старая ОС)'}
+              </span>
+            </div>
+            <div className="flex justify-between py-1 border-b border-gray-800">
+              <span className="text-gray-400">{isRu ? 'Канал обновлений PWA:' : 'PWA Update Channel:'}</span>
+              <span className={`font-bold ${isBetaTester ? 'text-purple-300' : 'text-amber-300'}`}>
+                {isBetaTester
+                  ? (isRu ? '🧪 Beta Channel (Открыт)' : '🧪 Beta Channel (Joined)')
+                  : (isRu ? '🔒 Release (Бета недоступна)' : '🔒 Release (Beta Locked)')}
               </span>
             </div>
             <div className="flex justify-between py-1">
