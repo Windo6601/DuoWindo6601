@@ -1,6 +1,7 @@
 
 import { Exercise, AdventureScenario, RoleplayMessage } from "../types";
 import { playKlingonSpeech } from "./klingonSpeechService";
+import { isPIqaDText, KLINGON_SENTENCES } from "./klingonDictionaryService";
 import { 
   getTodayAiUsage, 
   recordAiUsage, 
@@ -15,7 +16,17 @@ import {
   getDevApiKeyDetails,
   getGeminiKeyPriority
 } from "./aiLimitManager";
-import { getAdminFishConfig, resolveAllowedFishModel } from "./fishAudioConfig";
+import {
+  FISH_NATIVE_LANGS,
+  getAdminFishConfig,
+  getFishReferenceIdForLang,
+  resolveAllowedFishModel,
+} from "./fishAudioConfig";
+import {
+  GTTS_SUPPORTED_LANGS,
+  normalizeCourseLangCode,
+  resolvePhoneticTtsTarget,
+} from "./multilingualTtsHelper";
 import { getRandomProgrammingFallbackExercise } from "./programmingCurriculum";
 
 export enum Type {
@@ -745,44 +756,62 @@ const playWav = async (base64Audio: string) => {
 
 const resolveSpeechLanguage = (text: string, lang: string): string => {
   const clean = text.trim();
-  if (!clean) return lang || 'en';
+  const rawLang = (lang || '').trim().toLowerCase();
+  const baseLang = normalizeCourseLangCode(rawLang);
+  if (!clean) return baseLang || 'en';
 
-  const lower = clean.toLowerCase();
-  const englishWords = ['hello', 'hi', 'welcome', 'thank', 'thanks', 'good', 'morning', 'afternoon', 'evening', 'night', 'how', 'are', 'you', 'what', 'where', 'when', 'why', 'who', 'yes', 'no', 'apple', 'banana', 'cat', 'dog', 'house', 'water', 'book', 'friend', 'school', 'computer'];
-  const hasEnglishWord = englishWords.some(w => new RegExp(`\\b${w}\\b`, 'i').test(lower));
+  // 1. Klingon course or ConScript pIqaD text ALWAYS stays 'tlh' (never hijacked to English)
+  if (rawLang === 'tlh' || rawLang === 'klingon' || isPIqaDText(clean)) {
+    return 'tlh';
+  }
 
-  // Non-language courses should resolve to Russian or English based on content
-  if (lang === 'math' || lang === 'chess' || lang === 'music' || lang === 'coding' || lang === 'art') {
+  // 2. Non-language courses resolve to Russian or English strictly by script
+  if (rawLang === 'math' || rawLang === 'chess' || rawLang === 'music' || rawLang === 'coding' || rawLang === 'art') {
     return /[\u0400-\u04FF]/.test(clean) ? 'ru' : 'en';
   }
 
-  // If text contains English words or pure English ASCII when lang is 'ru' or empty, switch to 'en'
-  if ((lang === 'ru' || lang === 'be' || lang === 'uk' || lang === 'cv' || lang === 'tt' || !lang) && (hasEnglishWord || /^[a-zA-Z0-9\s.,!?'"\-]+$/.test(clean))) {
-    return 'en';
-  }
-
-  // If text contains Cyrillic characters
+  // 3. Explicit non-Latin scripts override UI/default codes
   if (/[\u0400-\u04FF]/.test(clean)) {
-    if (lang === 'uk') return 'uk';
-    if (lang === 'be') return 'be';
-    if (lang === 'kk') return 'kk';
+    if (rawLang === 'rf-chuvash' || baseLang === 'cv') return 'cv';
+    if (baseLang === 'uk') return 'uk';
+    if (baseLang === 'be') return 'be';
+    if (baseLang === 'kk') return 'kk';
+    if (baseLang === 'tt') return 'tt';
+    if (baseLang === 'ky') return 'ky';
+    if (baseLang === 'tg') return 'tg';
+    if (baseLang === 'tab') return 'tab';
     return 'ru';
   }
-
-  // Arabic
   if (/[\u0600-\u06FF]/.test(clean)) return 'ar';
-  // Hebrew
-  if (/[\u0590-\u05FF]/.test(clean)) return 'he';
-  // CJK
+  if (/[\u0590-\u05FF]/.test(clean)) return baseLang === 'yi' ? 'yi' : 'he';
   if (/[\u4e00-\u9fa5]/.test(clean)) return 'zh';
   if (/[\u3040-\u30ff]/.test(clean)) return 'ja';
   if (/[\uac00-\ud7af]/.test(clean)) return 'ko';
+  if (/[\u0900-\u097F]/.test(clean)) return 'hi';
+  if (/[\u0370-\u03FF]/.test(clean)) return 'el';
+  if (/[\u0530-\u058F]/.test(clean)) return 'hy';
+  if (/[\u10A0-\u10FF]/.test(clean)) return 'ka';
 
-  // Force 'en' for common greetings and basic English words regardless of lowercase/uppercase
-  const forcedEnglish = ['hello', 'hi', 'how are you', 'welcome', 'goodbye', 'thanks', 'thank you', 'morning', 'afternoon', 'evening'];
-  if (forcedEnglish.some(w => lower.includes(w))) return 'en';
+  // 4. Preserve explicit English course strictly as 'en'
+  if (baseLang === 'en') {
+    return 'en';
+  }
 
-  return lang || 'en';
+  // 5. Only switch to 'en' if lang is empty or UI-Russian ('ru') and text is clearly English ASCII
+  const englishWords = [
+    'hello', 'welcome', 'thank', 'thanks', 'good', 'morning', 'afternoon', 'evening', 'night',
+    'how', 'are', 'you', 'what', 'where', 'when', 'why', 'who', 'yes', 'apple', 'banana',
+    'cat', 'dog', 'house', 'water', 'book', 'friend', 'school', 'computer', 'goodbye'
+  ];
+  const hasEnglishWord =
+    /\bhi\b/i.test(clean) ||
+    englishWords.some((w) => new RegExp(`\\b${w}\\b`, 'i').test(clean));
+
+  if ((!rawLang || baseLang === 'ru') && (hasEnglishWord || /^[a-zA-Z0-9\s.,!?'"\-]+$/.test(clean))) {
+    return 'en';
+  }
+
+  return baseLang || 'en';
 };
 
 const fallbackSpeak = (text: string, lang: string = 'en', slow: boolean = false, provider: 'google' | 'yandex' | 'system' = 'system') => {
@@ -793,52 +822,83 @@ const fallbackSpeak = (text: string, lang: string = 'en', slow: boolean = false,
   if (!cleanText) return;
 
   const effectiveLang = resolveSpeechLanguage(cleanText, lang);
+  const SYSTEM_SUPPORTED_LANGS = new Set([
+    'en', 'de', 'fr', 'es', 'ja', 'zh', 'ko', 'it', 'pt', 'ru', 'uk',
+    'et', 'lv', 'lt', 'tr', 'ar', 'hu', 'fi', 'is', 'pl', 'eu', 'he',
+    'hi', 'sv', 'no', 'id', 'ro', 'nl', 'cs', 'el', 'vi', 'th'
+  ]);
+  const routed = SYSTEM_SUPPORTED_LANGS.has(effectiveLang)
+    ? { lang: effectiveLang, text: cleanText }
+    : resolvePhoneticTtsTarget(cleanText, effectiveLang, SYSTEM_SUPPORTED_LANGS);
 
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     try {
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(cleanText);
+      const utterance = new SpeechSynthesisUtterance(routed.text);
       utterance.rate = slow ? 0.6 : 1.0;
-      
+
       const langMap: Record<string, string> = {
-        'en': 'en-US', 'de': 'de-DE', 'fr': 'fr-FR', 'es': 'es-ES', 'ja': 'ja-JP', 
+        'en': 'en-US', 'de': 'de-DE', 'fr': 'fr-FR', 'es': 'es-ES', 'ja': 'ja-JP',
         'zh': 'zh-CN', 'ko': 'ko-KR', 'it': 'it-IT', 'pt': 'pt-BR', 'ru': 'ru-RU',
-        'be': 'ru-RU', 'uk': 'uk-UA', 'et': 'et-EE', 'lv': 'lv-LV', 'lt': 'lt-LT', 'tr': 'tr-TR',
+        'be': 'uk-UA', 'uk': 'uk-UA', 'et': 'et-EE', 'lv': 'lv-LV', 'lt': 'lt-LT', 'tr': 'tr-TR',
         'ar': 'ar-SA', 'hu': 'hu-HU', 'fi': 'fi-FI', 'is': 'is-IS', 'pl': 'pl-PL', 'eu': 'eu-ES',
-        'nv': 'en-US', 'tab': 'ru-RU', 'cv': 'ru-RU', 'tt': 'ru-RU', 'kk': 'kk-KZ', 'uz': 'uz-UZ',
-        'ky': 'ky-KG', 'az': 'az-AZ', 'hy': 'hy-AM', 'ka': 'ka-GE', 'he': 'he-IL', 'yi': 'he-IL',
-        'hi': 'hi-IN', 'sv': 'sv-SE', 'no': 'nb-NO', 'eo': 'eo', 'id': 'id-ID', 'ro': 'ro-RO',
+        'nv': 'es-ES', 'tab': 'ru-RU', 'cv': 'ru-RU', 'tt': 'ru-RU', 'kk': 'ru-RU', 'uz': 'tr-TR',
+        'ky': 'ru-RU', 'az': 'tr-TR', 'tk': 'tr-TR', 'tg': 'ru-RU', 'hy': 'it-IT', 'ka': 'it-IT',
+        'he': 'he-IL', 'yi': 'he-IL', 'la': 'it-IT', 'eo': 'es-ES', 'hv': 'it-IT',
+        'hi': 'hi-IN', 'sv': 'sv-SE', 'no': 'nb-NO', 'id': 'id-ID', 'ro': 'ro-RO',
         'mo': 'ro-RO', 'nl': 'nl-NL', 'cs': 'cs-CZ', 'el': 'el-GR', 'vi': 'vi-VN', 'th': 'th-TH'
       };
-      
-      // Default lang
-      utterance.lang = langMap[effectiveLang] || effectiveLang;
-      
-      // Ensure voices are loaded (Chrome sometimes loads asynchronously)
+
+      const targetBcp47 = langMap[routed.lang] || routed.lang;
+      utterance.lang = targetBcp47;
+
       let voices = window.speechSynthesis.getVoices();
-      
+
       const findVoice = () => {
         try {
+          const targetPrefix = targetBcp47.split('-')[0].toLowerCase();
           let matchingVoice: SpeechSynthesisVoice | undefined;
 
           if (provider === 'yandex') {
-              matchingVoice = voices.find(v => (v.name.toLowerCase().includes("yandex") || v.name.toLowerCase().includes("yuri")) && v.lang.startsWith(utterance.lang.split('-')[0]));
+            matchingVoice = voices.find(v => (v.name.toLowerCase().includes("yandex") || v.name.toLowerCase().includes("yuri")) && v.lang.toLowerCase().startsWith(targetPrefix));
           } else if (provider === 'google') {
-              matchingVoice = voices.find(v => v.name.toLowerCase().includes("google") && v.lang.startsWith(utterance.lang.split('-')[0]));
+            matchingVoice = voices.find(v => v.name.toLowerCase().includes("google") && v.lang.toLowerCase().startsWith(targetPrefix));
           }
 
           if (!matchingVoice) {
-              matchingVoice = voices.find(v => v.lang === utterance.lang);
+            matchingVoice = voices.find(v => v.lang.toLowerCase() === targetBcp47.toLowerCase());
           }
           if (!matchingVoice) {
-              matchingVoice = voices.find(v => v.lang.startsWith(utterance.lang.split('-')[0]));
+            matchingVoice = voices.find(v => v.lang.toLowerCase().startsWith(targetPrefix));
           }
-          if (!matchingVoice && voices.length > 0) {
-              matchingVoice = voices[0];
+
+          // Never force an English voices[0] onto non-English courses!
+          if (!matchingVoice && targetPrefix !== 'en') {
+            const siblingPrefixes: Record<string, string[]> = {
+              no: ['nb', 'sv', 'da'],
+              nb: ['no', 'sv', 'da'],
+              sv: ['nb', 'no', 'da'],
+              is: ['sv', 'nb', 'no', 'de'],
+              uk: ['ru', 'pl'],
+              et: ['fi'],
+              lv: ['pl', 'ru'],
+              lt: ['pl', 'ru'],
+              eu: ['es'],
+              cs: ['pl', 'sk'],
+              ro: ['it', 'es'],
+            };
+            for (const sib of (siblingPrefixes[targetPrefix] || [])) {
+              matchingVoice = voices.find(v => v.lang.toLowerCase().startsWith(sib));
+              if (matchingVoice) break;
+            }
+          }
+
+          if (!matchingVoice && targetPrefix === 'en' && voices.length > 0) {
+            matchingVoice = voices.find(v => v.lang.toLowerCase().startsWith('en')) || voices[0];
           }
 
           if (matchingVoice) {
-              utterance.voice = matchingVoice;
+            utterance.voice = matchingVoice;
           }
           window.speechSynthesis.speak(utterance);
         } catch (e) {
@@ -847,19 +907,19 @@ const fallbackSpeak = (text: string, lang: string = 'en', slow: boolean = false,
       };
 
       if (voices.length === 0) {
-          window.speechSynthesis.onvoiceschanged = () => {
-              voices = window.speechSynthesis.getVoices();
-              findVoice();
-          };
-          setTimeout(() => {
-              try {
-                  if (!window.speechSynthesis.speaking) {
-                      findVoice();
-                  }
-              } catch {}
-          }, 300);
-      } else {
+        window.speechSynthesis.onvoiceschanged = () => {
+          voices = window.speechSynthesis.getVoices();
           findVoice();
+        };
+        setTimeout(() => {
+          try {
+            if (!window.speechSynthesis.speaking) {
+              findVoice();
+            }
+          } catch {}
+        }, 300);
+      } else {
+        findVoice();
       }
     } catch (e) {
       console.warn("fallbackSpeak error:", e);
@@ -924,6 +984,42 @@ export const getSelectedFishModel = (): string => {
   return 's2.1-pro-free';
 };
 
+const googleTtsAudioCache = new Map<string, ArrayBuffer>();
+
+const speakWithGoogleServerTts = async (text: string, lang: string, slow: boolean = false): Promise<void> => {
+  if (!text) return;
+  const effectiveLang = resolveSpeechLanguage(text, lang);
+  const cacheKey = `gtts_${effectiveLang}_${text}_${slow}`;
+  let arrayBuffer = googleTtsAudioCache.get(cacheKey);
+  if (!arrayBuffer) {
+    const res = await fetch('/api/tts/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, lang: effectiveLang }),
+    });
+    if (!res.ok) {
+      throw new Error(`Google TTS failed (${res.status})`);
+    }
+    arrayBuffer = await res.arrayBuffer();
+    googleTtsAudioCache.set(cacheKey, arrayBuffer);
+  }
+  const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
+  const audioUrl = URL.createObjectURL(blob);
+  const audio = new Audio(audioUrl);
+  if (slow) audio.playbackRate = 0.75;
+  await new Promise<void>((resolve, reject) => {
+    audio.onended = () => {
+      URL.revokeObjectURL(audioUrl);
+      resolve();
+    };
+    audio.onerror = (e) => {
+      URL.revokeObjectURL(audioUrl);
+      reject(e);
+    };
+    audio.play().catch(reject);
+  });
+};
+
 export const speakWithFishAudio = async (
   text: string,
   lang: string = 'ru',
@@ -932,6 +1028,12 @@ export const speakWithFishAudio = async (
   referenceId?: string
 ): Promise<void> => {
   if (!text) return;
+  const effectiveLang = resolveSpeechLanguage(text, lang);
+  if (effectiveLang === 'tlh') {
+    await playKlingonSpeech(text, slow);
+    return;
+  }
+
   let storedUser: any = null;
   try {
     if (typeof window !== 'undefined') {
@@ -942,8 +1044,19 @@ export const speakWithFishAudio = async (
 
   const adminFishCfg = getAdminFishConfig();
   const effectiveModel = resolveAllowedFishModel(model || getSelectedFishModel() || 's2.1-pro-free', storedUser);
-  const effectiveReferenceId = referenceId || adminFishCfg.defaultReferenceId || undefined;
-  const cacheKey = `fish_${text}_${slow}_${effectiveModel}_${effectiveReferenceId || ''}`;
+
+  // Use native per-language Fish Audio voice (or GTTS/phonetic routing handled cleanly on /api/tts/fish)
+  // NEVER force English DEFAULT_FISH_REFERENCE_ID ("Adrian") onto non-English courses!
+  const targetLangForRef = FISH_NATIVE_LANGS.has(effectiveLang)
+    ? effectiveLang
+    : resolvePhoneticTtsTarget(text, effectiveLang, FISH_NATIVE_LANGS).lang;
+  const effectiveReferenceId = getFishReferenceIdForLang(
+    targetLangForRef,
+    adminFishCfg.defaultReferenceId,
+    referenceId
+  );
+
+  const cacheKey = `fish_${effectiveLang}_${text}_${slow}_${effectiveModel}_${effectiveReferenceId || 'auto'}`;
 
   let arrayBuffer = fishAudioCache.get(cacheKey);
 
@@ -961,7 +1074,7 @@ export const speakWithFishAudio = async (
       body: JSON.stringify({
         text,
         format: 'mp3',
-        lang,
+        lang: effectiveLang,
         model: effectiveModel,
         ...(effectiveReferenceId ? { reference_id: effectiveReferenceId } : {})
       })
@@ -1027,7 +1140,13 @@ export const speakText = async (
       await speakWithFishAudio(cleanText, effectiveLang, slow, fishModelToUse);
       return;
     } catch (e) {
-      console.warn("Fish Audio TTS failed, falling back to Gemini / System:", e);
+      console.warn("Fish Audio TTS failed, falling back to Google TTS / Gemini / System:", e);
+      if (typeof navigator !== 'undefined' && navigator.onLine) {
+        try {
+          await speakWithGoogleServerTts(cleanText, effectiveLang, slow);
+          return;
+        } catch {}
+      }
     }
   }
 
@@ -1037,6 +1156,15 @@ export const speakText = async (
       return;
     } catch (e) {
       console.warn("Grok TTS failed, falling back to Gemini / System:", e);
+    }
+  }
+
+  if (provider === 'google' && typeof navigator !== 'undefined' && navigator.onLine && GTTS_SUPPORTED_LANGS.has(effectiveLang)) {
+    try {
+      await speakWithGoogleServerTts(cleanText, effectiveLang, slow);
+      return;
+    } catch {
+      // Fall back to browser Google voice below
     }
   }
 
@@ -1061,7 +1189,7 @@ export const speakText = async (
     const res = await fetch('/api/gemini/tts', {
       method: 'POST',
       headers,
-      body: JSON.stringify({ text: cleanText, voiceName: normalizedVoice }),
+      body: JSON.stringify({ text: cleanText, voiceName: normalizedVoice, lang: effectiveLang }),
       signal: controller.signal,
     });
     clearTimeout(timer);
@@ -1094,14 +1222,15 @@ export const speakText = async (
     }
     throw new Error(`Gemini TTS status ${res.status}`);
   } catch (error) {
-    const fishLangs = new Set(['en', 'ru', 'de', 'fr', 'es', 'ja', 'zh', 'ko', 'ar', 'pt', 'it', 'tr']);
-    if (fishLangs.has(effectiveLang)) {
-      try {
-        await speakWithFishAudio(cleanText, effectiveLang, slow, 's2.1-pro-free');
-        return;
-      } catch (fishErr) {
-        console.warn("Fish Audio fallback failed, using Web Speech:", fishErr);
-      }
+    try {
+      await speakWithGoogleServerTts(cleanText, effectiveLang, slow);
+      return;
+    } catch {}
+    try {
+      await speakWithFishAudio(cleanText, effectiveLang, slow, 's2.1-pro-free');
+      return;
+    } catch (fishErr) {
+      console.warn("Fish Audio fallback failed, using Web Speech:", fishErr);
     }
     console.warn("TTS failed, using system speech fallback:", error);
     fallbackSpeak(cleanText, effectiveLang, slow, 'system');
@@ -1530,6 +1659,84 @@ export const getFallbackExercise = (
         { orig: "Какая структура данных работает по принципу LIFO (последним пришёл — первым вышел)?", trans: "Стек", bank: ["Стек", "Очередь", "Массив", "Граф"] },
         { orig: "Какой протокол используется для защищённого веб-соединения?", trans: "HTTPS", bank: ["HTTPS", "FTP", "SMTP", "UDP"] }
       ],
+      sv: [
+        { orig: "Hej! Hur mår du idag?", trans: "Привет! Как у тебя дела сегодня?", bank: ["Привет!", "Как", "у", "тебя", "дела", "сегодня?"] },
+        { orig: "Jag lär mig svenska varje dag", trans: "Я учу шведский каждый день", bank: ["Я", "учу", "шведский", "каждый", "день", "книга"] },
+        { orig: "Tack så mycket för hjälpen", trans: "Большое спасибо за помощь", bank: ["Большое", "спасибо", "за", "помощь", "пожалуйста"] },
+      ],
+      no: [
+        { orig: "Hei! Hvordan har du det?", trans: "Привет! Как твои дела?", bank: ["Привет!", "Как", "твои", "дела?", "хорошо"] },
+        { orig: "Jeg studerer norsk med glede", trans: "Я с радостью изучаю норвежский", bank: ["Я", "с", "радостью", "изучаю", "норвежский", "язык"] },
+        { orig: "Tusen takk for hjelpen", trans: "Большое спасибо за помощь", bank: ["Большое", "спасибо", "за", "помощь", "друг"] },
+      ],
+      la: [
+        { orig: "Salve, amice! Quid agis?", trans: "Здравствуй, друг! Как поживаешь?", bank: ["Здравствуй,", "друг!", "Как", "поживаешь?", "хорошо"] },
+        { orig: "Linguam Latinam disco", trans: "Я изучаю латинский язык", bank: ["Я", "изучаю", "латинский", "язык", "книгу"] },
+        { orig: "Gratias tibi ago, magister", trans: "Благодарю тебя, учитель", bank: ["Благодарю", "тебя,", "учитель", "друг", "спасибо"] },
+      ],
+      tt: [
+        { orig: "Сәлам! Хәлләрең ничек?", trans: "Привет! Как твои дела?", bank: ["Привет!", "Как", "твои", "дела?", "рәхмәт"] },
+        { orig: "Мин татар телен өйрәнәм", trans: "Я изучаю татарский язык", bank: ["Я", "изучаю", "татарский", "язык", "мы"] },
+        { orig: "Ярдәмең өчен бик зур рәхмәт", trans: "Большое спасибо за твою помощь", bank: ["Большое", "спасибо", "за", "твою", "помощь"] },
+      ],
+      hv: [
+        { orig: "Rytsas, raqiros!", trans: "Привет, друг!", bank: ["Привет,", "друг!", "хорошо", "спасибо"] },
+        { orig: "Valyrio udrāzma iksan", trans: "Я говорю на высоком валирийском", bank: ["Я", "говорю", "на", "высоком", "валирийском"] },
+        { orig: "Kirimvose, nyke sȳz iksan", trans: "Спасибо, у меня всё хорошо", bank: ["Спасибо,", "у", "меня", "всё", "хорошо"] },
+      ],
+      yi: [
+        { orig: "שלום עליכם, מיין פריינט!", trans: "Мир вам, мой друг!", bank: ["Мир", "вам,", "мой", "друг!", "привет"] },
+        { orig: "איך לערן ייִדיש יעדן טאָג", trans: "Я учу идиш каждый день", bank: ["Я", "учу", "идиш", "каждый", "день"] },
+      ],
+      he: [
+        { orig: "שלום! מה שלומך היום?", trans: "Привет! Как твои дела сегодня?", bank: ["Привет!", "Как", "твои", "дела", "сегодня?"] },
+        { orig: "אני לומד עברית כל יום", trans: "Я изучаю иврит каждый день", bank: ["Я", "изучаю", "иврит", "каждый", "день"] },
+      ],
+      mo: [
+        { orig: "Salut! Ce mai faci astăzi?", trans: "Привет! Как дела сегодня?", bank: ["Привет!", "Как", "дела", "сегодня?", "хорошо"] },
+        { orig: "Eu învăț limba română cu plăcere", trans: "Я учу язык с удовольствием", bank: ["Я", "учу", "язык", "с", "удовольствием"] },
+      ],
+      lt: [
+        { orig: "Labas! Kaip sekasi šiandien?", trans: "Привет! Как дела сегодня?", bank: ["Привет!", "Как", "дела", "сегодня?", "спасибо"] },
+        { orig: "Aš mokausi lietuvių kalbos", trans: "Я изучаю литовский язык", bank: ["Я", "изучаю", "литовский", "язык"] },
+      ],
+      lv: [
+        { orig: "Sveiki! Kā jums klājas?", trans: "Привет! Как у вас дела?", bank: ["Привет!", "Как", "у", "вас", "дела?"] },
+        { orig: "Es mācos latviešu valodu", trans: "Я изучаю латышский язык", bank: ["Я", "изучаю", "латышский", "язык"] },
+      ],
+      et: [
+        { orig: "Tere! Kuidas sul täna läheb?", trans: "Привет! Как у тебя сегодня дела?", bank: ["Привет!", "Как", "у", "тебя", "сегодня", "дела?"] },
+        { orig: "Ma õpin eesti keelt", trans: "Я изучаю эстонский язык", bank: ["Я", "изучаю", "эстонский", "язык"] },
+      ],
+      ka: [
+        { orig: "გამარჯობა! როგორ ხარ დღეს?", trans: "Привет! Как ты сегодня?", bank: ["Привет!", "Как", "ты", "сегодня?", "хорошо"] },
+        { orig: "მე ვსწავლობ ქართულ ენას", trans: "Я изучаю грузинский язык", bank: ["Я", "изучаю", "грузинский", "язык"] },
+      ],
+      hy: [
+        { orig: "Բարև ձեզ, ինչպե՞ս եք", trans: "Здравствуйте, как ваши дела?", bank: ["Здравствуйте,", "как", "ваши", "дела?"] },
+        { orig: "Ես սովորում եմ հայերեն", trans: "Я изучаю армянский язык", bank: ["Я", "изучаю", "армянский", "язык"] },
+      ],
+      az: [
+        { orig: "Salam! Bu gün necəsən?", trans: "Привет! Как ты сегодня?", bank: ["Привет!", "Как", "ты", "сегодня?", "хорошо"] },
+        { orig: "Mən Azərbaycan dilini öyrənirəm", trans: "Я изучаю азербайджанский язык", bank: ["Я", "изучаю", "азербайджанский", "язык"] },
+      ],
+      ky: [
+        { orig: "Салам! Кандайсың досум?", trans: "Привет! Как дела, друг?", bank: ["Привет!", "Как", "дела,", "друг?"] },
+        { orig: "Мен кыргыз тилин үйрөнүп жатам", trans: "Я изучаю киргизский язык", bank: ["Я", "изучаю", "киргизский", "язык"] },
+      ],
+      tk: [
+        { orig: "Salam! Ýagdaýlaryňyz nähili?", trans: "Привет! Как ваши дела?", bank: ["Привет!", "Как", "ваши", "дела?"] },
+        { orig: "Men türkmen dilini öwrenýärin", trans: "Я изучаю туркменский язык", bank: ["Я", "изучаю", "туркменский", "язык"] },
+      ],
+      tg: [
+        { orig: "Салом! Аҳволатон чӣ тавр аст?", trans: "Привет! Как ваше самочувствие?", bank: ["Привет!", "Как", "ваше", "самочувствие?"] },
+        { orig: "Ман забони тоҷикиро меомӯзам", trans: "Я изучаю таджикский язык", bank: ["Я", "изучаю", "таджикский", "язык"] },
+      ],
+      tlh: KLINGON_SENTENCES.map((s) => ({
+        orig: s.tlhLatn,
+        trans: userLanguage === 'en' ? s.en : s.ru,
+        bank: userLanguage === 'en' ? s.bankEn : s.bankRu,
+      })),
       art: [
         { orig: "Какие три цвета являются основными в живописи?", trans: "Красный, жёлтый, синий", bank: ["Красный,", "жёлтый,", "синий", "Зелёный"] },
         { orig: "Как называется техника письма по сырой штукатурке?", trans: "Фреска", bank: ["Фреска", "Акварель", "Гравюра", "Пастель"] }
@@ -1545,7 +1752,11 @@ export const getFallbackExercise = (
     if (effectiveBankKey && hardestFallbacks[effectiveBankKey]) {
       const list = hardestFallbacks[effectiveBankKey];
       const item = list[Math.floor(Math.random() * list.length)];
-      const safeType = (type === 'listening' || type === 'speech') ? type : 'translation';
+      // Klingon course removes speaking ('speech') exercises and converts them to listening/translation
+      const safeType =
+        subjectId === 'tlh'
+          ? (type === 'listening' ? 'listening' : 'translation')
+          : ((type === 'listening' || type === 'speech') ? type : 'translation');
       return {
         id: crypto.randomUUID(),
         type: safeType,
@@ -1629,7 +1840,13 @@ export const getFallbackExercise = (
 export const OFFLINE_INTERNET_REQUIRED_MESSAGE =
   'Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова';
 
-const isNetworkDisconnectError = (err: unknown): boolean => {
+export const notifyNetworkOffline = (): void => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('duowindo_network_offline'));
+  }
+};
+
+export const isNetworkDisconnectError = (err: unknown): boolean => {
   if (typeof navigator !== 'undefined' && !navigator.onLine) return true;
   const msg = String((err as any)?.message || err || '').toLowerCase();
   return (
@@ -1680,12 +1897,26 @@ export const generateExercise = async (
 
   const isChuvash = subjectId === 'cv' || subjectId === 'rf-chuvash' || cleanTargetSubject.toLowerCase().includes('чуваш') || cleanTargetSubject.toLowerCase().includes('chuvash');
 
+  const effectiveType: Exercise['type'] = subjectId === 'tlh' && type === 'speech' ? 'listening' : type;
+
   let prompt = '';
-  if (isChuvash) {
+  if (subjectId === 'tlh') {
+    prompt = `Ты создаешь упражнение для курса КЛИНГОНСКОГО ЯЗЫКА (tlhIngan Hol / Klingon language, орфография tlh_Latn по словарю PanderMusubi/klingon и hol.kag.org).
+${difficultyInstruction}
+Тип упражнения: "${effectiveType}" (режим речи отключён; используются перевод и аудирование).
+Обязательно используй строгую каноническую клингонскую орфографию (чувствительную к регистру: D, H, I, Q, S — заглавные; ch, gh, ng, tlh, ’ — канонические графемы; реальные слова вроде nuqneH, Qapla’, tlhIngan Hol, batlh, Duj, HoD, SuvwI’, HIja’, ghobe’, qatlho’, jIyaj, bIQ, Soj, paq, logh).
+Тема урока: ${topic}.
+
+Строгая структура JSON:
+- originalSentence: аутентичная фраза СТРОГО на клингонском (tlhIngan Hol, tlh_Latn) без перевода в скобках.
+- targetTranslation: точный перевод СТРОГО на ${translationLangName}.
+- wordBank: массив отдельных слов из targetTranslation плюс 3-4 дистрактора на ${translationLangName}.
+Код уникальности: ${nonce}.`;
+  } else if (isChuvash) {
     prompt = `Ты создаешь упражнение для курса ЧУВАШСКОГО ЯЗЫКА (Чӑвашла / Chuvash language).
 ${difficultyInstruction}
 Упражнение должно быть ИСКЛЮЧИТЕЛЬНО на ЧУВАШСКОМ и ${translationLangName} языках.
-Тема урока: ${topic}. Тип упражнения: "${type}".
+Тема урока: ${topic}. Тип упражнения: "${effectiveType}".
 Обязательно используй настоящие чувашские буквы: Ӑ, Ӗ, Ҫ, Ӳ (например: ырӑ кун, салам, тавах, эпӗ, эсир, вӗренетӗп, юлташ, ҫӗршыв, шкул, кӗнеке, пурнӑҫ, апат, ҫӑкӑр, шыв).
 
 Строгая структура JSON:
@@ -1805,7 +2036,7 @@ ${difficultyInstruction}
       targetTranslation: trans,
       wordBank: bank,
       hints: data?.hints,
-      type: type,
+      type: effectiveType,
       difficultyLevel
     };
     shownExerciseSentences.add(exercise.originalSentence);
@@ -1816,7 +2047,7 @@ ${difficultyInstruction}
       throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
     }
     console.warn("API exercise generation failed/timed out, returning backup exercise:", error);
-    return { ...getFallbackExercise(subjectId, type, cleanTargetSubject, userLanguage, customTopic, difficultyLevel), difficultyLevel };
+    return { ...getFallbackExercise(subjectId, effectiveType, cleanTargetSubject, userLanguage, customTopic, difficultyLevel), difficultyLevel };
   }
 };
 
@@ -2425,6 +2656,13 @@ const MINIMAL_PAIRS_BANK: Record<string, Array<{ wordA: string; wordB: string; d
     ],
     hi: [
         { wordA: "पल", wordB: "फल", diffRu: "पल [мгновение] (непридыхательный «प» /p/) против फल [фрукт] (придыхательный «फ» /pʰ/).", diffEn: "पल [moment] (unaspirated /p/) vs फल [fruit] (aspirated /pʰ/)." }
+    ],
+    tlh: [
+        { wordA: "Qapla’", wordB: "qaH", diffRu: "Qapla’ [успех!] (увулярная аффриката «Q» /q͡χ/) против qaH [сэр] (глухой взрывной «q» /qʰ/).", diffEn: "Qapla’ [success!] (uvular affricate Q /q͡χ/) vs qaH [sir] (uvular stop q /qʰ/)." },
+        { wordA: "HoD", wordB: "ghom", diffRu: "HoD [капитан] (глухой хриплый «H» /x/) против ghom [группа] (звонкий фрикативный «gh» /ɣ/).", diffEn: "HoD [captain] (voiceless H /x/) vs ghom [group] (voiced gh /ɣ/)." },
+        { wordA: "tlhIngan", wordB: "tI", diffRu: "tlhIngan [клингон] (латеральная аффриката «tlh» /t͡ɬʰ/) против tI [растение] (взрывной «t» /tʰ/).", diffEn: "tlhIngan [Klingon] (lateral affricate tlh /t͡ɬʰ/) vs tI [plant] (plain t /tʰ/)." },
+        { wordA: "Duj", wordB: "juH", diffRu: "Duj [корабль] (ретрофлексный «D» /ɖ/) против juH [дом] (аффриката «j» /d͡ʒ/).", diffEn: "Duj [ship] (retroflex D /ɖ/) vs juH [home] (affricate j /d͡ʒ/)." },
+        { wordA: "SoH", wordB: "choH", diffRu: "SoH [ты] (ретрофлексный «S» /ʂ/) против choH [изменение] (аффриката «ch» /t͡ʃ/).", diffEn: "SoH [you] (retroflex S /ʂ/) vs choH [change] (affricate ch /t͡ʃ/)." }
     ]
 };
 
@@ -2434,6 +2672,7 @@ const getCuratedIllusion = (subject: string, subjectId: string): { soundText: st
 
     let langKey = '';
     if (MINIMAL_PAIRS_BANK[sId]) langKey = sId;
+    else if (sId === 'tlh' || sName.includes('klingon') || sName.includes('клингон')) langKey = 'tlh';
     else if (sId === 'rf-chuvash' || sId === 'cv' || sName.includes('чуваш') || sName.includes('chuvash')) langKey = 'cv';
     else if (sId.includes('eo') || sName.includes('esperanto') || sName.includes('эсперанто')) langKey = 'eo';
     else if (sId.includes('id') || sName.includes('indones') || sName.includes('индонез')) langKey = 'id';

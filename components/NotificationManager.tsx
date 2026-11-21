@@ -64,7 +64,7 @@ export const NotificationManager: React.FC<NotificationManagerProps> = ({
         
         // Save preference to user profile & localStorage
         setUser(prev => {
-          const updated: UserProgress = { ...prev, isBetaTester: true, notificationTime: selectedTime };
+          const updated: UserProgress = { ...prev, notificationTime: selectedTime };
           try {
             localStorage.setItem('duowindo6601_user_progress_v1', JSON.stringify(updated));
             localStorage.setItem('duowindo6601_notifications_enabled', 'true');

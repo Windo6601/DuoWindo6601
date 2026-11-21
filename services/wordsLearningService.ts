@@ -4,6 +4,7 @@
  */
 
 import { CIS_ALPHABET_DATA, AlphabetItem } from './alphabetData';
+import { KLINGON_LEXICON, splitKlingonPhonemes } from './klingonDictionaryService';
 
 export interface LetterWordItem {
   id: string;
@@ -80,7 +81,25 @@ const CURATED_COURSE_WORDS: Record<string, LetterWordItem[]> = {
     { id: 'ar_w_2', char: 'ب', word: 'بيت', translationRu: 'Дом', translationEn: 'House', translit: 'Bayt', lettersBreakdown: ['ب', 'ي', 'ت'], distractorLetters: ['ن', 'ك', 'ل'], soundPronunciation: 'بيت', definitionRu: 'Дом, жилище.' },
     { id: 'ar_w_3', char: 'ك', word: 'كتاب', translationRu: 'Книга', translationEn: 'Book', translit: 'Kitaab', lettersBreakdown: ['ك', 'ت', 'ا', 'ب'], distractorLetters: ['م', 'ر', 'س'], soundPronunciation: 'كتاب', definitionRu: 'Книга для чтения.' },
     { id: 'ar_w_4', char: 'ص', word: 'صديق', translationRu: 'Друг', translationEn: 'Friend', translit: 'Sadeeq', lettersBreakdown: ['ص', 'د', 'ي', 'ق'], distractorLetters: ['س', 'ر', 'م'], soundPronunciation: 'صديق', definitionRu: 'Верный друг.' }
-  ]
+  ],
+  tlh: KLINGON_LEXICON.filter((e) => !e.tlhLatn.includes(' ')).map((entry, idx) => {
+    const phonemes = splitKlingonPhonemes(entry.tlhLatn);
+    const tlhPool = ['tlh', 'ch', 'gh', 'ng', 'q', 'Q', 'D', 'H', 'S', '’', 'a', 'e', 'I', 'o', 'u'];
+    const distractors = tlhPool.filter((p) => !phonemes.includes(p)).slice(0, 4);
+    return {
+      id: `tlh_w_${idx + 1}`,
+      char: phonemes[0] || entry.tlhLatn[0],
+      word: entry.tlhLatn,
+      translationRu: entry.ru,
+      translationEn: entry.en,
+      translit: `${entry.pIqaD} • ${entry.ipa}`,
+      lettersBreakdown: phonemes,
+      distractorLetters: distractors,
+      soundPronunciation: entry.tlhLatn,
+      definitionRu: `pIqaD: ${entry.pIqaD} • ${entry.ipa}`,
+      definitionEn: `pIqaD: ${entry.pIqaD} • ${entry.ipa}`
+    };
+  })
 };
 
 /**
@@ -147,8 +166,10 @@ export const generateWordExercise = (
     const letters = [...selected.lettersBreakdown];
     const extraCount = difficultyLevel === 'hard' ? 5 : 2;
     const baseDistractors = selected.distractorLetters || ['о', 'а', 'т', 'е', 'с'];
-    const fallbackPool = ['а', 'о', 'е', 'и', 'к', 'м', 'н', 'р', 'с', 'т', 'e', 'a', 'o', 's', 'n', 'r'];
-    const combinedDistractors = [...baseDistractors, ...fallbackPool].slice(0, extraCount);
+    const fallbackPool = courseId === 'tlh'
+      ? ['tlh', 'ch', 'gh', 'ng', 'q', 'Q', 'D', 'H', 'S', '’', 'a', 'e', 'I', 'o', 'u']
+      : ['а', 'о', 'е', 'и', 'к', 'м', 'н', 'р', 'с', 'т', 'e', 'a', 'o', 's', 'n', 'r'];
+    const combinedDistractors = [...baseDistractors, ...fallbackPool.filter(f => !letters.includes(f))].slice(0, extraCount);
     const pool = [...letters, ...combinedDistractors]
       .map(letter => ({ id: crypto.randomUUID(), letter }))
       .sort(() => Math.random() - 0.5);

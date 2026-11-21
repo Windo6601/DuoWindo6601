@@ -74,6 +74,65 @@ export const FISH_AUDIO_MODELS: FishModelSpec[] = [
 export const DEFAULT_FISH_REFERENCE_ID = 'bf322df2096a46f18c579d0baa36f41d';
 export const ADMIN_FISH_CONFIG_STORAGE = 'duowindo_admin_fish_config';
 
+/**
+ * Verified clean native narrator/educational Fish Audio voice reference IDs per language.
+ * Keeps 'en' on DEFAULT_FISH_REFERENCE_ID ("Adrian") while giving every other supported
+ * language its own native speaker so Fish Audio never defaults to an English voice.
+ */
+export const FISH_VOICE_BY_LANG: Record<string, string> = {
+  en: DEFAULT_FISH_REFERENCE_ID,
+  ru: '2a1036d645634680b3cc69aeeb60375b',
+  es: '8d2c17a9b26d4d83888ea67a1ee565b2',
+  de: '90042f762dbf49baa2e7776d011eee6b',
+  fr: '5567200c7d8341738f0892bbacd3be3c',
+  zh: '54a5170264694bfc8e9ad98df7bd89c3',
+  ja: '46745543e52548238593a3962be77e3a',
+  ko: '773c8796d726413bb9273821fdc1a5f9',
+  ar: '79b0fd32e00645e2827b841629034be5',
+  pt: '5661bf8cb97740fcb10d2f756abf7779',
+  it: 'fa3d2a996c0f4d90920ef022584f2aeb',
+  tr: 'b8c121ff4fca4940bf44657f1b0d5734',
+  nl: 'add4d395494c4ed0ba2018e77b39ea54',
+  pl: '4f63d293e42d4ec9adf3d9ab1ad2652c',
+  sv: 'a1843c13ba504f589506a1df30ca39db',
+  no: '32d4aeb41c3b421fb31da086e2c18fa0',
+  uk: '3fef666f5cf44077bd00172095cd417b',
+  he: 'b11e90d946c5439b92098ee5d1dc01f2',
+  fi: 'f6046e0f4cbb4504b15722ab37548738',
+  hu: '551a5c19580a44fa9fee8545744d3f44',
+  id: 'ce4650d0df864e4195806b91065f30be',
+  ro: 'eb4404091b7a488b8304517daec7818d',
+  mo: 'eb4404091b7a488b8304517daec7818d',
+  cs: '9b95ea0fa97e4ebfa3de5e00e9a5e868',
+  el: '6f26667105a940c3af8a99af1ce42f19',
+  hi: '0de8162a9e384545a0106046b57488a7',
+  vi: '9ac6a11757ed4662aff7cb64bc33e868',
+  th: 'a0fe0d1bea8b455abed879f84daae3e0',
+};
+
+export const FISH_NATIVE_LANGS = new Set(Object.keys(FISH_VOICE_BY_LANG));
+
+export function getFishReferenceIdForLang(
+  lang: string,
+  configuredDefaultRef?: string,
+  explicitRef?: string
+): string | undefined {
+  const baseLang = (lang || '').trim().toLowerCase().split(/[-_]/)[0];
+  if (explicitRef && explicitRef.trim()) {
+    if (baseLang && baseLang !== 'en' && explicitRef.trim() === DEFAULT_FISH_REFERENCE_ID) {
+      return FISH_VOICE_BY_LANG[baseLang];
+    }
+    return explicitRef.trim();
+  }
+  if (baseLang === 'en') {
+    return configuredDefaultRef?.trim() || DEFAULT_FISH_REFERENCE_ID;
+  }
+  if (configuredDefaultRef && configuredDefaultRef.trim() && configuredDefaultRef.trim() !== DEFAULT_FISH_REFERENCE_ID) {
+    return configuredDefaultRef.trim();
+  }
+  return FISH_VOICE_BY_LANG[baseLang];
+}
+
 export interface AdminFishConfig {
   customApiKey: string;
   defaultReferenceId: string;

@@ -48,7 +48,7 @@ export const AdminFishAudioManager: React.FC<AdminFishAudioManagerProps> = ({
   );
   const [testingModel, setTestingModel] = useState<FishModelId | null>(null);
   const [testResults, setTestResults] = useState<
-    Record<string, { ok: boolean; status: number; modelUsed: string; bytes: number; ms: number; error?: string }>
+    Record<string, { ok: boolean; status: number; modelUsed: string; voiceLang?: string; bytes: number; ms: number; error?: string }>
   >({});
 
   const persistConfig = async (nextConfig: ReturnType<typeof getAdminFishConfig>, note?: string) => {
@@ -90,26 +90,53 @@ export const AdminFishAudioManager: React.FC<AdminFishAudioManagerProps> = ({
         headers['x-fish-api-key'] = config.customApiKey;
       }
 
+      const phrase = testText.trim() || 'Testing Fish Audio TTS.';
+      const detectedLang = /[\u0400-\u04FF]/.test(phrase)
+        ? 'ru'
+        : /[\u0600-\u06FF]/.test(phrase)
+          ? 'ar'
+          : /[\u3040-\u30FF]/.test(phrase)
+            ? 'ja'
+            : /[\uAC00-\uD7AF]/.test(phrase)
+              ? 'ko'
+              : /[\u4E00-\u9FFF]/.test(phrase)
+                ? 'zh'
+                : /[\u0590-\u05FF]/.test(phrase)
+                  ? 'he'
+                  : /[\u0900-\u097F]/.test(phrase)
+                    ? 'hi'
+                    : /[\u0E00-\u0E7F]/.test(phrase)
+                      ? 'th'
+                      : /[\u0370-\u03FF]/.test(phrase)
+                        ? 'el'
+                        : !testText.trim()
+                          ? 'en'
+                          : (user.language || 'ru');
+      const shouldSendRef =
+        Boolean(config.defaultReferenceId) &&
+        (detectedLang === 'en' || config.defaultReferenceId !== DEFAULT_FISH_REFERENCE_ID);
+
       const res = await fetch('/api/tts/fish', {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          text: testText.trim() || 'Testing Fish Audio TTS.',
+          text: phrase,
           format: 'mp3',
-          lang: user.language || 'ru',
+          lang: detectedLang,
           model: modelId,
-          ...(config.defaultReferenceId ? { reference_id: config.defaultReferenceId } : {}),
+          ...(shouldSendRef ? { reference_id: config.defaultReferenceId } : {}),
         }),
       });
 
       const ms = Math.round(performance.now() - t0);
       const modelUsed = res.headers.get('x-fish-model-used') || modelId;
+      const voiceLang = res.headers.get('x-fish-voice-lang') || detectedLang;
 
       if (!res.ok) {
         const errTxt = await res.text();
         setTestResults((prev) => ({
           ...prev,
-          [modelId]: { ok: false, status: res.status, modelUsed, bytes: 0, ms, error: errTxt.slice(0, 140) },
+          [modelId]: { ok: false, status: res.status, modelUsed, voiceLang, bytes: 0, ms, error: errTxt.slice(0, 140) },
         }));
         playSound?.('wrong');
         setToast?.(`❌ ${modelId}: HTTP ${res.status}`);
@@ -119,7 +146,7 @@ export const AdminFishAudioManager: React.FC<AdminFishAudioManagerProps> = ({
       const buf = await res.arrayBuffer();
       setTestResults((prev) => ({
         ...prev,
-        [modelId]: { ok: true, status: res.status, modelUsed, bytes: buf.byteLength, ms },
+        [modelId]: { ok: true, status: res.status, modelUsed, voiceLang, bytes: buf.byteLength, ms },
       }));
 
       const blob = new Blob([buf], { type: 'audio/mpeg' });
@@ -130,7 +157,7 @@ export const AdminFishAudioManager: React.FC<AdminFishAudioManagerProps> = ({
 
       playSound?.('success');
       setToast?.(
-        `🐋 ${modelId} → ${modelUsed} (${Math.round(buf.byteLength / 1024)} KB, ${ms} мс)`
+        `🐋 ${modelId} → ${modelUsed} [${voiceLang}] (${Math.round(buf.byteLength / 1024)} KB, ${ms} мс)`
       );
     } catch (err: any) {
       const ms = Math.round(performance.now() - t0);
@@ -373,7 +400,7 @@ export const AdminFishAudioManager: React.FC<AdminFishAudioManagerProps> = ({
                   >
                     <span>
                       {res.ok
-                        ? `✅ HTTP ${res.status} • Использована: ${res.modelUsed} • ${Math.round(res.bytes / 1024)} KB`
+                        ? `✅ HTTP ${res.status} • ${res.modelUsed}${res.voiceLang ? ` [${res.voiceLang}]` : ''} • ${Math.round(res.bytes / 1024)} KB`
                         : `❌ HTTP ${res.status}: ${res.error}`}
                     </span>
                     <span className="font-mono text-[10px] bg-black/40 px-2 py-0.5 rounded">

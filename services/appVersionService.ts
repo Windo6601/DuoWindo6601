@@ -8,6 +8,8 @@ export const APP_BUILD_CODE = '6601.2026.11';
 export const APP_RELEASE_DATE = '2026-11-13';
 export const APP_CODENAME = 'Nova Max';
 export const APP_CHANNEL = 'Release • PWA Core';
+export const APP_BETA_VERSION = '1.0.5-beta.1';
+export const APP_BETA_CHANNEL = 'Beta Channel • PWA Early Access';
 export const APP_STORAGE_KEY_PROTECTED = 'duowindo6601_user_progress_v1';
 
 export interface ReleaseNoteEntry {
@@ -98,6 +100,7 @@ export interface AppRuntimeDiagnostics {
   browserLabel: string;
   activeCourseId: string;
   subscriptionTier: string;
+  isBetaTester: boolean;
 }
 
 /**
@@ -181,18 +184,20 @@ export async function collectAppDiagnostics(
     osLabel: `${systemInfo.osName}${systemInfo.osVersion ? ` (${systemInfo.osVersion})` : ''}`,
     browserLabel: `${systemInfo.browserName}${systemInfo.browserVersion > 0 ? ` v${systemInfo.browserVersion}` : ''}`,
     activeCourseId,
-    subscriptionTier: user.subscription || 'free'
+    subscriptionTier: user.subscription || 'free',
+    isBetaTester: Boolean(user.isBetaTester)
   };
 }
 
 export function formatDiagnosticsReport(diag: AppRuntimeDiagnostics, user: UserProgress): string {
   return [
     `${APP_NAME} v${diag.appVersion} (${diag.pwaCoreVersion} • Build ${diag.buildCode} • ${APP_CODENAME})`,
+    `Channel: ${diag.isBetaTester ? APP_BETA_CHANNEL : APP_CHANNEL}`,
     `Mode: ${diag.displayMode === 'standalone' ? 'PWA Standalone' : 'Web Browser'} | Network: ${diag.isOnline ? 'Online' : 'Offline'}`,
     `OS: ${diag.osLabel} | Browser: ${diag.browserLabel}`,
     `Service Worker: ${diag.serviceWorkerSupported ? (diag.serviceWorkerActive ? 'Active' : 'Registered/Idle') : 'Unsupported'} | Cache Buckets: ${diag.cacheBucketCount}`,
     `Profile Integrity (${APP_STORAGE_KEY_PROTECTED}): ${diag.progressKeyFound ? `OK (${diag.progressSizeKb} KB)` : 'Memory State'}`,
-    `Account: @${user.username || 'learner'} | Tier: ${diag.subscriptionTier.toUpperCase()} | XP: ${user.xp || 0} | Course: ${diag.activeCourseId.toUpperCase()}`,
+    `Account: @${user.username || 'learner'} | Tier: ${diag.subscriptionTier.toUpperCase()} | Beta: ${diag.isBetaTester ? 'Joined' : 'Not Joined'} | XP: ${user.xp || 0} | Course: ${diag.activeCourseId.toUpperCase()}`,
     `Checked at: ${diag.checkedAt}`
   ].join('\n');
 }

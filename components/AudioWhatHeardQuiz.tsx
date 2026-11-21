@@ -6,6 +6,8 @@ import {
   WhatYouHeardExercise
 } from '../services/soundIllusionService';
 import { playSound, triggerHapticFeedback } from '../services/audioService';
+import { tlhToPIqaD } from '../services/klingonDictionaryService';
+import { downloadKlingonAudioFile } from '../services/klingonSpeechService';
 
 interface AudioWhatHeardQuizProps {
   currentCourse: Course;
@@ -67,6 +69,7 @@ export const AudioWhatHeardQuiz: React.FC<AudioWhatHeardQuizProps> = ({
 
   const safeIdx = exercises.length > 0 ? currentIdx % exercises.length : 0;
   const currentExercise = exercises[safeIdx];
+  const isKlingonAudio = (currentExercise?.courseId || currentCourse.id) === 'tlh';
 
   const handleSwitchDifficulty = (level: 'easy' | 'hard') => {
     playSound('select');
@@ -274,7 +277,29 @@ export const AudioWhatHeardQuiz: React.FC<AudioWhatHeardQuizProps> = ({
               <span className="text-lg">🐢</span>
               <span className="text-[9px] font-black uppercase mt-0.5">0.75x</span>
             </button>
+
+            {/* Klingon Audio File Download Button */}
+            {isKlingonAudio && (
+              <button
+                type="button"
+                onClick={() => {
+                  playSound('click');
+                  void downloadKlingonAudioFile(currentExercise.soundText, isSlowMode);
+                }}
+                className="p-3 rounded-2xl border bg-emerald-950/70 hover:bg-emerald-800 border-emerald-500/40 text-emerald-300 transition-all cursor-pointer flex flex-col items-center justify-center"
+                title={isRu ? 'Скачать аудио-файл клингонский' : 'Download Klingon audio file'}
+              >
+                <span className="text-lg">💾</span>
+                <span className="text-[9px] font-black uppercase mt-0.5">{isRu ? 'Файл' : 'Audio'}</span>
+              </button>
+            )}
           </div>
+
+          {isKlingonAudio && (
+            <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-200 border border-purple-500/40">
+              🖖 {isRu ? 'Клиентский Speech + hol.kag.org' : 'Client Speech + hol.kag.org'}
+            </span>
+          )}
 
           <h4 className="text-xl sm:text-2xl font-black text-white uppercase tracking-wider text-center">
             {isRu ? 'Что вы услышали?' : 'What did you hear?'}
@@ -305,7 +330,14 @@ export const AudioWhatHeardQuiz: React.FC<AudioWhatHeardQuizProps> = ({
                 }`}
               >
                 <div>
-                  <span className="text-xl font-black block">{item.data.text}</span>
+                  <span className={`text-xl font-black block ${isKlingonAudio ? 'font-klingon' : ''}`}>
+                    {item.data.text}
+                  </span>
+                  {isKlingonAudio && (
+                    <span className="font-piqad text-xs text-purple-300 block">
+                      {tlhToPIqaD(item.data.text)}
+                    </span>
+                  )}
                   <span className={`text-xs font-medium ${isLightMode && !isSelected ? 'text-slate-500' : 'text-gray-400'}`}>
                     {isRu ? item.data.translationRu : item.data.translationEn}
                   </span>
@@ -336,7 +368,10 @@ export const AudioWhatHeardQuiz: React.FC<AudioWhatHeardQuizProps> = ({
                   </span>
                   <span className="text-xs opacity-90">
                     {isRu ? 'Звучало слово: ' : 'Target sound was: '}
-                    <strong>{currentExercise.soundText}</strong>
+                    <strong className={isKlingonAudio ? 'font-klingon' : ''}>{currentExercise.soundText}</strong>
+                    {isKlingonAudio && (
+                      <span className="font-piqad text-xs text-purple-300 ml-2">({tlhToPIqaD(currentExercise.soundText)})</span>
+                    )}
                   </span>
                 </div>
               </div>
@@ -364,7 +399,7 @@ export const AudioWhatHeardQuiz: React.FC<AudioWhatHeardQuizProps> = ({
                     className="py-2.5 px-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors"
                   >
                     <VolumeIcon className="w-4 h-4 text-sky-400" />
-                    <span>{item.data.text}</span>
+                    <span className={isKlingonAudio ? 'font-klingon' : ''}>{item.data.text}</span>
                   </button>
                 ))}
               </div>

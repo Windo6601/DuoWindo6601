@@ -103,6 +103,17 @@
         font-style: normal;
         font-display: swap;
       }
+      /* Klingon pIqaD Unicode Font (ConScript PUA U+F8D0-F8FF via hol.kag.org) */
+      @font-face {
+        font-family: 'pIqaD';
+        src: url('/fonts/pIqaD.woff2') format('woff2'),
+             url('/fonts/pIqaD.woff') format('woff'),
+             url('/fonts/pIqaD-medium.ttf') format('truetype');
+        unicode-range: U+F8D0-F8FF;
+        font-weight: normal;
+        font-style: normal;
+        font-display: swap;
+      }
 
       body {
         background-color: #131F24;
@@ -178,7 +189,11 @@
         font-family: 'Rubik', 'Noto Sans Hebrew', sans-serif !important;
       }
       .font-klingon, [data-lang="tlh"], :lang(tlh), .lang-tlh, [data-course-script="klingon"], [data-course="tlh"] {
-        font-family: 'Klingon', 'DIN Next Rounded', sans-serif !important;
+        font-family: 'pIqaD', 'Klingon', 'DIN Next Rounded', sans-serif !important;
+      }
+      .font-piqad {
+        font-family: 'pIqaD', 'Klingon', sans-serif !important;
+        letter-spacing: 0.04em;
       }
       /* Dual Arabic Numerals Styling: European/Western on left, Eastern Arabic on right */
       .arabic-dual-numeral {

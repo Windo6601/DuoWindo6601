@@ -224,7 +224,7 @@ export const AiLimitModal: React.FC<AiLimitModalProps> = ({
             }}
             className="w-full py-2.5 text-center text-xs font-bold text-gray-400 hover:text-white transition-colors uppercase tracking-wider"
           >
-            {isRu ? 'Продолжить уроки в офлайн-режиме' : 'Continue in Offline Cache Mode'}
+            {isRu ? 'Закрыть' : 'Close'}
           </button>
         </div>
 

@@ -5,48 +5,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>DuoWindo6601</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Noto+Sans+Arabic:wght@400;600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ['"DIN Next Rounded"', 'Cairo', 'Nunito', 'sans-serif'],
-              din: ['"DIN Next Rounded"', 'Nunito', 'sans-serif'],
-              feather: ['"Feather"', 'sans-serif'],
-              arabic: ['"Cairo"', '"Noto Sans Arabic"', 'sans-serif'],
-            },
-            colors: {
-              duo: {
-                dark: '#131F24',
-                card: '#202F36',
-                green: '#58CC02',
-                greenDark: '#58A700', // For border-b
-                blue: '#1CB0F6',
-                blueDark: '#1899D6',
-                gray: '#E5E5E5',
-                grayDark: '#AFAFAF',
-                red: '#FF4B4B',
-                yellow: '#FFC800',
-                yellowDark: '#D6A600',
-                orange: '#FF9600'
-              }
-            },
-            keyframes: {
-              float: {
-                '0%, 100%': { transform: 'translateY(0px)' },
-                '50%': { transform: 'translateY(-10px)' },
-              }
-            },
-            animation: {
-              'float': 'float 3s ease-in-out infinite',
-              'spin-slow': 'spin 8s linear infinite',
-            }
-          }
-        }
-      }
-    </script>
+    <meta name="description" content="A gamified language learning app featuring an interactive mascot, learning path, AI video calls, regional courses, and multi-language support (EN, DE, FR, ES, JA, ZH, RU, AR)." />
+    <meta property="og:title" content="DuoWindo6601" />
+    <meta property="og:description" content="A gamified language learning app featuring an interactive mascot, learning path, AI video calls, regional courses, and multi-language support (EN, DE, FR, ES, JA, ZH, RU, AR)." />
+    <!-- Progressive Web App (PWA) Meta & Icons -->
+    <meta name="theme-color" content="#131F24" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="DuoWindo" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="alternate icon" type="image/png" href="/favicon.png" />
+    <link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@100;200;300;400;500;600;700;800;900&family=Almarai:wght@400;700;800&family=Amiri:ital,wght@0,400;0,700;1,400;1,700&family=Cairo:wght@400;600;700;800;900&family=Lexend:wght@400;500;600;700;800;900&family=M+PLUS+Rounded+1c:wght@400;500;700;800;900&family=Ma+Shan+Zheng&family=Montserrat:wght@400;500;600;700;800;900&family=Noto+Sans+Arabic:wght@400;600;700;800;900&family=Noto+Sans+Hebrew:wght@400;600;700;800&family=Noto+Sans+JP:wght@400;500;700;900&family=Noto+Sans+SC:wght@400;500;700;900&family=Noto+Serif+SC:wght@400;700&family=Nunito:wght@400;600;700;800&family=Rubik:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&family=ZCOOL+KuaiLe&family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <!-- International & Script Fonts: Korean, Hindi, Bengali, Thai, Portuguese, Italian, Turkish, Polish, Indonesian -->
+    <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Hind+Siliguri:wght@400;600;700&family=Kanit:wght@400;600;700;800&family=Noto+Sans+Bengali:wght@400;600;700;900&family=Noto+Sans+Devanagari:wght@400;600;700;900&family=Noto+Sans+KR:wght@400;500;700;900&family=Noto+Sans+Thai:wght@400;600;700;900&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
       /* Duolingo DIN Next Rounded Typeface */
       @font-face {
@@ -63,11 +36,70 @@
         font-style: normal;
         font-display: swap;
       }
+      /* Alexandria Font-Family V 5.013 (by Mai El Guebara - github.com/Gue3bara/Alexandria) */
+      @font-face {
+        font-family: 'Alexandria';
+        src: url('/fonts/alexandria/Alexandria-Regular.woff2') format('woff2'),
+             local('Alexandria Regular'), local('Alexandria-Regular');
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Alexandria';
+        src: url('/fonts/alexandria/Alexandria-Medium.woff2') format('woff2'),
+             local('Alexandria Medium'), local('Alexandria-Medium');
+        font-weight: 500;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Alexandria';
+        src: url('/fonts/alexandria/Alexandria-SemiBold.woff2') format('woff2'),
+             local('Alexandria SemiBold'), local('Alexandria-SemiBold');
+        font-weight: 600;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Alexandria';
+        src: url('/fonts/alexandria/Alexandria-Bold.woff2') format('woff2'),
+             local('Alexandria Bold'), local('Alexandria-Bold');
+        font-weight: 700;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Alexandria';
+        src: url('/fonts/alexandria/Alexandria-ExtraBold.woff2') format('woff2'),
+             local('Alexandria ExtraBold'), local('Alexandria-ExtraBold');
+        font-weight: 800;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Alexandria';
+        src: url('/fonts/alexandria/Alexandria-Black.woff2') format('woff2'),
+             local('Alexandria Black'), local('Alexandria-Black');
+        font-weight: 900;
+        font-style: normal;
+        font-display: swap;
+      }
       /* Feather Bold (Icon/Display font) */
       @font-face {
         font-family: 'Feather';
         src: url('https://db.onlinewebfonts.com/t/0628292f75a0694e22e6b72049e390c2.woff2') format('woff2');
         font-weight: 700;
+        font-style: normal;
+        font-display: swap;
+      }
+      /* Klingon Typeface (fontomania.ru/17807-klingon.html) */
+      @font-face {
+        font-family: 'Klingon';
+        src: url('/fonts/klingon.ttf') format('truetype'),
+             url('https://fontomania.ru/storage/fonts/a09/17807/klingon%20font.ttf') format('truetype'),
+             local('Klingon'), local('klingon');
+        font-weight: normal;
         font-style: normal;
         font-display: swap;
       }
@@ -95,39 +127,240 @@
         font-weight: 700;
       }
 
-      /* Arabic typography and RTL override U+202E helper */
-      .font-arabic {
-        font-family: 'Cairo', 'Noto Sans Arabic', sans-serif !important;
+      /* Chinese, Japanese, Arabic & Hebrew typography helpers */
+      .font-chinese, [data-lang="zh"], :lang(zh), .lang-zh, [data-course-script="chinese"] {
+        font-family: 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'ZCOOL KuaiLe', sans-serif !important;
+      }
+      .font-japanese, [data-lang="ja"], :lang(ja), .lang-ja, [data-course-script="japanese"] {
+        font-family: 'Zen Maru Gothic', 'M PLUS Rounded 1c', 'Noto Sans JP', 'Hiragino Sans', 'Meiryo', sans-serif !important;
+      }
+      .font-arabic, [data-lang="ar"], :lang(ar), .lang-ar, [data-course-script="arabic"] {
+        font-family: 'DIN Next Rounded', 'Nunito', 'Noto Sans Arabic', 'Cairo', sans-serif !important;
+      }
+      /* Arabic Font Switcher Specific Font Rules */
+      [data-arabic-font="duo"] .font-arabic,
+      [data-arabic-font="duo"] [data-lang="ar"],
+      [data-arabic-font="duo"] :lang(ar),
+      [data-arabic-font="duo"] .lang-ar,
+      [data-arabic-font="duo"] [data-course-script="arabic"],
+      .font-arabic-duo {
+        font-family: 'DIN Next Rounded', 'Nunito', sans-serif !important;
+      }
+      [data-arabic-font="noto"] .font-arabic,
+      [data-arabic-font="noto"] [data-lang="ar"],
+      [data-arabic-font="noto"] :lang(ar),
+      [data-arabic-font="noto"] .lang-ar,
+      [data-arabic-font="noto"] [data-course-script="arabic"],
+      .font-arabic-noto {
+        font-family: 'Noto Sans Arabic', sans-serif !important;
+      }
+      [data-arabic-font="cairo"] .font-arabic,
+      [data-arabic-font="cairo"] [data-lang="ar"],
+      [data-arabic-font="cairo"] :lang(ar),
+      [data-arabic-font="cairo"] .lang-ar,
+      [data-arabic-font="cairo"] [data-course-script="arabic"],
+      .font-arabic-cairo {
+        font-family: 'Cairo', sans-serif !important;
+      }
+      [data-arabic-font="alexandria"] .font-arabic,
+      [data-arabic-font="alexandria"] [data-lang="ar"],
+      [data-arabic-font="alexandria"] :lang(ar),
+      [data-arabic-font="alexandria"] .lang-ar,
+      [data-arabic-font="alexandria"] [data-course-script="arabic"],
+      .font-arabic-alexandria {
+        font-family: 'Alexandria', 'Cairo', 'Noto Sans Arabic', sans-serif !important;
+        letter-spacing: normal;
+      }
+      .font-family-alexandria {
+        font-family: 'Alexandria', 'Cairo', sans-serif !important;
+      }
+      .font-hebrew {
+        font-family: 'Rubik', 'Noto Sans Hebrew', sans-serif !important;
+      }
+      .font-klingon, [data-lang="tlh"], :lang(tlh), .lang-tlh, [data-course-script="klingon"], [data-course="tlh"] {
+        font-family: 'Klingon', 'DIN Next Rounded', sans-serif !important;
+      }
+      /* Dual Arabic Numerals Styling: European/Western on left, Eastern Arabic on right */
+      .arabic-dual-numeral {
+        direction: ltr !important;
+        unicode-bidi: isolate;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-weight: 800;
+      }
+      .arabic-dual-numeral .western-num {
+        font-family: 'DIN Next Rounded', 'Nunito', sans-serif;
+        color: #38bdf8;
+      }
+      .arabic-dual-numeral .num-separator {
+        color: #94a3b8;
+        font-weight: 600;
+        font-size: 0.85em;
+      }
+      .arabic-dual-numeral .eastern-num {
+        font-family: 'Cairo', 'Amiri', 'Noto Sans Arabic', sans-serif;
+        color: #34d399;
       }
       .rtl-text {
         direction: rtl;
+        unicode-bidi: isolate;
         text-align: right;
       }
       .rtl-override {
         direction: rtl;
-        unicode-bidi: bidi-override;
+        unicode-bidi: isolate;
+      }
+      [dir="rtl"] {
+        text-align: right;
+        font-family: 'Cairo', 'Noto Sans Arabic', 'DIN Next Rounded', 'Nunito', sans-serif;
+      }
+      [dir="rtl"] code,
+      [dir="rtl"] pre,
+      [dir="rtl"] .ltr-preserve,
+      [dir="rtl"] input[type="text"],
+      [dir="rtl"] input[type="password"],
+      [dir="rtl"] textarea {
+        direction: ltr;
+        unicode-bidi: isolate;
+        text-align: left;
+      }
+      bdi, .bdi-isolate, [dir="auto"] {
+        unicode-bidi: isolate;
+      }
+      /* Prevent Arabic RTL from scrambling Russian Cyrillic & English */
+      [dir="rtl"] bdi,
+      [dir="rtl"] [dir="auto"],
+      [dir="rtl"] .bdi-isolate,
+      [dir="rtl"] .cyrillic-preserve {
+        unicode-bidi: isolate;
+        text-align: start;
+      }
+      [dir="rtl"] :is(p, span, h1, h2, h3, h4, h5, h6, input, textarea, button, a, select, label)[dir="auto"] {
+        unicode-bidi: isolate;
+      }
+      [dir="rtl"] .cyrillic-text,
+      [dir="rtl"] :is(.font-sans, p, span, h1, h2, h3, h4, h5, h6, input, textarea, button):lang(ru) {
+        direction: ltr;
+        unicode-bidi: isolate;
+        text-align: left;
       }
       /* RTL button flex layout helper */
       [dir="rtl"] .rtl-btn-flex,
       .rtl-btn-flex {
         flex-direction: row-reverse;
       }
+
+      /* RTL Directional-Aware CSS Utility */
+      .rtl-directional-aware {
+        direction: ltr;
+        unicode-bidi: isolate;
+      }
+      [dir="rtl"] .rtl-directional-aware,
+      .rtl-directional-aware[dir="rtl"] {
+        direction: rtl;
+        text-align: right;
+        unicode-bidi: isolate;
+      }
+      [dir="rtl"] .rtl-directional-aware.flex-row,
+      [dir="rtl"] .rtl-directional-aware .flex-row {
+        flex-direction: row-reverse;
+      }
+      [dir="rtl"] .rtl-directional-aware.flex,
+      [dir="rtl"] .rtl-directional-aware .flex {
+        direction: rtl;
+      }
+      [dir="rtl"] .rtl-directional-aware .ml-auto {
+        margin-left: 0 !important;
+        margin-right: auto !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .mr-auto {
+        margin-right: 0 !important;
+        margin-left: auto !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .space-x-1 > :not([hidden]) ~ :not([hidden]),
+      [dir="rtl"] .rtl-directional-aware.space-x-1 > :not([hidden]) ~ :not([hidden]) {
+        margin-left: 0 !important;
+        margin-right: 0.25rem !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .space-x-2 > :not([hidden]) ~ :not([hidden]),
+      [dir="rtl"] .rtl-directional-aware.space-x-2 > :not([hidden]) ~ :not([hidden]) {
+        margin-left: 0 !important;
+        margin-right: 0.5rem !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .space-x-3 > :not([hidden]) ~ :not([hidden]),
+      [dir="rtl"] .rtl-directional-aware.space-x-3 > :not([hidden]) ~ :not([hidden]) {
+        margin-left: 0 !important;
+        margin-right: 0.75rem !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .space-x-4 > :not([hidden]) ~ :not([hidden]),
+      [dir="rtl"] .rtl-directional-aware.space-x-4 > :not([hidden]) ~ :not([hidden]) {
+        margin-left: 0 !important;
+        margin-right: 1rem !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .space-x-6 > :not([hidden]) ~ :not([hidden]),
+      [dir="rtl"] .rtl-directional-aware.space-x-6 > :not([hidden]) ~ :not([hidden]) {
+        margin-left: 0 !important;
+        margin-right: 1.5rem !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .space-x-8 > :not([hidden]) ~ :not([hidden]),
+      [dir="rtl"] .rtl-directional-aware.space-x-8 > :not([hidden]) ~ :not([hidden]) {
+        margin-left: 0 !important;
+        margin-right: 2rem !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .right-4 {
+        right: auto !important;
+        left: 1rem !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .left-4 {
+        left: auto !important;
+        right: 1rem !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .right-5 {
+        right: auto !important;
+        left: 1.25rem !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .left-5 {
+        left: auto !important;
+        right: 1.25rem !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .right-0 {
+        right: auto !important;
+        left: 0 !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .left-0 {
+        left: auto !important;
+        right: 0 !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .text-left {
+        text-align: right !important;
+      }
+      [dir="rtl"] .rtl-directional-aware .text-right {
+        text-align: left !important;
+      }
+      bdi, .bdi-isolate, [dir="auto"] {
+        unicode-bidi: plaintext;
+      }
     </style>
 
-<link rel="stylesheet" href="/index.css">
-  <script type="importmap">
-{
-  "imports": {
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0",
-    "react/": "https://aistudiocdn.com/react@^19.2.1/",
-    "react": "https://aistudiocdn.com/react@^19.2.1",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/"
-  }
-}
-</script>
-  <script type="module" crossorigin src="/assets/index-BbODIK9n.js"></script>
-</head>
+    <!-- Google reCAPTCHA API -->
+    <script src="https://www.google.com/recaptcha/api.js?render=explicit" async defer></script>
+    <!-- Stripe Buy Button Script -->
+    <script async src="https://js.stripe.com/v3/buy-button.js"></script>
+  <script type="module" crossorigin src="/assets/index-DqDQjQpl.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-CyE8wRM4.css">
+<link rel="manifest" href="/manifest.webmanifest"></head>
   <body>
+    <noscript>
+      <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #131F24; color: #fff; font-family: sans-serif; padding: 20px; text-align: center;">
+        <div style="max-width: 480px; background: #1f2937; padding: 24px; border-radius: 20px; border: 2px solid #374151;">
+          <h2 style="font-size: 20px; font-weight: 800; margin-bottom: 12px; color: #60a5fa;">DuoWindo6601</h2>
+          <p style="font-size: 14px; line-height: 1.5; color: #9ca3af; margin-bottom: 16px;">
+            Для работы приложения требуется JavaScript. Пожалуйста, включите JavaScript в настройках браузера или обновите браузер.
+          </p>
+        </div>
+      </div>
+    </noscript>
     <div id="root"></div>
-</body>
+  </body>
 </html>

@@ -6,7 +6,7 @@ import { doc, getDoc, setDoc, onSnapshot, serverTimestamp } from 'firebase/fires
 import { signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db, googleProvider, handleFirestoreError, OperationType } from './firebase';
 import { MultiUserShareModal } from './components/MultiUserShareModal';
-import { AppScreen, Exercise, UserProgress, Course, WordToken, LeaderboardEntry, SubscriptionTier, RoleplayMessage } from './types';
+import { AppScreen, Exercise, UserProgress, Course, WordToken, LeaderboardEntry, SubscriptionTier, RoleplayMessage, CharacterAvatarConfig } from './types';
 import { Chess, Square } from 'chess.js';
 import { generateExercise, checkAnswerWithAI, pingGeminiApi, speakText, startRoleplay, replyToRoleplay, generateIllusion, generateDrawing, checkDrawing, getFallbackExercise, getChessMove, getChessChatReply, getChessTutorialHint, translateText, getMistakeExplanation, generateLocalMistakeExplanation, generateIshihara, generateInterviewQuestion, getInterviewHint, generateReading, generateVideoCallRoleplayResponse } from './services/geminiService';
 
@@ -19,6 +19,8 @@ import { readPendingPwaUpdate, clearPendingPwaUpdate, InstalledPwaPatchInfo } fr
 import { AppVersionCard } from "./components/AppVersionCard";
 import { APP_VERSION } from "./services/appVersionService";
 import { BetaModal } from "./components/BetaModal";
+import { tlhToPIqaD, isPIqaDText } from './services/klingonDictionaryService';
+import { downloadKlingonAudioFile } from './services/klingonSpeechService';
 import { playSound } from './services/audioService';
 import { createStripeCheckout, createStripeGemsCheckout, cancelStripeSubscription, openStripePortal, checkStripeSession, navigateToStripeUrl } from './services/stripeService';
 import { 
@@ -49,6 +51,10 @@ import { PlacementTestModal } from './components/PlacementTestModal';
 import { PWAInstallButton, PWAInstructionModal } from './components/PWAInstallButton';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { DuoWindo6601PoemModal } from './components/DuoWindo6601PoemModal';
+import { DuoWindo6601RadioButton } from './components/DuoWindo6601RadioButton';
+import { DuoWindo6601RadioModal, getCompletedRadioEpisodeIds } from './components/DuoWindo6601RadioModal';
+import { ProfileAvatarDisplay } from './components/ProfileAvatarDisplay';
+import { ProfileAvatarStudioModal } from './components/ProfileAvatarStudioModal';
 import { MusicStudioModal } from './components/MusicStudioModal';
 import { StreakSaverCountdown } from './components/StreakSaverCountdown';
 import { NotificationManager, NotificationPromptBanner } from './components/NotificationManager';
@@ -3498,6 +3504,8 @@ function App() {
   const [dailyChallengeDismissedDate, setDailyChallengeDismissedDate] = useState<string>(() => localStorage.getItem('duo_daily_challenge_dismissed') || '');
   const [showBetaModal, setShowBetaModal] = useState<boolean>(false);
   const [showPoemModal, setShowPoemModal] = useState<boolean>(false);
+  const [showDuoRadioModal, setShowDuoRadioModal] = useState<boolean>(false);
+  const [completedRadioIds, setCompletedRadioIds] = useState<string[]>(() => getCompletedRadioEpisodeIds());
   const [showMusicStudioModal, setShowMusicStudioModal] = useState<boolean>(false);
   const [musicStudioTab, setMusicStudioTab] = useState<'notes' | 'learn' | 'tempo' | 'repeat'>('notes');
   const [showExplanationModal, setShowExplanationModal] = useState<boolean>(false);
@@ -4272,8 +4280,83 @@ const getTodayChallenge = () => {
 
   const [currentCourse, setCurrentCourse] = useState<Course>(() => {
     const savedCourseId = localStorage.getItem('duo_course_id_6601');
-    return COURSES.find(l => l.id === savedCourseId) || COURSES[0];
+    const found = COURSES.find(l => l.id === savedCourseId) || COURSES[0];
+    if (found?.isBeta && !user.isBetaTester) {
+      return COURSES[0];
+    }
+    return found;
   });
+
+  const handleToggleBetaTesting = (join: boolean) => {
+    const isRuLang = user.language !== 'en';
+    const joinedAt = join ? new Date().toISOString() : undefined;
+    setUser(prev => {
+      const updated: UserProgress = {
+        ...prev,
+        isBetaTester: join,
+        betaJoinedAt: joinedAt
+      };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    if (!join && currentCourse.isBeta) {
+      setCurrentCourse(COURSES[0]);
+      try {
+        localStorage.setItem('duo_course_id_6601', COURSES[0].id);
+      } catch {}
+    }
+
+    if (join) {
+      playSound('correct');
+      setToast(
+        isRuLang
+          ? '🧪 Вы присоединились к бета-тестированию приложения DuoWindo6601 PWA! Функции бета-тестирования разблокированы.'
+          : '🧪 You joined DuoWindo6601 PWA App Beta Testing! Beta features are now unlocked.'
+      );
+    } else {
+      playSound('click');
+      setToast(
+        isRuLang
+          ? '🔒 Вы вышли из бета-тестирования. Функции бета-тестирования снова недоступны.'
+          : '🔒 You left App Beta Testing. Beta features are now locked.'
+      );
+    }
+  };
+
+  const goToSettingsVersion = () => {
+    setShowBetaModal(false);
+    setScreen(AppScreen.SETTINGS);
+    setTimeout(() => {
+      try {
+        document.getElementById('duowindo-app-version-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } catch {}
+    }, 120);
+  };
+
+  const selectCourseSafely = (course: Course, targetScreen?: AppScreen) => {
+    const isRuLang = user.language !== 'en';
+    if (course.isBeta && !user.isBetaTester) {
+      playSound('wrong');
+      setToast(
+        isRuLang
+          ? '🔒 Функция бета-тестирования недоступна! Присоединитесь в Настройках → «Версия Приложения DuoWindo6601».'
+          : '🔒 Beta testing feature unavailable! Join in Settings → "DuoWindo6601 App Version".'
+      );
+      return false;
+    }
+    playSound('select');
+    setCurrentCourse(course);
+    try {
+      localStorage.setItem('duo_course_id_6601', course.id);
+    } catch {}
+    if (targetScreen) {
+      setScreen(targetScreen);
+    }
+    return true;
+  };
 
   const [loading, setLoading] = useState(false);
   const [isCheckingApi, setIsCheckingApi] = useState(false);
@@ -4591,6 +4674,7 @@ const getTodayChallenge = () => {
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [canvasSize, setCanvasSize] = useState<{width: number, height: number}>({width: 320, height: 320}); 
   const [showTrace, setShowTrace] = useState(true); 
+  const [showKlingonPIqaD, setShowKlingonPIqaD] = useState(true);
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const [showAndroidModal, setShowAndroidModal] = useState(false);
   const [showBrowserModal, setShowBrowserModal] = useState(false);
@@ -5030,7 +5114,89 @@ const getTodayChallenge = () => {
   const [editAvatarColor, setEditAvatarColor] = useState<string>('bg-duo-blue');
   const [editAvatarUrl, setEditAvatarUrl] = useState<string>('');
   const [editAvatarIcon, setEditAvatarIcon] = useState<string>('');
+  const [showAvatarStudioModal, setShowAvatarStudioModal] = useState<boolean>(false);
+  const [avatarStudioInitialTab, setAvatarStudioInitialTab] = useState<'character' | 'photo'>('character');
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
+
+  const openAvatarStudio = (tab: 'character' | 'photo' = 'character') => {
+    playSound('click');
+    setAvatarStudioInitialTab(tab);
+    setShowAvatarStudioModal(true);
+  };
+
+  const handleApplyStudioAvatar = async (patch: {
+    avatarMode: 'photo' | 'character' | 'icon';
+    avatarColor: string;
+    avatarUrl?: string;
+    avatarImage?: string;
+    characterAvatar: CharacterAvatarConfig;
+  }) => {
+    const updatedUser: UserProgress = {
+      ...user,
+      avatarMode: patch.avatarMode,
+      avatarColor: patch.avatarColor,
+      avatarUrl: patch.avatarUrl,
+      avatarImage: patch.avatarImage,
+      characterAvatar: patch.characterAvatar
+    };
+
+    setUser(updatedUser);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUser));
+    setEditAvatarUrl(patch.avatarUrl || '');
+    setEditAvatarColor(patch.avatarColor);
+
+    if (firebaseUser) {
+      try {
+        const userRef = doc(db, 'users', firebaseUser.uid);
+        await setDoc(userRef, sanitizeForFirestore({
+          ...updatedUser,
+          updatedAt: serverTimestamp()
+        }, true), { merge: true });
+      } catch (err) {
+        console.error("Error saving avatar studio config to Firestore:", err);
+      }
+    }
+
+    setToast(
+      patch.avatarMode === 'character'
+        ? (user.language === 'ru' ? '🎭 Аватар-персонаж установлен! Фото профиля сохранено.' : '🎭 Character avatar applied! Profile photo kept.')
+        : (user.language === 'ru' ? '📷 Фотография профиля установлена!' : '📷 Profile photo applied!')
+    );
+  };
+
+  const handleQuickSwitchAvatarMode = async (mode: 'photo' | 'character') => {
+    if (mode === 'photo' && !(user.avatarUrl || user.avatarImage)) {
+      openAvatarStudio('photo');
+      return;
+    }
+    if (mode === 'character' && !user.characterAvatar) {
+      openAvatarStudio('character');
+      return;
+    }
+    playSound('select');
+    const updatedUser: UserProgress = {
+      ...user,
+      avatarMode: mode
+    };
+    setUser(updatedUser);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUser));
+    if (firebaseUser) {
+      try {
+        const userRef = doc(db, 'users', firebaseUser.uid);
+        await setDoc(userRef, sanitizeForFirestore({
+          avatarMode: mode,
+          updatedAt: serverTimestamp()
+        }, true), { merge: true });
+      } catch (err) {
+        console.error("Error switching avatar mode in Firestore:", err);
+      }
+    }
+    setToast(
+      mode === 'character'
+        ? (user.language === 'ru' ? '🎭 Включён аватар-персонаж' : '🎭 Switched to character avatar')
+        : (user.language === 'ru' ? '📷 Включено фото профиля' : '📷 Switched to profile photo')
+    );
+  };
 
   const openEditProfile = () => {
     playSound('click');
@@ -5072,6 +5238,14 @@ const getTodayChallenge = () => {
     }
     playSound('success');
     const cleanUsername = editUsername.trim().replace(/^@/, '');
+    const photoChanged = (editAvatarUrl || '') !== (user.avatarUrl || user.avatarImage || '');
+    const nextAvatarMode: UserProgress['avatarMode'] =
+      photoChanged && editAvatarUrl
+        ? 'photo'
+        : !editAvatarUrl && user.avatarMode === 'photo'
+          ? (user.characterAvatar ? 'character' : 'icon')
+          : user.avatarMode;
+
     const updatedUser: UserProgress = {
       ...user,
       name: editName.trim(),
@@ -5086,6 +5260,7 @@ const getTodayChallenge = () => {
       avatarUrl: editAvatarUrl || undefined,
       avatarImage: editAvatarUrl || undefined,
       avatarIcon: editAvatarIcon || undefined,
+      avatarMode: nextAvatarMode,
     };
     
     setUser(updatedUser);
@@ -5329,6 +5504,13 @@ const getTodayChallenge = () => {
   const isRtlCourse = useMemo(() => {
     return isArabicCourse || isHebrewCourse;
   }, [isArabicCourse, isHebrewCourse]);
+
+  const isKlingonCourse = currentCourse.id === 'tlh';
+  const isKlingonTextOrToken = useCallback((text: string) => {
+    if (!text || currentCourse.id !== 'tlh') return false;
+    if (isPIqaDText(text)) return true;
+    return !(/[\u0400-\u04FF]/.test(text));
+  }, [currentCourse.id]);
 
   const isArabicText = useCallback((text: string) => {
     return /[\u0600-\u06FF]/.test(text || '');
@@ -5859,7 +6041,8 @@ const getTodayChallenge = () => {
           'no': 'nb-NO', 'ro': 'ro-RO', 'mo': 'ro-RO', 'nl': 'nl-NL', 'cs': 'cs-CZ',
           'el': 'el-GR', 'vi': 'vi-VN', 'th': 'th-TH', 'cv': 'ru-RU', 'tt': 'ru-RU',
           'ky': 'ru-RU', 'az': 'az-AZ', 'hy': 'hy-AM', 'ka': 'ka-GE', 'eo': 'eo',
-          'la': 'it-IT'
+          'la': 'it-IT', 'hv': 'it-IT', 'eu': 'es-ES', 'tab': 'ru-RU', 'tk': 'tr-TR',
+          'tg': 'ru-RU', 'et': 'et-EE', 'lv': 'lv-LV', 'lt': 'lt-LT', 'nv': 'es-ES'
         };
         const resolvedRecLang = NON_LANGUAGE_IDS.includes(currentCourse.id)
           ? (user.language === 'ru' ? 'ru-RU' : 'en-US')
@@ -6388,6 +6571,9 @@ const getTodayChallenge = () => {
   };
   const startTraining = async (type: Exercise['type'] = 'translation', topicOverride?: string) => {
     playSound('click');
+    if (currentCourse.id === 'tlh' && type === 'speech') {
+      type = 'listening';
+    }
     if (user.subscription === 'free' && user.energy <= 0) {
       setToast(t('t_energy_low'));
       setScreen(AppScreen.SHOP);
@@ -6581,7 +6767,10 @@ const getTodayChallenge = () => {
   const checkAndAwardDailyChallenge = (exType: Exercise['type']) => {
     try {
       const todayStr = new Date().toISOString().split('T')[0];
-      const todayChallenge = getTodayChallenge();
+      const rawChallenge = getTodayChallenge();
+      const todayChallenge = (currentCourse.id === 'tlh' && rawChallenge.type === 'speech')
+        ? (DAILY_CHALLENGES.find(c => c.type === 'listening') || rawChallenge)
+        : rawChallenge;
       if (exType === todayChallenge.type && user.dailyChallengeCompletedDate !== todayStr) {
         setUser(u => ({
           ...u,
@@ -6972,16 +7161,32 @@ const getTodayChallenge = () => {
                     </button>
 
                     <button 
-                      onClick={() => { playSound('click'); setShowBetaModal(true); }} 
+                      onClick={() => {
+                        if (!user.isBetaTester) {
+                          playSound('wrong');
+                          setToast(
+                            user.language === 'ru'
+                              ? '🔒 Бета-тестирование недоступно: присоединитесь в Настройках → «Версия Приложения DuoWindo6601».'
+                              : '🔒 Beta testing unavailable: join in Settings → "DuoWindo6601 App Version".'
+                          );
+                        } else {
+                          playSound('click');
+                        }
+                        setShowBetaModal(true);
+                      }} 
                       className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider ${
-                        isLightMode 
-                          ? 'bg-purple-100 hover:bg-purple-200 text-purple-900 border-purple-300' 
-                          : 'bg-purple-900/60 hover:bg-purple-800 text-purple-200 border-purple-500/50'
+                        !user.isBetaTester
+                          ? isLightMode
+                            ? 'bg-slate-200 hover:bg-slate-300 text-slate-600 border-slate-300'
+                            : 'bg-gray-800/90 hover:bg-gray-700 text-gray-400 border-gray-700'
+                          : isLightMode 
+                            ? 'bg-purple-100 hover:bg-purple-200 text-purple-900 border-purple-300' 
+                            : 'bg-purple-900/60 hover:bg-purple-800 text-purple-200 border-purple-500/50'
                       } hover:scale-105 transition-all flex items-center space-x-1 shadow-md cursor-pointer border`}
-                      title="Доступ бета-тестирование DuoWindo6601"
+                      title={user.isBetaTester ? "Бета-Центр DuoWindo6601" : "Недоступно: присоединитесь к бета-тестированию в Настройках"}
                     >
-                      <span className="animate-pulse">🧪</span>
-                      <span className="hidden sm:inline">Бета-Тест</span>
+                      <span className={user.isBetaTester ? 'animate-pulse' : ''}>{user.isBetaTester ? '🧪' : '🔒'}</span>
+                      <span className="hidden sm:inline">{user.isBetaTester ? 'Бета-Тест' : 'Бета (🔒)'}</span>
                     </button>
                     <button 
                       onClick={() => { playSound('click'); setShowBrowserModal(true); setShowSystemInfoModal(true); }} 
@@ -7018,7 +7223,7 @@ const getTodayChallenge = () => {
                   return (
                     <button 
                       key={c.id} 
-                      onClick={() => { playSound('select'); setCurrentCourse(c); setScreen(AppScreen.PATH); }} 
+                      onClick={() => selectCourseSafely(c, AppScreen.PATH)} 
                       className={`flex-shrink-0 w-14 h-11 rounded-2xl border-2 flex items-center justify-center transition-all relative ${
                         currentCourse.id === c.id 
                           ? 'border-duo-blue bg-duo-blue/15 scale-110 shadow-lg' 
@@ -7162,6 +7367,7 @@ const getTodayChallenge = () => {
                       setToast={setToast}
                       onOpenSystemChecker={() => setShowSystemInfoModal(true)}
                       onOpenBetaCenter={() => setShowBetaModal(true)}
+                      onToggleBetaTesting={handleToggleBetaTesting}
                     />
                     
                                         {/* SYSTEM COMPATIBILITY & DUOWINDO6601 SYSTEM CHECKER CARD */}
@@ -7232,20 +7438,17 @@ const getTodayChallenge = () => {
                       systemInfo={systemInfo} 
                       onOpenSystemChecker={() => setShowSystemInfoModal(true)} 
                       lang={user.language} 
+                      isBetaTester={Boolean(user.isBetaTester)}
                     />
 
 {/* PROFILE SUMMARY & EDIT TRIGGER */}
                     <div className="bg-duo-card border-2 border-gray-700 rounded-3xl p-6 mb-6 shadow-xl flex items-center justify-between">
                         <div className="flex items-center space-x-4">
-                            <div className={`w-14 h-14 rounded-2xl ${user.avatarColor || 'bg-duo-blue'} flex items-center justify-center text-2xl font-bold overflow-hidden border-2 border-gray-700 shadow-md`}>
-                                {user.avatarUrl || user.avatarImage ? (
-                                    <img src={user.avatarUrl || user.avatarImage} alt={user.name} className="w-full h-full object-cover" />
-                                ) : user.avatarIcon ? (
-                                    <span>{user.avatarIcon}</span>
-                                ) : (
-                                    <span>{user.name ? user.name[0].toUpperCase() : 'U'}</span>
-                                )}
-                            </div>
+                            <ProfileAvatarDisplay
+                              user={user}
+                              className="w-14 h-14 rounded-2xl border-2 border-gray-700 shadow-md shrink-0"
+                              textClassName="text-2xl"
+                            />
                             <div>
                                 <h4 className="font-black text-lg text-white flex items-center gap-2">
                                     <span>{user.name}</span>
@@ -8899,7 +9102,7 @@ const getTodayChallenge = () => {
                                 onClick={() => { playSound('click'); setCourseRegionTab('beta'); }}
                                 className={`px-4 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider whitespace-nowrap transition-all border-b-4 ${courseRegionTab === 'beta' ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-fuchsia-600 border-purple-900 text-white shadow-lg shadow-purple-500/25 ring-2 ring-purple-400/40' : 'bg-gray-800 border-gray-900 text-gray-400 hover:bg-gray-700'}`}
                             >
-                                🧪 {user.language === 'ru' ? 'Бета-курсы (8)' : 'Beta Courses (8)'}
+                                {user.isBetaTester ? '🧪' : '🔒'} {user.language === 'ru' ? 'Бета-курсы (8)' : 'Beta Courses (8)'}
                             </button>
                         </div>
                     )}
@@ -8923,8 +9126,8 @@ const getTodayChallenge = () => {
                                     return (
                                         <div 
                                             key={c.id} 
-                                            onClick={() => { playSound('select'); setCurrentCourse(c); setScreen(AppScreen.PATH); }} 
-                                            className={`relative p-4 rounded-2xl border-2 border-b-4 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all flex flex-col justify-between shadow-lg group ${isSelected ? 'bg-blue-900/30 border-duo-blue ring-2 ring-duo-blue' : 'bg-gray-800 border-gray-700 hover:bg-gray-750'}`}
+                                            onClick={() => selectCourseSafely(c, AppScreen.PATH)} 
+                                            className={`relative p-4 rounded-2xl border-2 border-b-4 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all flex flex-col justify-between shadow-lg group ${c.isBeta && !user.isBetaTester ? 'bg-gray-900/70 border-amber-500/40 opacity-80' : isSelected ? 'bg-blue-900/30 border-duo-blue ring-2 ring-duo-blue' : 'bg-gray-800 border-gray-700 hover:bg-gray-750'}`}
                                         >
                                             <div className="flex items-center space-x-4">
                                                 {SPECIAL_IDS.includes(c.id) ? (
@@ -9612,8 +9815,7 @@ const getTodayChallenge = () => {
                                                         themeBorder: 'border-duo-blueDark',
                                                         mascotVariant: 'default'
                                                     };
-                                                    setCurrentCourse(selectedCourse);
-                                                    setScreen(AppScreen.PATH);
+                                                    selectCourseSafely(selectedCourse, AppScreen.PATH);
                                                 }}
                                                 className="relative p-4 rounded-2xl border-2 border-sky-500/30 bg-gray-800/90 hover:bg-sky-950/60 cursor-pointer transition-all flex flex-col justify-between hover:scale-[1.02] active:scale-95 shadow-lg group"
                                             >
@@ -9684,22 +9886,49 @@ const getTodayChallenge = () => {
                                         </div>
                                     </div>
 
+                                    {/* LOCKED BANNER WHEN USER HAS NOT JOINED APP BETA TESTING */}
+                                    {!user.isBetaTester && (
+                                        <div className="mb-5 p-4 rounded-2xl bg-amber-950/70 border-2 border-amber-500/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+                                            <div className="flex items-start space-x-3">
+                                                <span className="text-2xl shrink-0">🔒</span>
+                                                <div>
+                                                    <h4 className="font-black text-sm text-amber-300 uppercase tracking-wider">
+                                                        {user.language === 'ru'
+                                                            ? 'Функции бета-тестирования недоступны'
+                                                            : 'Beta Testing Features Unavailable'}
+                                                    </h4>
+                                                    <p className="text-xs text-amber-100/90 font-semibold mt-0.5">
+                                                        {user.language === 'ru'
+                                                            ? 'Вы не присоединились к бета-тестированию приложения. Присоединитесь в Настройках → «Версия Приложения DuoWindo6601», чтобы открыть бета-курсы.'
+                                                            : 'You have not joined App Beta Testing. Join in Settings → "DuoWindo6601 App Version" to unlock beta courses.'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    playSound('click');
+                                                    goToSettingsVersion();
+                                                }}
+                                                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:brightness-110 text-black font-black text-xs uppercase tracking-wider border-b-4 border-amber-700 active:border-b-0 active:translate-y-0.5 transition-all cursor-pointer shrink-0"
+                                            >
+                                                ⚙️ {user.language === 'ru' ? 'Присоединиться в Настройках' : 'Join in Settings'}
+                                            </button>
+                                        </div>
+                                    )}
+
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                         {BETA_COURSES.map(c => {
                                             const isSelected = currentCourse.id === c.id;
+                                            const isBetaLocked = Boolean(c.isBeta && !user.isBetaTester);
                                             return (
                                                 <div 
                                                     key={c.id} 
-                                                    className={`relative p-4 rounded-2xl border-2 border-b-4 transition-all flex flex-col justify-between shadow-xl group ${isSelected ? 'bg-purple-950/60 border-purple-400 ring-2 ring-purple-400' : 'bg-gray-850/90 border-purple-900/50 hover:bg-gray-800 hover:border-purple-500/50'}`}
+                                                    className={`relative p-4 rounded-2xl border-2 border-b-4 transition-all flex flex-col justify-between shadow-xl group ${isBetaLocked ? 'bg-gray-900/75 border-gray-800 opacity-75' : isSelected ? 'bg-purple-950/60 border-purple-400 ring-2 ring-purple-400' : 'bg-gray-850/90 border-purple-900/50 hover:bg-gray-800 hover:border-purple-500/50'}`}
                                                 >
                                                     <div 
                                                         className="flex items-start justify-between gap-3 mb-2 cursor-pointer"
-                                                        onClick={() => {
-                                                            playSound('select');
-                                                            setCurrentCourse(c);
-                                                            localStorage.setItem('duo_course_id_6601', c.id);
-                                                            setScreen(AppScreen.PATH);
-                                                        }}
+                                                        onClick={() => selectCourseSafely(c, AppScreen.PATH)}
                                                     >
                                                         <div className="flex items-center space-x-3 min-w-0">
                                                             <img 
@@ -9721,7 +9950,11 @@ const getTodayChallenge = () => {
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        {isSelected && (
+                                                        {isBetaLocked ? (
+                                                            <div className="bg-amber-500/20 border border-amber-500/40 rounded-full p-1.5 shrink-0 text-xs">
+                                                                🔒
+                                                            </div>
+                                                        ) : isSelected && (
                                                             <div className="bg-duo-green rounded-full p-1 shrink-0">
                                                                 <CheckCircleIcon className="w-5 h-5 text-white"/>
                                                             </div>
@@ -9744,14 +9977,17 @@ const getTodayChallenge = () => {
                                                                 type="button"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    playSound('select');
-                                                                    setCurrentCourse(c);
-                                                                    localStorage.setItem('duo_course_id_6601', c.id);
-                                                                    setScreen(AppScreen.PATH);
+                                                                    selectCourseSafely(c, AppScreen.PATH);
                                                                 }}
-                                                                className="flex-1 py-1.5 px-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-[10px] uppercase tracking-wider rounded-xl transition-all shadow cursor-pointer border border-purple-400/40 text-center active:scale-95"
+                                                                className={`flex-1 py-1.5 px-3 font-black text-[10px] uppercase tracking-wider rounded-xl transition-all shadow text-center ${
+                                                                    isBetaLocked
+                                                                        ? 'bg-gray-800 text-amber-300 border border-amber-500/40 cursor-not-allowed'
+                                                                        : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white cursor-pointer border border-purple-400/40 active:scale-95'
+                                                                }`}
                                                             >
-                                                                {user.language === 'ru' ? 'Тестировать курс' : 'Test Course'}
+                                                                {isBetaLocked
+                                                                    ? (user.language === 'ru' ? '🔒 Недоступно' : '🔒 Locked')
+                                                                    : (user.language === 'ru' ? 'Тестировать курс' : 'Test Course')}
                                                             </button>
                                                             <button
                                                                 type="button"
@@ -10250,7 +10486,10 @@ const getTodayChallenge = () => {
               {(() => {
                 const todayStr = new Date().toISOString().split('T')[0];
                 if (dailyChallengeDismissedDate === todayStr) return null;
-                const todayChallenge = getTodayChallenge();
+                const rawChallenge = getTodayChallenge();
+                const todayChallenge = (currentCourse.id === 'tlh' && rawChallenge.type === 'speech')
+                  ? (DAILY_CHALLENGES.find(c => c.type === 'listening') || rawChallenge)
+                  : rawChallenge;
                 const isChallengeDone = user.dailyChallengeCompletedDate === todayStr;
                 const challengeTitle = user.language === 'ru' ? todayChallenge.titleRu : todayChallenge.titleEn;
                 const challengeDesc = user.language === 'ru' ? todayChallenge.descRu : todayChallenge.descEn;
@@ -10381,35 +10620,53 @@ const getTodayChallenge = () => {
                       
                       <div className="flex items-start space-x-4">
                           <div className="bg-purple-500/20 p-3.5 rounded-2xl mt-1 border border-purple-400/30 flex-shrink-0">
-                              <span className="text-3xl">🧪</span>
+                              <span className="text-3xl">{user.isBetaTester ? '🧪' : '🔒'}</span>
                           </div>
                           <div className="flex-1 pr-6">
                               <div className="flex items-center space-x-2 mb-1.5 flex-wrap">
-                                  <span className="bg-purple-500 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">Бета-тестирование</span>
-                                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9.5px] font-bold px-2 py-0.5 rounded-full uppercase font-mono">v{APP_VERSION} Active</span>
+                                  <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${user.isBetaTester ? 'bg-purple-500 text-white' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'}`}>
+                                      {user.isBetaTester ? 'Бета-тестер активен' : 'Бета-тест не подключён'}
+                                  </span>
+                                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9.5px] font-bold px-2 py-0.5 rounded-full uppercase font-mono">v{APP_VERSION} PWA</span>
                               </div>
-                              <h3 className="font-din font-black text-xl text-white tracking-widest uppercase mb-1">DuoWindo6601 Доступ Бета-тестирование</h3>
+                              <h3 className="font-din font-black text-xl text-white tracking-widest uppercase mb-1">
+                                  {user.isBetaTester ? 'DuoWindo6601 Доступ Бета-тестирование' : 'Бета-тестирование DuoWindo6601 PWA'}
+                              </h3>
                               <p className="font-din font-bold text-xs text-purple-200 leading-normal mb-3">
-                                  Все функции приложения доступны для проверки тестеров: языки СНГ и мира, Шахматы, Графика, AI Озвучка и Панель Управления.
+                                  {user.isBetaTester
+                                    ? 'Все функции бета-тестирования открыты: бета-курсы, Бета-Центр, экспериментальные функции PWA и инструменты тестера.'
+                                    : 'Функции бета-тестирования сейчас недоступны. Присоединитесь в Настройках → «Версия Приложения DuoWindo6601».'}
                               </p>
 
                               <div className="flex flex-col sm:flex-row gap-2">
-                                  <button 
-                                      onClick={() => {
-                                          playSound('select');
-                                          setShowBetaModal(true);
-                                      }}
-                                      className="font-din font-black text-xs uppercase tracking-widest bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white hover:scale-[1.02] active:scale-95 px-4 py-2.5 rounded-xl border-b-4 border-indigo-950 transition-all shadow-md text-center flex-1 flex items-center justify-center space-x-1.5"
-                                  >
-                                      <span>🧪 Бета-Центр DuoWindo6601</span>
-                                  </button>
+                                  {user.isBetaTester ? (
+                                    <button 
+                                        onClick={() => {
+                                            playSound('select');
+                                            setShowBetaModal(true);
+                                        }}
+                                        className="font-din font-black text-xs uppercase tracking-widest bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white hover:scale-[1.02] active:scale-95 px-4 py-2.5 rounded-xl border-b-4 border-indigo-950 transition-all shadow-md text-center flex-1 flex items-center justify-center space-x-1.5 cursor-pointer"
+                                    >
+                                        <span>🧪 Бета-Центр DuoWindo6601</span>
+                                    </button>
+                                  ) : (
+                                    <button 
+                                        onClick={() => {
+                                            playSound('click');
+                                            goToSettingsVersion();
+                                        }}
+                                        className="font-din font-black text-xs uppercase tracking-widest bg-gradient-to-r from-amber-500 to-orange-500 hover:brightness-110 text-black hover:scale-[1.02] active:scale-95 px-4 py-2.5 rounded-xl border-b-4 border-amber-700 transition-all shadow-md text-center flex-1 flex items-center justify-center space-x-1.5 cursor-pointer"
+                                    >
+                                        <span>⚙️ Присоединиться в Настройках</span>
+                                    </button>
+                                  )}
                                   
                                   <button 
                                       onClick={() => {
                                           playSound('click');
                                           setScreen(AppScreen.FEEDBACK);
                                       }}
-                                      className="font-din font-black text-xs uppercase tracking-widest bg-gray-800 hover:bg-gray-750 text-amber-300 hover:scale-[1.02] active:scale-95 px-3 py-2.5 rounded-xl border-b-4 border-gray-950 border border-amber-500/30 transition-all shadow-md text-center flex items-center justify-center space-x-1"
+                                      className="font-din font-black text-xs uppercase tracking-widest bg-gray-800 hover:bg-gray-750 text-amber-300 hover:scale-[1.02] active:scale-95 px-3 py-2.5 rounded-xl border-b-4 border-gray-950 border border-amber-500/30 transition-all shadow-md text-center flex items-center justify-center space-x-1 cursor-pointer"
                                   >
                                       <span>⭐ Отзывы</span>
                                   </button>
@@ -11331,9 +11588,23 @@ const getTodayChallenge = () => {
                     </div>
                   )}
 
-                  <div className="flex flex-col items-center space-y-16">
+                  <div className="flex flex-col items-center space-y-12">
                     <button onClick={() => startTraining('translation')} className="w-28 h-28 rounded-full bg-duo-green border-b-8 border-duo-greenDark active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center shadow-2xl hover:brightness-110 group cursor-pointer"><StarIcon className="w-14 h-14 text-white group-hover:scale-110 transition-transform" /></button>
-                    <div className="w-3 h-16 bg-gray-800 rounded-full"></div>
+                    <div className="w-3 h-12 bg-gray-800 rounded-full"></div>
+
+                    {/* DUOWINDO6601RADIO PODCAST LISTENING NODE ON THE PATH */}
+                    <DuoWindo6601RadioButton
+                      onClick={() => {
+                        playSound('select');
+                        setShowDuoRadioModal(true);
+                      }}
+                      language={user.language}
+                      isLightMode={isLightMode}
+                      completedCount={completedRadioIds.filter(id => id.includes(`-${currentCourse.id}`)).length}
+                      totalCount={3}
+                    />
+
+                    <div className="w-3 h-12 bg-gray-800 rounded-full"></div>
                     <button onClick={() => { playSound('click'); setScreen(AppScreen.VOCABULARY); }} className="bg-gradient-to-r from-emerald-600 to-teal-600 p-8 md:p-10 rounded-[2.5rem] border-b-8 border-emerald-800 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center justify-between shadow-2xl group md:col-span-2 cursor-pointer">
                   <div className="flex items-center space-x-6 md:space-x-8">
                       <div className="bg-white/20 p-4 md:p-5 rounded-3xl group-hover:rotate-6 transition-transform">
@@ -12536,20 +12807,60 @@ const getTodayChallenge = () => {
                 <button onClick={() => { playSound('click'); setScreen(AppScreen.SETTINGS); }} className="absolute top-0 right-4 p-3 bg-duo-card rounded-2xl border-2 border-gray-700 hover:bg-gray-800 transition-colors shadow-lg"><GearIcon className="w-7 h-7 text-gray-400" /></button>
                 
                 {/* AVATAR INTERACTIVE DISPLAY */}
-                <div onClick={openEditProfile} className="relative group cursor-pointer mt-2">
-                   <div className={`w-36 h-36 md:w-44 md:h-44 rounded-[3rem] ${user.avatarColor || 'bg-duo-blue'} border-8 border-gray-800 flex items-center justify-center text-7xl font-bold shadow-2xl relative overflow-hidden font-feather transition-transform group-hover:scale-105`}>
-                      {user.avatarUrl || user.avatarImage ? (
-                         <img src={user.avatarUrl || user.avatarImage} alt={user.name} className="w-full h-full object-cover" />
-                      ) : user.avatarIcon ? (
-                         <span className="text-7xl">{user.avatarIcon}</span>
-                      ) : (
-                         <span>{user.name ? user.name[0].toUpperCase() : 'U'}</span>
-                      )}
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white">
-                         <CameraIcon className="w-10 h-10 mb-1" />
-                         <span className="text-xs font-black uppercase tracking-wider">{t('change')}</span>
-                      </div>
-                   </div>
+                <div className="flex flex-col items-center gap-3 mt-2">
+                  <div onClick={() => openAvatarStudio(user.avatarMode === 'photo' ? 'photo' : 'character')} className="relative group cursor-pointer">
+                     <div className="w-36 h-36 md:w-44 md:h-44 rounded-[3rem] border-8 border-gray-800 shadow-2xl relative overflow-hidden transition-transform group-hover:scale-105">
+                        <ProfileAvatarDisplay
+                          user={user}
+                          className="w-full h-full"
+                          textClassName="text-7xl"
+                        />
+                        <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white">
+                           <CameraIcon className="w-10 h-10 mb-1" />
+                           <span className="text-xs font-black uppercase tracking-wider">{t('change')}</span>
+                        </div>
+                     </div>
+                     <button
+                       type="button"
+                       onClick={(e) => {
+                         e.stopPropagation();
+                         openAvatarStudio('character');
+                       }}
+                       title={user.language === 'ru' ? 'Настроить или загрузить аватар-персонаж' : 'Customize or upload character avatar'}
+                       className="absolute -bottom-2 -right-2 px-3 py-1.5 rounded-2xl bg-duo-blue hover:brightness-110 text-white border-2 border-gray-900 shadow-lg text-xs font-black flex items-center gap-1 cursor-pointer active:scale-95 transition-transform"
+                     >
+                       <span>🎭</span>
+                       <span className="hidden sm:inline">{user.language === 'ru' ? 'Персонаж' : 'Avatar'}</span>
+                     </button>
+                  </div>
+
+                  {/* QUICK SWITCHER: АВАТАР-ПЕРСОНАЖ vs ФОТО ПРОФИЛЯ */}
+                  <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-duo-card border border-gray-700/80 shadow-md">
+                    <button
+                      type="button"
+                      onClick={() => handleQuickSwitchAvatarMode('character')}
+                      className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer ${
+                        user.avatarMode === 'character'
+                          ? 'bg-duo-blue text-white shadow'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      <span>🎭</span>
+                      <span>{user.language === 'ru' ? 'Аватар-персонаж' : 'Character'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickSwitchAvatarMode('photo')}
+                      className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer ${
+                        (user.avatarMode === 'photo' || (!user.avatarMode && Boolean(user.avatarUrl || user.avatarImage)))
+                          ? 'bg-emerald-600 text-white shadow'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      <span>📷</span>
+                      <span>{user.language === 'ru' ? 'Фото профиля' : 'Photo'}</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* NAME & USERNAME DISPLAY */}
@@ -12563,11 +12874,15 @@ const getTodayChallenge = () => {
                       {user.username ? `@${user.username}` : t('noUsername')}
                    </p>
                    <div className="flex flex-wrap justify-center gap-3 mt-3">
-                      <button onClick={openEditProfile} className="px-5 py-2.5 bg-duo-blue hover:brightness-110 text-white rounded-2xl font-black text-xs uppercase tracking-wider border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all flex items-center space-x-2 shadow-lg">
+                      <button onClick={() => openAvatarStudio('character')} className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-xs uppercase tracking-wider border-b-4 border-indigo-800 active:border-b-0 active:translate-y-1 transition-all flex items-center space-x-2 shadow-lg cursor-pointer">
+                         <span>🎭</span>
+                         <span>{user.language === 'ru' ? 'Аватар-персонаж и фото' : 'Avatar & Photo'}</span>
+                      </button>
+                      <button onClick={openEditProfile} className="px-5 py-2.5 bg-duo-blue hover:brightness-110 text-white rounded-2xl font-black text-xs uppercase tracking-wider border-b-4 border-duo-blueDark active:border-b-0 active:translate-y-1 transition-all flex items-center space-x-2 shadow-lg cursor-pointer">
                          <PenIcon className="w-4 h-4" />
                          <span>{t('editProfile')}</span>
                       </button>
-                      <button onClick={() => openRegisterModal('register')} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-wider border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all flex items-center space-x-2 shadow-lg">
+                      <button onClick={() => openRegisterModal('register')} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-wider border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all flex items-center space-x-2 shadow-lg cursor-pointer">
                          <span>👤</span>
                          <span>{t('registerAuth')}</span>
                       </button>
@@ -13595,6 +13910,21 @@ const getTodayChallenge = () => {
         speakText={(text, courseId, slow) => speakText(text, courseId, slow, user.preferredVoice, user.voiceProvider)}
       />
 
+      {/* DUOWINDO6601RADIO PODCAST LISTENING MODAL */}
+      <DuoWindo6601RadioModal
+        isOpen={showDuoRadioModal}
+        onClose={() => setShowDuoRadioModal(false)}
+        currentCourse={currentCourse}
+        user={user}
+        setUser={setUser}
+        playSound={playSound}
+        setToast={setToast}
+        speakText={(text, courseId, slow) => speakText(text, courseId, slow, user.preferredVoice, user.voiceProvider)}
+        langSection={langSection}
+        isLightMode={isLightMode}
+        onEpisodeCompleted={(ids) => setCompletedRadioIds(ids)}
+      />
+
       {/* DUOWINDO6601 MUSIC STUDIO MODAL (КУРС МУЗЫКА) */}
       <MusicStudioModal
         isOpen={showMusicStudioModal}
@@ -13628,16 +13958,17 @@ const getTodayChallenge = () => {
           }}
           courses={COURSES}
           onSelectCourse={(course) => {
-            setCurrentCourse(course);
-            localStorage.setItem('duo_course_id_6601', course.id);
-            setScreen(AppScreen.PATH);
-            setShowBetaModal(false);
+            if (selectCourseSafely(course, AppScreen.PATH)) {
+              setShowBetaModal(false);
+            }
           }}
           onDismissBanner={() => {
             setBetaDismissed(true);
             localStorage.setItem('duo_beta_dismissed', 'true');
             setShowBetaModal(false);
           }}
+          onGoToSettingsVersion={goToSettingsVersion}
+          onToggleBetaTesting={handleToggleBetaTesting}
           playSound={playSound}
           onAttemptSwitchLanguage={(code) => handleAttemptSwitchLanguage(code, () => {
             setUser(prev => ({ ...prev, language: code as any }));
@@ -13720,15 +14051,23 @@ const getTodayChallenge = () => {
               {/* FILE UPLOAD & URL CONTROLS */}
               <div className="flex flex-wrap justify-center gap-2 w-full pt-1">
                 <button 
+                  type="button"
+                  onClick={() => openAvatarStudio('character')}
+                  className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-400/40 rounded-xl text-xs font-black transition-all flex items-center space-x-1 cursor-pointer"
+                >
+                  <span>🎭</span>
+                  <span>{user.language === 'ru' ? 'Аватар-персонаж' : 'Character Avatar'}</span>
+                </button>
+                <button 
                   onClick={() => avatarFileInputRef.current?.click()} 
-                  className="px-3 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl text-xs font-bold transition-all flex items-center space-x-1"
+                  className="px-3 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer"
                 >
                   <span>{t('uploadPhotoBtn')}</span>
                 </button>
                 {editAvatarUrl && (
                   <button 
                     onClick={() => { setEditAvatarUrl(''); setToast("Photo cleared"); }} 
-                    className="px-3 py-2 bg-red-900/40 hover:bg-red-800/60 text-red-300 border border-red-700 rounded-xl text-xs font-bold transition-all"
+                    className="px-3 py-2 bg-red-900/40 hover:bg-red-800/60 text-red-300 border border-red-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
                   >
                     <span>{t('deletePhotoBtn')}</span>
                   </button>
@@ -13947,6 +14286,18 @@ const getTodayChallenge = () => {
         </div>
       )}
 
+      {/* PROFILE AVATAR & PHOTO STUDIO MODAL */}
+      <ProfileAvatarStudioModal
+        isOpen={showAvatarStudioModal}
+        initialTab={avatarStudioInitialTab}
+        onClose={() => setShowAvatarStudioModal(false)}
+        user={user}
+        onApplyAvatar={handleApplyStudioAvatar}
+        playSound={playSound}
+        setToast={setToast}
+        isLightMode={isLightMode}
+      />
+
       {/* AD OVERLAY */}
       {showAd && (
           <div className="fixed inset-0 z-[250] bg-black/90 flex flex-col items-center justify-center p-6 animate-in fade-in">
@@ -14132,6 +14483,63 @@ const getTodayChallenge = () => {
                  </div>
                  <div className="text-[11px] text-emerald-200 font-bold">
                    ✅ 1 ноября 2026 год: Раздел «Письмо» и тренировки во время урока открыты!
+                 </div>
+               </div>
+             )}
+
+             {isKlingonCourse && currentExercise.type !== 'chess' && currentExercise.type !== 'ishihara' && (
+               <div className="mb-3 flex flex-wrap items-center justify-between gap-2 bg-stone-900/90 border border-stone-700/80 rounded-2xl px-3 py-2 flex-shrink-0">
+                 <div className="flex items-center gap-2 min-w-0">
+                   <span className="text-base">🖖</span>
+                   <span className="font-klingon text-xs md:text-sm font-black text-amber-300 truncate">tlhIngan Hol</span>
+                   <span className="hidden sm:inline text-[11px] font-bold text-stone-400">
+                     {user.language === 'ru' ? 'Клиентский Speech + hol.kag.org' : 'Client Speech + hol.kag.org'}
+                   </span>
+                 </div>
+                 <div className="flex items-center gap-1.5 flex-wrap">
+                   <button
+                     type="button"
+                     onClick={() => { playSound('select'); setShowKlingonPIqaD(v => !v); }}
+                     className={`px-2.5 py-1 rounded-xl text-[11px] font-black border transition-all cursor-pointer ${
+                       showKlingonPIqaD
+                         ? 'bg-purple-600/30 border-purple-400/60 text-purple-200'
+                         : 'bg-stone-800 border-stone-700 text-stone-400'
+                     }`}
+                   >
+                     <span className="font-piqad mr-1">{tlhToPIqaD('tlh')}</span>
+                     pIqaD {showKlingonPIqaD ? 'ON' : 'OFF'}
+                   </button>
+                   {(() => {
+                     const activeAudioText =
+                       currentExercise.illusionData?.soundText ||
+                       currentExercise.readingData?.text ||
+                       (currentExercise.roleplayData?.messages?.slice().reverse().find(m => m.role === 'model')?.text) ||
+                       currentExercise.originalSentence;
+                     if (!activeAudioText) return null;
+                     return (
+                       <>
+                         <button
+                           type="button"
+                           onClick={() => speakText(activeAudioText, 'tlh', false, user.preferredVoice, user.voiceProvider)}
+                           className="px-2.5 py-1 rounded-xl text-[11px] font-black bg-sky-600/30 hover:bg-sky-600/50 border border-sky-400/50 text-sky-200 transition-all cursor-pointer"
+                         >
+                           🔊 {user.language === 'ru' ? 'Клиентский Speech' : 'Client Speech'}
+                         </button>
+                         <button
+                           type="button"
+                           onClick={() => {
+                             playSound('click');
+                             void downloadKlingonAudioFile(activeAudioText, false, 'auto').then(info => {
+                               setToast(user.language === 'ru' ? `💾 Аудио-файл сохранён: ${info.filename}` : `💾 Audio saved: ${info.filename}`);
+                             });
+                           }}
+                           className="px-2.5 py-1 rounded-xl text-[11px] font-black bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-400/50 text-emerald-200 transition-all cursor-pointer"
+                         >
+                           💾 {user.language === 'ru' ? 'Аудио-файл' : 'Audio File'}
+                         </button>
+                       </>
+                     );
+                   })()}
                  </div>
                </div>
              )}
@@ -14397,7 +14805,10 @@ const getTodayChallenge = () => {
                     
                     {currentExercise.readingData.mode === 'write' ? (
                         <div className="w-full max-w-2xl">
-                            <p className="text-lg mb-4 text-gray-300 italic" dir="auto">"{currentExercise.readingData.text}"</p>
+                            <p className={`text-lg mb-4 text-gray-300 italic ${isKlingonCourse ? 'font-klingon not-italic text-white' : ''}`} dir="auto">"{currentExercise.readingData.text}"</p>
+                            {isKlingonCourse && showKlingonPIqaD && (
+                              <p className="font-piqad text-base text-purple-300 mb-3" dir="auto">{tlhToPIqaD(currentExercise.readingData.text)}</p>
+                            )}
                             <p className="text-white font-bold mb-4 uppercase tracking-widest text-sm" dir="auto">{currentExercise.readingData.prompt}</p>
                             <textarea 
                                 value={readingInput}
@@ -14409,7 +14820,7 @@ const getTodayChallenge = () => {
                             />
                         </div>
                     ) : (
-                        <div className="w-full max-w-2xl text-xl leading-relaxed text-center font-bold text-gray-300" dir="auto">
+                        <div className={`w-full max-w-2xl text-xl leading-relaxed text-center font-bold text-gray-300 ${isKlingonCourse ? 'font-klingon text-white' : ''}`} dir="auto">
                             {currentExercise.readingData.text.split("___").map((part, i, arr) => (
                                 <React.Fragment key={i}>
                                     <span>{part}</span>
@@ -14420,6 +14831,11 @@ const getTodayChallenge = () => {
                                     )}
                                 </React.Fragment>
                             ))}
+                            {isKlingonCourse && showKlingonPIqaD && (
+                              <div className="font-piqad text-base text-purple-300 mt-3 tracking-wide">
+                                {tlhToPIqaD(currentExercise.readingData.text.replace(/___/g, ' … '))}
+                              </div>
+                            )}
                         </div>
                     )}
                     
@@ -14436,10 +14852,13 @@ const getTodayChallenge = () => {
                                             setSelectedWordIds([...selectedWordIds, token.id]);
                                         }
                                     }}
-                                    className={`p-3 px-6 rounded-xl border-b-4 font-bold text-lg transition-all ${selectedWordIds.includes(token.id) ? 'opacity-0 pointer-events-none scale-90' : 'bg-duo-card border-gray-700 hover:border-duo-blue hover:text-duo-blue active:translate-y-1 active:border-b-0'}`}
+                                    className={`p-3 px-6 rounded-xl border-b-4 font-bold text-lg transition-all ${isKlingonTextOrToken(token.text) ? 'font-klingon' : ''} ${selectedWordIds.includes(token.id) ? 'opacity-0 pointer-events-none scale-90' : 'bg-duo-card border-gray-700 hover:border-duo-blue hover:text-duo-blue active:translate-y-1 active:border-b-0'}`}
                                     dir="auto"
                                 >
-                                    {token.text}
+                                    <span>{token.text}</span>
+                                    {isKlingonCourse && showKlingonPIqaD && isKlingonTextOrToken(token.text) && (
+                                      <span className="font-piqad text-xs text-purple-300 block mt-0.5">{tlhToPIqaD(token.text)}</span>
+                                    )}
                                 </button>
                             ))}
                             {selectedWordIds.length > 0 && feedback.status === 'idle' && (
@@ -14461,8 +14880,18 @@ const getTodayChallenge = () => {
                     </p>
                     <button onClick={() => speakText(currentExercise.illusionData!.soundText, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} className="w-32 h-32 md:w-48 md:h-48 rounded-[2rem] md:rounded-[3rem] bg-indigo-600 border-b-8 border-indigo-800 shadow-2xl flex items-center justify-center mb-10 md:mb-16 hover:brightness-110 active:translate-y-2 active:border-b-0 transition-all group"><VolumeIcon className="w-16 h-16 md:w-24 md:h-24 text-white group-hover:scale-110 transition-transform" /></button>
                     <div className="grid grid-cols-2 gap-4 md:gap-6 w-full max-w-lg px-4">
-                        <button disabled={feedback.status !== 'idle'} onClick={() => checkIllusionAnswer('A')} className="bg-duo-card border-2 border-b-4 border-gray-700 p-4 md:p-8 rounded-3xl font-bold text-xl md:text-2xl hover:bg-gray-700 active:border-b-0 active:translate-y-1 transition-all">{currentExercise.illusionData.optionA}</button>
-                        <button disabled={feedback.status !== 'idle'} onClick={() => checkIllusionAnswer('B')} className="bg-duo-card border-2 border-b-4 border-gray-700 p-4 md:p-8 rounded-3xl font-bold text-xl md:text-2xl hover:bg-gray-700 active:border-b-0 active:translate-y-1 transition-all">{currentExercise.illusionData.optionB}</button>
+                        <button disabled={feedback.status !== 'idle'} onClick={() => checkIllusionAnswer('A')} className={`bg-duo-card border-2 border-b-4 border-gray-700 p-4 md:p-8 rounded-3xl font-bold text-xl md:text-2xl hover:bg-gray-700 active:border-b-0 active:translate-y-1 transition-all ${isKlingonCourse ? 'font-klingon' : ''}`}>
+                          <span>{currentExercise.illusionData.optionA}</span>
+                          {isKlingonCourse && showKlingonPIqaD && (
+                            <span className="font-piqad text-sm text-purple-300 block mt-1">{tlhToPIqaD(currentExercise.illusionData.optionA)}</span>
+                          )}
+                        </button>
+                        <button disabled={feedback.status !== 'idle'} onClick={() => checkIllusionAnswer('B')} className={`bg-duo-card border-2 border-b-4 border-gray-700 p-4 md:p-8 rounded-3xl font-bold text-xl md:text-2xl hover:bg-gray-700 active:border-b-0 active:translate-y-1 transition-all ${isKlingonCourse ? 'font-klingon' : ''}`}>
+                          <span>{currentExercise.illusionData.optionB}</span>
+                          {isKlingonCourse && showKlingonPIqaD && (
+                            <span className="font-piqad text-sm text-purple-300 block mt-1">{tlhToPIqaD(currentExercise.illusionData.optionB)}</span>
+                          )}
+                        </button>
                     </div>
                  </div>
              ) : currentExercise.type === 'roleplay' && currentExercise.roleplayData ? (
@@ -14518,10 +14947,13 @@ const getTodayChallenge = () => {
                                  )}
                                  <div className="max-w-[85%] flex flex-col">
                                    <div 
-                                     className={`p-3 md:p-4 rounded-2xl text-sm md:text-lg font-bold ${isAr ? 'font-arabic text-right' : ''} ${isUser ? 'bg-duo-blue text-white rounded-br-none' : 'bg-gray-800 text-white rounded-bl-none border-2 border-gray-700'}`}
+                                     className={`p-3 md:p-4 rounded-2xl text-sm md:text-lg font-bold ${isAr ? 'font-arabic text-right' : isKlingonCourse && isKlingonTextOrToken(textFormatted) ? 'font-klingon' : ''} ${isUser ? 'bg-duo-blue text-white rounded-br-none' : 'bg-gray-800 text-white rounded-bl-none border-2 border-gray-700'}`}
                                      dir="auto"
                                    >
                                      {textFormatted}
+                                     {isKlingonCourse && showKlingonPIqaD && isKlingonTextOrToken(textFormatted) && (
+                                       <span className="font-piqad text-xs text-purple-200/90 block mt-1">{tlhToPIqaD(textFormatted)}</span>
+                                     )}
                                    </div>
                                    {msg.correction && (
                                      <div className="mt-2 bg-black border border-duo-blue/50 p-2 md:p-3 rounded-xl text-xs md:text-sm flex items-start space-x-2 animate-in fade-in" dir="auto">
@@ -14611,15 +15043,30 @@ const getTodayChallenge = () => {
                      </div>
                      <div className="flex-1 w-full px-2">
                         {currentExercise.type === 'listening' ? (
-                          <div className="flex items-center space-x-0 border-2 border-gray-700 rounded-[2rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl max-w-sm mx-auto md:mx-0">
-                            <button onClick={() => speakText(currentExercise.originalSentence, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} className="flex-1 bg-duo-card p-6 md:p-12 hover:bg-white/5 transition-colors border-r border-gray-700"><VolumeIcon className="w-12 h-12 md:w-20 md:h-20 text-duo-blue mx-auto" /></button>
-                            <button onClick={() => speakText(currentExercise.originalSentence, currentCourse.id, true, user.preferredVoice, user.voiceProvider)} className="flex-1 bg-duo-card p-6 md:p-12 hover:bg-white/5 transition-colors"><TurtleIcon className="w-8 h-8 md:w-16 md:h-16 text-duo-blue mx-auto" /></button>
+                          <div className="flex flex-col gap-3 max-w-sm mx-auto md:mx-0">
+                            <div className="flex items-center space-x-0 border-2 border-gray-700 rounded-[2rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl">
+                              <button onClick={() => speakText(currentExercise.originalSentence, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} className="flex-1 bg-duo-card p-6 md:p-12 hover:bg-white/5 transition-colors border-r border-gray-700"><VolumeIcon className="w-12 h-12 md:w-20 md:h-20 text-duo-blue mx-auto" /></button>
+                              <button onClick={() => speakText(currentExercise.originalSentence, currentCourse.id, true, user.preferredVoice, user.voiceProvider)} className="flex-1 bg-duo-card p-6 md:p-12 hover:bg-white/5 transition-colors"><TurtleIcon className="w-8 h-8 md:w-16 md:h-16 text-duo-blue mx-auto" /></button>
+                            </div>
+                            {isKlingonCourse && feedback.status !== 'idle' && (
+                              <div className="bg-stone-900/90 border border-stone-700 rounded-2xl px-4 py-2.5 text-center md:text-left">
+                                <div className="font-klingon text-lg font-black text-amber-300">{currentExercise.originalSentence}</div>
+                                {showKlingonPIqaD && (
+                                  <div className="font-piqad text-sm text-purple-300 mt-0.5">{tlhToPIqaD(currentExercise.originalSentence)}</div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         ) : currentExercise.type === 'speech' ? (
                             <div className="w-full flex justify-center py-2"><button onClick={toggleRecording} className={`w-28 h-28 md:w-36 md:h-36 rounded-[2.5rem] md:rounded-[3rem] flex items-center justify-center transition-all shadow-2xl ${isRecording ? 'bg-red-500 scale-110 animate-pulse' : 'bg-duo-blue hover:brightness-110'}`}><MicIcon className="w-12 h-12 md:w-16 md:h-16 text-white" />{isRecording && <span className="absolute mt-20 md:mt-24 text-xs md:text-sm font-bold animate-bounce">Слушаю...</span>}</button></div>
                         ) : (
-                          <div className={`bg-duo-card border-2 border-gray-700 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 pb-16 md:pb-10 text-xl md:text-3xl font-bold relative shadow-xl text-center md:text-left break-words ${isArabicText(currentExercise.originalSentence) ? 'font-arabic text-right' : ''}`} dir="auto">
-                            {formatRTLOverride(currentExercise.originalSentence)}
+                          <div className={`bg-duo-card border-2 border-gray-700 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 pb-16 md:pb-10 text-xl md:text-3xl font-bold relative shadow-xl text-center md:text-left break-words ${isArabicText(currentExercise.originalSentence) ? 'font-arabic text-right' : isKlingonCourse ? 'font-klingon' : ''}`} dir="auto">
+                            <div>{formatRTLOverride(currentExercise.originalSentence)}</div>
+                            {isKlingonCourse && showKlingonPIqaD && (
+                              <div className="font-piqad text-base md:text-xl text-purple-300 mt-2 tracking-wide">
+                                {tlhToPIqaD(currentExercise.originalSentence)}
+                              </div>
+                            )}
                             <div className="absolute top-1/2 -left-3 -translate-y-1/2 w-0 h-0 border-t-[10px] border-t-transparent border-r-[15px] border-r-gray-700 border-b-[10px] border-b-transparent hidden md:block"></div>
                             <div className="absolute bottom-4 right-4 flex space-x-3"><button onClick={() => speakText(currentExercise.originalSentence, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} className="p-2 md:p-3 bg-gray-800 rounded-2xl hover:bg-gray-700 transition-all shadow-md border-b-4 border-black/20 active:border-b-0 active:translate-y-1"><VolumeIcon className="w-5 h-5 md:w-6 md:h-6 text-duo-blue" /></button><button onClick={() => speakText(currentExercise.originalSentence, currentCourse.id, true, user.preferredVoice, user.voiceProvider)} className="p-2 md:p-3 bg-gray-800 rounded-2xl hover:bg-gray-700 transition-all shadow-md border-b-4 border-black/20 active:border-b-0 active:translate-y-1"><TurtleIcon className="w-5 h-5 md:w-6 md:h-6 text-duo-blue" /></button></div>
                           </div>
@@ -14634,8 +15081,9 @@ const getTodayChallenge = () => {
                             const tok = availableTokens.find(t => t.id === id);
                             const tokText = tok?.text || '';
                             const isArTok = isArabicText(tokText);
+                            const isTlhTok = isKlingonCourse && isPIqaDText(tokText);
                             return (
-                              <button key={id} onClick={() => { playSound('click'); setSelectedWordIds(p => p.filter(x => x !== id)); }} className={`bg-duo-card border-2 border-b-4 border-gray-700 p-2 px-4 md:p-4 md:px-8 rounded-xl md:rounded-2xl font-bold text-lg md:text-2xl hover:bg-gray-700 transition-all animate-in slide-in-from-bottom-2 ${isArTok ? 'font-arabic' : ''}`}>
+                              <button key={id} onClick={() => { playSound('click'); setSelectedWordIds(p => p.filter(x => x !== id)); }} className={`bg-duo-card border-2 border-b-4 border-gray-700 p-2 px-4 md:p-4 md:px-8 rounded-xl md:rounded-2xl font-bold text-lg md:text-2xl hover:bg-gray-700 transition-all animate-in slide-in-from-bottom-2 ${isArTok ? 'font-arabic' : isTlhTok ? 'font-klingon' : ''}`}>
                                 {formatRTLOverride(tokText)}
                               </button>
                             );
@@ -14644,8 +15092,9 @@ const getTodayChallenge = () => {
                         <div className="flex flex-wrap gap-2 md:gap-4 justify-center pb-4" dir="auto">
                           {availableTokens.map(token => {
                             const isArTok = isArabicText(token.text);
+                            const isTlhTok = isKlingonCourse && isPIqaDText(token.text);
                             return (
-                              <button key={token.id} disabled={selectedWordIds.includes(token.id) || feedback.status !== 'idle'} onClick={() => { playSound('click'); setSelectedWordIds(p => [...p, token.id]); }} className={`bg-duo-card border-2 border-b-4 border-gray-700 p-2 px-4 md:p-4 md:px-8 rounded-xl md:rounded-2xl font-bold text-lg md:text-2xl hover:bg-gray-700 transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none ${isArTok ? 'font-arabic' : ''}`}>
+                              <button key={token.id} disabled={selectedWordIds.includes(token.id) || feedback.status !== 'idle'} onClick={() => { playSound('click'); setSelectedWordIds(p => [...p, token.id]); }} className={`bg-duo-card border-2 border-b-4 border-gray-700 p-2 px-4 md:p-4 md:px-8 rounded-xl md:rounded-2xl font-bold text-lg md:text-2xl hover:bg-gray-700 transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none ${isArTok ? 'font-arabic' : isTlhTok ? 'font-klingon' : ''}`}>
                                 {formatRTLOverride(token.text)}
                               </button>
                             );

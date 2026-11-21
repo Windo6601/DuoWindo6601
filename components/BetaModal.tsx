@@ -30,6 +30,8 @@ interface BetaModalProps {
   onOpenPoems?: () => void;
   onSelectCourse?: (course: Course) => void;
   onDismissBanner?: () => void;
+  onGoToSettingsVersion?: () => void;
+  onToggleBetaTesting?: (join: boolean) => void;
   playSound: (type: 'click' | 'correct' | 'wrong' | 'fanfare' | 'streak' | string) => void;
   courses?: Course[];
   onAttemptSwitchLanguage?: (langCode: string) => boolean;
@@ -43,7 +45,7 @@ const DEFAULT_BETA_COURSES: Course[] = [
   { id: 'no', name: 'Norwegian', localName: 'Норвежский (Norsk)', flagCode: 'no', themeColor: 'bg-red-600', themeBorder: 'border-red-800', mascotVariant: 'default', isBeta: true, betaTag: 'Скандинавский', betaVersion: 'v0.9.0 Beta', betaFeedbackCount: 84, writingRestrictionNotice: 'Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год' },
   { id: 'tt', name: 'Tatar', localName: 'Татарский (Татар теле)', flagCode: 'ru', themeColor: 'bg-teal-600', themeBorder: 'border-teal-800', mascotVariant: 'default', isBeta: true, betaTag: 'Тюркский', betaVersion: 'v0.9.5 Beta', betaFeedbackCount: 230, writingRestrictionNotice: 'Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год' },
   { id: 'hv', name: 'High Valyrian', localName: 'Высокий валирийский (Valyrio)', flagCode: 'gb', themeColor: 'bg-purple-700', themeBorder: 'border-purple-900', mascotVariant: 'default', isBeta: true, betaTag: 'Вымышленный', betaVersion: 'v0.8.0 Beta', betaFeedbackCount: 76, writingRestrictionNotice: 'Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год' },
-  { id: 'tlh', name: 'Klingon', localName: 'Клингонский (tlhIngan Hol)', flagCode: 'us', themeColor: 'bg-stone-700', themeBorder: 'border-stone-900', mascotVariant: 'default', isBeta: true, betaTag: 'Вымышленный', betaVersion: 'v0.7.3 Beta', betaFeedbackCount: 63, writingRestrictionNotice: 'Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год' },
+  { id: 'tlh', name: 'Klingon', localName: 'Клингонский (tlhIngan Hol)', flagCode: 'us', themeColor: 'bg-stone-700', themeBorder: 'border-stone-900', mascotVariant: 'default', isBeta: true, betaTag: 'Вымышленный', betaVersion: 'v0.7.3 Beta', betaFeedbackCount: 63, writingRestrictionNotice: 'Клиентский Speech + шрифт pIqaD/Klingon во время урока + словарь слов и аудио-файлы hol.kag.org (режим Речи отключён)' },
   { id: 'yi', name: 'Yiddish', localName: 'Идиш (ייִדיш)', flagCode: 'il', themeColor: 'bg-indigo-600', themeBorder: 'border-indigo-800', mascotVariant: 'default', isBeta: true, betaTag: 'Германский / Еврейский', betaVersion: 'v0.9.2 Beta', betaFeedbackCount: 91, writingRestrictionNotice: 'Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год' }
 ];
 
@@ -57,6 +59,8 @@ export const BetaModal: React.FC<BetaModalProps> = ({
   onOpenPoems,
   onSelectCourse,
   onDismissBanner,
+  onGoToSettingsVersion,
+  onToggleBetaTesting,
   playSound,
   courses = [],
   onAttemptSwitchLanguage,
@@ -133,6 +137,83 @@ export const BetaModal: React.FC<BetaModalProps> = ({
       onSelectCourse(course);
     }
   };
+
+  const isRu = user.language !== 'en';
+  const isBetaMember = Boolean(user.isBetaTester);
+
+  if (!isBetaMember) {
+    return (
+      <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+        <div className="bg-gradient-to-b from-gray-900 via-slate-900 to-slate-950 border-2 border-amber-500/60 rounded-3xl max-w-lg w-full p-6 text-white shadow-2xl space-y-5 relative">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={isRu ? 'Закрыть' : 'Close'}
+            className="absolute top-4 right-4 p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-xl transition-colors cursor-pointer"
+          >
+            <CloseIcon className="w-6 h-6" />
+          </button>
+
+          <div className="flex flex-col items-center text-center space-y-3 pt-2">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border-2 border-amber-500/50 flex items-center justify-center text-3xl shadow-lg">
+              🔒
+            </div>
+            <span className="text-[11px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40">
+              {isRu ? 'Бета-тестирование не подключено' : 'App Beta Testing Not Joined'}
+            </span>
+            <h3 className="font-din font-black text-xl sm:text-2xl uppercase tracking-wider text-white">
+              {isRu ? 'Функция бета-тестирования недоступна' : 'Beta Testing Feature Unavailable'}
+            </h3>
+            <p className="text-xs sm:text-sm text-gray-300 font-semibold leading-relaxed">
+              {isRu
+                ? 'Вы ещё не присоединились к бета-тестированию приложения DuoWindo6601 Progressive Web App. Кто не присоединился к бета-тестированию — функции бета-тестирования недоступны.'
+                : 'You have not joined DuoWindo6601 Progressive Web App Beta Testing yet. Beta testing features are unavailable until you join.'}
+            </p>
+          </div>
+
+          <div className="bg-black/45 border border-gray-800 rounded-2xl p-4 space-y-2 text-xs text-gray-300 font-semibold">
+            <p className="text-[11px] font-black uppercase tracking-wider text-amber-300">
+              {isRu ? 'Заблокировано до присоединения:' : 'Locked until you join:'}
+            </p>
+            <p>🔒 {isRu ? 'Бета-Центр DuoWindo6601 и панель тестировщика' : 'DuoWindo6601 Beta Center & testing tools'}</p>
+            <p>🔒 {isRu ? '8 экспериментальных бета-курсов языков' : '8 experimental beta language courses'}</p>
+            <p>🔒 {isRu ? 'Ранний канал обновлений DuoWindo6601 PWA Beta' : 'Early DuoWindo6601 PWA Beta update channel'}</p>
+          </div>
+
+          <div className="bg-indigo-950/50 border border-indigo-500/40 rounded-2xl p-3.5 text-xs text-indigo-200 font-bold leading-relaxed">
+            💡 {isRu
+              ? 'Откройте Настройки → раздел «Версия Приложения DuoWindo6601» и нажмите «Присоединиться к бета-тестированию».'
+              : 'Open Settings → "DuoWindo6601 App Version" and tap "Join App Beta Testing".'}
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
+            {onGoToSettingsVersion && (
+              <button
+                type="button"
+                onClick={() => {
+                  playSound('click');
+                  onGoToSettingsVersion();
+                }}
+                className="flex-1 py-3 px-4 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:brightness-110 text-white font-black text-xs uppercase tracking-wider border-b-4 border-indigo-950 active:border-b-0 active:translate-y-0.5 transition-all shadow-lg cursor-pointer text-center"
+              >
+                ⚙️ {isRu ? 'Настройки → Версия Приложения' : 'Settings → App Version'}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                playSound('click');
+                onClose();
+              }}
+              className="py-3 px-5 rounded-2xl bg-gray-800 hover:bg-gray-700 text-gray-200 font-black text-xs uppercase tracking-wider border border-gray-700 transition-all cursor-pointer"
+            >
+              {isRu ? 'Закрыть' : 'Close'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
@@ -771,19 +852,36 @@ export const BetaModal: React.FC<BetaModalProps> = ({
 
         {/* Footer Buttons */}
         <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-800">
-          {onDismissBanner && (
-            <button
-              onClick={onDismissBanner}
-              className="text-xs font-bold text-gray-400 hover:text-red-400 transition-colors"
-            >
-              Скрыть баннер бета-тестирования
-            </button>
-          )}
+          <div className="flex flex-wrap items-center gap-3">
+            {onToggleBetaTesting && (
+              <button
+                type="button"
+                onClick={() => {
+                  playSound('click');
+                  onToggleBetaTesting(false);
+                  onClose();
+                }}
+                className="text-xs font-bold text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
+              >
+                {isRu ? '🚪 Выйти из бета-тестирования' : '🚪 Leave Beta Testing'}
+              </button>
+            )}
+            {onDismissBanner && (
+              <button
+                type="button"
+                onClick={onDismissBanner}
+                className="text-xs font-bold text-gray-400 hover:text-red-400 transition-colors cursor-pointer"
+              >
+                {isRu ? 'Скрыть баннер бета-тестирования' : 'Hide Beta Banner'}
+              </button>
+            )}
+          </div>
           <button
+            type="button"
             onClick={onClose}
-            className="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg transition-all active:scale-95"
+            className="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg transition-all active:scale-95 cursor-pointer"
           >
-            Закрыть Бета-Центр
+            {isRu ? 'Закрыть Бета-Центр' : 'Close Beta Center'}
           </button>
         </div>
 

@@ -352,8 +352,25 @@ html.light body,
   font-display: swap;
 }
 
+/* Klingon pIqaD Unicode Font (ConScript PUA U+F8D0-F8FF) */
+@font-face {
+  font-family: 'pIqaD';
+  src: url('/fonts/pIqaD.woff2') format('woff2'),
+       url('/fonts/pIqaD.woff') format('woff'),
+       url('/fonts/pIqaD-medium.ttf') format('truetype');
+  unicode-range: U+F8D0-F8FF;
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 .font-klingon, [data-lang="tlh"], :lang(tlh), .lang-tlh, [data-course-script="klingon"], [data-course="tlh"] {
-  font-family: 'Klingon', 'DIN Next Rounded', sans-serif !important;
+  font-family: 'pIqaD', 'Klingon', 'DIN Next Rounded', sans-serif !important;
+}
+
+.font-piqad {
+  font-family: 'pIqaD', 'Klingon', sans-serif !important;
+  letter-spacing: 0.04em;
 }
 
 /* ==========================================================================

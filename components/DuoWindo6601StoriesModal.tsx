@@ -33,51 +33,51 @@ export interface DuolingoStory {
   question: StoryQuestion;
 }
 
-// Built-in authentic Duolingo-style stories adapted for courses
+// Built-in DuoWindo6601 Owl stories adapted for courses
 const DEFAULT_STORIES: DuolingoStory[] = [
   {
     id: 'good-morning',
-    titleRu: 'Доброе утро',
-    titleEn: 'Good Morning',
-    descRu: 'Джуниор хочет взрослого кофе, но у папы другие планы',
-    descEn: 'Junior wants coffee for breakfast, but dad has other plans',
+    titleRu: 'Доброе утро, Сова DuoWindo6601!',
+    titleEn: 'Good Morning, Owl DuoWindo6601!',
+    descRu: 'Сова DuoWindo6601 готовит бодрый завтрак и выбирает полезный напиток',
+    descEn: 'Owl DuoWindo6601 prepares breakfast and chooses a healthy drink',
     icon: '☕',
     accentColor: 'from-amber-500 to-orange-500',
     lines: [
-      { id: '1', character: 'Junior', avatar: '👦', text: 'Доброе утро, папа! Мне нужен кофе.', translationRu: 'Доброе утро, папа! Мне нужен кофе.', translationEn: 'Good morning, dad! I need coffee.' },
-      { id: '2', character: 'Eddy', avatar: '👨', text: 'Кофе? Джуниор, тебе всего восемь лет!', translationRu: 'Кофе? Джуниор, тебе всего восемь лет!', translationEn: 'Coffee? Junior, you are only eight years old!' },
-      { id: '3', character: 'Junior', avatar: '👦', text: 'Но я уже взрослый! У меня сегодня сложный экзамен в школе.', translationRu: 'Но я уже взрослый! У меня сегодня сложный экзамен в школе.', translationEn: 'But I am already grown up! I have a hard exam at school today.' },
-      { id: '4', character: 'Eddy', avatar: '👨', text: 'Вот, держи стакан теплого молока с мёдом.', translationRu: 'Вот, держи стакан теплого молока с мёдом.', translationEn: 'Here, take a glass of warm milk with honey.' },
-      { id: '5', character: 'Junior', avatar: '👦', text: 'Хм... это сладко. Ладно, взрослые дела подождут!', translationRu: 'Хм... это сладко. Ладно, взрослые дела подождут!', translationEn: 'Hmm... that is sweet. Okay, grown-up things can wait!' }
+      { id: '1', character: 'Сова DuoWindo6601', avatar: '🦉', text: 'Доброе утро! Сегодня у меня сложный урок, мне нужен кофе.', translationRu: 'Доброе утро! Сегодня у меня сложный урок, мне нужен кофе.', translationEn: 'Good morning! I have a busy lesson today, I need coffee.' },
+      { id: '2', character: 'Бариста', avatar: '☕', text: 'Кофе? Сова DuoWindo6601, может быть лучше тёплое молоко с мёдом?', translationRu: 'Кофе? Сова DuoWindo6601, может быть лучше тёплое молоко с мёдом?', translationEn: 'Coffee? Owl DuoWindo6601, maybe warm milk with honey is better?' },
+      { id: '3', character: 'Сова DuoWindo6601', avatar: '🦉', text: 'Но впереди целый день тренировок и грамматики!', translationRu: 'Но впереди целый день тренировок и грамматики!', translationEn: 'But there is a whole day of practice and grammar ahead!' },
+      { id: '4', character: 'Бариста', avatar: '☕', text: 'Вот, попробуй стакан тёплого молока с мёдом и тост.', translationRu: 'Вот, попробуй стакан тёплого молока с мёдом и тост.', translationEn: 'Here, try a glass of warm milk with honey and toast.' },
+      { id: '5', character: 'Сова DuoWindo6601', avatar: '🦉', text: 'Хм... это вкусно! Настроение сразу отличное!', translationRu: 'Хм... это вкусно! Настроение сразу отличное!', translationEn: 'Hmm... that is delicious! My mood is great already!' }
     ],
     question: {
-      questionRu: 'Что в итоге выпил Джуниор?',
-      questionEn: 'What did Junior end up drinking?',
-      optionsRu: ['Горячий черный кофе', 'Теплое молоко с мёдом', 'Апельсиновый сок'],
+      questionRu: 'Что в итоге выпила Сова DuoWindo6601?',
+      questionEn: 'What did Owl DuoWindo6601 end up drinking?',
+      optionsRu: ['Горячий чёрный кофе', 'Тёплое молоко с мёдом', 'Апельсиновый сок'],
       optionsEn: ['Hot black coffee', 'Warm milk with honey', 'Orange juice'],
       correctIndex: 1
     }
   },
   {
     id: 'the-date',
-    titleRu: 'Свидание',
-    titleEn: 'A Date',
-    descRu: 'Беа встречает в ресторане мужчину, но произошла забавная путаница',
-    descEn: 'Bea meets a man in a restaurant, but there is a funny mix-up',
+    titleRu: 'Встреча в кафе',
+    titleEn: 'Meeting at the Cafe',
+    descRu: 'Сова DuoWindo6601 заглянула в ресторан, но перепутала столики',
+    descEn: 'Owl DuoWindo6601 visits a restaurant, but mixes up the tables',
     icon: '🌹',
     accentColor: 'from-rose-500 to-pink-500',
     lines: [
-      { id: '1', character: 'Bea', avatar: '👩', text: 'Привет! Ты Даниэль? Извини за опоздание.', translationRu: 'Привет! Ты Даниэль? Извини за опоздание.', translationEn: 'Hello! Are you Daniel? Sorry for being late.' },
-      { id: '2', character: 'Daniel', avatar: '🧔', text: 'Да, я Даниэль. Но я ждал маму...', translationRu: 'Да, я Даниэль. Но я ждал маму...', translationEn: 'Yes, I am Daniel. But I was waiting for my mom...' },
-      { id: '3', character: 'Bea', avatar: '👩', text: 'Ой! Я перепутала столики! Какая неловкость!', translationRu: 'Ой! Я перепутала столики! Какая неловкость!', translationEn: 'Oh! I mixed up the tables! How awkward!' },
-      { id: '4', character: 'Daniel', avatar: '🧔', text: 'Ничего страшного! Присаживайся, мама как раз позвонила, что застряла в пробке.', translationRu: 'Ничего страшного! Присаживайся, мама как раз позвонила, что застряла в пробке.', translationEn: 'No problem at all! Sit down, my mom just called saying she is stuck in traffic.' },
-      { id: '5', character: 'Bea', avatar: '👩', text: 'Тогда давай закажем десерт!', translationRu: 'Тогда давай закажем десерт!', translationEn: 'Then let us order dessert!' }
+      { id: '1', character: 'Сова DuoWindo6601', avatar: '🦉', text: 'Привет! Ты ждёшь меня на практику языка? Извини за опоздание.', translationRu: 'Привет! Ты ждёшь меня на практику языка? Извини за опоздание.', translationEn: 'Hello! Are you waiting for me for language practice? Sorry for being late.' },
+      { id: '2', character: 'Гость кафе', avatar: '🧔', text: 'Здравствуйте, Сова DuoWindo6601! Вообще-то я ждал маму...', translationRu: 'Здравствуйте, Сова DuoWindo6601! Вообще-то я ждал маму...', translationEn: 'Hello, Owl DuoWindo6601! Actually I was waiting for my mom...' },
+      { id: '3', character: 'Сова DuoWindo6601', avatar: '🦉', text: 'Ой! Я перепутала столики! Какая неловкость!', translationRu: 'Ой! Я перепутала столики! Какая неловкость!', translationEn: 'Oh! I mixed up the tables! How awkward!' },
+      { id: '4', character: 'Гость кафе', avatar: '🧔', text: 'Ничего страшного! Присаживайтесь, мама как раз позвонила, что застряла в пробке.', translationRu: 'Ничего страшного! Присаживайтесь, мама как раз позвонила, что застряла в пробке.', translationEn: 'No problem at all! Sit down, my mom just called saying she is stuck in traffic.' },
+      { id: '5', character: 'Сова DuoWindo6601', avatar: '🦉', text: 'Тогда давай закажем десерт и пообщаемся!', translationRu: 'Тогда давай закажем десерт и пообщаемся!', translationEn: 'Then let us order dessert and chat!' }
     ],
     question: {
-      questionRu: 'Кого на самом деле ждал Даниэль за столиком?',
-      questionEn: 'Who was Daniel actually waiting for?',
-      optionsRu: ['Своего коллегу по работе', 'Свою маму', 'Свою девушку'],
-      optionsEn: ['His coworker', 'His mother', 'His girlfriend'],
+      questionRu: 'Кого на самом деле ждал гость за столиком?',
+      questionEn: 'Who was the cafe guest actually waiting for?',
+      optionsRu: ['Своего коллегу по работе', 'Свою маму', 'Преподавателя'],
+      optionsEn: ['A coworker', 'His mother', 'A teacher'],
       correctIndex: 1
     }
   },
@@ -85,45 +85,45 @@ const DEFAULT_STORIES: DuolingoStory[] = [
     id: 'lost-ticket',
     titleRu: 'Потерянный билет',
     titleEn: 'The Lost Ticket',
-    descRu: 'Викрам на вокзале проверяет все карманы перед отправлением',
-    descEn: 'Vikram checks all his pockets before the train departs',
+    descRu: 'Сова DuoWindo6601 на вокзале проверяет все карманы перед отправлением',
+    descEn: 'Owl DuoWindo6601 checks all pockets at the station before departure',
     icon: '🎫',
     accentColor: 'from-emerald-500 to-teal-500',
     lines: [
-      { id: '1', character: 'Vikram', avatar: '👨‍💼', text: 'О нет! Где мой билет на поезд?', translationRu: 'О нет! Где мой билет на поезд?', translationEn: 'Oh no! Where is my train ticket?' },
-      { id: '2', character: 'Clerk', avatar: '👮', text: 'Поезд отправляется через две минуты, сэр.', translationRu: 'Поезд отправляется через две минуты, сэр.', translationEn: 'The train leaves in two minutes, sir.' },
-      { id: '3', character: 'Vikram', avatar: '👨‍💼', text: 'Его нет в сумке! Его нет в кошельке!', translationRu: 'Его нет в сумке! Его нет в кошельке!', translationEn: 'It is not in the bag! It is not in the wallet!' },
-      { id: '4', character: 'Clerk', avatar: '👮', text: 'Сэр, взгляните на свою правую руку.', translationRu: 'Сэр, взгляните на свою правую руку.', translationEn: 'Sir, please look at your right hand.' },
-      { id: '5', character: 'Vikram', avatar: '👨‍💼', text: 'Ха-ха! Я держал его всё это время! Спасибо!', translationRu: 'Ха-ха! Я держал его всё это время! Спасибо!', translationEn: 'Haha! I was holding it all this time! Thank you!' }
+      { id: '1', character: 'Сова DuoWindo6601', avatar: '🦉', text: 'О нет! Где мой билет на поезд?', translationRu: 'О нет! Где мой билет на поезд?', translationEn: 'Oh no! Where is my train ticket?' },
+      { id: '2', character: 'Дежурный', avatar: '👮', text: 'Поезд отправляется через две минуты.', translationRu: 'Поезд отправляется через две минуты.', translationEn: 'The train leaves in two minutes.' },
+      { id: '3', character: 'Сова DuoWindo6601', avatar: '🦉', text: 'Его нет в сумке! Его нет в рюкзаке!', translationRu: 'Его нет в сумке! Его нет в рюкзаке!', translationEn: 'It is not in the bag! It is not in the backpack!' },
+      { id: '4', character: 'Дежурный', avatar: '👮', text: 'Взгляните на своё правое крыло.', translationRu: 'Взгляните на своё правое крыло.', translationEn: 'Please look at your right wing.' },
+      { id: '5', character: 'Сова DuoWindo6601', avatar: '🦉', text: 'Ха-ха! Я держала билет всё это время! Спасибо!', translationRu: 'Ха-ха! Я держала билет всё это время! Спасибо!', translationEn: 'Haha! I was holding the ticket all this time! Thank you!' }
     ],
     question: {
-      questionRu: 'Где всё это время находился билет Викрама?',
-      questionEn: 'Where was Vikram\'s ticket the entire time?',
-      optionsRu: ['В чемодане', 'В его руке', 'Он выпал на перрон'],
-      optionsEn: ['In the suitcase', 'In his hand', 'It dropped onto the platform'],
+      questionRu: 'Где всё это время находился билет Совы DuoWindo6601?',
+      questionEn: 'Where was Owl DuoWindo6601\'s ticket the entire time?',
+      optionsRu: ['В чемодане', 'У неё в руках (в крыле)', 'Он выпал на перрон'],
+      optionsEn: ['In the suitcase', 'In her hand/wing', 'It dropped onto the platform'],
       correctIndex: 1
     }
   },
   {
     id: 'red-jacket',
-    titleRu: 'Красная куртка',
-    titleEn: 'The Red Jacket',
-    descRu: 'Люси выбирает одежду в магазине, когда к ней подходят с вопросом',
-    descEn: 'Lucy is browsing clothes when a shopper asks for advice',
+    titleRu: 'Синяя куртка и значок',
+    titleEn: 'The Blue Jacket & Badge',
+    descRu: 'Сова DuoWindo6601 выбирает одежду в магазине, когда к ней подходят с вопросом',
+    descEn: 'Owl DuoWindo6601 is browsing clothes when a shopper asks for advice',
     icon: '🧥',
     accentColor: 'from-purple-500 to-indigo-500',
     lines: [
-      { id: '1', character: 'Shopper', avatar: '👱‍♀️', text: 'Здравствуйте! У вас есть эта куртка в синем цвете?', translationRu: 'Здравствуйте! У вас есть эта куртка в синем цвете?', translationEn: 'Hello! Do you have this jacket in blue?' },
-      { id: '2', character: 'Lucy', avatar: '🧓', text: 'Я не знаю, милочка.', translationRu: 'Я не знаю, милочка.', translationEn: 'I do not know, dear.' },
-      { id: '3', character: 'Shopper', avatar: '👱‍♀️', text: 'Разве вы здесь не работаете? На вас красный бейдж!', translationRu: 'Разве вы здесь не работаете? На вас красный бейдж!', translationEn: 'Do you not work here? You have a red badge!' },
-      { id: '4', character: 'Lucy', avatar: '🧓', text: 'Это значок моего шахматного клуба! Но синий цвет вам определенно пойдет.', translationRu: 'Это значок моего шахматного клуба! Но синий цвет вам определенно пойдет.', translationEn: 'This is my chess club badge! But blue will definitely suit you.' },
-      { id: '5', character: 'Shopper', avatar: '👱‍♀️', text: 'Спасибо за совет, чемпионка!', translationRu: 'Спасибо за совет, чемпионка!', translationEn: 'Thanks for the advice, champion!' }
+      { id: '1', character: 'Покупатель', avatar: '🛍️', text: 'Здравствуйте! У вас есть эта куртка в синем цвете?', translationRu: 'Здравствуйте! У вас есть эта куртка в синем цвете?', translationEn: 'Hello! Do you have this jacket in blue?' },
+      { id: '2', character: 'Сова DuoWindo6601', avatar: '🦉', text: 'Я не знаю, я тоже покупатель!', translationRu: 'Я не знаю, я тоже покупатель!', translationEn: 'I do not know, I am a shopper too!' },
+      { id: '3', character: 'Покупатель', avatar: '🛍️', text: 'Разве вы здесь не работаете? На вас яркий красный бейдж!', translationRu: 'Разве вы здесь не работаете? На вас яркий красный бейдж!', translationEn: 'Do you not work here? You have a bright red badge!' },
+      { id: '4', character: 'Сова DuoWindo6601', avatar: '🦉', text: 'Это значок моего шахматного клуба! Но синий цвет вам определённо пойдёт.', translationRu: 'Это значок моего шахматного клуба! Но синий цвет вам определённо пойдёт.', translationEn: 'This is my chess club badge! But blue will definitely suit you.' },
+      { id: '5', character: 'Покупатель', avatar: '🛍️', text: 'Спасибо за совет, Сова DuoWindo6601!', translationRu: 'Спасибо за совет, Сова DuoWindo6601!', translationEn: 'Thanks for the advice, Owl DuoWindo6601!' }
     ],
     question: {
-      questionRu: 'Кем на самом деле оказалась Люси?',
-      questionEn: 'Who did Lucy turn out to be?',
-      optionsRu: ['Менеджером магазина', 'Членом шахматного клуба', 'Охранником'],
-      optionsEn: ['Store manager', 'Chess club member', 'Security guard'],
+      questionRu: 'Какой значок был на Сове DuoWindo6601?',
+      questionEn: 'What badge was Owl DuoWindo6601 wearing?',
+      optionsRu: ['Бейдж менеджера магазина', 'Значок шахматного клуба', 'Пропуск охранника'],
+      optionsEn: ['Store manager badge', 'Chess club badge', 'Security pass'],
       correctIndex: 1
     }
   }

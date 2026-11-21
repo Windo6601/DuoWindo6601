@@ -2,6 +2,13 @@ import { GoogleGenAI, Modality, ThinkingLevel, LiveServerMessage } from '@google
 import type { Request, Response } from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server as HttpServer } from 'http';
+import { FISH_NATIVE_LANGS, getFishReferenceIdForLang } from './fishAudioConfig.ts';
+import {
+  GTTS_SUPPORTED_LANGS,
+  normalizeCourseLangCode,
+  resolveGoogleTtsLang,
+  resolvePhoneticTtsTarget,
+} from './multilingualTtsHelper.ts';
 
 export const MODEL_FREE = 'gemini-4-hydrogen';
 export const MODEL_PRO = 'gemini-4-argon';
@@ -438,6 +445,52 @@ export async function handleGeminiStream(req: Request, res: Response): Promise<v
  * POST /api/gemini/tts
  * Server-side Text-to-Speech using gemini-3.8-flash-lite-tts / gemini-3.8-flash-tts.
  */
+let defaultServerGeminiTtsMissing = false;
+
+const TTS_LANGUAGE_LABELS: Record<string, string> = {
+  ru: 'Russian', es: 'Spanish', de: 'German', fr: 'French', it: 'Italian', pt: 'Portuguese',
+  ja: 'Japanese', zh: 'Mandarin Chinese', ko: 'Korean', ar: 'Arabic', he: 'Hebrew', yi: 'Yiddish',
+  sv: 'Swedish', no: 'Norwegian', la: 'Classical Latin', eo: 'Esperanto', tt: 'Tatar',
+  hv: 'High Valyrian', uk: 'Ukrainian', be: 'Belarusian', kk: 'Kazakh', uz: 'Uzbek',
+  ky: 'Kyrgyz', az: 'Azerbaijani', hy: 'Armenian', ka: 'Georgian', tr: 'Turkish',
+  pl: 'Polish', fi: 'Finnish', hu: 'Hungarian', is: 'Icelandic', eu: 'Basque',
+  id: 'Indonesian', hi: 'Hindi', nl: 'Dutch', el: 'Greek', ro: 'Romanian', mo: 'Romanian',
+  cs: 'Czech', vi: 'Vietnamese', th: 'Thai', et: 'Estonian', lv: 'Latvian', lt: 'Lithuanian',
+  cv: 'Chuvash', tab: 'Tabasaran', tk: 'Turkmen', tg: 'Tajik', nv: 'Navajo',
+};
+
+async function fetchServerGoogleTtsAudio(rawText: string, rawLang: string): Promise<Buffer | null> {
+  const gttsTarget = resolveGoogleTtsLang(rawLang);
+  const phonetic = !gttsTarget ? resolvePhoneticTtsTarget(rawText, rawLang, GTTS_SUPPORTED_LANGS) : null;
+  const tl = gttsTarget
+    ? gttsTarget.tl
+    : (phonetic && GTTS_SUPPORTED_LANGS.has(phonetic.lang)
+      ? (phonetic.lang === 'zh' ? 'zh-CN' : phonetic.lang)
+      : null);
+  const textToSpeak = gttsTarget ? rawText : (phonetic ? phonetic.text : rawText);
+  if (!tl || !textToSpeak.trim()) return null;
+
+  const trimmed = textToSpeak.trim().slice(0, 200);
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4500);
+    const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${encodeURIComponent(tl)}&q=${encodeURIComponent(trimmed)}`;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        'Referer': 'https://translate.google.com/',
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    return buf.length >= 128 ? buf : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function handleGeminiTTS(req: Request, res: Response): Promise<void> {
   const customKey =
     (req.headers['x-goog-api-key'] as string) ||
@@ -456,126 +509,182 @@ export async function handleGeminiTTS(req: Request, res: Response): Promise<void
   }
   const ai = customKey ? createServerGenAiClient(customKey) : serverAi;
 
-  const { text, voiceName = 'Kore' } = req.body || {};
+  const { text, voiceName = 'Kore', lang } = req.body || {};
   if (!text || typeof text !== 'string') {
     res.status(400).json({ error: { message: 'text is required' } });
+    return;
+  }
+  const normalizedLang = normalizeCourseLangCode(String(lang || 'en'));
+  if (normalizedLang === 'tlh') {
+    res.status(400).json({ error: { message: 'Klingon speech is served via /api/tts/klingon or client synthesizer' } });
     return;
   }
 
   const safeVoice = normalizeVoiceName(voiceName, 'Kore');
   const ttsModels = ['gemini-2.5-flash-preview-tts', TTS_MODEL, TTS_FALLBACK_MODEL];
+  const langLabel = TTS_LANGUAGE_LABELS[normalizedLang];
+  const geminiPromptText =
+    normalizedLang !== 'en' && langLabel
+      ? `Read aloud clearly in ${langLabel} with authentic native ${langLabel} pronunciation:\n${text}`
+      : text;
 
   try {
     let lastError: any = null;
 
-    for (const candidateModel of ttsModels) {
-      try {
-        let response: any;
+    if (customKey || !defaultServerGeminiTtsMissing) {
+      let all404 = true;
+      for (const candidateModel of ttsModels) {
         try {
-          response = await withTimeout(
-            ai.models.generateContent({
-              model: candidateModel,
-              contents: [
-                {
-                  role: 'user',
-                  parts: [{ text }],
-                },
-              ],
-              config: {
-                responseModalities: [Modality.AUDIO],
-                speechConfig: {
-                  voiceConfig: {
-                    prebuiltVoiceConfig: { voiceName: safeVoice },
-                  },
-                },
-              },
-            }),
-            4500,
-            'TTS'
-          );
-        } catch (errWithCfg: any) {
-          const msg = String(errWithCfg?.message || '');
-          if (msg.includes('speechConfig')) {
+          let response: any;
+          try {
             response = await withTimeout(
               ai.models.generateContent({
                 model: candidateModel,
                 contents: [
                   {
                     role: 'user',
-                    parts: [{ text }],
+                    parts: [{ text: geminiPromptText }],
                   },
                 ],
                 config: {
                   responseModalities: [Modality.AUDIO],
+                  speechConfig: {
+                    voiceConfig: {
+                      prebuiltVoiceConfig: { voiceName: safeVoice },
+                    },
+                  },
                 },
               }),
               4500,
-              'TTS_PLAIN'
+              'TTS'
             );
-          } else {
-            throw errWithCfg;
+          } catch (errWithCfg: any) {
+            const msg = String(errWithCfg?.message || '');
+            if (msg.includes('speechConfig')) {
+              response = await withTimeout(
+                ai.models.generateContent({
+                  model: candidateModel,
+                  contents: [
+                    {
+                      role: 'user',
+                      parts: [{ text: geminiPromptText }],
+                    },
+                  ],
+                  config: {
+                    responseModalities: [Modality.AUDIO],
+                  },
+                }),
+                4500,
+                'TTS_PLAIN'
+              );
+            } else {
+              throw errWithCfg;
+            }
+          }
+
+          all404 = false;
+          const part = response?.candidates?.[0]?.content?.parts?.[0];
+          if (part?.inlineData?.data) {
+            const base64Data = part.inlineData.data;
+            const isRiffWav = typeof base64Data === 'string' && base64Data.startsWith('UklGR');
+            res.json({
+              ok: true,
+              audioBase64: base64Data,
+              mimeType: isRiffWav ? 'audio/wav' : part.inlineData.mimeType || 'audio/pcm;rate=24000',
+            });
+            return;
+          }
+        } catch (modelErr: any) {
+          lastError = modelErr;
+          const errStr = String(modelErr?.message || '');
+          if (!errStr.includes('404') && !errStr.includes('NOT_FOUND')) {
+            all404 = false;
           }
         }
-
-        const part = response?.candidates?.[0]?.content?.parts?.[0];
-        if (part?.inlineData?.data) {
-          const base64Data = part.inlineData.data;
-          const isRiffWav = typeof base64Data === 'string' && base64Data.startsWith('UklGR');
-          res.json({
-            ok: true,
-            audioBase64: base64Data,
-            mimeType: isRiffWav ? 'audio/wav' : part.inlineData.mimeType || 'audio/pcm;rate=24000',
-          });
-          return;
-        }
-      } catch (modelErr: any) {
-        lastError = modelErr;
+      }
+      if (!customKey && all404) {
+        defaultServerGeminiTtsMissing = true;
       }
     }
 
-    // Server-side Fish Audio TTS fallback so TTS works reliably with or without VPN
-    try {
-      const envFishKey = (process.env.FISH_AUDIO_API_KEY || '').trim();
-      const fishApiKey = (envFishKey && envFishKey.startsWith('sk-fish-'))
-        ? envFishKey
-        : 'sk-fish-u5Iq7Y832NDeKO1mTkjc5_thtfuYFZ8HIiSX7xfNwyo';
-      const fishController = new AbortController();
-      const fishTimeout = setTimeout(() => fishController.abort(), 5500);
-      const fishRes = await fetch('https://api.fish.audio/v1/tts', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${fishApiKey}`,
-          'Content-Type': 'application/json',
-          'model': 's2.1-pro-free',
-        },
-        body: JSON.stringify({
-          text,
-          format: 'mp3',
-          model: 's2.1-pro-free',
-          normalize: true,
-          latency: 'normal',
-          top_p: 0.5,
-          temperature: 0.1,
-          repetition_penalty: 1.2,
-        }),
-        signal: fishController.signal,
-      });
-      clearTimeout(fishTimeout);
-      if (fishRes.ok) {
-        const audioBuf = Buffer.from(await fishRes.arrayBuffer());
-        if (audioBuf.length > 0) {
-          res.json({
-            ok: true,
-            audioBase64: audioBuf.toString('base64'),
-            mimeType: 'audio/mpeg',
-          });
-          return;
-        }
+    // 1. Native Google Translate TTS for all 33 natively supported languages (including la, sv, no, is, et, lv, lt, eu, uk, fi, hu, he)
+    if (GTTS_SUPPORTED_LANGS.has(normalizedLang)) {
+      const gttsBuf = await fetchServerGoogleTtsAudio(text, normalizedLang);
+      if (gttsBuf) {
+        res.json({
+          ok: true,
+          audioBase64: gttsBuf.toString('base64'),
+          mimeType: 'audio/mpeg',
+          providerUsed: `gtts-${normalizedLang}`,
+        });
+        return;
       }
-    } catch {}
+    }
+
+    // 2. Native / Phonetically-routed Fish Audio TTS with explicit per-language reference_id (never English bf322df2... for non-English)
+    const routed = FISH_NATIVE_LANGS.has(normalizedLang)
+      ? { lang: normalizedLang, text }
+      : resolvePhoneticTtsTarget(text, normalizedLang, FISH_NATIVE_LANGS);
+
+    const refId = getFishReferenceIdForLang(routed.lang);
+    if (FISH_NATIVE_LANGS.has(routed.lang) && refId) {
+      try {
+        const envFishKey = (process.env.FISH_AUDIO_API_KEY || '').trim();
+        const fishApiKey = (envFishKey && envFishKey.startsWith('sk-fish-'))
+          ? envFishKey
+          : 'sk-fish-u5Iq7Y832NDeKO1mTkjc5_thtfuYFZ8HIiSX7xfNwyo';
+        const fishController = new AbortController();
+        const fishTimeout = setTimeout(() => fishController.abort(), 5500);
+        const fishRes = await fetch('https://api.fish.audio/v1/tts', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${fishApiKey}`,
+            'Content-Type': 'application/json',
+            'model': 's2.1-pro-free',
+          },
+          body: JSON.stringify({
+            text: routed.text,
+            format: 'mp3',
+            model: 's2.1-pro-free',
+            normalize: true,
+            latency: 'normal',
+            top_p: 0.5,
+            temperature: 0.1,
+            repetition_penalty: 1.2,
+            reference_id: refId,
+          }),
+          signal: fishController.signal,
+        });
+        clearTimeout(fishTimeout);
+        if (fishRes.ok) {
+          const audioBuf = Buffer.from(await fishRes.arrayBuffer());
+          if (audioBuf.length > 0) {
+            res.json({
+              ok: true,
+              audioBase64: audioBuf.toString('base64'),
+              mimeType: 'audio/mpeg',
+              providerUsed: `fish-${routed.lang}`,
+            });
+            return;
+          }
+        }
+      } catch {}
+    }
+
+    // 3. Phonetic GTTS fallback (e.g. eo -> es/it, tt/cv/kk/ky/tg -> ru, uz/az/tk -> tr, yi -> he/de, ka/hy -> it)
+    const phoneticGttsBuf = await fetchServerGoogleTtsAudio(text, normalizedLang);
+    if (phoneticGttsBuf) {
+      res.json({
+        ok: true,
+        audioBase64: phoneticGttsBuf.toString('base64'),
+        mimeType: 'audio/mpeg',
+        providerUsed: `gtts-phonetic-${normalizedLang}`,
+      });
+      return;
+    }
 
     res.status(lastError?.status || 502).json({
-      error: { message: lastError?.message || 'No audio returned from Gemini TTS model' },
+      error: { message: lastError?.message || 'No audio returned from TTS engine' },
     });
   } catch (err: any) {
     console.error('[Server Gemini TTS Error]:', err?.message || err);

@@ -304,8 +304,6 @@ export function setSkipCustomApiKey(skip: boolean): void {
   try {
     if (skip) {
       localStorage.setItem(SKIP_CUSTOM_API_KEY_STORAGE, 'true');
-      // Automatically disable offline mode when skipping custom API key
-      window.dispatchEvent(new CustomEvent('duowindo_disable_offline_mode'));
     } else {
       localStorage.removeItem(SKIP_CUSTOM_API_KEY_STORAGE);
     }

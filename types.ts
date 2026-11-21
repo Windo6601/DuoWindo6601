@@ -147,6 +147,46 @@ export type SupportedAppLanguage =
   | 'kk' | 'uz' | 'hy' | 'ka' | 'az'
   | 'uk' | 'cs' | 'nl' | 'el' | 'hu' | 'kn' | 'mr' | 'pa' | 'ro' | 'sv' | 'tl' | 'ta' | 'te' | 'ur';
 
+export interface CharacterAvatarConfig {
+  characterId: string;
+  bgColor: string;
+  expression: 'happy' | 'cool' | 'smart' | 'wink';
+  accessory: 'none' | 'glasses' | 'sunglasses' | 'headphones' | 'visor';
+  headwear: 'none' | 'crown' | 'gradcap' | 'beret' | 'helmet';
+  customImageUrl?: string;
+  skinColor?: string;
+  headShape?: 'rounded' | 'round' | 'oval' | 'chiseled' | 'tall' | 'heart';
+  earStyle?: 'normal' | 'small' | 'large' | 'elf' | 'cat' | 'cyber';
+  bodyStyle?: 'slim' | 'medium' | 'broad' | 'collar' | 'hoodie' | 'wide' | 'jacket' | 'sweater' | 'scarf' | 'turtleneck';
+  eyeColor?: string;
+  eyeStyle?: 'classic' | 'happy' | 'wink' | 'calm' | 'wide' | 'lashes' | 'starry' | 'focused' | 'heart' | 'cyber';
+  eyebrowColor?: string;
+  eyebrowStyle?: 'none' | 'natural' | 'thick' | 'arched' | 'serious' | 'raised' | 'unibrow' | 'slit';
+  noseStyle?: 'drop' | 'button' | 'round' | 'bridge' | 'wide' | 'pointed' | 'upturned' | 'diamond';
+  faceStyle?: 'smile' | 'smirk' | 'grin' | 'wink' | 'surprised' | 'calm' | 'tongue' | 'cat' | 'whistle' | 'kiss' | 'vampire' | 'yawn';
+  cheekStyle?: 'none' | 'blush' | 'freckles' | 'blushFreckles' | 'bandaid' | 'mole' | 'hearts' | 'stripes';
+  faceMark?: 'none' | 'scar' | 'eyeshadow' | 'eyeliner' | 'starMark' | 'heartMark' | 'whiskers';
+  hairColor?: string;
+  hairStyle?: 'none' | 'buzz' | 'fade' | 'curl' | 'pomp' | 'side' | 'bob' | 'curly' | 'bun' | 'twintails' | 'spiky' | 'long' | 'afro' | 'mohawk' | 'undercut' | 'ponytail' | 'dreads' | 'wavy';
+  bangsStyle?: 'none' | 'straight' | 'side' | 'curtains' | 'curly' | 'strand';
+  glassesColor?: string;
+  glassesStyle?: 'none' | 'round' | 'square' | 'half' | 'shades' | 'oval' | 'aviator' | 'catEye' | 'pixel' | 'monocle';
+  facialHairColor?: string;
+  facialHairStyle?: 'none' | 'mustache' | 'fullbeard' | 'goatee' | 'stubble' | 'bushy' | 'handlebar' | 'vandyke' | 'anchor' | 'mutton';
+  earringStyle?: 'none' | 'studs' | 'hoops' | 'stars' | 'drops' | 'double';
+  neckwearStyle?: 'none' | 'tie' | 'bowtie' | 'chain' | 'pendant' | 'choker' | 'scarf';
+  faceAccessory?: 'none' | 'headphones' | 'studEarrings' | 'hoopEarrings' | 'crown' | 'headband' | 'flower' | 'mic' | 'horns' | 'halo';
+  hatColor?: string;
+  hatStyle?: 'none' | 'cap' | 'duocap' | 'sidecap' | 'beanie' | 'tophat' | 'beret' | 'gradcap' | 'wizard' | 'ushanka' | 'astronaut' | 'chef';
+  outfitColor?: string;
+  outfitDecal?: 'none' | 'owl66' | 'star' | 'lightning' | 'heart' | 'code' | 'music' | 'chess' | 'globe';
+  auraEffect?: 'none' | 'angelWings' | 'dragonWings' | 'cyberRing' | 'flame' | 'rainbow' | 'stars';
+  shoulderPet?: 'none' | 'owl' | 'cat' | 'dog' | 'drone' | 'butterfly';
+  bgHex?: string;
+  bgPattern?: 'solid' | 'dots' | 'stripes' | 'rays' | 'grid' | 'sparkles' | 'hearts' | 'waves';
+  avatarFrame?: 'none' | 'double' | 'neon' | 'gold' | 'stars' | 'comic';
+}
+
 export interface UserProgress {
   id?: string;
   name: string;
@@ -164,6 +204,8 @@ export interface UserProgress {
   avatarImage?: string; 
   avatarUrl?: string;
   avatarIcon?: string;
+  avatarMode?: 'photo' | 'character' | 'icon';
+  characterAvatar?: CharacterAvatarConfig;
   energy: number; 
   hearts: number;
   subscription: SubscriptionTier;
@@ -229,6 +271,7 @@ export interface UserProgress {
   mathGrade?: number;
   mathTopic?: 'arithmetic' | 'algebra' | 'geometry' | 'calculus';
   isBetaTester?: boolean;
+  betaJoinedAt?: string;
   betaTestedCourses?: string[];
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;

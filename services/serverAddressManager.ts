@@ -236,7 +236,7 @@ export const pingServerEndpoint = async (url: string, timeoutMs: number = 4000):
     return {
       ok: false,
       latencyMs,
-      message: isTimeout ? 'Таймаут соединения (>4 сек)' : 'Сетевая ошибка / Офлайн'
+      message: isTimeout ? 'Таймаут соединения (>4 сек)' : 'Нет подключения к интернету'
     };
   }
 };
