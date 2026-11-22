@@ -11,6 +11,8 @@ export const APP_CHANNEL = 'Release • PWA Core';
 export const APP_BETA_VERSION = '1.0.5-beta.1';
 export const APP_BETA_CHANNEL = 'Beta Channel • PWA Early Access';
 export const APP_STORAGE_KEY_PROTECTED = 'duowindo6601_user_progress_v1';
+export const APP_GITHUB_REPO_URL = 'https://github.com/Windo6601/DuoWindo6601';
+export const APP_IS_OPEN_SOURCE = true;
 
 export interface ReleaseNoteEntry {
   version: string;
@@ -198,6 +200,7 @@ export function formatDiagnosticsReport(diag: AppRuntimeDiagnostics, user: UserP
     `Service Worker: ${diag.serviceWorkerSupported ? (diag.serviceWorkerActive ? 'Active' : 'Registered/Idle') : 'Unsupported'} | Cache Buckets: ${diag.cacheBucketCount}`,
     `Profile Integrity (${APP_STORAGE_KEY_PROTECTED}): ${diag.progressKeyFound ? `OK (${diag.progressSizeKb} KB)` : 'Memory State'}`,
     `Account: @${user.username || 'learner'} | Tier: ${diag.subscriptionTier.toUpperCase()} | Beta: ${diag.isBetaTester ? 'Joined' : 'Not Joined'} | XP: ${user.xp || 0} | Course: ${diag.activeCourseId.toUpperCase()}`,
+    `Open Source (GitHub): ${APP_GITHUB_REPO_URL}`,
     `Checked at: ${diag.checkedAt}`
   ].join('\n');
 }

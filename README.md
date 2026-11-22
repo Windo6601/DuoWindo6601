@@ -1,6 +1,8 @@
 # DuoWindo6601 🦉📱
 
-DuoWindo6601 is a gamified language learning application designed for both web and mobile platforms. It features an interactive learning path, gamification elements, customizable courses across different regions, and AI-enabled translation exercises.
+**DuoWindo6601** is an open-source gamified language learning application designed for both web and mobile platforms. It features an interactive learning path, gamification elements, customizable courses across different regions, and AI-enabled translation exercises.
+
+- **Open Source Repository (GitHub):** [https://github.com/Windo6601/DuoWindo6601](https://github.com/Windo6601/DuoWindo6601)
 
 ---
 

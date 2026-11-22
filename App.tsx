@@ -1948,8 +1948,8 @@ const TRANSLATIONS: Record<string, any> = {
     betaDesc: 'Все функции приложения доступны для проверки тестеров: языки СНГ и мира, Шахматы, Графика, AI Озвучка и Панель Управления.',
     betaBtn: '🧪 Бета-Центр DuoWindo6601',
     reviewsBtn: '⭐ Отзывы',
-    githubTitle: 'DuoWindo6601 уже доступен на GitHub',
-    githubDesc: 'Автоматическая сборка Android APK запущена через .github/workflows/build.yml.',
+    githubTitle: 'DuoWindo6601 уже доступен на GitHub (Открытый исходный код)',
+    githubDesc: 'Открытый исходный код проекта опубликован на GitHub (Windo6601/DuoWindo6601). Автоматическая сборка Android APK работает через .github/workflows/build.yml.',
     testAndroidBtn: '🤖 Тест Android',
     home: 'ГЛАВНАЯ', practice: 'ПРАКТИКА', leaderboard: 'РЕЙТИНГ', shop: 'МАГАЗИН', profile: 'ПРОФИЛЬ', feedback: 'ОТЗЫВЫ',
     lang_ru: 'Русский', lang_en: 'Английский', lang_de: 'Немецкий', lang_fr: 'Французский', lang_es: 'Испанский', lang_ja: 'Японский', lang_zh: 'Китайский',
@@ -2191,8 +2191,8 @@ const TRANSLATIONS: Record<string, any> = {
     betaDesc: 'All app features are available for testing: CIS & world languages, Chess, Graphics, AI Voiceover, and Control Panel.',
     betaBtn: '🧪 DuoWindo6601 Beta Center',
     reviewsBtn: '⭐ Reviews',
-    githubTitle: 'DuoWindo6601 is already available on GitHub',
-    githubDesc: 'Automatic Android APK build is launched via .github/workflows/build.yml.',
+    githubTitle: 'DuoWindo6601 is now Open Source on GitHub',
+    githubDesc: 'Full open-source repository is live at Windo6601/DuoWindo6601. Automatic Android APK build is configured via .github/workflows/build.yml.',
     testAndroidBtn: '🤖 Test Android',
     home: 'HOME', practice: 'PRACTICE', leaderboard: 'LEADERBOARD', shop: 'SHOP', profile: 'PROFILE', feedback: 'FEEDBACK',
     lang_ru: 'Russian', lang_en: 'English', lang_de: 'German', lang_fr: 'French', lang_es: 'Spanish', lang_ja: 'Japanese', lang_zh: 'Chinese',
@@ -2421,8 +2421,8 @@ const TRANSLATIONS: Record<string, any> = {
     betaDesc: 'Alle App-Funktionen stehen zum Testen zur Verfügung: GUS- und Weltsprachen, Schach, Grafik, KI-Voiceover und Kontrollzentrum.',
     betaBtn: '🧪 DuoWindo6601 Beta-Zentrum',
     reviewsBtn: '⭐ Bewertungen',
-    githubTitle: 'DuoWindo6601 ist bereits auf GitHub verfügbar',
-    githubDesc: 'Automatisches Android APK Build wird über .github/workflows/build.yml gestartet.',
+    githubTitle: 'DuoWindo6601 ist jetzt Open Source auf GitHub',
+    githubDesc: 'Der offene Quellcode ist auf GitHub verfügbar (Windo6601/DuoWindo6601). Automatisches Android APK Build über .github/workflows/build.yml.',
     testAndroidBtn: '🤖 Android-Test',
     home: 'STARTSEITE', practice: 'ÜBEN', leaderboard: 'RANGLISTE', shop: 'SHOP', profile: 'PROFIL', feedback: 'BEWERTUNGEN',
     lang_ru: 'Russisch', lang_en: 'Englisch', lang_de: 'Deutsch', lang_fr: 'Französisch', lang_es: 'Spanisch', lang_ja: 'Japanisch', lang_zh: 'Chinesisch',
@@ -2596,8 +2596,8 @@ const TRANSLATIONS: Record<string, any> = {
     betaDesc: 'Toutes les fonctionnalités de l’application sont disponibles pour les tests : langues de la CEI et du monde, Échecs, Graphiques, Voix off IA et Panneau de configuration.',
     betaBtn: '🧪 Centre Bêta DuoWindo6601',
     reviewsBtn: '⭐ Avis',
-    githubTitle: 'DuoWindo6601 est déjà disponible sur GitHub',
-    githubDesc: 'La génération automatique de l’APK Android est lancée via .github/workflows/build.yml.',
+    githubTitle: 'DuoWindo6601 est disponible en Open Source sur GitHub',
+    githubDesc: 'Le code source ouvert est publié sur GitHub (Windo6601/DuoWindo6601). Génération automatique de l’APK Android via .github/workflows/build.yml.',
     testAndroidBtn: '🤖 Test Android',
     home: 'ACCUEIL', practice: 'PRATIQUE', leaderboard: 'CLASSEMENT', shop: 'BOUTIQUE', profile: 'PROFIL', feedback: 'AVIS',
     lang_ru: 'Russe', lang_en: 'Anglais', lang_de: 'Allemand', lang_fr: 'Français', lang_es: 'Espagnol', lang_ja: 'Japonais', lang_zh: 'Chinois',
@@ -2770,8 +2770,8 @@ const TRANSLATIONS: Record<string, any> = {
     betaDesc: 'Todas las funciones de la aplicación están disponibles para pruebas: idiomas de la CEI y del mundo, Ajedrez, Gráficos, Locución de IA y Panel de control.',
     betaBtn: '🧪 Centro Beta DuoWindo6601',
     reviewsBtn: '⭐ Reseñas',
-    githubTitle: 'DuoWindo6601 ya está disponible en GitHub',
-    githubDesc: 'La compilación automática de APK de Android se inicia a través de .github/workflows/build.yml.',
+    githubTitle: 'DuoWindo6601 ya es código abierto en GitHub',
+    githubDesc: 'El código fuente abierto está disponible en GitHub (Windo6601/DuoWindo6601). Compilación automática de APK mediante .github/workflows/build.yml.',
     testAndroidBtn: '🤖 Prueba Android',
     home: 'INICIO', practice: 'PRÁCTICA', leaderboard: 'CLASIFICACIÓN', shop: 'TIENDA', profile: 'PERFIL', feedback: 'OPINIONES',
     lang_ru: 'Ruso', lang_en: 'Inglés', lang_de: 'Alemán', lang_fr: 'Francés', lang_es: 'Español', lang_ja: 'Japonés', lang_zh: 'Chino',
@@ -2944,8 +2944,8 @@ const TRANSLATIONS: Record<string, any> = {
     betaDesc: 'すべてのアプリ機能がテスト可能です：独立国家共同体と言語、チェス、グラフィック、AI音声、コントロールパネル。',
     betaBtn: '🧪 DuoWindo6601 ベータセンター',
     reviewsBtn: '⭐ レビュー',
-    githubTitle: 'DuoWindo6601はすでにGitHubで利用可能です',
-    githubDesc: '.github/workflows/build.yml経由で自動Android APKビルドが実行されます。',
+    githubTitle: 'DuoWindo6601 は GitHub でオープンソース公開中',
+    githubDesc: 'オープンソースコードは GitHub (Windo6601/DuoWindo6601) で公開されています。.github/workflows/build.yml で Android APK を自動ビルドします。',
     testAndroidBtn: '🤖 Androidテスト',
     home: 'ホーム', practice: '練習', leaderboard: 'ランキング', shop: 'ショップ', profile: 'プロフィール', feedback: 'フィードバック',
     lang_ru: 'ロシア語', lang_en: '英語', lang_de: 'ドイツ語', lang_fr: 'フランス語', lang_es: 'スペイン語', lang_ja: '日本語', lang_zh: '中国語',
@@ -3118,8 +3118,8 @@ const TRANSLATIONS: Record<string, any> = {
     betaDesc: '所有应用功能均可用于测试：独联体和世界语言、国际象棋、图形、AI配音和控制面板。',
     betaBtn: '🧪 DuoWindo6601 Beta 中心',
     reviewsBtn: '⭐ 评价',
-    githubTitle: 'DuoWindo6601 已在 GitHub 上可用',
-    githubDesc: '通过 .github/workflows/build.yml 启动自动 Android APK 构建。',
+    githubTitle: 'DuoWindo6601 现已在 GitHub 开源',
+    githubDesc: '项目开源代码已发布至 GitHub (Windo6601/DuoWindo6601)，并通过 .github/workflows/build.yml 自动构建 Android APK。',
     testAndroidBtn: '🤖 Android 测试',
     home: '首页', practice: '练习', leaderboard: '排行榜', shop: '商店', profile: '个人资料', feedback: '反馈',
     lang_ru: '俄语', lang_en: '英语', lang_de: '德语', lang_fr: '法语', lang_es: '西班牙语', lang_ja: '日语', lang_zh: '中文',
@@ -3292,8 +3292,8 @@ const TRANSLATIONS: Record<string, any> = {
     betaDesc: 'جميع ميزات التطبيق متاحة للاختبار.',
     betaBtn: '🧪 مركز بيتا DuoWindo6601',
     reviewsBtn: '⭐ المراجعات',
-    githubTitle: 'DuoWindo6601 متاح على GitHub',
-    githubDesc: 'تم إطلاق البناء التلقائي لـ Android APK عبر .github/workflows/build.yml.',
+    githubTitle: 'DuoWindo6601 متاح الآن كمصدر مفتوح على GitHub',
+    githubDesc: 'الكود المصدري المفتوح منشور على GitHub (Windo6601/DuoWindo6601) مع بناء تلقائي لـ Android APK عبر .github/workflows/build.yml.',
     testAndroidBtn: '🤖 اختبار أندرويد',
     home: 'الرئيسية', practice: 'الممارسة', leaderboard: 'التصنيف', shop: 'المتجر', profile: 'الملف الشخصي', feedback: 'الآراء',
     lang_ru: 'الروسية', lang_en: 'الإنجليزية', lang_de: 'الألمانية', lang_fr: 'الفرنسية', lang_es: 'الإسبانية', lang_ja: 'اليابانية', lang_zh: 'الصينية', lang_ar: 'العربية',
@@ -10736,10 +10736,15 @@ const getTodayChallenge = () => {
                               </svg>
                           </div>
                           <div className="flex-1 pr-6">
-                              <span className="inline-block bg-yellow-400 text-black text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider mb-2">GitHub Release</span>
-                              <h3 className="font-din font-black text-xl text-white tracking-widest uppercase mb-1">DuoWindo6601 уже доступен на GitHub</h3>
+                              <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                                  <span className="inline-block bg-yellow-400 text-black text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">GitHub Release</span>
+                                  <span className="inline-block bg-emerald-950/80 text-emerald-200 border border-emerald-400/50 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                                      {user.language === 'en' ? 'Open Source' : 'Открытый исходный код'}
+                                  </span>
+                              </div>
+                              <h3 className="font-din font-black text-lg text-white tracking-wider uppercase mb-1">{t('githubTitle')}</h3>
                               <p className="font-din font-bold text-xs text-emerald-100 leading-normal mb-3">
-                                  Автоматическая сборка Android APK запущена через <code className="bg-black/30 px-1 py-0.5 rounded font-mono text-[11px] text-yellow-300">.github/workflows/build.yml</code>.
+                                  {t('githubDesc')}
                               </p>
 
                               <a 
@@ -10748,7 +10753,7 @@ const getTodayChallenge = () => {
                                   rel="noopener noreferrer"
                                   className="font-din font-black text-xs uppercase tracking-widest bg-white hover:bg-gray-100 text-gray-950 hover:scale-[1.03] active:scale-95 px-4 py-2.5 rounded-xl border-b-4 border-gray-300 transition-all shadow-md text-center flex items-center justify-center space-x-2 mb-3"
                               >
-                                  <span>🐙 GitHub Repository (DuoWindo6601)</span>
+                                  <span>🐙 {user.language === 'en' ? 'GitHub Open Source (Windo6601/DuoWindo6601)' : 'Открытый код GitHub (Windo6601/DuoWindo6601)'}</span>
                               </a>
                               
                               <div className="flex flex-col sm:flex-row flex-wrap gap-2">

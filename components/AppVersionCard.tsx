@@ -10,6 +10,7 @@ import {
   APP_RELEASE_DATE,
   APP_CODENAME,
   APP_RELEASE_NOTES,
+  APP_GITHUB_REPO_URL,
   AppRuntimeDiagnostics,
   collectAppDiagnostics,
   formatDiagnosticsReport
@@ -141,6 +142,14 @@ export const AppVersionCard: React.FC<AppVersionCardProps> = ({
                   ? (isRu ? `🧪 Бета-канал (${APP_BETA_VERSION})` : `🧪 Beta (${APP_BETA_VERSION})`)
                   : (isRu ? 'Стабильный релиз' : 'Stable Release')}
               </span>
+              <a
+                href={APP_GITHUB_REPO_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider border bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30 transition-colors"
+              >
+                🐙 {isRu ? 'Открытый исходный код' : 'Open Source'}
+              </a>
             </div>
             <p className={`text-xs font-bold mt-0.5 ${mutedText}`}>
               {isRu
@@ -354,6 +363,66 @@ export const AppVersionCard: React.FC<AppVersionCardProps> = ({
                 </li>
               ))}
             </ul>
+          </div>
+
+          <div
+            className={`p-3.5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+              isLightMode
+                ? 'bg-emerald-50 border-emerald-200 text-slate-900'
+                : 'bg-gradient-to-r from-emerald-950/60 via-teal-950/50 to-slate-900/70 border-emerald-500/40 text-white'
+            }`}
+          >
+            <div className="space-y-0.5 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-black uppercase tracking-wider text-emerald-400">
+                  🐙 {isRu ? 'Открытый исходный код на GitHub' : 'Open Source on GitHub'}
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase">
+                  Open Source
+                </span>
+              </div>
+              <p className={`text-xs font-semibold ${mutedText} break-all`}>
+                {isRu
+                  ? 'DuoWindo6601 уже доступен на GitHub с открытым исходным кодом:'
+                  : 'DuoWindo6601 is available as open source on GitHub:'}{' '}
+                <span className="font-mono text-emerald-400">{APP_GITHUB_REPO_URL}</span>
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <a
+                href={APP_GITHUB_REPO_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => playSound('click')}
+                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider border-b-4 border-emerald-900 active:border-b-0 active:translate-y-0.5 transition-all flex items-center gap-1.5 shadow"
+              >
+                <span>GitHub ↗</span>
+              </a>
+              <button
+                type="button"
+                onClick={async () => {
+                  playSound('click');
+                  try {
+                    await navigator.clipboard.writeText(APP_GITHUB_REPO_URL);
+                    setToast(
+                      isRu
+                        ? '📋 Ссылка на GitHub (Windo6601/DuoWindo6601) скопирована!'
+                        : '📋 GitHub repository link copied!'
+                    );
+                  } catch {
+                    setToast(APP_GITHUB_REPO_URL);
+                  }
+                }}
+                className={`px-3 py-2 rounded-xl font-bold text-xs uppercase border transition-all cursor-pointer ${
+                  isLightMode
+                    ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-300'
+                    : 'bg-gray-800 hover:bg-gray-700 text-gray-200 border-gray-700'
+                }`}
+                title={isRu ? 'Скопировать ссылку GitHub' : 'Copy GitHub URL'}
+              >
+                📋
+              </button>
+            </div>
           </div>
         </div>
       )}
