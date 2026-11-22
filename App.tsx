@@ -20,7 +20,16 @@ import { AppVersionCard } from "./components/AppVersionCard";
 import { APP_VERSION } from "./services/appVersionService";
 import { BetaModal } from "./components/BetaModal";
 import { tlhToPIqaD, isPIqaDText } from './services/klingonDictionaryService';
-import { downloadKlingonAudioFile } from './services/klingonSpeechService';
+import {
+  downloadKlingonAudioFile,
+  getKlingonSentencePlayerUrl,
+  getKlingonSpeechMode,
+  KLINGON_HOL_HELLO_URL,
+  KLINGON_SAM_HOMEPAGE,
+  KlingonSpeechSource,
+  playKlingonSpeech,
+  setKlingonSpeechMode,
+} from './services/klingonSpeechService';
 import { playSound } from './services/audioService';
 import { createStripeCheckout, createStripeGemsCheckout, cancelStripeSubscription, openStripePortal, checkStripeSession, navigateToStripeUrl } from './services/stripeService';
 import { 
@@ -4675,6 +4684,16 @@ const getTodayChallenge = () => {
   const [canvasSize, setCanvasSize] = useState<{width: number, height: number}>({width: 320, height: 320}); 
   const [showTrace, setShowTrace] = useState(true); 
   const [showKlingonPIqaD, setShowKlingonPIqaD] = useState(true);
+  const [showKlingonFont, setShowKlingonFont] = useState(true);
+  const [klingonSpeechMode, setKlingonSpeechModeState] = useState<KlingonSpeechSource>(() => getKlingonSpeechMode());
+  const handleSwitchKlingonSpeechMode = (mode: KlingonSpeechSource, sampleText?: string) => {
+    playSound('select');
+    setKlingonSpeechMode(mode);
+    setKlingonSpeechModeState(mode);
+    if (sampleText) {
+      void playKlingonSpeech(sampleText, false, mode);
+    }
+  };
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const [showAndroidModal, setShowAndroidModal] = useState(false);
   const [showBrowserModal, setShowBrowserModal] = useState(false);
@@ -5509,8 +5528,23 @@ const getTodayChallenge = () => {
   const isKlingonTextOrToken = useCallback((text: string) => {
     if (!text || currentCourse.id !== 'tlh') return false;
     if (isPIqaDText(text)) return true;
-    return !(/[\u0400-\u04FF]/.test(text));
-  }, [currentCourse.id]);
+    if (/[\u0400-\u04FF]/.test(text)) return false;
+    const norm = text.trim();
+    if (!norm) return false;
+    if (/(tlh|gh|ng|[QDHS]|'|’)/.test(norm)) return true;
+    if (currentExercise?.type === 'listening' || currentExercise?.type === 'reading') {
+      return true;
+    }
+    const orig = currentExercise?.originalSentence || '';
+    const target = currentExercise?.targetTranslation || '';
+    if (/[\u0400-\u04FF]/.test(orig) && !/[\u0400-\u04FF]/.test(target)) {
+      return true;
+    }
+    if (/(tlh|gh|ng|[QDHS]|'|’)/.test(target) && target.toLowerCase().includes(norm.toLowerCase())) {
+      return true;
+    }
+    return false;
+  }, [currentCourse.id, currentExercise]);
 
   const isArabicText = useCallback((text: string) => {
     return /[\u0600-\u06FF]/.test(text || '');
@@ -6732,7 +6766,7 @@ const getTodayChallenge = () => {
   const handleRoleplaySend = async (text: string) => { if (!currentExercise || !currentExercise.roleplayData || !text.trim()) return; if (typeof navigator !== 'undefined' && !navigator.onLine) { setOfflineMode(true); setToast(user.language === 'ru' ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова' : '📡 No internet connection. DuoWindo6601 requires internet.'); return; } const newMessage: RoleplayMessage = { role: 'user', text: text }; const updatedMessages = [...currentExercise.roleplayData.messages, newMessage]; setCurrentExercise({ ...currentExercise, roleplayData: { ...currentExercise.roleplayData, messages: updatedMessages, userTurn: false } }); setRoleplayInput(""); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); setLoading(true); const speechLangId = NON_LANGUAGE_IDS.includes(currentCourse.id) ? (user.language === 'ru' ? 'ru' : 'en') : currentCourse.id; try { const reply = await replyToRoleplay(updatedMessages, text, currentCourse.localName, user.subscription === 'max', user.language, currentCourse.id); if (reply.isFallback && !offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); setCurrentExercise(prev => { if (!prev || !prev.roleplayData) return prev; return { ...prev, roleplayData: { ...prev.roleplayData, messages: [...updatedMessages, reply], userTurn: true } } }); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); speakText(reply.text, speechLangId, false, user.preferredVoice, user.voiceProvider); setUser(u => ({ ...u, xp: u.xp + 10 })); checkAndAwardDailyChallenge('roleplay'); awardLessonStreak(); } catch (e: any) { console.error(e); const isOfflineErr = (typeof navigator !== 'undefined' && !navigator.onLine) || String(e?.message || '').includes('Нет подключения к интернету'); setCurrentExercise(prev => { if (!prev || !prev.roleplayData) return prev; return { ...prev, roleplayData: { ...prev.roleplayData, userTurn: true } }; }); setToast(isOfflineErr ? (user.language === 'ru' ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова' : '📡 Network error. Check your internet connection.') : (user.language === 'ru' ? '⚠️ Ошибка ответа AI. Попробуйте ещё раз.' : '⚠️ AI reply error. Please try again.')); } finally { setLoading(false); } };
   const checkIllusionAnswer = async (selectedOption: 'A' | 'B') => { if (!currentExercise || !currentExercise.illusionData) return; setLoading(true); try { const isCorrect = currentExercise.illusionData.correctOption === selectedOption; const isHardMode = (currentExercise?.difficultyLevel || user.difficultyLevel) === 'hard'; if (isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: currentExercise.illusionData.explanation }); setUser(u => ({ ...u, xp: u.xp + (isHardMode ? 35 : 20) })); checkAndAwardDailyChallenge('illusion'); awardLessonStreak(); } else { playSound('wrong'); const correctText = currentExercise.illusionData.correctOption === 'A' ? currentExercise.illusionData.optionA : currentExercise.illusionData.optionB; setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${correctText}. ${currentExercise.illusionData.explanation}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } finally { setLoading(false); } };
   const checkDrawingAnswer = async () => { if (!currentExercise || !currentExercise.drawingData || !canvasRef.current) return; playSound('click'); setLoading(true); try { const imageBase64 = canvasRef.current.toDataURL('image/png').split(',')[1]; const result = await checkDrawing(imageBase64, currentExercise.drawingData.character); const isHardMode = (currentExercise?.difficultyLevel || user.difficultyLevel) === 'hard'; if (result.isFallback && !offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); if (result.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: result.feedback }); setUser(u => ({ ...u, xp: u.xp + (isHardMode ? 35 : 20) })); checkAndAwardDailyChallenge('drawing'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: result.feedback }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } catch (e) { console.error(e); } finally { setLoading(false); } };
-  const checkAnswer = async (spokenText?: string) => { if (!currentExercise) return; const isHardMode = (currentExercise?.difficultyLevel || user.difficultyLevel) === 'hard'; if (isRecording) { setIsRecording(false); if (recognitionRef.current) recognitionRef.current.stop(); if (timerRef.current) clearTimeout(timerRef.current); } if (!spokenText && currentExercise.type !== 'ishihara') playSound('click'); if (currentExercise.type === 'ishihara') { const correct = currentExercise.targetTranslation; const userAnswer = ishiharaInput.trim(); if (userAnswer === correct) { playSound('correct'); setFeedback({ status: 'correct', message: "Correct! You have good color vision for this plate." }); setUser(u => ({ ...u, xp: u.xp + (isHardMode ? 30 : 15) })); checkAndAwardDailyChallenge('ishihara'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `Incorrect. The number was ${correct}.` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } return; } if (currentExercise.type === 'reading') { setLoading(true); try { if (currentExercise.readingData?.mode === 'write') { const ans = readingInput; if (!ans.trim()) { setToast(user.language === 'ru' ? 'Введите текст ответа!' : 'Please write an answer!'); return; } const res = await checkAnswerWithAI(currentCourse.localName, ans, currentExercise.readingData.prompt || "Write something relevant", user.subscription === 'max'); if (res.isFallback && !offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + (isHardMode ? 35 : 20), gems: u.gems + (isHardMode ? 10 : 5) })); checkAndAwardDailyChallenge('reading'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: res.feedback }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } return; } else { const tempText = currentExercise.readingData?.text || ''; const blanksCount = (tempText.match(/___/g) || []).length; if (selectedWordIds.length !== blanksCount) { setToast(user.language === 'ru' ? 'Заполните все пропуски!' : 'Fill all blanks!'); return; } const correctWords = (currentExercise.readingData?.blanks || []).map(b => String(b?.word || '')); const userWords = selectedWordIds.map(id => String(availableTokens.find(t => t.id === id)?.text || '')); const isCorrect = correctWords.length > 0 && correctWords.every((w, i) => w.toLowerCase() === (userWords[i] || '').toLowerCase()); if (isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: user.language === 'ru' ? 'Отлично!' : 'Perfect!' }); setUser(u => ({ ...u, xp: u.xp + (isHardMode ? 35 : 20) })); checkAndAwardDailyChallenge('reading'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${currentExercise.targetTranslation || correctWords.join(', ')}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } return; } } catch (e) { console.error(e); setToast(user.language === 'ru' ? 'Ошибка проверки чтения' : 'Reading check error'); return; } finally { setLoading(false); } } setLoading(true); try { let ans = ""; if (typeof spokenText === 'string') ans = spokenText; else if (currentExercise.type === 'speech') { if (transcriptRef.current.trim()) ans = transcriptRef.current; else if (!recognitionRef.current) ans = currentExercise.originalSentence; else { setLoading(false); setToast(t('t_speech_empty')); return; } } else ans = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text).join(' '); const correctAnswer = currentExercise.type === 'speech' ? currentExercise.originalSentence : currentExercise.targetTranslation; const res = await checkAnswerWithAI(currentCourse.localName, ans, correctAnswer, user.subscription === 'max'); if (res.isFallback && !offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + (isHardMode ? 35 : 20), gems: u.gems + (isHardMode ? 10 : 5) })); checkAndAwardDailyChallenge(currentExercise.type); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${correctAnswer}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } catch (e) { console.error(e); setToast("Ошибка проверки"); } finally { setLoading(false); } };
+  const checkAnswer = async (spokenText?: string) => { if (!currentExercise) return; const isHardMode = (currentExercise?.difficultyLevel || user.difficultyLevel) === 'hard'; if (isRecording) { setIsRecording(false); if (recognitionRef.current) recognitionRef.current.stop(); if (timerRef.current) clearTimeout(timerRef.current); } if (!spokenText && currentExercise.type !== 'ishihara') playSound('click'); if (currentExercise.type === 'ishihara') { const correct = currentExercise.targetTranslation; const userAnswer = ishiharaInput.trim(); if (userAnswer === correct) { playSound('correct'); setFeedback({ status: 'correct', message: "Correct! You have good color vision for this plate." }); setUser(u => ({ ...u, xp: u.xp + (isHardMode ? 30 : 15) })); checkAndAwardDailyChallenge('ishihara'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `Incorrect. The number was ${correct}.` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } return; } if (currentExercise.type === 'reading') { setLoading(true); try { if (currentExercise.readingData?.mode === 'write') { const ans = readingInput; if (!ans.trim()) { setToast(user.language === 'ru' ? 'Введите текст ответа!' : 'Please write an answer!'); return; } const res = await checkAnswerWithAI(currentCourse.localName, ans, currentExercise.readingData.prompt || "Write something relevant", user.subscription === 'max'); if (res.isFallback && !offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + (isHardMode ? 35 : 20), gems: u.gems + (isHardMode ? 10 : 5) })); checkAndAwardDailyChallenge('reading'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: res.feedback }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } return; } else { const tempText = currentExercise.readingData?.text || ''; const blanksCount = (tempText.match(/___/g) || []).length; if (selectedWordIds.length !== blanksCount) { setToast(user.language === 'ru' ? 'Заполните все пропуски!' : 'Fill all blanks!'); return; } const correctWords = (currentExercise.readingData?.blanks || []).map(b => String(b?.word || '')); const userWords = selectedWordIds.map(id => String(availableTokens.find(t => t.id === id)?.text || '')); const isCorrect = correctWords.length > 0 && correctWords.every((w, i) => w.toLowerCase() === (userWords[i] || '').toLowerCase()); if (isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: user.language === 'ru' ? 'Отлично!' : 'Perfect!' }); setUser(u => ({ ...u, xp: u.xp + (isHardMode ? 35 : 20) })); checkAndAwardDailyChallenge('reading'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${currentExercise.targetTranslation || correctWords.join(', ')}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } return; } } catch (e) { console.error(e); setToast(user.language === 'ru' ? 'Ошибка проверки чтения' : 'Reading check error'); return; } finally { setLoading(false);  } } setLoading(true); try { const effectiveSpeechMode = currentExercise.type === 'speech' && currentCourse.id !== 'tlh'; let ans = ""; if (typeof spokenText === 'string') ans = spokenText; else if (effectiveSpeechMode) { if (transcriptRef.current.trim()) ans = transcriptRef.current; else if (!recognitionRef.current) ans = currentExercise.originalSentence; else { setLoading(false); setToast(t('t_speech_empty')); return; } } else ans = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text).join(' '); const correctAnswer = effectiveSpeechMode ? currentExercise.originalSentence : currentExercise.targetTranslation; const res = await checkAnswerWithAI(currentCourse.localName, ans, correctAnswer, user.subscription === 'max'); if (res.isFallback && !offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + (isHardMode ? 35 : 20), gems: u.gems + (isHardMode ? 10 : 5) })); checkAndAwardDailyChallenge(currentExercise.type); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${correctAnswer}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } catch (e) { console.error(e); setToast("Ошибка проверки"); } finally { setLoading(false); } };
   const handleContinueAfterLesson = () => { playSound('click'); if (user.subscription === 'free' && Math.random() > 0.5) setShowAd(true); else setScreen(AppScreen.PATH); setFeedback({ status: 'idle', message: '' }); setCurrentExercise(null); setExplanation(null); setShowExplanationModal(false); }
   const openLettersSubTab = (tab: 'letters' | 'words' | 'illusion' | 'audio') => {
     playSound('click');
@@ -6746,7 +6780,7 @@ const getTodayChallenge = () => {
     setScreen(AppScreen.ALPHABET);
   };
   const handleSkip = () => { playSound('click'); setToast(t('t_skip')); handleContinueAfterLesson(); };
-  const toggleRecording = () => { playSound('click'); if (isRecording) { setIsRecording(false); if (recognitionRef.current) recognitionRef.current.stop(); if (timerRef.current) clearTimeout(timerRef.current); if (currentExercise?.type === 'roleplay') setTimeout(() => { if (transcriptRef.current) handleRoleplaySend(transcriptRef.current); }, 500); else if (screen === AppScreen.VIDEO_CALL) setTimeout(() => { if (transcriptRef.current) handleVideoCallSend(transcriptRef.current); }, 500); else if (!recognitionRef.current) checkAnswer(currentExercise?.originalSentence); else setTimeout(() => checkAnswer(), 200); } else { transcriptRef.current = ""; if (recognitionRef.current) { setIsRecording(true); try { recognitionRef.current.start(); } catch (e) { console.error("Rec start error", e); setIsRecording(false); } } else { setIsRecording(false); setToast(user.language === 'ru' ? '🎙️ Голосовой ввод недоступен в этом браузере — введите ответ текстом' : '🎙️ Speech recognition unavailable in this browser — please type your response'); } } };
+  const toggleRecording = () => { playSound('click'); if (currentCourse.id === 'tlh') { setIsRecording(false); return; } if (isRecording) { setIsRecording(false); if (recognitionRef.current) recognitionRef.current.stop(); if (timerRef.current) clearTimeout(timerRef.current); if (currentExercise?.type === 'roleplay') setTimeout(() => { if (transcriptRef.current) handleRoleplaySend(transcriptRef.current); }, 500); else if (screen === AppScreen.VIDEO_CALL) setTimeout(() => { if (transcriptRef.current) handleVideoCallSend(transcriptRef.current); }, 500); else if (!recognitionRef.current) checkAnswer(currentExercise?.originalSentence); else setTimeout(() => checkAnswer(), 200); } else { transcriptRef.current = ""; if (recognitionRef.current) { setIsRecording(true); try { recognitionRef.current.start(); } catch (e) { console.error("Rec start error", e); setIsRecording(false); } } else { setIsRecording(false); setToast(user.language === 'ru' ? '🎙️ Голосовой ввод недоступен в этом браузере — введите ответ текстом' : '🎙️ Speech recognition unavailable in this browser — please type your response'); } } };
   const upgradeSubscription = (tier: SubscriptionTier) => {
     if (isIncognitoUser) {
       playSound('wrong');
@@ -10341,20 +10375,22 @@ const getTodayChallenge = () => {
 
                 {/* Interactive Bottom Control Bar */}
                 <div className="p-4 md:p-6 bg-[#18181f]/95 backdrop-blur-2xl border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4 z-50 pb-8 md:pb-6">
-                    {/* Live Mic Speech & Recording Button */}
+                    {/* Live Mic Speech & Recording Button (hidden on Klingon tlh) */}
                     <div className="flex items-center space-x-3 w-full md:w-auto justify-center">
-                        <button 
-                            onClick={toggleRecording} 
-                            disabled={loading}
-                            className={`p-5 rounded-2xl transition-all font-black uppercase text-xs tracking-wider flex items-center space-x-3 shadow-xl active:scale-95 ${
-                                isRecording 
-                                ? 'bg-red-600 text-white animate-pulse ring-4 ring-red-500/50 scale-105' 
-                                : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:brightness-110'
-                            }`}
-                        >
-                            <MicIcon className="w-7 h-7"/>
-                            <span>{isRecording ? "Слушаю вас..." : "Говорить с DuoWindo6601"}</span>
-                        </button>
+                        {!isKlingonCourse && (
+                          <button 
+                              onClick={toggleRecording} 
+                              disabled={loading}
+                              className={`p-5 rounded-2xl transition-all font-black uppercase text-xs tracking-wider flex items-center space-x-3 shadow-xl active:scale-95 ${
+                                  isRecording 
+                                  ? 'bg-red-600 text-white animate-pulse ring-4 ring-red-500/50 scale-105' 
+                                  : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:brightness-110'
+                              }`}
+                          >
+                              <MicIcon className="w-7 h-7"/>
+                              <span>{isRecording ? "Слушаю вас..." : "Говорить с DuoWindo6601"}</span>
+                          </button>
+                        )}
 
                         <button 
                             onClick={() => setVideoCameraOn(!videoCameraOn)} 
@@ -11593,18 +11629,21 @@ const getTodayChallenge = () => {
                     <div className="w-3 h-12 bg-gray-800 rounded-full"></div>
 
                     {/* DUOWINDO6601RADIO PODCAST LISTENING NODE ON THE PATH */}
-                    <DuoWindo6601RadioButton
-                      onClick={() => {
-                        playSound('select');
-                        setShowDuoRadioModal(true);
-                      }}
-                      language={user.language}
-                      isLightMode={isLightMode}
-                      completedCount={completedRadioIds.filter(id => id.includes(`-${currentCourse.id}`)).length}
-                      totalCount={3}
-                    />
-
-                    <div className="w-3 h-12 bg-gray-800 rounded-full"></div>
+                    {currentCourse.id !== 'tlh' && !NON_LANGUAGE_IDS.includes(currentCourse.id) && (
+                      <>
+                        <DuoWindo6601RadioButton
+                          onClick={() => {
+                            playSound('select');
+                            setShowDuoRadioModal(true);
+                          }}
+                          language={user.language}
+                          isLightMode={isLightMode}
+                          completedCount={completedRadioIds.filter(id => id.includes(`-${currentCourse.id}`)).length}
+                          totalCount={3}
+                        />
+                        <div className="w-3 h-12 bg-gray-800 rounded-full"></div>
+                      </>
+                    )}
                     <button onClick={() => { playSound('click'); setScreen(AppScreen.VOCABULARY); }} className="bg-gradient-to-r from-emerald-600 to-teal-600 p-8 md:p-10 rounded-[2.5rem] border-b-8 border-emerald-800 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center justify-between shadow-2xl group md:col-span-2 cursor-pointer">
                   <div className="flex items-center space-x-6 md:space-x-8">
                       <div className="bg-white/20 p-4 md:p-5 rounded-3xl group-hover:rotate-6 transition-transform">
@@ -12364,6 +12403,8 @@ const getTodayChallenge = () => {
               setExplanation={setExplanation}
               setShowExplanationModal={setShowExplanationModal}
               speakText={(text, courseId, slow) => speakText(text, courseId, slow, user.preferredVoice, user.voiceProvider)}
+              courses={COURSES}
+              onSwitchCourse={(course) => { selectCourseSafely(course); }}
               t={t}
             />
           )}
@@ -13470,6 +13511,14 @@ const getTodayChallenge = () => {
                   return updated;
                 });
               }}
+              autoTranslateFeedback={user.autoTranslateFeedback ?? true}
+              onToggleAutoTranslate={(enabled) => {
+                setUser((prev) => {
+                  const updated: UserProgress = { ...prev, autoTranslateFeedback: enabled };
+                  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+                  return updated;
+                });
+              }}
             />
           )}
 
@@ -13911,19 +13960,23 @@ const getTodayChallenge = () => {
       />
 
       {/* DUOWINDO6601RADIO PODCAST LISTENING MODAL */}
-      <DuoWindo6601RadioModal
-        isOpen={showDuoRadioModal}
-        onClose={() => setShowDuoRadioModal(false)}
-        currentCourse={currentCourse}
-        user={user}
-        setUser={setUser}
-        playSound={playSound}
-        setToast={setToast}
-        speakText={(text, courseId, slow) => speakText(text, courseId, slow, user.preferredVoice, user.voiceProvider)}
-        langSection={langSection}
-        isLightMode={isLightMode}
-        onEpisodeCompleted={(ids) => setCompletedRadioIds(ids)}
-      />
+      {currentCourse.id !== 'tlh' && !NON_LANGUAGE_IDS.includes(currentCourse.id) && (
+        <DuoWindo6601RadioModal
+          isOpen={showDuoRadioModal}
+          onClose={() => setShowDuoRadioModal(false)}
+          currentCourse={currentCourse}
+          allCourses={COURSES}
+          onSwitchCourse={(course) => { selectCourseSafely(course); }}
+          user={user}
+          setUser={setUser}
+          playSound={playSound}
+          setToast={setToast}
+          speakText={(text, courseId, slow) => speakText(text, courseId, slow, user.preferredVoice, user.voiceProvider)}
+          langSection={langSection}
+          isLightMode={isLightMode}
+          onEpisodeCompleted={(ids) => setCompletedRadioIds(ids)}
+        />
+      )}
 
       {/* DUOWINDO6601 MUSIC STUDIO MODAL (КУРС МУЗЫКА) */}
       <MusicStudioModal
@@ -14440,27 +14493,29 @@ const getTodayChallenge = () => {
                            ? (user.language === 'ru' ? '🔥 Сложный' : '🔥 Hard')
                            : (user.language === 'ru' ? '🌱 Лёгкий' : '🌱 Easy')}
                        </span>
-                       {/* Live AI Partner (Video Call & Roleplays Max) Button during Lesson */}
-                       <button
-                           type="button"
-                           onClick={() => {
-                               playSound('select');
-                               setShowLessonAiPartnerModal(true);
-                           }}
-                           className="flex items-center space-x-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 hover:brightness-110 active:scale-95 text-white rounded-2xl font-black text-xs shadow-lg transition-all border border-purple-400/40 cursor-pointer"
-                           title={user.language === 'ru' ? 'AI Партнер: Видеозвонок и Roleplays Max' : 'AI Partner: Video Call & Roleplays Max'}
-                       >
-                           <VideoIcon className="w-4 h-4 text-white animate-pulse" />
-                           <span className="hidden sm:inline">{user.language === 'ru' ? 'AI Партнер' : 'AI Partner'}</span>
-                           {user.subscription !== 'max' ? (
-                             <span className="bg-slate-900/90 text-amber-300 border border-amber-400/60 text-[9px] px-1.5 py-0.5 rounded-full font-black tracking-wider flex items-center gap-0.5 shadow">
-                               <span>🔒</span>
-                               <span>MAX</span>
-                             </span>
-                           ) : (
-                             <span className="bg-yellow-400 text-black text-[9px] px-1.5 py-0.5 rounded font-black tracking-wider">MAX</span>
-                           )}
-                       </button>
+                       {/* Live AI Partner (Video Call & Roleplays Max) Button during Lesson — hidden for Klingon tlh */}
+                       {!isKlingonCourse && (
+                         <button
+                             type="button"
+                             onClick={() => {
+                                 playSound('select');
+                                 setShowLessonAiPartnerModal(true);
+                             }}
+                             className="flex items-center space-x-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 hover:brightness-110 active:scale-95 text-white rounded-2xl font-black text-xs shadow-lg transition-all border border-purple-400/40 cursor-pointer"
+                             title={user.language === 'ru' ? 'AI Партнер: Видеозвонок и Roleplays Max' : 'AI Partner: Video Call & Roleplays Max'}
+                         >
+                             <VideoIcon className="w-4 h-4 text-white animate-pulse" />
+                             <span className="hidden sm:inline">{user.language === 'ru' ? 'AI Партнер' : 'AI Partner'}</span>
+                             {user.subscription !== 'max' ? (
+                               <span className="bg-slate-900/90 text-amber-300 border border-amber-400/60 text-[9px] px-1.5 py-0.5 rounded-full font-black tracking-wider flex items-center gap-0.5 shadow">
+                                 <span>🔒</span>
+                                 <span>MAX</span>
+                               </span>
+                             ) : (
+                               <span className="bg-yellow-400 text-black text-[9px] px-1.5 py-0.5 rounded font-black tracking-wider">MAX</span>
+                             )}
+                         </button>
+                       )}
 
                        <div className="flex items-center space-x-2 text-yellow-400 font-bold text-xl md:text-2xl">
                            {user.subscription !== 'free' ? <InfiniteEnergyIcon className="w-6 h-6 md:w-8 md:h-8 text-yellow-400"/> : <><LightningIcon className="w-5 h-5 md:w-7 md:h-7" /> <span>{user.energy}</span></>}
@@ -14493,10 +14548,22 @@ const getTodayChallenge = () => {
                    <span className="text-base">🖖</span>
                    <span className="font-klingon text-xs md:text-sm font-black text-amber-300 truncate">tlhIngan Hol</span>
                    <span className="hidden sm:inline text-[11px] font-bold text-stone-400">
-                     {user.language === 'ru' ? 'Клиентский Speech + hol.kag.org' : 'Client Speech + hol.kag.org'}
+                     {user.language === 'ru' ? 'Шрифт + SAM (Software Automatic Mouth) • hol.kag.org → SAM' : 'Font + SAM (Software Automatic Mouth) • hol.kag.org → SAM'}
                    </span>
                  </div>
                  <div className="flex items-center gap-1.5 flex-wrap">
+                   <button
+                     type="button"
+                     onClick={() => { playSound('select'); setShowKlingonFont(v => !v); }}
+                     className={`px-2.5 py-1 rounded-xl text-[11px] font-black border transition-all cursor-pointer ${
+                       showKlingonFont
+                         ? 'bg-amber-600/30 border-amber-400/60 text-amber-200'
+                         : 'bg-stone-800 border-stone-700 text-stone-400'
+                     }`}
+                   >
+                     <span className="font-klingon mr-1">Aa</span>
+                     {user.language === 'ru' ? 'Шрифт' : 'Font'} {showKlingonFont ? 'ON' : 'OFF'}
+                   </button>
                    <button
                      type="button"
                      onClick={() => { playSound('select'); setShowKlingonPIqaD(v => !v); }}
@@ -14520,16 +14587,51 @@ const getTodayChallenge = () => {
                        <>
                          <button
                            type="button"
-                           onClick={() => speakText(activeAudioText, 'tlh', false, user.preferredVoice, user.voiceProvider)}
-                           className="px-2.5 py-1 rounded-xl text-[11px] font-black bg-sky-600/30 hover:bg-sky-600/50 border border-sky-400/50 text-sky-200 transition-all cursor-pointer"
+                           onClick={() => handleSwitchKlingonSpeechMode('client', activeAudioText)}
+                           className={`px-2.5 py-1 rounded-xl text-[11px] font-black border transition-all cursor-pointer ${
+                             klingonSpeechMode !== 'hol'
+                               ? 'bg-sky-600/80 border-sky-400 text-white shadow'
+                               : 'bg-sky-600/20 hover:bg-sky-600/40 border-sky-500/40 text-sky-200'
+                           }`}
+                           title="SAM Software Automatic Mouth (https://discordier.github.io/sam/)"
                          >
-                           🔊 {user.language === 'ru' ? 'Клиентский Speech' : 'Client Speech'}
+                           🔊 SAM Speech
                          </button>
+                         <button
+                           type="button"
+                           onClick={() => handleSwitchKlingonSpeechMode('hol', activeAudioText)}
+                           className={`px-2.5 py-1 rounded-xl text-[11px] font-black border transition-all cursor-pointer ${
+                             klingonSpeechMode === 'hol'
+                               ? 'bg-indigo-600/85 border-indigo-400 text-white shadow'
+                               : 'bg-indigo-600/20 hover:bg-indigo-600/40 border-indigo-500/40 text-indigo-200'
+                           }`}
+                           title="hol.kag.org → SAM Software Automatic Mouth (https://hol.kag.org/sentence/Hello)"
+                         >
+                           🎧 hol.kag.org (SAM)
+                         </button>
+                         <a
+                           href={getKlingonSentencePlayerUrl(activeAudioText) || KLINGON_HOL_HELLO_URL}
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           className="px-2 py-1 rounded-xl text-[10px] font-black bg-indigo-950/60 hover:bg-indigo-800/70 border border-indigo-500/40 text-indigo-300 hover:text-white transition-all"
+                           title="https://hol.kag.org/sentence/Hello"
+                         >
+                           hol.kag.org ↗
+                         </a>
+                         <a
+                           href={KLINGON_SAM_HOMEPAGE}
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           className="px-2 py-1 rounded-xl text-[10px] font-black bg-sky-950/60 hover:bg-sky-800/70 border border-sky-500/40 text-sky-300 hover:text-white transition-all"
+                           title="https://discordier.github.io/sam/"
+                         >
+                           SAM ↗
+                         </a>
                          <button
                            type="button"
                            onClick={() => {
                              playSound('click');
-                             void downloadKlingonAudioFile(activeAudioText, false, 'auto').then(info => {
+                             void downloadKlingonAudioFile(activeAudioText, false, klingonSpeechMode).then(info => {
                                setToast(user.language === 'ru' ? `💾 Аудио-файл сохранён: ${info.filename}` : `💾 Audio saved: ${info.filename}`);
                              });
                            }}
@@ -14805,7 +14907,7 @@ const getTodayChallenge = () => {
                     
                     {currentExercise.readingData.mode === 'write' ? (
                         <div className="w-full max-w-2xl">
-                            <p className={`text-lg mb-4 text-gray-300 italic ${isKlingonCourse ? 'font-klingon not-italic text-white' : ''}`} dir="auto">"{currentExercise.readingData.text}"</p>
+                            <p className={`text-lg mb-4 text-gray-300 italic ${isKlingonCourse && showKlingonFont ? 'font-klingon not-italic text-white' : ''}`} dir="auto">"{currentExercise.readingData.text}"</p>
                             {isKlingonCourse && showKlingonPIqaD && (
                               <p className="font-piqad text-base text-purple-300 mb-3" dir="auto">{tlhToPIqaD(currentExercise.readingData.text)}</p>
                             )}
@@ -14820,7 +14922,7 @@ const getTodayChallenge = () => {
                             />
                         </div>
                     ) : (
-                        <div className={`w-full max-w-2xl text-xl leading-relaxed text-center font-bold text-gray-300 ${isKlingonCourse ? 'font-klingon text-white' : ''}`} dir="auto">
+                        <div className={`w-full max-w-2xl text-xl leading-relaxed text-center font-bold text-gray-300 ${isKlingonCourse && showKlingonFont ? 'font-klingon text-white' : ''}`} dir="auto">
                             {currentExercise.readingData.text.split("___").map((part, i, arr) => (
                                 <React.Fragment key={i}>
                                     <span>{part}</span>
@@ -14852,7 +14954,7 @@ const getTodayChallenge = () => {
                                             setSelectedWordIds([...selectedWordIds, token.id]);
                                         }
                                     }}
-                                    className={`p-3 px-6 rounded-xl border-b-4 font-bold text-lg transition-all ${isKlingonTextOrToken(token.text) ? 'font-klingon' : ''} ${selectedWordIds.includes(token.id) ? 'opacity-0 pointer-events-none scale-90' : 'bg-duo-card border-gray-700 hover:border-duo-blue hover:text-duo-blue active:translate-y-1 active:border-b-0'}`}
+                                    className={`p-3 px-6 rounded-xl border-b-4 font-bold text-lg transition-all ${showKlingonFont && isKlingonTextOrToken(token.text) ? 'font-klingon' : ''} ${selectedWordIds.includes(token.id) ? 'opacity-0 pointer-events-none scale-90' : 'bg-duo-card border-gray-700 hover:border-duo-blue hover:text-duo-blue active:translate-y-1 active:border-b-0'}`}
                                     dir="auto"
                                 >
                                     <span>{token.text}</span>
@@ -14880,13 +14982,13 @@ const getTodayChallenge = () => {
                     </p>
                     <button onClick={() => speakText(currentExercise.illusionData!.soundText, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} className="w-32 h-32 md:w-48 md:h-48 rounded-[2rem] md:rounded-[3rem] bg-indigo-600 border-b-8 border-indigo-800 shadow-2xl flex items-center justify-center mb-10 md:mb-16 hover:brightness-110 active:translate-y-2 active:border-b-0 transition-all group"><VolumeIcon className="w-16 h-16 md:w-24 md:h-24 text-white group-hover:scale-110 transition-transform" /></button>
                     <div className="grid grid-cols-2 gap-4 md:gap-6 w-full max-w-lg px-4">
-                        <button disabled={feedback.status !== 'idle'} onClick={() => checkIllusionAnswer('A')} className={`bg-duo-card border-2 border-b-4 border-gray-700 p-4 md:p-8 rounded-3xl font-bold text-xl md:text-2xl hover:bg-gray-700 active:border-b-0 active:translate-y-1 transition-all ${isKlingonCourse ? 'font-klingon' : ''}`}>
+                        <button disabled={feedback.status !== 'idle'} onClick={() => checkIllusionAnswer('A')} className={`bg-duo-card border-2 border-b-4 border-gray-700 p-4 md:p-8 rounded-3xl font-bold text-xl md:text-2xl hover:bg-gray-700 active:border-b-0 active:translate-y-1 transition-all ${isKlingonCourse && showKlingonFont ? 'font-klingon' : ''}`}>
                           <span>{currentExercise.illusionData.optionA}</span>
                           {isKlingonCourse && showKlingonPIqaD && (
                             <span className="font-piqad text-sm text-purple-300 block mt-1">{tlhToPIqaD(currentExercise.illusionData.optionA)}</span>
                           )}
                         </button>
-                        <button disabled={feedback.status !== 'idle'} onClick={() => checkIllusionAnswer('B')} className={`bg-duo-card border-2 border-b-4 border-gray-700 p-4 md:p-8 rounded-3xl font-bold text-xl md:text-2xl hover:bg-gray-700 active:border-b-0 active:translate-y-1 transition-all ${isKlingonCourse ? 'font-klingon' : ''}`}>
+                        <button disabled={feedback.status !== 'idle'} onClick={() => checkIllusionAnswer('B')} className={`bg-duo-card border-2 border-b-4 border-gray-700 p-4 md:p-8 rounded-3xl font-bold text-xl md:text-2xl hover:bg-gray-700 active:border-b-0 active:translate-y-1 transition-all ${isKlingonCourse && showKlingonFont ? 'font-klingon' : ''}`}>
                           <span>{currentExercise.illusionData.optionB}</span>
                           {isKlingonCourse && showKlingonPIqaD && (
                             <span className="font-piqad text-sm text-purple-300 block mt-1">{tlhToPIqaD(currentExercise.illusionData.optionB)}</span>
@@ -14988,14 +15090,16 @@ const getTodayChallenge = () => {
                           }}
                           className="flex items-center space-x-2 md:space-x-3 max-w-2xl mx-auto w-full"
                         >
-                          <button 
-                            type="button"
-                            onClick={toggleRecording} 
-                            className={`w-11 h-11 md:w-13 md:h-13 rounded-2xl flex-shrink-0 flex items-center justify-center transition-all shadow-lg border-2 ${isRecording ? 'bg-red-500 border-red-400 scale-105 animate-pulse' : 'bg-gray-800 border-gray-700 hover:bg-gray-700 text-duo-blue'}`}
-                            title={isRecording ? "Слушаю..." : "Голосовой ввод"}
-                          >
-                            <MicIcon className="w-5 h-5 md:w-6 md:h-6 text-white" />
-                          </button>
+                          {!isKlingonCourse && (
+                            <button 
+                              type="button"
+                              onClick={toggleRecording} 
+                              className={`w-11 h-11 md:w-13 md:h-13 rounded-2xl flex-shrink-0 flex items-center justify-center transition-all shadow-lg border-2 ${isRecording ? 'bg-red-500 border-red-400 scale-105 animate-pulse' : 'bg-gray-800 border-gray-700 hover:bg-gray-700 text-duo-blue'}`}
+                              title={isRecording ? "Слушаю..." : "Голосовой ввод"}
+                            >
+                              <MicIcon className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                            </button>
+                          )}
 
                           <input 
                             type="text"
@@ -15031,36 +15135,85 @@ const getTodayChallenge = () => {
                    className="flex-1 overflow-y-auto no-scrollbar min-h-0"
                  >
                    <h2 className="text-2xl md:text-3xl font-black mb-6 md:mb-10 text-center sm:text-left tracking-tight px-2">
-                     {currentExercise.type === 'listening' 
+                     {currentExercise.type === 'listening' || (isKlingonCourse && currentExercise.type === 'speech')
                        ? (user.language === 'ru' ? 'Аудио: Что вы услышали?' : 'Audio: What did you hear?') 
                        : currentExercise.type === 'speech' ? t('speakForDuo') : t('readPractice')}
                    </h2>
                    <div className="flex flex-col md:flex-row items-center space-y-6 md:space-y-0 md:space-x-12 mb-8 md:mb-12">
                      <div className="relative flex flex-col items-center flex-shrink-0">
                         <Mascot emotion={feedback.status === 'wrong' ? 'confused' : (feedback.status === 'correct' ? 'dance' : 'neutral')} className="w-32 h-32 md:w-48 md:h-48" variant={currentCourse.mascotVariant} />
-                        {currentExercise.type === 'speech' && <button onClick={() => speakText(currentExercise.originalSentence, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} className="md:hidden mt-4 bg-duo-card border-2 border-gray-700 p-3 px-4 rounded-2xl shadow-xl flex items-center space-x-2 active:scale-95 transition-transform"><VolumeIcon className="w-6 h-6 text-duo-blue" /><span className="font-bold text-lg">{currentExercise.originalSentence}</span></button>}
-                        {currentExercise.type === 'speech' && <button onClick={() => speakText(currentExercise.originalSentence, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} className="hidden md:flex absolute -top-4 -right-48 w-max max-w-xs bg-duo-card border-2 border-gray-700 p-4 rounded-2xl shadow-2xl animate-in zoom-in items-center space-x-3 hover:bg-gray-800 transition-colors active:scale-95"><VolumeIcon className="w-6 h-6 text-duo-blue" /><span className="font-bold text-lg border-b-2 border-dashed border-gray-500">{currentExercise.originalSentence}</span></button>}
+                        {currentExercise.type === 'speech' && !isKlingonCourse && <button onClick={() => speakText(currentExercise.originalSentence, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} className="md:hidden mt-4 bg-duo-card border-2 border-gray-700 p-3 px-4 rounded-2xl shadow-xl flex items-center space-x-2 active:scale-95 transition-transform"><VolumeIcon className="w-6 h-6 text-duo-blue" /><span className="font-bold text-lg">{currentExercise.originalSentence}</span></button>}
+                        {currentExercise.type === 'speech' && !isKlingonCourse && <button onClick={() => speakText(currentExercise.originalSentence, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} className="hidden md:flex absolute -top-4 -right-48 w-max max-w-xs bg-duo-card border-2 border-gray-700 p-4 rounded-2xl shadow-2xl animate-in zoom-in items-center space-x-3 hover:bg-gray-800 transition-colors active:scale-95"><VolumeIcon className="w-6 h-6 text-duo-blue" /><span className="font-bold text-lg border-b-2 border-dashed border-gray-500">{currentExercise.originalSentence}</span></button>}
                      </div>
                      <div className="flex-1 w-full px-2">
-                        {currentExercise.type === 'listening' ? (
+                        {currentExercise.type === 'listening' || (isKlingonCourse && currentExercise.type === 'speech') ? (
                           <div className="flex flex-col gap-3 max-w-sm mx-auto md:mx-0">
                             <div className="flex items-center space-x-0 border-2 border-gray-700 rounded-[2rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl">
                               <button onClick={() => speakText(currentExercise.originalSentence, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} className="flex-1 bg-duo-card p-6 md:p-12 hover:bg-white/5 transition-colors border-r border-gray-700"><VolumeIcon className="w-12 h-12 md:w-20 md:h-20 text-duo-blue mx-auto" /></button>
                               <button onClick={() => speakText(currentExercise.originalSentence, currentCourse.id, true, user.preferredVoice, user.voiceProvider)} className="flex-1 bg-duo-card p-6 md:p-12 hover:bg-white/5 transition-colors"><TurtleIcon className="w-8 h-8 md:w-16 md:h-16 text-duo-blue mx-auto" /></button>
                             </div>
+                            {isKlingonCourse && (
+                              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSwitchKlingonSpeechMode('client', currentExercise.originalSentence)}
+                                  className={`px-3 py-1.5 rounded-xl text-xs font-black border transition-all cursor-pointer ${
+                                    klingonSpeechMode !== 'hol'
+                                      ? 'bg-sky-600/80 border-sky-400 text-white shadow'
+                                      : 'bg-sky-600/20 hover:bg-sky-600/40 border-sky-500/40 text-sky-200'
+                                  }`}
+                                  title="SAM Software Automatic Mouth (https://discordier.github.io/sam/)"
+                                >
+                                  🔊 SAM Speech
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSwitchKlingonSpeechMode('hol', currentExercise.originalSentence)}
+                                  className={`px-3 py-1.5 rounded-xl text-xs font-black border transition-all cursor-pointer ${
+                                    klingonSpeechMode === 'hol'
+                                      ? 'bg-indigo-600/85 border-indigo-400 text-white shadow'
+                                      : 'bg-indigo-600/20 hover:bg-indigo-600/40 border-indigo-500/40 text-indigo-200'
+                                  }`}
+                                  title="hol.kag.org → SAM Software Automatic Mouth (https://hol.kag.org/sentence/Hello)"
+                                >
+                                  🎧 hol.kag.org (SAM)
+                                </button>
+                                <a
+                                  href={getKlingonSentencePlayerUrl(currentExercise.originalSentence)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-2.5 py-1.5 rounded-xl text-xs font-black bg-indigo-950/60 hover:bg-indigo-800/70 border border-indigo-500/40 text-indigo-300 hover:text-white transition-all"
+                                  title="https://hol.kag.org/sentence/Hello"
+                                >
+                                  hol.kag.org ↗
+                                </a>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    playSound('click');
+                                    void downloadKlingonAudioFile(currentExercise.originalSentence, false, klingonSpeechMode).then(info => {
+                                      setToast(user.language === 'ru' ? `💾 Аудио-файл сохранён: ${info.filename}` : `💾 Audio saved: ${info.filename}`);
+                                    });
+                                  }}
+                                  className="px-3 py-1.5 rounded-xl text-xs font-black bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-400/50 text-emerald-200 transition-all cursor-pointer"
+                                >
+                                  💾 {user.language === 'ru' ? 'Аудио-файл' : 'Audio File'}
+                                </button>
+                              </div>
+                            )}
                             {isKlingonCourse && feedback.status !== 'idle' && (
                               <div className="bg-stone-900/90 border border-stone-700 rounded-2xl px-4 py-2.5 text-center md:text-left">
-                                <div className="font-klingon text-lg font-black text-amber-300">{currentExercise.originalSentence}</div>
+                                <div className={`${showKlingonFont ? 'font-klingon' : ''} text-lg font-black text-amber-300`}>{currentExercise.originalSentence}</div>
                                 {showKlingonPIqaD && (
                                   <div className="font-piqad text-sm text-purple-300 mt-0.5">{tlhToPIqaD(currentExercise.originalSentence)}</div>
                                 )}
                               </div>
                             )}
                           </div>
-                        ) : currentExercise.type === 'speech' ? (
+                        ) : currentExercise.type === 'speech' && !isKlingonCourse ? (
                             <div className="w-full flex justify-center py-2"><button onClick={toggleRecording} className={`w-28 h-28 md:w-36 md:h-36 rounded-[2.5rem] md:rounded-[3rem] flex items-center justify-center transition-all shadow-2xl ${isRecording ? 'bg-red-500 scale-110 animate-pulse' : 'bg-duo-blue hover:brightness-110'}`}><MicIcon className="w-12 h-12 md:w-16 md:h-16 text-white" />{isRecording && <span className="absolute mt-20 md:mt-24 text-xs md:text-sm font-bold animate-bounce">Слушаю...</span>}</button></div>
                         ) : (
-                          <div className={`bg-duo-card border-2 border-gray-700 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 pb-16 md:pb-10 text-xl md:text-3xl font-bold relative shadow-xl text-center md:text-left break-words ${isArabicText(currentExercise.originalSentence) ? 'font-arabic text-right' : isKlingonCourse ? 'font-klingon' : ''}`} dir="auto">
+                          <div className={`bg-duo-card border-2 border-gray-700 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 pb-16 md:pb-10 text-xl md:text-3xl font-bold relative shadow-xl text-center md:text-left break-words ${isArabicText(currentExercise.originalSentence) ? 'font-arabic text-right' : isKlingonCourse && showKlingonFont ? 'font-klingon' : ''}`} dir="auto">
                             <div>{formatRTLOverride(currentExercise.originalSentence)}</div>
                             {isKlingonCourse && showKlingonPIqaD && (
                               <div className="font-piqad text-base md:text-xl text-purple-300 mt-2 tracking-wide">
@@ -15074,17 +15227,21 @@ const getTodayChallenge = () => {
                      </div>
                    </div>
                    <div className="space-y-6 md:space-y-12 px-2">
-                     {(currentExercise.type === 'translation' || currentExercise.type === 'listening') && (
+                     {(currentExercise.type === 'translation' || currentExercise.type === 'listening' || (isKlingonCourse && currentExercise.type === 'speech')) && (
                         <>
                         <div className="min-h-[80px] md:min-h-[100px] border-b-2 border-gray-700 flex flex-wrap gap-2 md:gap-4 p-2 md:p-4 items-end" dir="auto">
                           {selectedWordIds.map(id => {
                             const tok = availableTokens.find(t => t.id === id);
                             const tokText = tok?.text || '';
                             const isArTok = isArabicText(tokText);
-                            const isTlhTok = isKlingonCourse && isPIqaDText(tokText);
+                            const isKlingonTok = isKlingonTextOrToken(tokText);
+                            const isTlhTok = isKlingonCourse && showKlingonFont && isKlingonTok;
                             return (
                               <button key={id} onClick={() => { playSound('click'); setSelectedWordIds(p => p.filter(x => x !== id)); }} className={`bg-duo-card border-2 border-b-4 border-gray-700 p-2 px-4 md:p-4 md:px-8 rounded-xl md:rounded-2xl font-bold text-lg md:text-2xl hover:bg-gray-700 transition-all animate-in slide-in-from-bottom-2 ${isArTok ? 'font-arabic' : isTlhTok ? 'font-klingon' : ''}`}>
-                                {formatRTLOverride(tokText)}
+                                <span>{formatRTLOverride(tokText)}</span>
+                                {isKlingonCourse && showKlingonPIqaD && isKlingonTok && !isPIqaDText(tokText) && (
+                                  <span className="font-piqad text-[11px] text-purple-300 block leading-tight mt-0.5">{tlhToPIqaD(tokText)}</span>
+                                )}
                               </button>
                             );
                           })}
@@ -15092,10 +15249,14 @@ const getTodayChallenge = () => {
                         <div className="flex flex-wrap gap-2 md:gap-4 justify-center pb-4" dir="auto">
                           {availableTokens.map(token => {
                             const isArTok = isArabicText(token.text);
-                            const isTlhTok = isKlingonCourse && isPIqaDText(token.text);
+                            const isKlingonTok = isKlingonTextOrToken(token.text);
+                            const isTlhTok = isKlingonCourse && showKlingonFont && isKlingonTok;
                             return (
                               <button key={token.id} disabled={selectedWordIds.includes(token.id) || feedback.status !== 'idle'} onClick={() => { playSound('click'); setSelectedWordIds(p => [...p, token.id]); }} className={`bg-duo-card border-2 border-b-4 border-gray-700 p-2 px-4 md:p-4 md:px-8 rounded-xl md:rounded-2xl font-bold text-lg md:text-2xl hover:bg-gray-700 transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none ${isArTok ? 'font-arabic' : isTlhTok ? 'font-klingon' : ''}`}>
-                                {formatRTLOverride(token.text)}
+                                <span>{formatRTLOverride(token.text)}</span>
+                                {isKlingonCourse && showKlingonPIqaD && isKlingonTok && !isPIqaDText(token.text) && (
+                                  <span className="font-piqad text-[11px] text-purple-300 block leading-tight mt-0.5">{tlhToPIqaD(token.text)}</span>
+                                )}
                               </button>
                             );
                           })}
@@ -15111,16 +15272,16 @@ const getTodayChallenge = () => {
                   <>
                     <button onClick={handleSkip} disabled={loading} className="px-4 py-3 md:px-8 md:py-4 rounded-xl md:rounded-2xl font-bold text-gray-400 hover:text-white transition-colors uppercase tracking-wider text-sm md:text-base disabled:opacity-40">{t('t_skip')}</button>
                     <button 
-                      disabled={loading || (selectedWordIds.length === 0 && currentExercise.type !== 'speech' && currentExercise.type !== 'drawing' && !(currentExercise.type === 'ishihara' && ishiharaInput))} 
+                      disabled={loading || (selectedWordIds.length === 0 && !(currentExercise.type === 'speech' && !isKlingonCourse) && currentExercise.type !== 'drawing' && !(currentExercise.type === 'ishihara' && ishiharaInput))} 
                       onClick={() => { 
                         if (loading) return; 
                         if (currentExercise.type === 'drawing') checkDrawingAnswer(); 
-                        else if (selectedWordIds.length > 0 || currentExercise.type === 'speech' || currentExercise.type === 'ishihara') checkAnswer(); 
+                        else if (selectedWordIds.length > 0 || (currentExercise.type === 'speech' && !isKlingonCourse) || currentExercise.type === 'ishihara') checkAnswer(); 
                       }} 
                       className={`w-full py-4 md:py-7 rounded-2xl md:rounded-[2.5rem] font-bold text-xl md:text-2xl transition-all uppercase tracking-widest shadow-2xl active:translate-y-2 active:border-b-0 ${
                         loading 
                           ? 'bg-duo-green/60 border-b-4 border-duo-greenDark text-white cursor-wait'
-                          : selectedWordIds.length > 0 || currentExercise.type === 'speech' || currentExercise.type === 'drawing' || (currentExercise.type === 'ishihara' && ishiharaInput) 
+                          : selectedWordIds.length > 0 || (currentExercise.type === 'speech' && !isKlingonCourse) || currentExercise.type === 'drawing' || (currentExercise.type === 'ishihara' && ishiharaInput) 
                           ? 'bg-duo-green border-b-8 border-duo-greenDark text-white' 
                           : 'bg-gray-800 text-gray-600 cursor-not-allowed'
                       }`}
@@ -15299,37 +15460,39 @@ const getTodayChallenge = () => {
 
             {user.subscription === 'max' ? (
               <div className="space-y-3.5 my-5">
-                {/* Option 1: Live Video Call */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    playSound('click');
-                    setShowLessonAiPartnerModal(false);
-                    startVideoCall(
-                      currentExercise?.originalSentence
-                        ? `${currentCourse.localName}: ${currentExercise.originalSentence.substring(0, 40)}`
-                        : (currentCourse.localName || "Урок"),
-                      true
-                    );
-                  }}
-                  className="w-full p-4 rounded-2xl bg-gradient-to-r from-purple-700/80 to-indigo-700/80 hover:from-purple-600 hover:to-indigo-600 border border-purple-400/40 text-left transition-all active:scale-98 shadow-md flex items-center justify-between group cursor-pointer"
-                >
-                  <div className="flex items-center space-x-3.5">
-                    <div className="p-3 bg-white/20 rounded-xl group-hover:scale-105 transition-transform">
-                      <CameraIcon className="w-6 h-6 text-white" />
+                {/* Option 1: Live Video Call — hidden during Klingon lessons */}
+                {!isKlingonCourse && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playSound('click');
+                      setShowLessonAiPartnerModal(false);
+                      startVideoCall(
+                        currentExercise?.originalSentence
+                          ? `${currentCourse.localName}: ${currentExercise.originalSentence.substring(0, 40)}`
+                          : (currentCourse.localName || "Урок"),
+                        true
+                      );
+                    }}
+                    className="w-full p-4 rounded-2xl bg-gradient-to-r from-purple-700/80 to-indigo-700/80 hover:from-purple-600 hover:to-indigo-600 border border-purple-400/40 text-left transition-all active:scale-98 shadow-md flex items-center justify-between group cursor-pointer"
+                  >
+                    <div className="flex items-center space-x-3.5">
+                      <div className="p-3 bg-white/20 rounded-xl group-hover:scale-105 transition-transform">
+                        <CameraIcon className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h4 className="font-black text-sm text-white flex items-center space-x-2">
+                          <span>{user.language === 'ru' ? 'Видеозвонок DuoWindo6601' : 'Video Call DuoWindo6601'}</span>
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        </h4>
+                        <p className="text-xs text-purple-200 font-bold">
+                          {user.language === 'ru' ? 'Живое общение с AI партнером (камера, речь, AI Copilot)' : 'Live communication with AI partner'}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-black text-sm text-white flex items-center space-x-2">
-                        <span>{user.language === 'ru' ? 'Видеозвонок DuoWindo6601' : 'Video Call DuoWindo6601'}</span>
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                      </h4>
-                      <p className="text-xs text-purple-200 font-bold">
-                        {user.language === 'ru' ? 'Живое общение с AI партнером (камера, речь, AI Copilot)' : 'Live communication with AI partner'}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-white text-lg font-bold group-hover:translate-x-1 transition-transform">→</span>
-                </button>
+                    <span className="text-white text-lg font-bold group-hover:translate-x-1 transition-transform">→</span>
+                  </button>
+                )}
 
                 {/* Option 2: Roleplays Max */}
                 <button

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Course, PlacementQuestion, PlacementResult, UserProgress } from '../types';
+import { speakText as speakEngine } from '../services/geminiService';
 
 interface PlacementTestModalProps {
   isOpen: boolean;
@@ -395,12 +396,8 @@ export const PlacementTestModal: React.FC<PlacementTestModalProps> = ({
     onClose();
   };
 
-  const speakText = (text: string) => {
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = course.id === 'es' ? 'es-ES' : course.id === 'de' ? 'de-DE' : course.id === 'fr' ? 'fr-FR' : 'en-US';
-      window.speechSynthesis.speak(utterance);
-    }
+  const speakPlacementQuestion = (text: string, questionLang: string) => {
+    void speakEngine(text, questionLang, false, user.preferredVoice, user.voiceProvider);
   };
 
   return (
@@ -460,7 +457,14 @@ export const PlacementTestModal: React.FC<PlacementTestModalProps> = ({
                 </h4>
                 <button
                   type="button"
-                  onClick={() => speakText(currentQ.question)}
+                  onClick={() => {
+                    const hasNativeDb = Boolean(PLACEMENT_QUESTIONS[course.id]);
+                    const spokenText = hasNativeDb
+                      ? currentQ.question
+                      : (isRu && currentQ.questionRu ? currentQ.questionRu : currentQ.question);
+                    const spokenLang = hasNativeDb ? course.id : (isRu ? 'ru' : 'en');
+                    speakPlacementQuestion(spokenText, spokenLang);
+                  }}
                   className="p-2 bg-gray-800 hover:bg-gray-700 text-duo-blue rounded-xl border border-gray-700 shrink-0 cursor-pointer"
                   title={isRu ? 'Озвучить вопрос' : 'Speak question'}
                 >

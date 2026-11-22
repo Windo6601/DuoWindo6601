@@ -14,6 +14,19 @@ import {
   LOCKED_CIS_LANGUAGES
 } from '../services/languageLockService';
 
+import {
+  ADMIN_TITLE_TRANSLATIONS,
+  loadStoredTranslationCache,
+  saveStoredTranslationCache,
+  loadStoredNameCache,
+  saveStoredNameCache,
+  getNameCacheKey,
+  getTextCacheKey,
+  resolveTranslatedAuthorName,
+  translateTextOfflineFallback,
+  translateFeedbackBatchWithAI
+} from '../services/feedbackTranslatorService';
+
 interface FeedbackScreenProps {
   user: UserProgress;
   onBack: () => void;
@@ -28,6 +41,7 @@ interface FeedbackScreenProps {
   t?: (key: string) => string;
   onSetLanguage?: (lang: string) => void;
   autoTranslateFeedback?: boolean;
+  onToggleAutoTranslate?: (enabled: boolean) => void;
 }
 
 // Supported Languages configuration (8 available + 10 world locked + 5 CIS locked)
@@ -215,163 +229,15 @@ const RANDOM_USER_NAMES = [
 const RANDOM_USER_AVATARS = ['🦉', '🦊', '🦁', '🐼', '🐯', '🦄', '🐲', '🚀', '🐱', '🐶', '🤖', '👑', '🏛️', '🌍', '🧩', '♟️'];
 const RANDOM_USER_COLORS = ['#1cb0f6', '#ff9600', '#58cc02', '#ce82ff', '#ff4b4b', '#2b70c9', '#ec4899', '#14b8a6'];
 
-export const ADMIN_NAME_TRANSLATIONS: Record<string, string> = {
-  ru: 'Администратор DuoWindo6601',
-  en: 'DuoWindo6601 Administrator',
-  de: 'DuoWindo6601-Administrator',
-  fr: 'Administrateur DuoWindo6601',
-  es: 'Administrador de DuoWindo6601',
-  ja: 'DuoWindo6601 管理者',
-  zh: 'DuoWindo6601 管理员',
-  ar: 'مسؤول DuoWindo6601',
-  pt: 'Administrador DuoWindo6601',
-  it: 'Amministratore DuoWindo6601',
-  tr: 'DuoWindo6601 Yöneticisi',
-  ko: 'DuoWindo6601 관리자',
-  hi: 'DuoWindo6601 प्रशासक',
-  pl: 'Administrator DuoWindo6601',
-  id: 'Administrator DuoWindo6601',
-  bn: 'DuoWindo6601 প্রশাসক',
-  th: 'ผู้ดูแลระบบ DuoWindo6601',
-  vi: 'Quản trị viên DuoWindo6601',
-  kk: 'DuoWindo6601 Әкімшісі',
-  uz: 'DuoWindo6601 Administratori',
-  hy: 'DuoWindo6601 Ադմինիստրատոր',
-  ka: 'DuoWindo6601 ადმინისტრატორი',
-  az: 'DuoWindo6601 Administratoru'
-};
+export const ADMIN_NAME_TRANSLATIONS: Record<string, string> = ADMIN_TITLE_TRANSLATIONS;
 
-export const COMMON_NAME_TRANSLATIONS: Record<string, Record<string, string>> = {
-  'Мария С.': {
-    ru: 'Мария С.',
-    en: 'Maria S.',
-    de: 'Maria S.',
-    fr: 'Marie S.',
-    es: 'María S.',
-    ja: 'マリア S.',
-    zh: '玛丽亚 S.',
-    ar: 'ماريا س.'
-  },
-  'Игорь Н.': {
-    ru: 'Игорь Н.',
-    en: 'Igor N.',
-    de: 'Igor N.',
-    fr: 'Igor N.',
-    es: 'Ígor N.',
-    ja: 'イーゴリ N.',
-    zh: '伊戈尔 N.',
-    ar: 'إيغور ن.'
-  },
-  'София П.': {
-    ru: 'София П.',
-    en: 'Sophia P.',
-    de: 'Sophia P.',
-    fr: 'Sophie P.',
-    es: 'Sofía P.',
-    ja: 'ソフィア P.',
-    zh: '索菲亚 P.',
-    ar: 'صوفيا ب.'
-  },
-  'Максим Р.': {
-    ru: 'Максим Р.',
-    en: 'Maxim R.',
-    de: 'Maxim R.',
-    fr: 'Maxime R.',
-    es: 'Máximo R.',
-    ja: 'マキシム R.',
-    zh: '马克西姆 R.',
-    ar: 'مكسيم ر.'
-  },
-  'Анастасия Б.': {
-    ru: 'Анастасия Б.',
-    en: 'Anastasia B.',
-    de: 'Anastasia B.',
-    fr: 'Anastasia B.',
-    es: 'Anastasia B.',
-    ja: 'アナスタシア B.',
-    zh: '阿纳斯塔西娅 B.',
-    ar: 'أناستاسيا ب.'
-  },
-  'Владимир Т.': {
-    ru: 'Владимир Т.',
-    en: 'Vladimir T.',
-    de: 'Wladimir T.',
-    fr: 'Vladimir T.',
-    es: 'Vladímir T.',
-    ja: 'ウラジーミル T.',
-    zh: '弗拉基米尔 T.',
-    ar: 'فلاديمير ت.'
-  },
-  'Alexander W.': {
-    ru: 'Александр В.',
-    en: 'Alexander W.',
-    de: 'Alexander W.',
-    fr: 'Alexandre W.',
-    es: 'Alejandro W.',
-    ja: 'アレクサンダー W.',
-    zh: '亚历山大 W.',
-    ar: 'ألكسندر و.'
-  },
-  'Sophie M.': {
-    ru: 'Софи М.',
-    en: 'Sophie M.',
-    de: 'Sophie M.',
-    fr: 'Sophie M.',
-    es: 'Sofía M.',
-    ja: 'ソフィー M.',
-    zh: '索菲 M.',
-    ar: 'سوفي م.'
-  },
-  'Carlos R.': {
-    ru: 'Карлос Р.',
-    en: 'Carlos R.',
-    de: 'Carlos R.',
-    fr: 'Carlos R.',
-    es: 'Carlos R.',
-    ja: 'カルロス R.',
-    zh: '卡洛斯 R.',
-    ar: 'كارلوس ر.'
-  },
-  'Kenji T.': {
-    ru: 'Кэндзи Т.',
-    en: 'Kenji T.',
-    de: 'Kenji T.',
-    fr: 'Kenji T.',
-    es: 'Kenji T.',
-    ja: 'ケンジ T.',
-    zh: '健二 T.',
-    ar: 'كينجي ت.'
-  },
-  'Mei L.': {
-    ru: 'Мэй Л.',
-    en: 'Mei L.',
-    de: 'Mei L.',
-    fr: 'Mei L.',
-    es: 'Mei L.',
-    ja: 'メイ L.',
-    zh: '美 L.',
-    ar: 'مي ل.'
-  },
-  'Amira H.': {
-    ru: 'Амира Х.',
-    en: 'Amira H.',
-    de: 'Amira H.',
-    fr: 'Amira H.',
-    es: 'Amira H.',
-    ja: 'アミラ H.',
-    zh: '阿米拉 H.',
-    ar: 'أميرة ح.'
-  }
-};
-
-export const getTranslatedAuthorName = (name: string, targetLang: string, isAdmin?: boolean): string => {
-  if (isAdmin || name.includes('Администратор') || name.includes('Admin') || name.includes('مسؤول') || name.includes('管理者') || name.includes('管理员')) {
-    return ADMIN_NAME_TRANSLATIONS[targetLang] || ADMIN_NAME_TRANSLATIONS['en'] || ADMIN_NAME_TRANSLATIONS['ru'];
-  }
-  if (COMMON_NAME_TRANSLATIONS[name] && COMMON_NAME_TRANSLATIONS[name][targetLang]) {
-    return COMMON_NAME_TRANSLATIONS[name][targetLang];
-  }
-  return name;
+export const getTranslatedAuthorName = (
+  name: string,
+  targetLang: string,
+  isAdmin?: boolean,
+  nameCache?: Record<string, string>
+): string => {
+  return resolveTranslatedAuthorName(name, targetLang, isAdmin, nameCache);
 };
 
 export const getTranslatedCategory = (categoryStr: string | undefined, targetLang: string): string => {
@@ -385,7 +251,21 @@ export const getTranslatedCategory = (categoryStr: string | undefined, targetLan
   return categoryStr;
 };
 
-export const translateTextToTarget = (text: string, targetLang: string): string => {
+export const isExactStaticTranslationAvailable = (text: string, targetLang: string): boolean => {
+  if (!text) return true;
+  const trimmed = text.trim();
+  for (const item of MULTILINGUAL_REVIEWS_POOL) {
+    if (Object.values(item.comment).some((v) => v.trim() === trimmed) && item.comment[targetLang]) return true;
+    if (Object.values(item.adminReply).some((v) => v.trim() === trimmed) && item.adminReply[targetLang]) return true;
+  }
+  return false;
+};
+
+export const translateTextToTarget = (
+  text: string,
+  targetLang: string,
+  textCache?: Record<string, string>
+): string => {
   if (!text) return text;
   const trimmed = text.trim();
 
@@ -425,19 +305,7 @@ export const translateTextToTarget = (text: string, targetLang: string): string 
     return commonMap[trimmed][targetLang];
   }
 
-  const langNames: Record<string, string> = {
-    ru: 'Русский',
-    en: 'English',
-    de: 'Deutsch',
-    fr: 'Français',
-    es: 'Español',
-    ja: '日本語',
-    zh: '中文',
-    ar: 'العربية'
-  };
-
-  const targetName = langNames[targetLang] || targetLang.toUpperCase();
-  return `🌐 [${targetName}] ${text}`;
+  return translateTextOfflineFallback(text, targetLang, textCache);
 };
 
 interface ReviewTemplate {
@@ -829,7 +697,9 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
   courses = [],
   currentCourse,
   t,
-  onSetLanguage
+  onSetLanguage,
+  autoTranslateFeedback,
+  onToggleAutoTranslate
 }) => {
   const [reviews, setReviews] = useState<FeedbackItem[]>(INITIAL_REVIEWS);
   const [loading, setLoading] = useState(true);
@@ -844,15 +714,16 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
   const currentLang = user.language || 'ru';
   const [translatorTargetLang, setTranslatorTargetLang] = useState<string>(currentLang);
 
-  // Auto-Translator toggle state (defaults to user setting or true)
-  const [autoTranslate, setAutoTranslate] = useState<boolean>(user.autoTranslateFeedback ?? true);
+  // Auto-Translator toggle state (defaults to prop/user setting or true)
+  const [autoTranslate, setAutoTranslate] = useState<boolean>(autoTranslateFeedback ?? user.autoTranslateFeedback ?? true);
 
   // Synchronize autoTranslate with global user settings
   useEffect(() => {
-    if (user.autoTranslateFeedback !== undefined) {
-      setAutoTranslate(user.autoTranslateFeedback);
+    const incoming = autoTranslateFeedback ?? user.autoTranslateFeedback;
+    if (incoming !== undefined) {
+      setAutoTranslate(incoming);
     }
-  }, [user.autoTranslateFeedback]);
+  }, [autoTranslateFeedback, user.autoTranslateFeedback]);
 
   // Synchronize translatorTargetLang if app language changes
   useEffect(() => {
@@ -861,31 +732,127 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
     }
   }, [user.language]);
 
-  // Translations cache for reviews and replies: { [id_targetLang]: translatedText }
+  // Translations cache for reviews/replies/courses and author names
   const [translatedTexts, setTranslatedTexts] = useState<Record<string, string>>({});
   const [translatingMap, setTranslatingMap] = useState<Record<string, boolean>>({});
+  const [aiTextCache, setAiTextCache] = useState<Record<string, string>>(() => loadStoredTranslationCache());
+  const [aiNameCache, setAiNameCache] = useState<Record<string, string>>(() => loadStoredNameCache());
+  const [isBatchTranslating, setIsBatchTranslating] = useState<boolean>(false);
+  const [isWorkbenchTranslating, setIsWorkbenchTranslating] = useState<boolean>(false);
 
-  // Auto-translate reviews and admin replies when autoTranslate is ON
-  useEffect(() => {
-    if (!autoTranslate) return;
+  const handleToggleAutoTranslateState = (nextVal: boolean) => {
+    setAutoTranslate(nextVal);
+    onToggleAutoTranslate?.(nextVal);
+  };
 
-    const newTranslations: Record<string, string> = {};
-    for (const rev of reviews) {
-      const revKey = `${rev.id}_${translatorTargetLang}`;
-      newTranslations[revKey] = translateTextToTarget(rev.comment, translatorTargetLang);
+  const runBatchTranslation = async (targetLang: string, sourceReviews: FeedbackItem[], forceToast: boolean = false) => {
+    const langObj = SUPPORTED_LANGUAGES.find((l) => l.code === targetLang);
+    const targetLangName = langObj ? `${langObj.nativeName} (${langObj.name})` : targetLang;
+
+    // Step 1: Apply instant synchronous translations (exact pool + cache + smart offline)
+    const syncMap: Record<string, string> = {};
+    const missingTexts: string[] = [];
+    const missingNames: string[] = [];
+
+    for (const rev of sourceReviews) {
+      const revKey = `${rev.id}_${targetLang}`;
+      const revCached = aiTextCache[getTextCacheKey(rev.comment, targetLang)];
+      if (isExactStaticTranslationAvailable(rev.comment, targetLang) || revCached) {
+        syncMap[revKey] = revCached || translateTextToTarget(rev.comment, targetLang, aiTextCache);
+      } else {
+        syncMap[revKey] = translateTextToTarget(rev.comment, targetLang, aiTextCache);
+        missingTexts.push(rev.comment);
+      }
+
+      if (rev.courseName && !aiTextCache[getTextCacheKey(rev.courseName, targetLang)]) {
+        missingTexts.push(rev.courseName);
+      }
+      if (rev.userName && rev.userId !== 'admin-duowindo6601') {
+        missingNames.push(rev.userName);
+      }
 
       if (rev.replies) {
         for (const rep of rev.replies) {
-          const repKey = `${rep.id}_${translatorTargetLang}`;
-          newTranslations[repKey] = translateTextToTarget(rep.comment, translatorTargetLang);
+          const repKey = `${rep.id}_${targetLang}`;
+          const repCached = aiTextCache[getTextCacheKey(rep.comment, targetLang)];
+          if (isExactStaticTranslationAvailable(rep.comment, targetLang) || repCached) {
+            syncMap[repKey] = repCached || translateTextToTarget(rep.comment, targetLang, aiTextCache);
+          } else {
+            syncMap[repKey] = translateTextToTarget(rep.comment, targetLang, aiTextCache);
+            missingTexts.push(rep.comment);
+          }
+          if (rep.userName && !rep.isAdmin) {
+            missingNames.push(rep.userName);
+          }
         }
       }
     }
 
-    setTranslatedTexts((prev) => ({
-      ...prev,
-      ...newTranslations
-    }));
+    setTranslatedTexts((prev) => ({ ...prev, ...syncMap }));
+
+    const uncachedTexts = Array.from(new Set(missingTexts.map((t) => t.trim()).filter((t) => t && !aiTextCache[getTextCacheKey(t, targetLang)])));
+    const uncachedNames = Array.from(new Set(missingNames.map((n) => n.trim()).filter((n) => n && !aiNameCache[getNameCacheKey(n, targetLang)])));
+
+    if (uncachedTexts.length === 0 && uncachedNames.length === 0) {
+      if (forceToast) {
+        setToast(`🌐 Отзывы и имена переведены на: ${langObj?.name || targetLang}`);
+      }
+      return;
+    }
+
+    setIsBatchTranslating(true);
+    try {
+      const batchRes = await translateFeedbackBatchWithAI({
+        texts: uncachedTexts,
+        names: uncachedNames,
+        targetLang,
+        targetLangName
+      });
+
+      const nextTextCache = { ...aiTextCache };
+      for (const [orig, tr] of Object.entries(batchRes.texts)) {
+        nextTextCache[getTextCacheKey(orig, targetLang)] = tr;
+      }
+      setAiTextCache(nextTextCache);
+      saveStoredTranslationCache(nextTextCache);
+
+      const nextNameCache = { ...aiNameCache };
+      for (const [origName, trName] of Object.entries(batchRes.names)) {
+        nextNameCache[getNameCacheKey(origName, targetLang)] = trName;
+      }
+      setAiNameCache(nextNameCache);
+      saveStoredNameCache(nextNameCache);
+
+      const updatedItemMap: Record<string, string> = {};
+      for (const rev of sourceReviews) {
+        const revKey = `${rev.id}_${targetLang}`;
+        updatedItemMap[revKey] =
+          nextTextCache[getTextCacheKey(rev.comment, targetLang)] ||
+          translateTextToTarget(rev.comment, targetLang, nextTextCache);
+        if (rev.replies) {
+          for (const rep of rev.replies) {
+            const repKey = `${rep.id}_${targetLang}`;
+            updatedItemMap[repKey] =
+              nextTextCache[getTextCacheKey(rep.comment, targetLang)] ||
+              translateTextToTarget(rep.comment, targetLang, nextTextCache);
+          }
+        }
+      }
+      setTranslatedTexts((prev) => ({ ...prev, ...updatedItemMap }));
+
+      if (forceToast) {
+        playSound('correct');
+        setToast(`🌐 Переведено на: ${langObj?.flag || ''} ${langObj?.name || targetLang}`);
+      }
+    } finally {
+      setIsBatchTranslating(false);
+    }
+  };
+
+  // Auto-translate reviews, admin replies, categories, course names, and author names when autoTranslate is ON
+  useEffect(() => {
+    if (!autoTranslate) return;
+    void runBatchTranslation(translatorTargetLang, reviews, false);
   }, [reviews, translatorTargetLang, autoTranslate]);
 
   // Build course list for feedback form & filter
@@ -1072,13 +1039,18 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
     setToast(`Язык приложения переключен на: ${langLabel}!`);
   };
 
-  // Instant Translator for Reviews & Comments
-  const handleTranslateItem = async (itemId: string, originalText: string, targetLang: string) => {
+  // Instant Translator for Individual Reviews, Comments & Author Names
+  const handleTranslateItem = async (
+    itemId: string,
+    originalText: string,
+    targetLang: string,
+    authorName?: string,
+    isAdminAuthor?: boolean
+  ) => {
     playSound('click');
     const key = `${itemId}_${targetLang}`;
 
     if (translatedTexts[key]) {
-      // Toggle back to original if already viewing translation
       setTranslatedTexts((prev) => {
         const next = { ...prev };
         delete next[key];
@@ -1089,15 +1061,43 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
     }
 
     setTranslatingMap((prev) => ({ ...prev, [key]: true }));
+    try {
+      const cKey = getTextCacheKey(originalText, targetLang);
+      let translated = aiTextCache[cKey] || translateTextToTarget(originalText, targetLang, aiTextCache);
 
-    const translated = translateTextToTarget(originalText, targetLang);
+      if (!isExactStaticTranslationAvailable(originalText, targetLang) && !aiTextCache[cKey]) {
+        const langObj = SUPPORTED_LANGUAGES.find((l) => l.code === targetLang);
+        const batchRes = await translateFeedbackBatchWithAI({
+          texts: [originalText],
+          names: authorName && !isAdminAuthor ? [authorName] : [],
+          targetLang,
+          targetLangName: langObj ? `${langObj.nativeName} (${langObj.name})` : targetLang
+        });
 
-    await new Promise(r => setTimeout(r, 150));
+        const cleanOrig = originalText.trim();
+        if (batchRes.texts[cleanOrig]) {
+          translated = batchRes.texts[cleanOrig];
+          const nextCache = { ...aiTextCache, [cKey]: translated };
+          setAiTextCache(nextCache);
+          saveStoredTranslationCache(nextCache);
+        }
 
-    setTranslatedTexts((prev) => ({ ...prev, [key]: translated }));
-    setTranslatingMap((prev) => ({ ...prev, [key]: false }));
-    playSound('correct');
-    setToast(`Переведено на: ${SUPPORTED_LANGUAGES.find(l => l.code === targetLang)?.name || targetLang} 🌐`);
+        if (authorName && !isAdminAuthor && batchRes.names[authorName.trim()]) {
+          const nextNames = {
+            ...aiNameCache,
+            [getNameCacheKey(authorName, targetLang)]: batchRes.names[authorName.trim()]
+          };
+          setAiNameCache(nextNames);
+          saveStoredNameCache(nextNames);
+        }
+      }
+
+      setTranslatedTexts((prev) => ({ ...prev, [key]: translated }));
+      playSound('correct');
+      setToast(`Переведено на: ${SUPPORTED_LANGUAGES.find((l) => l.code === targetLang)?.name || targetLang} 🌐`);
+    } finally {
+      setTranslatingMap((prev) => ({ ...prev, [key]: false }));
+    }
   };
 
   // Manual Refresh Handler
@@ -1819,18 +1819,18 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
           <div className="bg-gray-900/90 p-4 rounded-2xl border border-purple-500/30 flex items-center justify-between flex-wrap gap-3">
             <div className="flex-1 min-w-[220px]">
               <div className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
-                <span>⚡</span> Авто-Переводчик (Автоматический перевод отзывов)
+                <span>⚡</span> Авто-Переводчик отзывов и имён DuoWindo6601
               </div>
               <div className="text-[11px] text-gray-400 mt-0.5">
-                При включении все отзывы, имена авторов, категории и комментарии администрации переводятся автоматически при переключении языка приложения.
+                Автоматический перевод отзывов, комментариев администрации, категорий и имён авторов на выбранный язык.
               </div>
             </div>
             <button
               onClick={() => {
                 playSound('click');
                 const nextVal = !autoTranslate;
-                setAutoTranslate(nextVal);
-                setToast(nextVal ? '⚡ Авто-Переводчик ВКЛЮЧЕН! Отзывы и комментарии переведены.' : '⚡ Авто-Переводчик ОТКЛЮЧЕН.');
+                handleToggleAutoTranslateState(nextVal);
+                setToast(nextVal ? '⚡ Авто-Переводчик отзывов и имён ВКЛЮЧЕН!' : '⚡ Авто-Переводчик ОТКЛЮЧЕН.');
               }}
               className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all border-b-2 flex items-center gap-2 ${
                 autoTranslate
@@ -1878,29 +1878,130 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
             </div>
           </div>
 
-          {/* Online Workbench */}
+          {/* Online Workbench for Names + Categories + Reviews */}
           <div className="bg-gray-900/80 p-4 rounded-2xl border border-gray-800 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <label className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
-                <span>🧪</span> Онлайн Интерактивный Переводчик Отзывов:
+                <span>🧪</span> Онлайн Переводчик Отзывов, Категорий и Имён:
               </label>
               <span className="text-[10px] text-purple-400 font-mono font-bold bg-purple-950/60 px-2 py-0.5 rounded border border-purple-800">
                 [{translatorTargetLang.toUpperCase()}]
               </span>
             </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">
+                  Имя автора:
+                </label>
+                <input
+                  type="text"
+                  dir="auto"
+                  value={workbenchAuthorName}
+                  onChange={(e) => setWorkbenchAuthorName(e.target.value)}
+                  className="w-full bg-gray-950 border border-gray-800 focus:border-purple-500 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                  placeholder="Например: Мария С. или Алексей Иванов"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">
+                  Категория:
+                </label>
+                <select
+                  value={workbenchCategory}
+                  onChange={(e) => setWorkbenchCategory(e.target.value)}
+                  className="w-full bg-gray-950 border border-gray-800 focus:border-purple-500 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                >
+                  {Object.keys(CATEGORIES).map((ck) => (
+                    <option key={ck} value={ck}>
+                      {CATEGORIES[ck]['ru'] || ck}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <label className="flex items-center gap-2 text-xs text-amber-300 font-bold cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={workbenchIsAdmin}
+                  onChange={(e) => setWorkbenchIsAdmin(e.target.checked)}
+                  className="rounded text-amber-500"
+                />
+                <span>👑 Как Администратор DuoWindo6601</span>
+              </label>
+
+              <button
+                type="button"
+                disabled={isWorkbenchTranslating || (!workbenchText.trim() && !workbenchAuthorName.trim())}
+                onClick={async () => {
+                  playSound('click');
+                  setIsWorkbenchTranslating(true);
+                  try {
+                    const langObj = SUPPORTED_LANGUAGES.find((l) => l.code === translatorTargetLang);
+                    const batchRes = await translateFeedbackBatchWithAI({
+                      texts: workbenchText.trim() ? [workbenchText.trim()] : [],
+                      names: workbenchAuthorName.trim() && !workbenchIsAdmin ? [workbenchAuthorName.trim()] : [],
+                      targetLang: translatorTargetLang,
+                      targetLangName: langObj ? `${langObj.nativeName} (${langObj.name})` : translatorTargetLang
+                    });
+                    if (workbenchText.trim() && batchRes.texts[workbenchText.trim()]) {
+                      const nextCache = {
+                        ...aiTextCache,
+                        [getTextCacheKey(workbenchText.trim(), translatorTargetLang)]: batchRes.texts[workbenchText.trim()]
+                      };
+                      setAiTextCache(nextCache);
+                      saveStoredTranslationCache(nextCache);
+                    }
+                    if (workbenchAuthorName.trim() && !workbenchIsAdmin && batchRes.names[workbenchAuthorName.trim()]) {
+                      const nextNames = {
+                        ...aiNameCache,
+                        [getNameCacheKey(workbenchAuthorName.trim(), translatorTargetLang)]: batchRes.names[workbenchAuthorName.trim()]
+                      };
+                      setAiNameCache(nextNames);
+                      saveStoredNameCache(nextNames);
+                    }
+                    playSound('correct');
+                    setToast(`🌐 Переведено на: ${langObj?.name || translatorTargetLang}`);
+                  } finally {
+                    setIsWorkbenchTranslating(false);
+                  }
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50"
+              >
+                {isWorkbenchTranslating ? '🔄 Перевод...' : '✨ Перевести (AI)'}
+              </button>
+            </div>
+
             <textarea
               rows={3}
+              dir="auto"
               value={workbenchText}
               onChange={(e) => setWorkbenchText(e.target.value)}
               className="w-full bg-gray-950 border border-gray-800 focus:border-purple-500 rounded-xl p-3 text-xs text-white placeholder-gray-600 focus:outline-none"
               placeholder="Введите любой текст или отзыв для мгновенного перевода..."
             />
-            <div className="p-3 bg-purple-950/40 rounded-xl border border-purple-800/40 space-y-1">
+
+            <div className="p-3.5 bg-purple-950/40 rounded-xl border border-purple-800/40 space-y-2">
               <div className="text-[10px] font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1">
-                <span>🌐</span> Перевод [{SUPPORTED_LANGUAGES.find(l => l.code === translatorTargetLang)?.name}]:
+                <span>🌐</span> Результат [{SUPPORTED_LANGUAGES.find(l => l.code === translatorTargetLang)?.name}]:
               </div>
-              <p className="text-xs text-purple-100 font-medium whitespace-pre-wrap leading-relaxed">
-                {translateTextToTarget(workbenchText, translatorTargetLang)}
+              <div className="flex items-center gap-2 flex-wrap text-xs">
+                <span className="font-black text-white">
+                  👤 {getTranslatedAuthorName(workbenchAuthorName, translatorTargetLang, workbenchIsAdmin, aiNameCache)}
+                </span>
+                {workbenchIsAdmin && (
+                  <span className="text-[10px] font-black bg-amber-500 text-gray-950 px-2 py-0.5 rounded-full">
+                    👑 {getTranslatedAuthorName('Администратор DuoWindo6601', translatorTargetLang, true, aiNameCache)}
+                  </span>
+                )}
+                <span className="text-[10px] bg-gray-800 text-gray-200 px-2 py-0.5 rounded-full border border-gray-700">
+                  {CATEGORIES[workbenchCategory]?.[translatorTargetLang] || CATEGORIES[workbenchCategory]?.['en'] || CATEGORIES[workbenchCategory]?.['ru']}
+                </span>
+              </div>
+              <p dir="auto" className="text-xs text-purple-100 font-medium whitespace-pre-wrap leading-relaxed">
+                <bdi dir="auto">{translateTextToTarget(workbenchText, translatorTargetLang, aiTextCache)}</bdi>
               </p>
             </div>
           </div>
@@ -2877,6 +2978,84 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
             </div>
           </div>
 
+          {/* Auto-Translator Quick Bar in Reviews Feed */}
+          <div className="bg-gradient-to-r from-purple-950/70 via-gray-900 to-indigo-950/70 border-2 border-purple-500/40 rounded-2xl p-3.5 mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+            <div className="flex items-center gap-2.5">
+              <span className="text-xl shrink-0">🌐</span>
+              <div>
+                <div className="text-xs font-black text-purple-200 uppercase tracking-wide flex items-center gap-2 flex-wrap">
+                  <span>Авто-Переводчик отзывов и имен DuoWindo6601</span>
+                  {isBatchTranslating && (
+                    <span className="text-[10px] font-bold bg-purple-500/30 text-purple-200 px-2 py-0.5 rounded animate-pulse">
+                      🔄 Переводим...
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-gray-300">
+                  Автоматический перевод отзывов, комментариев администрации, категорий и имён авторов на выбранный язык
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap shrink-0">
+              <select
+                value={translatorTargetLang}
+                onChange={(e) => {
+                  const nextLang = e.target.value;
+                  playSound('click');
+                  setTranslatorTargetLang(nextLang);
+                  if (!autoTranslate) {
+                    handleToggleAutoTranslateState(true);
+                  }
+                  const found = SUPPORTED_LANGUAGES.find((l) => l.code === nextLang);
+                  setToast(`🌐 Язык автоперевода: ${found?.flag || ''} ${found?.name || nextLang}`);
+                }}
+                aria-label="Целевой язык автопереводчика"
+                className="bg-gray-900 border border-purple-500/50 rounded-xl px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-purple-400"
+              >
+                {SUPPORTED_LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.flag} {l.name}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={() => {
+                  playSound('click');
+                  const nextVal = !autoTranslate;
+                  handleToggleAutoTranslateState(nextVal);
+                  setToast(
+                    nextVal
+                      ? '⚡ Авто-Переводчик отзывов и имён ВКЛЮЧЕН!'
+                      : '⚡ Авто-Переводчик ОТКЛЮЧЕН — показан оригинал.'
+                  );
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all border ${
+                  autoTranslate
+                    ? 'bg-purple-600 hover:bg-purple-500 text-white border-purple-400 shadow'
+                    : 'bg-gray-800 hover:bg-gray-700 text-gray-300 border-gray-600'
+                }`}
+              >
+                {autoTranslate ? '✅ Авто-Перевод ВКЛ' : '⚪ Авто-Перевод ВЫКЛ'}
+              </button>
+
+              <button
+                type="button"
+                disabled={isBatchTranslating}
+                onClick={() => {
+                  playSound('click');
+                  if (!autoTranslate) handleToggleAutoTranslateState(true);
+                  void runBatchTranslation(translatorTargetLang, reviews, true);
+                }}
+                className="px-3 py-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-purple-200 border border-purple-500/40 text-xs font-bold transition-all disabled:opacity-50"
+              >
+                🔄 Перевести всё
+              </button>
+            </div>
+          </div>
+
           {/* Reviews Feed List */}
           {loading ? (
             <div className="py-12 text-center text-gray-400 text-sm">
@@ -2939,10 +3118,10 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
                         </div>
                         <div>
                           <div className="font-bold text-white text-sm flex items-center gap-1.5 flex-wrap" dir="auto">
-                            <bdi dir="auto">{(isTranslated || autoTranslate) ? getTranslatedAuthorName(rev.userName, translatorTargetLang, rev.userId === 'admin-duowindo6601') : rev.userName}</bdi>
+                            <bdi dir="auto">{(isTranslated || autoTranslate) ? getTranslatedAuthorName(rev.userName, translatorTargetLang, rev.userId === 'admin-duowindo6601', aiNameCache) : rev.userName}</bdi>
                             {rev.userId === 'admin-duowindo6601' && (
                               <span className="text-[10px] font-black bg-amber-500 text-gray-950 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                                👑 {(isTranslated || autoTranslate) ? getTranslatedAuthorName('Администратор DuoWindo6601', translatorTargetLang, true) : 'Админ'}
+                                👑 {(isTranslated || autoTranslate) ? getTranslatedAuthorName('Администратор DuoWindo6601', translatorTargetLang, true, aiNameCache) : 'Админ'}
                               </span>
                             )}
                             {rev.rating >= 4 ? (
@@ -2970,7 +3149,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
                             )}
                             {rev.courseName && (
                               <span className="text-[10px] font-bold bg-duo-blue/20 text-duo-blue px-2 py-0.5 rounded-full border border-duo-blue/40 flex items-center gap-1" dir="auto">
-                                <bdi dir="auto">🎓 {(isTranslated || autoTranslate) ? translateTextToTarget(rev.courseName, translatorTargetLang) : rev.courseName}</bdi>
+                                <bdi dir="auto">🎓 {(isTranslated || autoTranslate) ? translateTextToTarget(rev.courseName, translatorTargetLang, aiTextCache) : rev.courseName}</bdi>
                               </span>
                             )}
                           </div>
@@ -3024,7 +3203,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
 
                         {/* Instant Translate Button */}
                         <button
-                          onClick={() => handleTranslateItem(rev.id, rev.comment, translatorTargetLang)}
+                          onClick={() => handleTranslateItem(rev.id, rev.comment, translatorTargetLang, rev.userName, rev.userId === 'admin-duowindo6601')}
                           disabled={isTranslating}
                           className={`flex items-center gap-1 font-bold text-[11px] px-2.5 py-1 rounded-xl transition-all border ${
                             isTranslated
@@ -3126,7 +3305,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
                                         {reply.userAvatar || '👤'}
                                       </div>
                                       <span className="font-bold text-white flex items-center gap-1" dir="auto">
-                                        <bdi dir="auto">{(isRepTranslated || autoTranslate) ? getTranslatedAuthorName(reply.userName, translatorTargetLang, reply.isAdmin) : reply.userName}</bdi>
+                                        <bdi dir="auto">{(isRepTranslated || autoTranslate) ? getTranslatedAuthorName(reply.userName, translatorTargetLang, reply.isAdmin, aiNameCache) : reply.userName}</bdi>
                                         {reply.isAdmin && (
                                           <span className="bg-amber-500 text-gray-950 font-black text-[9px] px-1.5 py-0.2 rounded uppercase">
                                             {t ? t('official_admin_reply') || 'Официальный ответ' : 'Официальный ответ'}
@@ -3137,7 +3316,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({
 
                                     <div className="flex items-center gap-2">
                                       <button
-                                        onClick={() => handleTranslateItem(reply.id, reply.comment, translatorTargetLang)}
+                                        onClick={() => handleTranslateItem(reply.id, reply.comment, translatorTargetLang, reply.userName, reply.isAdmin)}
                                         disabled={isRepTranslating}
                                         className="text-[10px] text-purple-300 hover:underline flex items-center gap-0.5"
                                       >

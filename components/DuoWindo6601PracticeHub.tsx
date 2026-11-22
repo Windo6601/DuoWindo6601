@@ -37,6 +37,8 @@ interface DuoWindo6601PracticeHubProps {
   setExplanation: (exp: any) => void;
   setShowExplanationModal: (show: boolean) => void;
   speakText?: (text: string, courseId: string, slow?: boolean) => void;
+  courses?: Course[];
+  onSwitchCourse?: (course: Course) => void;
   t: (key: string) => string;
 }
 
@@ -58,6 +60,8 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
   setExplanation,
   setShowExplanationModal,
   speakText,
+  courses,
+  onSwitchCourse,
   t
 }) => {
   const isRu = user.language === 'ru';
@@ -90,16 +94,30 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
   // Handler: Mistakes practice
   const handlePracticeSingleMistake = (targetMistake: Exercise) => {
     playSound('click');
-    setCurrentExercise(targetMistake);
-    setAvailableTokens((targetMistake.wordBank || []).map(w => ({ id: crypto.randomUUID(), text: w })));
+    const safeMistake: Exercise =
+      currentCourse.id === 'tlh' && targetMistake.type === 'speech'
+        ? {
+            ...targetMistake,
+            type: 'listening',
+            wordBank:
+              targetMistake.wordBank && targetMistake.wordBank.length > 0
+                ? targetMistake.wordBank
+                : (targetMistake.originalSentence || '').split(/\s+/).filter(Boolean),
+          }
+        : targetMistake;
+    setCurrentExercise(safeMistake);
+    setAvailableTokens((safeMistake.wordBank || []).map(w => ({ id: crypto.randomUUID(), text: w })));
     setSelectedWordIds([]);
     setFeedback({ status: 'idle', message: '' });
     setExplanation(null);
     setShowExplanationModal(false);
     setScreen(AppScreen.LESSON);
+    if (safeMistake.type === 'listening' && safeMistake.originalSentence) {
+      handleSpeak(safeMistake.originalSentence, currentCourse.id, false);
+    }
     const toastMsg = t('mistakePracticeToast')
-      ? t('mistakePracticeToast').replace('{text}', targetMistake.originalSentence)
-      : (isRu ? `🔄 Исправление ошибки: ${targetMistake.originalSentence}` : `🔄 Reviewing mistake: ${targetMistake.originalSentence}`);
+      ? t('mistakePracticeToast').replace('{text}', safeMistake.originalSentence)
+      : (isRu ? `🔄 Исправление ошибки: ${safeMistake.originalSentence}` : `🔄 Reviewing mistake: ${safeMistake.originalSentence}`);
     setToast(toastMsg);
   };
 
@@ -674,40 +692,42 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
               <span>+35 XP</span>
             </div>
           </button>
-          {/* 11b. DuoWindo6601Radio — Подкасты на аудирование */}
-          <button
-            type="button"
-            onClick={() => {
-              playSound('click');
-              setIsRadioModalOpen(true);
-            }}
-            className="bg-gradient-to-r from-[#2D9EE0] to-[#1A78B8] p-8 md:p-10 rounded-[2.5rem] border-b-8 border-[#125688] text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center justify-between shadow-2xl cursor-pointer md:col-span-2 group"
-          >
-            <div className="flex items-center space-x-6">
-              <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-gradient-to-b from-[#66DBFF] to-[#42C6FA] border-b-4 border-[#1B89C2] flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform">
-                <HeadphonesRadioIcon className="w-11 h-11 md:w-12 md:h-12" />
-              </div>
-              <div>
-                <div className="flex items-center space-x-2 mb-1 flex-wrap">
-                  <h3 className="text-2xl md:text-3xl font-black text-white">
-                    DuoWindo6601Radio
-                  </h3>
-                  <span className="bg-sky-950 text-sky-200 text-[10px] px-2.5 py-0.5 rounded-md font-black border border-sky-300/40 uppercase">
-                    {isRu ? 'ПОДКАСТЫ' : 'PODCASTS'}
-                  </span>
+          {/* 11b. DuoWindo6601Radio — Подкасты на аудирование (скрыто для клингонского и неязыковых курсов) */}
+          {currentCourse.id !== 'tlh' && !['math', 'music', 'chess', 'coding', 'art'].includes(currentCourse.id) && (
+            <button
+              type="button"
+              onClick={() => {
+                playSound('click');
+                setIsRadioModalOpen(true);
+              }}
+              className="bg-gradient-to-r from-[#2D9EE0] to-[#1A78B8] p-8 md:p-10 rounded-[2.5rem] border-b-8 border-[#125688] text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center justify-between shadow-2xl cursor-pointer md:col-span-2 group"
+            >
+              <div className="flex items-center space-x-6">
+                <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-gradient-to-b from-[#66DBFF] to-[#42C6FA] border-b-4 border-[#1B89C2] flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform">
+                  <HeadphonesRadioIcon className="w-11 h-11 md:w-12 md:h-12" />
                 </div>
-                <p className="opacity-95 font-bold text-xs md:text-sm text-sky-100">
-                  {isRu
-                    ? 'Короткие выпуски подкастов с DuoWindo6601, погружение в речь и проверка понимания'
-                    : 'Short podcast episodes with DuoWindo6601, speech immersion, and comprehension checks'}
-                </p>
+                <div>
+                  <div className="flex items-center space-x-2 mb-1 flex-wrap">
+                    <h3 className="text-2xl md:text-3xl font-black text-white">
+                      DuoWindo6601Radio
+                    </h3>
+                    <span className="bg-sky-950 text-sky-200 text-[10px] px-2.5 py-0.5 rounded-md font-black border border-sky-300/40 uppercase">
+                      {isRu ? 'ПОДКАСТЫ' : 'PODCASTS'}
+                    </span>
+                  </div>
+                  <p className="opacity-95 font-bold text-xs md:text-sm text-sky-100">
+                    {isRu
+                      ? 'Короткие выпуски подкастов с DuoWindo6601 и проверка понимания'
+                      : 'Short podcast episodes with DuoWindo6601 and comprehension checks'}
+                  </p>
+                </div>
               </div>
-            </div>
-            <div className="bg-amber-400 text-slate-950 font-black text-xs px-3.5 py-2 rounded-xl uppercase tracking-wider shrink-0 hidden sm:flex items-center gap-1 shadow-md">
-              <span>🎧</span>
-              <span>+30 XP</span>
-            </div>
-          </button>
+              <div className="bg-amber-400 text-slate-950 font-black text-xs px-3.5 py-2 rounded-xl uppercase tracking-wider shrink-0 hidden sm:flex items-center gap-1 shadow-md">
+                <span>🎧</span>
+                <span>+30 XP</span>
+              </div>
+            </button>
+          )}
         </div>
 
         {/* 12. Своя тема генерации задач */}
@@ -778,16 +798,20 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
         speakText={handleSpeak}
       />
 
-      <DuoWindo6601RadioModal
-        isOpen={isRadioModalOpen}
-        onClose={() => setIsRadioModalOpen(false)}
-        currentCourse={currentCourse}
-        user={user}
-        setUser={setUser}
-        playSound={playSound}
-        setToast={setToast}
-        speakText={handleSpeak}
-      />
+      {currentCourse.id !== 'tlh' && !['math', 'music', 'chess', 'coding', 'art'].includes(currentCourse.id) && (
+        <DuoWindo6601RadioModal
+          isOpen={isRadioModalOpen}
+          onClose={() => setIsRadioModalOpen(false)}
+          currentCourse={currentCourse}
+          allCourses={courses}
+          onSwitchCourse={onSwitchCourse}
+          user={user}
+          setUser={setUser}
+          playSound={playSound}
+          setToast={setToast}
+          speakText={handleSpeak}
+        />
+      )}
 
       {/* Modal for Arabic Numerals Converter (0-99) & Handbook */}
       {isArabicConverterOpen && (

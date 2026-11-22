@@ -23,6 +23,11 @@ import {
   resolveGoogleTtsLang,
   resolvePhoneticTtsTarget,
 } from './services/multilingualTtsHelper.ts';
+import {
+  KLINGON_SENTENCE_PLAYER_BASE,
+  normalizeToTlhLatin,
+  synthesizeSamKlingonWavBytes,
+} from './services/klingonSpeechService.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -217,13 +222,17 @@ app.post('/api/tts/google', express.json(), async (req, res) => {
     return;
   }
   try {
-    const audioBuf = await fetchGoogleTranslateTtsAudio(text, normalizedLang);
+    const gttsTarget = GTTS_SUPPORTED_LANGS.has(normalizedLang)
+      ? { lang: normalizedLang, text }
+      : resolvePhoneticTtsTarget(text, normalizedLang, GTTS_SUPPORTED_LANGS);
+    const audioBuf = await fetchGoogleTranslateTtsAudio(gttsTarget.text, gttsTarget.lang);
     if (!audioBuf) {
       res.status(404).json({ error: { message: `No GTTS audio for language ${normalizedLang}` } });
       return;
     }
     res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('X-TTS-Lang', normalizedLang);
+    res.setHeader('X-TTS-Lang', gttsTarget.lang);
+    res.setHeader('X-Requested-Lang', normalizedLang);
     res.send(audioBuf);
   } catch (err: any) {
     res.status(502).json({ error: { message: err?.message || 'Google TTS proxy failed' } });
@@ -401,28 +410,39 @@ app.post('/api/tts/grok', express.json(), async (req, res) => {
   }
 });
 
-// Klingon Audio-File & Sentence Player Proxy (hol.kag.org/sentence/)
-const klingonAudioCache = new Map<string, { buffer: Buffer; filename: string }>();
+// Klingon Audio-File & Sentence Player Proxy (hol.kag.org/sentence/ -> SAM Software Automatic Mouth)
+const klingonAudioCache = new Map<string, { buffer: Buffer; filename: string; holMatched: boolean }>();
+const holVerifiedCache = new Map<string, boolean>();
 
 app.get('/api/tts/klingon', async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   const rawText = String(req.query.text || '').trim();
   const forceDownload = req.query.download === '1' || req.query.download === 'true';
+  const isSlow = req.query.slow === '1' || req.query.slow === 'true';
 
   if (!rawText || rawText.length > 240) {
     res.status(400).json({ ok: false, error: 'Valid Klingon text is required', fallback: 'client' });
     return;
   }
 
-  // Normalize curly apostrophes to straight apostrophe used by hol.kag.org
-  const normalizedSent = rawText.replace(/’/g, "'").replace(/\s+/g, ' ').trim();
-  const cacheKey = normalizedSent.toLowerCase();
-  const safeSlug = normalizedSent.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'klingon';
+  // Normalize both tlh_Latn and ConScript pIqaD to canonical straight apostrophes used by hol.kag.org & SAM
+  const normalizedSent = normalizeToTlhLatin(rawText);
+  if (!normalizedSent) {
+    res.status(400).json({ ok: false, error: 'Valid Klingon text is required', fallback: 'client' });
+    return;
+  }
 
-  const sendCachedAudio = (entry: { buffer: Buffer; filename: string }) => {
-    res.setHeader('Content-Type', 'audio/mpeg');
+  const cacheKey = `${normalizedSent.toLowerCase()}__${isSlow ? 'slow' : 'norm'}`;
+  const safeSlug = normalizedSent.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'klingon';
+  const holSentenceUrl = `${KLINGON_SENTENCE_PLAYER_BASE}?sent=${encodeURIComponent(normalizedSent)}`;
+
+  const sendSamAudio = (entry: { buffer: Buffer; filename: string; holMatched: boolean }) => {
+    res.setHeader('Content-Type', 'audio/wav');
     res.setHeader('Cache-Control', 'public, max-age=86400');
-    res.setHeader('X-Klingon-Audio-Source', 'hol.kag.org');
+    res.setHeader('X-Klingon-Audio-Source', 'hol.kag.org + SAM (Software Automatic Mouth)');
+    res.setHeader('X-Klingon-Speech-Engine', 'SAM-Software-Automatic-Mouth');
+    res.setHeader('X-Hol-Sentence-Url', holSentenceUrl);
+    res.setHeader('X-Hol-Matched', entry.holMatched ? 'true' : 'false');
     if (forceDownload) {
       res.setHeader('Content-Disposition', `attachment; filename="${entry.filename}"`);
     }
@@ -431,62 +451,53 @@ app.get('/api/tts/klingon', async (req, res) => {
 
   const cached = klingonAudioCache.get(cacheKey);
   if (cached) {
-    sendCachedAudio(cached);
+    sendSamAudio(cached);
     return;
   }
 
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
-    const pageUrl = `https://hol.kag.org/sentence/?sent=${encodeURIComponent(normalizedSent)}`;
-    const pageRes = await fetch(pageUrl, {
-      headers: { 'User-Agent': 'DuoWindo6601/1.0 (+https://hol.kag.org)' },
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-
-    if (!pageRes.ok) {
-      res.status(404).json({ ok: false, fallback: 'client' });
-      return;
+  // Connect to hol.kag.org sentence player to verify/resolve canonical sentence metadata (fast cached check)
+  let holMatched = holVerifiedCache.get(normalizedSent.toLowerCase()) ?? false;
+  if (!holVerifiedCache.has(normalizedSent.toLowerCase())) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 1400);
+      const pageRes = await fetch(holSentenceUrl, {
+        headers: { 'User-Agent': 'DuoWindo6601/1.0 (+https://hol.kag.org)' },
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (pageRes.ok) {
+        const html = await pageRes.text();
+        holMatched = /\/media\/tts\/audio_[a-zA-Z0-9_-]+\.mp3/.test(html);
+      }
+    } catch {
+      holMatched = false;
     }
-
-    const html = await pageRes.text();
-    const match = html.match(/\/media\/tts\/audio_[a-zA-Z0-9_-]+\.mp3/);
-    if (!match) {
-      res.status(404).json({ ok: false, fallback: 'client' });
-      return;
+    if (holVerifiedCache.size > 150) {
+      const firstHolKey = holVerifiedCache.keys().next().value;
+      if (firstHolKey) holVerifiedCache.delete(firstHolKey);
     }
-
-    const audioController = new AbortController();
-    const audioTimer = setTimeout(() => audioController.abort(), 5000);
-    const mp3Res = await fetch(`https://hol.kag.org${match[0]}`, {
-      headers: { 'User-Agent': 'DuoWindo6601/1.0' },
-      signal: audioTimer.signal,
-    });
-    clearTimeout(audioTimer);
-
-    if (!mp3Res.ok) {
-      res.status(404).json({ ok: false, fallback: 'client' });
-      return;
-    }
-
-    const buf = Buffer.from(await mp3Res.arrayBuffer());
-    if (buf.length < 256) {
-      res.status(404).json({ ok: false, fallback: 'client' });
-      return;
-    }
-
-    const filename = `klingon_${safeSlug}.mp3`;
-    if (klingonAudioCache.size > 150) {
-      const oldestKey = klingonAudioCache.keys().next().value;
-      if (oldestKey) klingonAudioCache.delete(oldestKey);
-    }
-    const entry = { buffer: buf, filename };
-    klingonAudioCache.set(cacheKey, entry);
-    sendCachedAudio(entry);
-  } catch (err: any) {
-    res.status(404).json({ ok: false, fallback: 'client', reason: err?.message || 'hol_unavailable' });
+    holVerifiedCache.set(normalizedSent.toLowerCase(), holMatched);
   }
+
+  // Synthesize via SAM (Software Automatic Mouth / sam-js) so hol.kag.org endpoint also outputs SAM voice
+  const samBytes = synthesizeSamKlingonWavBytes(normalizedSent, isSlow);
+  if (!samBytes || samBytes.length < 64) {
+    res.status(404).json({ ok: false, fallback: 'client', holSentenceUrl });
+    return;
+  }
+
+  const entry = {
+    buffer: Buffer.from(samBytes),
+    filename: `klingon_${safeSlug}${isSlow ? '_slow' : ''}_sam.wav`,
+    holMatched,
+  };
+  if (klingonAudioCache.size > 150) {
+    const oldestKey = klingonAudioCache.keys().next().value;
+    if (oldestKey) klingonAudioCache.delete(oldestKey);
+  }
+  klingonAudioCache.set(cacheKey, entry);
+  sendSamAudio(entry);
 });
 
 // MCP (Model Context Protocol) & Jules debugging status endpoint

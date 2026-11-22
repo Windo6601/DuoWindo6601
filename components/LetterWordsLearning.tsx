@@ -9,7 +9,15 @@ import {
 } from '../services/wordsLearningService';
 import { playSound, triggerHapticFeedback } from '../services/audioService';
 import { tlhToPIqaD } from '../services/klingonDictionaryService';
-import { downloadKlingonAudioFile } from '../services/klingonSpeechService';
+import {
+  downloadKlingonAudioFile,
+  getKlingonSentencePlayerUrl,
+  getKlingonSpeechMode,
+  KLINGON_SAM_HOMEPAGE,
+  KlingonSpeechSource,
+  playKlingonSpeech,
+  setKlingonSpeechMode,
+} from '../services/klingonSpeechService';
 
 interface LetterWordsLearningProps {
   currentCourse: Course;
@@ -38,6 +46,16 @@ export const LetterWordsLearning: React.FC<LetterWordsLearningProps> = ({
   const [assembledLetters, setAssembledLetters] = useState<{ id: string; letter: string }[]>([]);
   const [quizFeedback, setQuizFeedback] = useState<'idle' | 'correct' | 'wrong'>('idle');
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
+  const [klingonSpeechMode, setKlingonSpeechModeState] = useState<KlingonSpeechSource>(() => getKlingonSpeechMode());
+
+  const handleSwitchKlingonMode = (mode: KlingonSpeechSource, sampleText?: string) => {
+    playSound('select');
+    setKlingonSpeechMode(mode);
+    setKlingonSpeechModeState(mode);
+    if (sampleText) {
+      void playKlingonSpeech(sampleText, false, mode);
+    }
+  };
 
   const filteredWords = useMemo(() => {
     if (!searchQuery.trim()) return words;
@@ -328,7 +346,7 @@ export const LetterWordsLearning: React.FC<LetterWordsLearningProps> = ({
                   type="button"
                   onClick={() => {
                     playSound('click');
-                    void downloadKlingonAudioFile(selectedWord.word);
+                    void downloadKlingonAudioFile(selectedWord.word, false, klingonSpeechMode);
                   }}
                   className="py-3 px-3 bg-emerald-950/80 hover:bg-emerald-800 text-emerald-200 font-black text-xs uppercase tracking-wider rounded-2xl border border-emerald-500/40 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                 >
@@ -337,6 +355,49 @@ export const LetterWordsLearning: React.FC<LetterWordsLearningProps> = ({
                 </button>
               )}
             </div>
+
+            {isKlingon && (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleSwitchKlingonMode('client', selectedWord.word)}
+                  className={`flex-1 py-2 px-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider border transition-all cursor-pointer ${
+                    klingonSpeechMode !== 'hol'
+                      ? 'bg-sky-600/80 border-sky-400 text-white'
+                      : 'bg-gray-800 border-gray-700 text-sky-200 hover:bg-gray-700'
+                  }`}
+                >
+                  🔊 SAM Speech
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSwitchKlingonMode('hol', selectedWord.word)}
+                  className={`flex-1 py-2 px-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider border transition-all cursor-pointer ${
+                    klingonSpeechMode === 'hol'
+                      ? 'bg-indigo-600/85 border-indigo-400 text-white'
+                      : 'bg-gray-800 border-gray-700 text-indigo-200 hover:bg-gray-700'
+                  }`}
+                >
+                  🎧 hol.kag.org (SAM)
+                </button>
+                <a
+                  href={KLINGON_SAM_HOMEPAGE}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="py-2 px-2.5 rounded-xl bg-gray-800 hover:bg-sky-700 text-sky-300 hover:text-white border border-gray-700 text-[10px] font-black"
+                >
+                  SAM ↗
+                </a>
+                <a
+                  href={getKlingonSentencePlayerUrl(selectedWord.word)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="py-2 px-2.5 rounded-xl bg-gray-800 hover:bg-indigo-700 text-indigo-300 hover:text-white border border-gray-700 text-[10px] font-black"
+                >
+                  hol.kag.org ↗
+                </a>
+              </div>
+            )}
 
             {/* Start Practice button */}
             <button

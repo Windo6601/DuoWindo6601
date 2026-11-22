@@ -760,8 +760,11 @@ const resolveSpeechLanguage = (text: string, lang: string): string => {
   const baseLang = normalizeCourseLangCode(rawLang);
   if (!clean) return baseLang || 'en';
 
-  // 1. Klingon course or ConScript pIqaD text ALWAYS stays 'tlh' (never hijacked to English)
-  if (rawLang === 'tlh' || rawLang === 'klingon' || isPIqaDText(clean)) {
+  // 1. Klingon course or ConScript pIqaD text stays 'tlh' ONLY if it is not Russian/Cyrillic UI/story text
+  if (isPIqaDText(clean)) {
+    return 'tlh';
+  }
+  if ((rawLang === 'tlh' || rawLang === 'klingon') && !/[\u0400-\u04FF]/.test(clean)) {
     return 'tlh';
   }
 
@@ -1159,7 +1162,7 @@ export const speakText = async (
     }
   }
 
-  if (provider === 'google' && typeof navigator !== 'undefined' && navigator.onLine && GTTS_SUPPORTED_LANGS.has(effectiveLang)) {
+  if (provider === 'google' && typeof navigator !== 'undefined' && navigator.onLine && effectiveLang !== 'tlh') {
     try {
       await speakWithGoogleServerTts(cleanText, effectiveLang, slow);
       return;

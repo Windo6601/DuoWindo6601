@@ -1,26 +1,52 @@
 /**
  * Client-Side Klingon Speech Synthesizer & Audio File Service
- * - Offline Client-Side Formant & Phoneme WAV Synthesizer (16-bit PCM .wav Blob)
+ * - SAM (Software Automatic Mouth / sam-js) Client-Side Speech Synthesizer (1982 C64/Atari retro formant TTS)
+ * - Offline Formant & Phoneme WAV fallback (16-bit PCM .wav Blob)
  * - Proxied Klingon Audio File Playback & Download via hol.kag.org (/api/tts/klingon)
  * - Supports both tlh_Latn and ConScript pIqaD (U+F8D0-U+F8FF) input
  */
 
-import { isPIqaDText, pIqaDToTlh, splitKlingonPhonemes } from './klingonDictionaryService';
+import SamJs from 'sam-js';
+import { isPIqaDText, pIqaDToTlh, splitKlingonPhonemes } from './klingonDictionaryService.ts';
 
 export const KLINGON_SENTENCE_PLAYER_BASE = 'https://hol.kag.org/sentence/';
+export const KLINGON_HOL_HELLO_URL = 'https://hol.kag.org/sentence/Hello';
+export const KLINGON_SAM_HOMEPAGE = 'https://discordier.github.io/sam/';
 
 export type KlingonSpeechSource = 'auto' | 'client' | 'hol';
+
+const KLINGON_SPEECH_MODE_STORAGE_KEY = 'duo_klingon_speech_mode';
+let activeKlingonSpeechMode: KlingonSpeechSource = (() => {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const saved = window.localStorage.getItem(KLINGON_SPEECH_MODE_STORAGE_KEY);
+      if (saved === 'hol' || saved === 'client' || saved === 'auto') return saved;
+    }
+  } catch {}
+  return 'client';
+})();
+
+export const getKlingonSpeechMode = (): KlingonSpeechSource => activeKlingonSpeechMode;
+
+export const setKlingonSpeechMode = (mode: KlingonSpeechSource): void => {
+  activeKlingonSpeechMode = mode;
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(KLINGON_SPEECH_MODE_STORAGE_KEY, mode);
+    }
+  } catch {}
+};
 
 export interface KlingonAudioInfo {
   text: string;
   normalizedTlh: string;
-  source: 'client-wav' | 'hol-mp3';
+  source: 'client-wav' | 'hol-sam-wav' | 'hol-mp3';
   mimeType: string;
   filename: string;
 }
 
 const SAMPLE_RATE = 22050;
-const remoteMp3BlobCache = new Map<string, Blob>();
+const remoteAudioBlobCache = new Map<string, Blob>();
 const clientWavBlobCache = new Map<string, Blob>();
 let activeAudioEl: HTMLAudioElement | null = null;
 let activeAudioUrl: string | null = null;
@@ -30,7 +56,7 @@ export const getKlingonLastAudioInfo = (): KlingonAudioInfo | null => lastAudioI
 
 export const getKlingonSentencePlayerUrl = (text: string): string => {
   const clean = normalizeToTlhLatin(text);
-  if (!clean) return 'https://hol.kag.org/sentence/Hello';
+  if (!clean) return KLINGON_HOL_HELLO_URL;
   return `${KLINGON_SENTENCE_PLAYER_BASE}?sent=${encodeURIComponent(clean.replace(/’/g, "'"))}`;
 };
 
@@ -176,15 +202,188 @@ const renderConsonantSegment = (phoneme: string, durationSec: number, baseF0: nu
   return out;
 };
 
+const KLINGON_TO_SAM_PHONEME_MAP: Record<string, string> = {
+  a: 'AA5',
+  e: 'EH5',
+  I: 'IH5',
+  i: 'IH5',
+  o: 'OH5',
+  u: 'UW5',
+  b: 'B',
+  ch: 'CH',
+  D: 'D',
+  d: 'D',
+  gh: 'G/H',
+  H: '/H',
+  j: 'J',
+  l: 'L',
+  m: 'M',
+  n: 'N',
+  ng: 'NX',
+  p: 'P',
+  q: 'K',
+  Q: 'K/H',
+  r: 'R',
+  S: 'SH',
+  t: 'T',
+  tlh: 'TL/H',
+  v: 'V',
+  w: 'W',
+  y: 'Y',
+  "'": 'Q',
+  '’': 'Q',
+};
+
 /**
- * Generates an authentic Client-Side 16-bit PCM WAV Blob for Klingon text.
- * Works 100% offline in the browser with zero network dependency.
+ * Converts tlh_Latn / pIqaD Klingon text into SAM (Software Automatic Mouth) phonetic tokens.
+ */
+export const klingonWordToSamPhonemes = (word: string): string => {
+  const cleanWord = (word || '').replace(/[^a-zA-Z'’]/g, '');
+  if (!cleanWord) return '';
+  const phonemes = splitKlingonPhonemes(cleanWord);
+  const parts: string[] = [];
+  for (const ph of phonemes) {
+    const mapped = KLINGON_TO_SAM_PHONEME_MAP[ph] || KLINGON_TO_SAM_PHONEME_MAP[ph.toLowerCase()];
+    if (mapped) {
+      parts.push(mapped);
+    }
+  }
+  return parts.join('');
+};
+
+export const klingonToSamPhonemes = (text: string): string => {
+  const normalized = normalizeToTlhLatin(text);
+  if (!normalized) return '';
+  return normalized
+    .split(/\s+/)
+    .map(w => klingonWordToSamPhonemes(w))
+    .filter(Boolean)
+    .join(' ');
+};
+
+const createWav8BitUint8ArrayFromSamples = (samples: Uint8Array): Uint8Array => {
+  const wav = new Uint8Array(44 + samples.length);
+  const view = new DataView(wav.buffer);
+  const writeAscii = (offset: number, str: string) => {
+    for (let i = 0; i < str.length; i++) {
+      view.setUint8(offset + i, str.charCodeAt(i));
+    }
+  };
+  writeAscii(0, 'RIFF');
+  view.setUint32(4, 36 + samples.length, true);
+  writeAscii(8, 'WAVE');
+  writeAscii(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, 1, true); // Mono
+  view.setUint32(24, SAMPLE_RATE, true);
+  view.setUint32(28, SAMPLE_RATE, true); // 8-bit mono = 1 byte/sample
+  view.setUint16(32, 1, true);
+  view.setUint16(34, 8, true);
+  writeAscii(36, 'data');
+  view.setUint32(40, samples.length, true);
+  wav.set(samples, 44);
+  return wav;
+};
+
+/**
+ * Generates raw 8-bit Mono PCM WAV bytes using SAM (Software Automatic Mouth / sam-js).
+ * Shared by both client-side browser playback and server /api/tts/klingon (hol.kag.org + SAM).
+ */
+export const synthesizeSamKlingonWavBytes = (text: string, isSlow: boolean = false): Uint8Array | null => {
+  const normalized = normalizeToTlhLatin(text);
+  if (!normalized) return null;
+
+  try {
+    const sam = new SamJs({
+      pitch: 72,
+      speed: isSlow ? 108 : 78,
+      mouth: 120,
+      throat: 112,
+    });
+
+    const words = normalized.split(/\s+/).filter(Boolean);
+    const wordPhonemes = words.map(w => klingonWordToSamPhonemes(w)).filter(Boolean);
+    if (wordPhonemes.length === 0) return null;
+
+    // Group into safe chunks (max 42 phoneme chars per SAM render call)
+    const groups: string[] = [];
+    let current = '';
+    for (const wp of wordPhonemes) {
+      if (current && current.length + 1 + wp.length > 42) {
+        groups.push(current);
+        current = wp;
+      } else {
+        current = current ? `${current} ${wp}` : wp;
+      }
+    }
+    if (current) groups.push(current);
+
+    const pcmChunks: Uint8Array[] = [];
+    const silenceGap = new Uint8Array(Math.floor(SAMPLE_RATE * (isSlow ? 0.14 : 0.08))).fill(128);
+
+    for (let i = 0; i < groups.length; i++) {
+      const grp = groups[i];
+      let buf = sam.buf8(grp, true);
+      if (!(buf instanceof Uint8Array) || buf.length === 0) {
+        const rawWords = words.join(' ');
+        const convertFn = (SamJs as unknown as { convert?: (text: string) => string }).convert;
+        const fallbackConv = typeof convertFn === 'function' ? convertFn(rawWords) : '';
+        if (fallbackConv) {
+          buf = sam.buf8(fallbackConv.slice(0, 60), true);
+        }
+      }
+      if (buf instanceof Uint8Array && buf.length > 0) {
+        pcmChunks.push(buf);
+        if (i < groups.length - 1) {
+          pcmChunks.push(silenceGap);
+        }
+      }
+    }
+
+    if (pcmChunks.length === 0) return null;
+    const totalLen = pcmChunks.reduce((acc, c) => acc + c.length, 0);
+    const merged = new Uint8Array(totalLen);
+    let pos = 0;
+    for (const c of pcmChunks) {
+      merged.set(c, pos);
+      pos += c.length;
+    }
+    return createWav8BitUint8ArrayFromSamples(merged);
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Generates an authentic Client-Side WAV Blob using SAM (Software Automatic Mouth / sam-js).
+ * Chunks longer sentences so SAM's internal 255-phoneme buffer never overflows.
+ */
+export const synthesizeSamKlingonWavBlob = (text: string, isSlow: boolean = false): Blob | null => {
+  const wavBytes = synthesizeSamKlingonWavBytes(text, isSlow);
+  if (!wavBytes) return null;
+  return new Blob([new Uint8Array(wavBytes)], { type: 'audio/wav' });
+};
+
+/**
+ * Generates an authentic Client-Side WAV Blob for Klingon text.
+ * Uses SAM Software Automatic Mouth (sam-js) first, with formant PCM fallback.
  */
 export const synthesizeClientKlingonWavBlob = (text: string, isSlow: boolean = false): Blob => {
   const normalized = normalizeToTlhLatin(text);
-  const cacheKey = `${normalized}__${isSlow ? 'slow' : 'norm'}`;
+  const cacheKey = `sam_${normalized}__${isSlow ? 'slow' : 'norm'}`;
   const existing = clientWavBlobCache.get(cacheKey);
   if (existing) return existing;
+
+  const samBlob = synthesizeSamKlingonWavBlob(normalized, isSlow);
+  if (samBlob) {
+    if (clientWavBlobCache.size > 120) {
+      const firstKey = clientWavBlobCache.keys().next().value;
+      if (firstKey) clientWavBlobCache.delete(firstKey);
+    }
+    clientWavBlobCache.set(cacheKey, samBlob);
+    return samBlob;
+  }
 
   const speed = isSlow ? 1.48 : 1.0;
   const words = normalized.split(/\s+/).filter(Boolean);
@@ -336,16 +535,16 @@ const playBlobViaWebAudio = async (blob: Blob, playbackRate: number = 1.0): Prom
   }
 };
 
-const fetchHolKlingonMp3Blob = async (normalizedTlh: string): Promise<Blob | null> => {
+const fetchHolKlingonSamBlob = async (normalizedTlh: string, isSlow: boolean = false): Promise<Blob | null> => {
   if (!normalizedTlh || typeof fetch === 'undefined') return null;
-  const cacheKey = normalizedTlh.toLowerCase();
-  const cached = remoteMp3BlobCache.get(cacheKey);
+  const cacheKey = `${normalizedTlh.toLowerCase()}__${isSlow ? 'slow' : 'norm'}`;
+  const cached = remoteAudioBlobCache.get(cacheKey);
   if (cached) return cached;
 
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 2200);
-    const res = await fetch(`/api/tts/klingon?text=${encodeURIComponent(normalizedTlh)}`, {
+    const timer = setTimeout(() => controller.abort(), 2500);
+    const res = await fetch(`/api/tts/klingon?text=${encodeURIComponent(normalizedTlh)}${isSlow ? '&slow=1' : ''}`, {
       signal: controller.signal,
     });
     clearTimeout(timer);
@@ -356,11 +555,11 @@ const fetchHolKlingonMp3Blob = async (normalizedTlh: string): Promise<Blob | nul
 
     const blob = await res.blob();
     if (!blob || blob.size < 256) return null;
-    if (remoteMp3BlobCache.size > 100) {
-      const first = remoteMp3BlobCache.keys().next().value;
-      if (first) remoteMp3BlobCache.delete(first);
+    if (remoteAudioBlobCache.size > 100) {
+      const first = remoteAudioBlobCache.keys().next().value;
+      if (first) remoteAudioBlobCache.delete(first);
     }
-    remoteMp3BlobCache.set(cacheKey, blob);
+    remoteAudioBlobCache.set(cacheKey, blob);
     return blob;
   } catch {
     return null;
@@ -368,39 +567,41 @@ const fetchHolKlingonMp3Blob = async (normalizedTlh: string): Promise<Blob | nul
 };
 
 /**
- * Generates a downloadable Klingon audio file (.mp3 from hol.kag.org if available, or offline Client Speech .wav).
+ * Generates a downloadable Klingon audio file using SAM (Software Automatic Mouth).
+ * Both direct client synthesis and hol.kag.org proxy (/api/tts/klingon) deliver SAM .wav audio.
  */
 export const generateKlingonAudioFileBlob = async (
   text: string,
   isSlow: boolean = false,
   sourcePref: KlingonSpeechSource = 'auto'
-): Promise<{ blob: Blob; filename: string; mimeType: string; source: 'hol-mp3' | 'client-wav' }> => {
+): Promise<{ blob: Blob; filename: string; mimeType: string; source: 'hol-sam-wav' | 'client-wav' }> => {
   const normalizedTlh = normalizeToTlhLatin(text);
   const safeSlug = normalizedTlh.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'klingon';
+  const effectivePref = sourcePref === 'auto' ? getKlingonSpeechMode() : sourcePref;
 
-  if (sourcePref !== 'client' && !isSlow && typeof navigator !== 'undefined' && navigator.onLine) {
-    const mp3Blob = await fetchHolKlingonMp3Blob(normalizedTlh);
-    if (mp3Blob) {
-      const filename = `klingon_${safeSlug}.mp3`;
-      lastAudioInfo = { text, normalizedTlh, source: 'hol-mp3', mimeType: 'audio/mpeg', filename };
-      return { blob: mp3Blob, filename, mimeType: 'audio/mpeg', source: 'hol-mp3' };
+  if (effectivePref === 'hol' && typeof navigator !== 'undefined' && navigator.onLine) {
+    const holSamBlob = await fetchHolKlingonSamBlob(normalizedTlh, isSlow);
+    if (holSamBlob) {
+      const filename = `klingon_${safeSlug}${isSlow ? '_slow' : ''}_sam.wav`;
+      lastAudioInfo = { text, normalizedTlh, source: 'hol-sam-wav', mimeType: holSamBlob.type || 'audio/wav', filename };
+      return { blob: holSamBlob, filename, mimeType: holSamBlob.type || 'audio/wav', source: 'hol-sam-wav' };
     }
   }
 
   const wavBlob = synthesizeClientKlingonWavBlob(normalizedTlh, isSlow);
-  const filename = `klingon_${safeSlug}${isSlow ? '_slow' : ''}.wav`;
+  const filename = `klingon_${safeSlug}${isSlow ? '_slow' : ''}_sam.wav`;
   lastAudioInfo = { text, normalizedTlh, source: 'client-wav', mimeType: 'audio/wav', filename };
   return { blob: wavBlob, filename, mimeType: 'audio/wav', source: 'client-wav' };
 };
 
 /**
- * Triggers browser download of the generated Klingon audio file (.mp3 / .wav).
+ * Triggers browser download of the generated Klingon audio file (SAM .wav).
  */
 export const downloadKlingonAudioFile = async (
   text: string,
   isSlow: boolean = false,
   sourcePref: KlingonSpeechSource = 'auto'
-): Promise<{ filename: string; source: 'hol-mp3' | 'client-wav' }> => {
+): Promise<{ filename: string; source: 'hol-sam-wav' | 'client-wav' }> => {
   const file = await generateKlingonAudioFileBlob(text, isSlow, sourcePref);
   if (typeof document !== 'undefined') {
     const url = URL.createObjectURL(file.blob);
@@ -416,9 +617,9 @@ export const downloadKlingonAudioFile = async (
 };
 
 /**
- * Primary Client-Side Klingon Speech entry point.
- * 1) Plays authentic hol.kag.org MP3 audio file when available (or when sourcePref='hol'),
- * 2) Plays Client-Side Formant & Phoneme WAV Speech synthesizer cleanly offline & on all browsers.
+ * Primary Klingon Speech entry point.
+ * Both client-side playback ('auto' / 'client') AND connected hol.kag.org ('hol')
+ * output SAM (Software Automatic Mouth) speech.
  */
 export const playKlingonSpeech = async (
   text: string,
@@ -427,35 +628,35 @@ export const playKlingonSpeech = async (
 ): Promise<boolean> => {
   const normalizedTlh = normalizeToTlhLatin(text);
   if (!normalizedTlh) return false;
+  const safeSlug = normalizedTlh.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'klingon';
+  const effectivePref = sourcePref === 'auto' ? getKlingonSpeechMode() : sourcePref;
 
-  // 1. Try hol.kag.org real MP3 audio file if online and not forced to client
-  if (sourcePref !== 'client' && typeof navigator !== 'undefined' && navigator.onLine) {
-    const mp3Blob = await fetchHolKlingonMp3Blob(normalizedTlh);
-    if (mp3Blob) {
-      const safeSlug = normalizedTlh.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'klingon';
+  // Connected hol.kag.org route: /api/tts/klingon validates against hol.kag.org AND outputs SAM Software Automatic Mouth
+  if (effectivePref === 'hol' && typeof navigator !== 'undefined' && navigator.onLine) {
+    const holSamBlob = await fetchHolKlingonSamBlob(normalizedTlh, isSlow);
+    if (holSamBlob) {
       lastAudioInfo = {
         text,
         normalizedTlh,
-        source: 'hol-mp3',
-        mimeType: 'audio/mpeg',
-        filename: `klingon_${safeSlug}.mp3`,
+        source: 'hol-sam-wav',
+        mimeType: holSamBlob.type || 'audio/wav',
+        filename: `klingon_${safeSlug}${isSlow ? '_slow' : ''}_sam.wav`,
       };
-      const played = await playBlobViaHtmlAudio(mp3Blob, isSlow ? 0.72 : 1.0);
+      const played = await playBlobViaHtmlAudio(holSamBlob, 1.0);
       if (played) return true;
-      const webAudioPlayed = await playBlobViaWebAudio(mp3Blob, isSlow ? 0.72 : 1.0);
+      const webAudioPlayed = await playBlobViaWebAudio(holSamBlob, 1.0);
       if (webAudioPlayed) return true;
     }
   }
 
-  // 2. Offline Client-Side Formant WAV Speech Synthesizer
+  // Direct Client-Side SAM (Software Automatic Mouth) Synthesizer (also fallback for offline/hol)
   const wavBlob = synthesizeClientKlingonWavBlob(normalizedTlh, isSlow);
-  const safeSlug = normalizedTlh.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'klingon';
   lastAudioInfo = {
     text,
     normalizedTlh,
-    source: 'client-wav',
+    source: effectivePref === 'hol' ? 'hol-sam-wav' : 'client-wav',
     mimeType: 'audio/wav',
-    filename: `klingon_${safeSlug}${isSlow ? '_slow' : ''}.wav`,
+    filename: `klingon_${safeSlug}${isSlow ? '_slow' : ''}_sam.wav`,
   };
 
   const okHtml = await playBlobViaHtmlAudio(wavBlob, 1.0);

@@ -1288,40 +1288,42 @@ export const DuoWindo6601PoemModal: React.FC<DuoWindo6601PoemModalProps> = ({
               </div>
             </div>
 
-            {/* Voice Recitation / Microphone Bar */}
-            <div className="bg-gradient-to-r from-purple-900/50 via-indigo-900/50 to-slate-900/50 border-2 border-purple-500/40 rounded-3xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
-              <div className="flex items-center space-x-3">
-                <button
-                  type="button"
-                  onClick={toggleSpeechRecognition}
-                  className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-lg transition-all cursor-pointer ${
-                    isRecording 
-                      ? 'bg-red-500 animate-pulse text-white ring-4 ring-red-400/50' 
-                      : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 hover:scale-105'
-                  }`}
-                  title={isRecording ? "Остановить запись" : "Включить микрофон и рассказывать"}
-                >
-                  {isRecording ? '⏹️' : '🎙️'}
-                </button>
-                <div>
-                  <h5 className="font-black text-white text-sm">
-                    {isRecording 
-                      ? (isRu ? 'Слушаю вас... Декламируйте стихотворение!' : 'Listening... Recite the poem!') 
-                      : (isRu ? 'Нажмите микрофон и расскажите вслух' : 'Tap mic and recite aloud')}
-                  </h5>
-                  <p className="text-xs text-purple-200/80">
-                    {isRecording ? 'Говорите громко и выразительно' : 'Или используйте поле ввода текста ниже'}
-                  </p>
+            {/* Voice Recitation / Microphone Bar (hidden for Klingon tlh only) */}
+            {currentCourse.id !== 'tlh' && selectedPoem.courseId !== 'tlh' && (
+              <div className="bg-gradient-to-r from-purple-900/50 via-indigo-900/50 to-slate-900/50 border-2 border-purple-500/40 rounded-3xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+                <div className="flex items-center space-x-3">
+                  <button
+                    type="button"
+                    onClick={toggleSpeechRecognition}
+                    className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-lg transition-all cursor-pointer ${
+                      isRecording 
+                        ? 'bg-red-500 animate-pulse text-white ring-4 ring-red-400/50' 
+                        : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 hover:scale-105'
+                    }`}
+                    title={isRecording ? "Остановить запись" : "Включить микрофон и рассказывать"}
+                  >
+                    {isRecording ? '⏹️' : '🎙️'}
+                  </button>
+                  <div>
+                    <h5 className="font-black text-white text-sm">
+                      {isRecording 
+                        ? (isRu ? 'Слушаю вас... Декламируйте стихотворение!' : 'Listening... Recite the poem!') 
+                        : (isRu ? 'Нажмите микрофон и расскажите вслух' : 'Tap mic and recite aloud')}
+                    </h5>
+                    <p className="text-xs text-purple-200/80">
+                      {isRecording ? 'Говорите громко и выразительно' : 'Или используйте поле ввода текста ниже'}
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              {reciteAccuracy !== null && (
-                <div className={`px-4 py-2 rounded-2xl text-center font-black ${reciteAccuracy >= 65 ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-400/40' : 'bg-rose-500/30 text-rose-300 border border-rose-400/40'}`}>
-                  <div className="text-lg md:text-xl">{reciteAccuracy}%</div>
-                  <div className="text-[10px] uppercase tracking-wider">{reciteAccuracy >= 65 ? 'Отлично!' : 'Попробуйте ещё'}</div>
-                </div>
-              )}
-            </div>
+                {reciteAccuracy !== null && (
+                  <div className={`px-4 py-2 rounded-2xl text-center font-black ${reciteAccuracy >= 65 ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-400/40' : 'bg-rose-500/30 text-rose-300 border border-rose-400/40'}`}>
+                    <div className="text-lg md:text-xl">{reciteAccuracy}%</div>
+                    <div className="text-[10px] uppercase tracking-wider">{reciteAccuracy >= 65 ? 'Отлично!' : 'Попробуйте ещё'}</div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Recitation TextArea */}
             <div className="space-y-1.5">

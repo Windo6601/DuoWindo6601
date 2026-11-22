@@ -26,7 +26,16 @@ import { SoundIllusionLab } from './SoundIllusionLab';
 import { AudioWhatHeardQuiz } from './AudioWhatHeardQuiz';
 import { stopActiveIllusion } from '../services/soundIllusionService';
 import { tlhToPIqaD } from '../services/klingonDictionaryService';
-import { downloadKlingonAudioFile } from '../services/klingonSpeechService';
+import {
+  downloadKlingonAudioFile,
+  getKlingonSentencePlayerUrl,
+  getKlingonSpeechMode,
+  KLINGON_HOL_HELLO_URL,
+  KLINGON_SAM_HOMEPAGE,
+  KlingonSpeechSource,
+  playKlingonSpeech,
+  setKlingonSpeechMode,
+} from '../services/klingonSpeechService';
 
 interface LettersScreenProps {
   currentCourse: Course;
@@ -85,6 +94,16 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
   const [showCoursePickerModal, setShowCoursePickerModal] = useState<boolean>(false);
   const [showBetaLockModal, setShowBetaLockModal] = useState<boolean>(false);
   const [courseCategoryTab, setCourseCategoryTab] = useState<'cis' | 'russia' | 'world' | 'easiest' | 'hardest' | 'beta'>('cis');
+  const [klingonSpeechMode, setKlingonSpeechModeState] = useState<KlingonSpeechSource>(() => getKlingonSpeechMode());
+
+  const handleSwitchKlingonSpeechMode = (mode: KlingonSpeechSource, sampleText?: string) => {
+    playSound('select');
+    setKlingonSpeechMode(mode);
+    setKlingonSpeechModeState(mode);
+    if (sampleText) {
+      void playKlingonSpeech(sampleText, false, mode);
+    }
+  };
 
   const isWritingLocked = isWritingSectionLocked(currentCourse.id);
   const isBetaRestricted = isWritingLocked || isBetaWritingRestricted(currentCourse.id);
@@ -1829,34 +1848,82 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                 </div>
               </div>
             )}
-            {/* Klingon Client Speech, Font & Audio File Bar */}
-            {currentCourse.id === 'tlh' && lettersSectionTab === 'letters' && (
-              <div className="w-full max-w-lg mt-4 p-3.5 bg-[#182329] border border-purple-500/40 rounded-2xl flex flex-col gap-2.5 shadow-lg text-left">
+            {/* Klingon Client SAM Speech, hol.kag.org Switcher, Font & Audio File Bar (Раздел Письмо) */}
+            {currentCourse.id === 'tlh' && lettersSectionTab !== 'illusion' && (
+              <div className="w-full max-w-2xl mt-4 p-3.5 bg-[#182329] border border-purple-500/40 rounded-2xl flex flex-col gap-2.5 shadow-lg text-left">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
                     <span className="text-lg">🖖</span>
                     <span className="text-xs font-black text-purple-300 uppercase tracking-wider">
-                      {user.language !== 'en' ? 'Клиентский Speech + pIqaD (tlh)' : 'Client Speech + pIqaD (tlh)'}
+                      {user.language !== 'en'
+                        ? 'Раздел Письмо • SAM Speech + hol.kag.org (SAM)'
+                        : 'Writing • SAM Speech + hol.kag.org (SAM)'}
                     </span>
                   </div>
-                  <span className="font-piqad text-sm px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-200 border border-purple-500/30">
-                    {tlhToPIqaD('tlhIngan Hol')}
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-piqad text-sm px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-200 border border-purple-500/30">
+                      {tlhToPIqaD('tlhIngan Hol')}
+                    </span>
+                    <a
+                      href={KLINGON_SAM_HOMEPAGE}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-sky-950/70 border border-sky-500/40 text-sky-300 hover:text-white transition-colors"
+                      title="SAM Software Automatic Mouth (https://discordier.github.io/sam/)"
+                    >
+                      SAM ↗
+                    </a>
+                    <a
+                      href={KLINGON_HOL_HELLO_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-indigo-950/70 border border-indigo-500/40 text-indigo-300 hover:text-white transition-colors"
+                      title="hol.kag.org Sentence Player (https://hol.kag.org/sentence/Hello)"
+                    >
+                      hol.kag.org ↗
+                    </a>
+                  </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
+                    onClick={() => handleSwitchKlingonSpeechMode('client', 'nuqneH, Qapla’')}
+                    className={`flex-1 min-w-[130px] py-2 px-3 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-all border ${
+                      klingonSpeechMode !== 'hol'
+                        ? 'bg-sky-600/80 border-sky-400 text-white shadow-md'
+                        : 'bg-gray-800 hover:bg-gray-700 border-gray-700 text-sky-200'
+                    }`}
+                    title="SAM Software Automatic Mouth (https://discordier.github.io/sam/)"
+                  >
+                    <span>🔊</span>
+                    <span>SAM Speech</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSwitchKlingonSpeechMode('hol', 'nuqneH, Qapla’')}
+                    className={`flex-1 min-w-[140px] py-2 px-3 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-all border ${
+                      klingonSpeechMode === 'hol'
+                        ? 'bg-indigo-600/85 border-indigo-400 text-white shadow-md'
+                        : 'bg-gray-800 hover:bg-gray-700 border-gray-700 text-indigo-200'
+                    }`}
+                    title="hol.kag.org → SAM Software Automatic Mouth (https://hol.kag.org/sentence/Hello)"
+                  >
+                    <span>🎧</span>
+                    <span>hol.kag.org (SAM)</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => handlePlayLetterAudio('nuqneH, Qapla’')}
-                    className="flex-1 min-w-[140px] py-2 px-3 rounded-xl bg-purple-600/80 hover:bg-purple-500 text-white text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                    className="py-2 px-3 rounded-xl bg-purple-600/80 hover:bg-purple-500 text-white text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-all"
                   >
                     <VolumeIcon className="w-4 h-4" />
-                    <span>{user.language !== 'en' ? 'Тест Speech (nuqneH)' : 'Test Speech (nuqneH)'}</span>
+                    <span>{user.language !== 'en' ? 'Тест' : 'Test'}</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => {
                       playSound('click');
-                      void downloadKlingonAudioFile('nuqneH, Qapla’');
+                      void downloadKlingonAudioFile('nuqneH, Qapla’', false, klingonSpeechMode);
                     }}
                     className="py-2 px-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-emerald-300 border border-emerald-500/40 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-all"
                   >
@@ -2034,19 +2101,54 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                       <span className="text-xs font-medium text-gray-400 ml-2">({selectedLetter.translation})</span>
                     )}
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
                     {currentCourse.id === 'tlh' && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          playSound('click');
-                          void downloadKlingonAudioFile(selectedLetter.word || selectedLetter.char);
-                        }}
-                        className="p-2.5 bg-gray-800 hover:bg-emerald-700 text-emerald-300 hover:text-white rounded-xl transition-colors cursor-pointer text-xs font-black"
-                        title={user.language !== 'en' ? 'Скачать аудио-файл клингонский' : 'Download Klingon audio file'}
-                      >
-                        💾
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleSwitchKlingonSpeechMode('client', selectedLetter.word || selectedLetter.char)}
+                          className={`px-2 py-1.5 rounded-xl text-[10px] font-black border transition-colors cursor-pointer ${
+                            klingonSpeechMode !== 'hol'
+                              ? 'bg-sky-600/70 border-sky-400 text-white'
+                              : 'bg-gray-800 hover:bg-sky-700 border-gray-700 text-sky-200'
+                          }`}
+                          title="SAM Speech (https://discordier.github.io/sam/)"
+                        >
+                          🔊 SAM
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSwitchKlingonSpeechMode('hol', selectedLetter.word || selectedLetter.char)}
+                          className={`px-2 py-1.5 rounded-xl text-[10px] font-black border transition-colors cursor-pointer ${
+                            klingonSpeechMode === 'hol'
+                              ? 'bg-indigo-600/80 border-indigo-400 text-white'
+                              : 'bg-gray-800 hover:bg-indigo-700 border-gray-700 text-indigo-200'
+                          }`}
+                          title="hol.kag.org → SAM"
+                        >
+                          🎧 hol.kag.org
+                        </button>
+                        <a
+                          href={getKlingonSentencePlayerUrl(selectedLetter.word || selectedLetter.char)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2 py-1.5 bg-gray-800 hover:bg-indigo-700 text-indigo-300 hover:text-white rounded-xl transition-colors text-[10px] font-black"
+                          title="https://hol.kag.org/sentence/Hello"
+                        >
+                          ↗
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            playSound('click');
+                            void downloadKlingonAudioFile(selectedLetter.word || selectedLetter.char, false, klingonSpeechMode);
+                          }}
+                          className="p-2.5 bg-gray-800 hover:bg-emerald-700 text-emerald-300 hover:text-white rounded-xl transition-colors cursor-pointer text-xs font-black"
+                          title={user.language !== 'en' ? 'Скачать аудио-файл клингонский' : 'Download Klingon audio file'}
+                        >
+                          💾
+                        </button>
+                      </>
                     )}
                     <button
                       onClick={() => handlePlayLetterAudio(selectedLetter.word || selectedLetter.char)}

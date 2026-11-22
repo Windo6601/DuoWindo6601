@@ -137,7 +137,11 @@ export const DuoWindo6601MistakesModal: React.FC<DuoWindo6601MistakesModalProps>
                   key={mistake.id || index}
                   onClick={() => {
                     onClose();
-                    onPracticeMistake(mistake);
+                    const safeMistake =
+                      currentCourse.id === 'tlh' && mistake.type === 'speech'
+                        ? { ...mistake, type: 'listening' as const }
+                        : mistake;
+                    onPracticeMistake(safeMistake);
                   }}
                   className="bg-[#182328] hover:bg-[#202f36] border-2 border-[#263843] hover:border-amber-500/50 rounded-2xl p-4 cursor-pointer transition-all duration-200 active:scale-[0.99] shadow-md flex items-start justify-between gap-3 group"
                 >
@@ -147,7 +151,7 @@ export const DuoWindo6601MistakesModal: React.FC<DuoWindo6601MistakesModalProps>
                         #{index + 1}
                       </span>
                       <span className="text-xs font-black text-gray-400 uppercase">
-                        {mistake.type === 'listening' 
+                        {mistake.type === 'listening' || (currentCourse.id === 'tlh' && mistake.type === 'speech')
                           ? (isRu ? 'Аудирование' : 'Listening') 
                           : mistake.type === 'speech' 
                           ? (isRu ? 'Речь' : 'Speech') 

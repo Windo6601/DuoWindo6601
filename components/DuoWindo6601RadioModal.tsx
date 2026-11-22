@@ -14,8 +14,11 @@ import {
   DuoRadioEpisode,
   DuoRadioQuestion,
   getCuratedRadioEpisodes,
-  generateDuoRadioEpisodeAI
+  generateDuoRadioEpisodeAI,
+  buildEpisodeFromCustomText,
+  classifyCoursesForRadio
 } from '../services/duowindo6601RadioService';
+import { normalizeCourseLangCode } from '../services/multilingualTtsHelper';
 
 export const DUO_RADIO_COMPLETED_STORAGE_KEY = 'duo_radio_completed_6601';
 
@@ -34,6 +37,8 @@ interface DuoWindo6601RadioModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentCourse: Course;
+  allCourses?: Course[];
+  onSwitchCourse?: (course: Course) => void;
   user: UserProgress;
   setUser: React.Dispatch<React.SetStateAction<UserProgress>>;
   playSound: (sound: any) => void;
@@ -48,6 +53,8 @@ export const DuoWindo6601RadioModal: React.FC<DuoWindo6601RadioModalProps> = ({
   isOpen,
   onClose,
   currentCourse,
+  allCourses,
+  onSwitchCourse,
   user,
   setUser,
   playSound,
@@ -65,8 +72,17 @@ export const DuoWindo6601RadioModal: React.FC<DuoWindo6601RadioModalProps> = ({
     [currentCourse, user.language, langSection]
   );
 
+  const courseLists = useMemo(
+    () => classifyCoursesForRadio(allCourses),
+    [allCourses]
+  );
+
   const [aiEpisodes, setAiEpisodes] = useState<DuoRadioEpisode[]>([]);
   const episodes = useMemo(() => [...aiEpisodes, ...baseEpisodes], [aiEpisodes, baseEpisodes]);
+
+  const [customEpisodeText, setCustomEpisodeText] = useState<string>('');
+  const [showCourseLists, setShowCourseLists] = useState<boolean>(false);
+  const [courseListTab, setCourseListTab] = useState<'available' | 'unavailable' | 'non_language'>('available');
 
   const [completedIds, setCompletedIds] = useState<string[]>(() => getCompletedRadioEpisodeIds());
   const [activeEpisode, setActiveEpisode] = useState<DuoRadioEpisode | null>(null);
@@ -124,7 +140,8 @@ export const DuoWindo6601RadioModal: React.FC<DuoWindo6601RadioModalProps> = ({
   const speakCueAndWait = async (cueIndex: number, ep: DuoRadioEpisode, runId: number, slowMode: boolean) => {
     const cue = ep.cues[cueIndex];
     if (!cue) return;
-    const langForCue = cue.isFamiliarLang ? hostLang : ep.courseId;
+    const targetLang = normalizeCourseLangCode(ep.courseId);
+    const langForCue = cue.isFamiliarLang ? hostLang : targetLang;
 
     try {
       await Promise.resolve(speakText(cue.text, langForCue, slowMode));
@@ -289,27 +306,48 @@ export const DuoWindo6601RadioModal: React.FC<DuoWindo6601RadioModalProps> = ({
         currentCourse,
         user.language,
         user.difficultyLevel === 'hard' ? 'hard' : 'easy',
-        langSection
+        langSection,
+        customEpisodeText.trim() || undefined
       );
-      if (generated) {
-        setAiEpisodes((prev) => [generated, ...prev]);
-        playSound('fanfare');
-        setToast(
-          isRu
-            ? '🎙️ Новый выпуск DuoWindo6601Radio готов к прослушиванию!'
-            : '🎙️ New DuoWindo6601Radio episode is ready!'
-        );
-        handleStartEpisode(generated);
-      } else {
-        setToast(
-          isRu
-            ? 'Не удалось создать AI-выпуск сейчас — открыт эфир из коллекции!'
-            : 'Could not generate AI episode right now — enjoy a curated show!'
-        );
-      }
+      setAiEpisodes((prev) => [generated, ...prev]);
+      playSound('fanfare');
+      setToast(
+        isRu
+          ? `🎙️ Новый выпуск DuoWindo6601Radio (${currentCourse.localName || currentCourse.name}) запущен!`
+          : `🎙️ New DuoWindo6601Radio episode (${currentCourse.name}) started!`
+      );
+      handleStartEpisode(generated);
     } finally {
       if (isMountedRef.current) setIsGeneratingAi(false);
     }
+  };
+
+  const handleLaunchCustomTextEpisode = () => {
+    const text = customEpisodeText.trim();
+    if (!text) {
+      setToast(
+        isRu
+          ? 'Введите текст или реплики для выпуска'
+          : 'Enter text or dialogue lines for the episode'
+      );
+      return;
+    }
+    const created = buildEpisodeFromCustomText(
+      currentCourse,
+      text,
+      user.language,
+      user.difficultyLevel === 'hard' ? 'hard' : 'easy',
+      langSection,
+      false
+    );
+    setAiEpisodes((prev) => [created, ...prev]);
+    playSound('fanfare');
+    setToast(
+      isRu
+        ? `📝 Выпуск по вашему тексту (${currentCourse.localName || currentCourse.name}) запущен!`
+        : `📝 Custom text episode (${currentCourse.name}) launched!`
+    );
+    handleStartEpisode(created);
   };
 
   const handleCloseModal = () => {
@@ -319,7 +357,8 @@ export const DuoWindo6601RadioModal: React.FC<DuoWindo6601RadioModalProps> = ({
     onClose();
   };
 
-  if (!isOpen) return null;
+  const blockedCourses = new Set(['tlh', 'math', 'music', 'chess', 'coding', 'art']);
+  if (!isOpen || blockedCourses.has(currentCourse.id)) return null;
 
   const modalShell = isLightMode
     ? 'bg-white border-slate-200 text-slate-900'
@@ -349,8 +388,8 @@ export const DuoWindo6601RadioModal: React.FC<DuoWindo6601RadioModalProps> = ({
               </h2>
               <p className={`text-xs font-bold ${subText}`}>
                 {isRu
-                  ? 'Подкасты на аудирование • Погружение в речь (+30 XP)'
-                  : 'Listening Podcasts • Speech Immersion (+30 XP)'}
+                  ? 'Подкасты на аудирование • Без спикера (+30 XP)'
+                  : 'Listening Podcasts • Audio Immersion (+30 XP)'}
               </p>
             </div>
           </div>
@@ -395,32 +434,291 @@ export const DuoWindo6601RadioModal: React.FC<DuoWindo6601RadioModalProps> = ({
                       {isRu ? 'Как устроен урок DuoWindo6601Radio' : 'How DuoWindo6601Radio Works'}
                     </div>
                     <ul className={`space-y-1 font-bold ${isLightMode ? 'text-slate-600' : 'text-gray-300'}`}>
-                      <li>• {isRu ? 'Формат подкаста: короткий аудиоэфир с ведущим DuoWindo6601 и героями.' : 'Podcast format: short radio episodes with DuoWindo6601 and characters.'}</li>
-                      <li>• {isRu ? 'Погружение: пояснения звучат на вашем языке, диалог — на изучаемом.' : 'Immersion: host tips in your language, main dialogue in your target language.'}</li>
+                      <li>• {isRu ? 'Формат подкаста: короткий аудиоэфир без спикера (только аудирование).' : 'Podcast format: short audio listening episodes.'}</li>
+                      <li>• {isRu ? 'Погружение: пояснения на вашем языке, диалог — на изучаемом.' : 'Immersion: notes in your language, dialogue in your target language.'}</li>
                       <li>• {isRu ? 'Проверка понимания: интерактивные вопросы по ходу и в конце выпуска.' : 'Comprehension checks: questions during and after listening.'}</li>
                     </ul>
                   </div>
                 </div>
               </div>
 
-              {/* AI Generate Fresh Episode Bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <span className={`text-xs font-black uppercase tracking-wider ${subText}`}>
-                  {isRu ? `Эфиры курса (${episodes.length})` : `Course Episodes (${episodes.length})`}
-                </span>
+              {/* Custom Episode Text / Topic Input Studio */}
+              <div className={`rounded-2xl p-4 border space-y-3 ${
+                isLightMode
+                  ? 'bg-slate-50 border-slate-200 text-slate-900'
+                  : 'bg-[#17252d] border-[#283c48] text-white'
+              }`}>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <label className="text-xs font-black uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
+                    <span>📝</span>
+                    <span>{isRu ? 'Текст или тема выпуска (по желанию)' : 'Custom Episode Text or Topic (Optional)'}</span>
+                  </label>
+                  {customEpisodeText.trim() && (
+                    <button
+                      type="button"
+                      onClick={() => setCustomEpisodeText('')}
+                      className={`text-[11px] font-bold px-2 py-0.5 rounded-lg cursor-pointer ${
+                        isLightMode ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' : 'bg-gray-800 text-gray-300 hover:text-white'
+                      }`}
+                    >
+                      ✕ {isRu ? 'Очистить' : 'Clear'}
+                    </button>
+                  )}
+                </div>
+
+                <textarea
+                  rows={3}
+                  dir="auto"
+                  value={customEpisodeText}
+                  onChange={(e) => setCustomEpisodeText(e.target.value.slice(0, 1200))}
+                  placeholder={
+                    isRu
+                      ? `Введите свой текст, реплики на языке «${currentCourse.localName || currentCourse.name}» (по строкам) или тему для нового выпуска...`
+                      : `Enter your own dialogue lines in ${currentCourse.name} (one per line) or a topic for the new episode...`
+                  }
+                  className={`w-full rounded-xl p-3 text-xs font-medium border focus:outline-none focus:border-sky-400 transition-colors ${
+                    isLightMode
+                      ? 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
+                      : 'bg-[#101a20] border-[#293d49] text-white placeholder-gray-500'
+                  }`}
+                />
+
+                {/* Quick Topic Chips */}
+                <div className="flex flex-wrap gap-1.5">
+                  {(isRu
+                    ? [
+                        { label: '☕ В кафе', text: 'Заказ кофе и десерта в уютном кафе' },
+                        { label: '✈️ В аэропорту', text: 'Регистрация на рейс и посадка в аэропорту' },
+                        { label: '🌦️ О погоде', text: 'Прогноз погоды на выходные и прогулка в парке' },
+                        { label: '📚 Любимая книга', text: 'Обсуждение интересной книги и музыки' }
+                      ]
+                    : [
+                        { label: '☕ Cafe Order', text: 'Ordering coffee and pastry at a cozy cafe' },
+                        { label: '✈️ At the Airport', text: 'Flight check-in and boarding announcement' },
+                        { label: '🌦️ Weather Forecast', text: 'Weekend weather forecast and walk in the park' },
+                        { label: '📚 Favorite Book', text: 'Talking about a favorite book and music' }
+                      ]
+                  ).map((chip, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        playSound('click');
+                        setCustomEpisodeText(chip.text);
+                      }}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
+                        isLightMode
+                          ? 'bg-white border-slate-200 hover:border-sky-400 text-slate-700'
+                          : 'bg-[#111c22] border-[#293d49] hover:border-sky-400 text-sky-200'
+                      }`}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Action Buttons: AI Generate & Direct Custom Text Launch */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
+                  <span className={`text-xs font-black uppercase tracking-wider ${subText}`}>
+                    {isRu ? `Эфиры курса (${episodes.length})` : `Course Episodes (${episodes.length})`}
+                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {customEpisodeText.trim().length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleLaunchCustomTextEpisode}
+                        className="px-4 py-2.5 rounded-2xl bg-emerald-500 hover:brightness-110 text-slate-950 font-black text-xs uppercase tracking-wider border-b-4 border-emerald-700 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <span>▶</span>
+                        <span>{isRu ? 'Запустить из текста' : 'Play From Text'}</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleGenerateAiEpisode}
+                      disabled={isGeneratingAi}
+                      className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-sky-500 to-cyan-500 hover:brightness-110 text-slate-950 font-black text-xs uppercase tracking-wider border-b-4 border-sky-700 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                    >
+                      <SparklesIcon className="w-4 h-4" />
+                      <span>
+                        {isGeneratingAi
+                          ? (isRu ? 'Записываем эфир...' : 'Recording episode...')
+                          : (isRu ? 'Новый выпуск (AI)' : 'New AI Episode')}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3-Category Course Availability Lists (Available Language / Unavailable Language / Non-Language) */}
+              <div className={`rounded-2xl border overflow-hidden ${
+                isLightMode ? 'bg-slate-50 border-slate-200' : 'bg-[#152229] border-[#263843]'
+              }`}>
                 <button
                   type="button"
-                  onClick={handleGenerateAiEpisode}
-                  disabled={isGeneratingAi}
-                  className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-sky-500 to-cyan-500 hover:brightness-110 text-slate-950 font-black text-xs uppercase tracking-wider border-b-4 border-sky-700 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                  onClick={() => {
+                    playSound('click');
+                    setShowCourseLists((v) => !v);
+                  }}
+                  className={`w-full px-4 py-3 flex items-center justify-between gap-2 text-left cursor-pointer transition-colors ${
+                    isLightMode ? 'hover:bg-slate-100' : 'hover:bg-[#1a2b34]'
+                  }`}
                 >
-                  <SparklesIcon className="w-4 h-4" />
-                  <span>
-                    {isGeneratingAi
-                      ? (isRu ? 'Записываем эфир...' : 'Recording episode...')
-                      : (isRu ? 'Новый выпуск (AI)' : 'New AI Episode')}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-base">📋</span>
+                    <span className="text-xs font-black uppercase tracking-wider text-sky-400">
+                      {isRu ? 'Списки курсов DuoWindo6601Radio' : 'DuoWindo6601Radio Course Lists'}
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      ✅ {courseLists.availableLanguageCourses.length}
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                      🚫 {courseLists.unavailableLanguageCourses.length}
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                      🧩 {courseLists.nonLanguageCourses.length}
+                    </span>
+                  </div>
+                  <span className={`text-xs font-black ${subText}`}>
+                    {showCourseLists ? '▲' : '▼'}
                   </span>
                 </button>
+
+                {showCourseLists && (
+                  <div className="px-4 pb-4 pt-1 space-y-3 border-t border-white/10">
+                    {/* Sub-tabs */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => { playSound('click'); setCourseListTab('available'); }}
+                        className={`px-3 py-2 rounded-xl text-[11px] font-black transition-all cursor-pointer border text-left flex items-center justify-between ${
+                          courseListTab === 'available'
+                            ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
+                            : isLightMode
+                            ? 'bg-white border-slate-200 text-slate-600'
+                            : 'bg-[#101a20] border-[#253844] text-gray-400'
+                        }`}
+                      >
+                        <span>✅ {isRu ? 'Доступные языки' : 'Available Languages'}</span>
+                        <span>({courseLists.availableLanguageCourses.length})</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => { playSound('click'); setCourseListTab('unavailable'); }}
+                        className={`px-3 py-2 rounded-xl text-[11px] font-black transition-all cursor-pointer border text-left flex items-center justify-between ${
+                          courseListTab === 'unavailable'
+                            ? 'bg-rose-500/20 border-rose-400 text-rose-300'
+                            : isLightMode
+                            ? 'bg-white border-slate-200 text-slate-600'
+                            : 'bg-[#101a20] border-[#253844] text-gray-400'
+                        }`}
+                      >
+                        <span>🚫 {isRu ? 'Недоступные языки' : 'Unavailable Languages'}</span>
+                        <span>({courseLists.unavailableLanguageCourses.length})</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => { playSound('click'); setCourseListTab('non_language'); }}
+                        className={`px-3 py-2 rounded-xl text-[11px] font-black transition-all cursor-pointer border text-left flex items-center justify-between ${
+                          courseListTab === 'non_language'
+                            ? 'bg-amber-500/20 border-amber-400 text-amber-300'
+                            : isLightMode
+                            ? 'bg-white border-slate-200 text-slate-600'
+                            : 'bg-[#101a20] border-[#253844] text-gray-400'
+                        }`}
+                      >
+                        <span>🧩 {isRu ? 'Курсы не языки' : 'Non-Language Courses'}</span>
+                        <span>({courseLists.nonLanguageCourses.length})</span>
+                      </button>
+                    </div>
+
+                    {/* Tab Body */}
+                    <div className="max-h-56 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-2 pr-1">
+                      {courseListTab === 'available' &&
+                        courseLists.availableLanguageCourses.map((c) => {
+                          const isCurrent = c.id === currentCourse.id;
+                          return (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => {
+                                if (onSwitchCourse && !isCurrent) {
+                                  playSound('click');
+                                  onSwitchCourse(c);
+                                  setToast(
+                                    isRu
+                                      ? `📻 DuoWindo6601Radio переключено на курс: ${c.localName || c.name}`
+                                      : `📻 Switched DuoWindo6601Radio to: ${c.name}`
+                                  );
+                                }
+                              }}
+                              className={`p-2.5 rounded-xl border text-left flex items-center justify-between gap-2 transition-all ${
+                                isCurrent
+                                  ? 'bg-sky-500/25 border-sky-400 text-white'
+                                  : isLightMode
+                                  ? 'bg-white border-slate-200 hover:border-emerald-400 text-slate-800'
+                                  : 'bg-[#101a20] border-[#253844] hover:border-emerald-500/60 text-gray-200'
+                              } ${onSwitchCourse && !isCurrent ? 'cursor-pointer' : 'cursor-default'}`}
+                            >
+                              <div className="min-w-0">
+                                <div className="text-xs font-black truncate">{c.localName || c.name}</div>
+                                <div className={`text-[10px] font-bold truncate ${subText}`}>
+                                  {c.name} • {c.id.toUpperCase()}
+                                  {c.isBeta ? ' • BETA' : ''}
+                                </div>
+                              </div>
+                              <span className="text-[10px] font-black px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 shrink-0">
+                                {isCurrent ? (isRu ? 'ВЫБРАН' : 'ACTIVE') : 'AI + 🎧'}
+                              </span>
+                            </button>
+                          );
+                        })}
+
+                      {courseListTab === 'unavailable' &&
+                        courseLists.unavailableLanguageCourses.map((c) => (
+                          <div
+                            key={c.id}
+                            className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 ${
+                              isLightMode ? 'bg-rose-50 border-rose-200 text-rose-900' : 'bg-rose-950/30 border-rose-500/30 text-rose-100'
+                            }`}
+                          >
+                            <div className="min-w-0">
+                              <div className="text-xs font-black truncate">{c.localName || c.name}</div>
+                              <div className="text-[10px] font-bold opacity-80">
+                                {c.name} • {c.id.toUpperCase()} • {isRu ? 'Без спикера (SAM Speech)' : 'No Radio / SAM Speech'}
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-black px-2 py-0.5 rounded bg-rose-500/25 text-rose-300 shrink-0">
+                              {isRu ? 'НЕ ДОСТУПЕН' : 'UNAVAILABLE'}
+                            </span>
+                          </div>
+                        ))}
+
+                      {courseListTab === 'non_language' &&
+                        courseLists.nonLanguageCourses.map((c) => (
+                          <div
+                            key={c.id}
+                            className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 ${
+                              isLightMode ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-amber-950/25 border-amber-500/30 text-amber-100'
+                            }`}
+                          >
+                            <div className="min-w-0">
+                              <div className="text-xs font-black truncate">{c.localName || c.name}</div>
+                              <div className="text-[10px] font-bold opacity-80">
+                                {c.name} • {c.id.toUpperCase()} • {isRu ? 'Предмет / Навык' : 'Subject / Skill'}
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-black px-2 py-0.5 rounded bg-amber-500/25 text-amber-300 shrink-0">
+                              {isRu ? 'НЕ ЯЗЫК' : 'NOT A LANG'}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Episodes Grid */}
@@ -582,8 +880,8 @@ export const DuoWindo6601RadioModal: React.FC<DuoWindo6601RadioModalProps> = ({
                     </span>
                     <span>
                       {activeEpisode.cues[currentCueIndex]?.isFamiliarLang
-                        ? (isRu ? '🗣️ Пояснение ведущего' : '🗣️ Host explanation')
-                        : (isRu ? `🌍 Речь: ${currentCourse.localName}` : `🌍 Target: ${currentCourse.name}`)}
+                        ? (isRu ? '🎧 Пояснение в эфире' : '🎧 Audio note')
+                        : (isRu ? `🎧 Язык курса: ${currentCourse.localName}` : `🎧 Course Audio: ${currentCourse.name}`)}
                     </span>
                   </div>
                 </div>
@@ -694,7 +992,7 @@ export const DuoWindo6601RadioModal: React.FC<DuoWindo6601RadioModalProps> = ({
                       onClick={() => {
                         const targetCue = activeEpisode.cues[activeQuestion.replayCueIndex];
                         if (targetCue) {
-                          const lang = targetCue.isFamiliarLang ? hostLang : activeEpisode.courseId;
+                          const lang = targetCue.isFamiliarLang ? hostLang : normalizeCourseLangCode(activeEpisode.courseId);
                           void speakText(targetCue.text, lang, isSlow);
                         }
                       }}
@@ -806,16 +1104,11 @@ export const DuoWindo6601RadioModal: React.FC<DuoWindo6601RadioModalProps> = ({
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-black text-xs uppercase tracking-wide">
-                              {cue.speaker}
-                            </span>
-                            {cue.role === 'host' && (
-                              <span className="text-[10px] font-black text-emerald-400 uppercase">
-                                {isRu ? 'Ведущий' : 'Host'}
-                              </span>
-                            )}
-                          </div>
+                          <span className="font-black text-[11px] uppercase tracking-wide text-sky-400">
+                            {cue.isFamiliarLang
+                              ? (isRu ? '🎧 Пояснение' : '🎧 Audio Note')
+                              : (isRu ? `🎧 Фрагмент #${idx + 1}` : `🎧 Audio Segment #${idx + 1}`)}
+                          </span>
                           <VolumeIcon className={`w-4 h-4 shrink-0 ${isCurrent ? 'text-sky-400' : subText}`} />
                         </div>
 

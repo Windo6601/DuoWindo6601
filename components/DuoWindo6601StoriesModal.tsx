@@ -172,7 +172,8 @@ export const DuoWindo6601StoriesModal: React.FC<DuoWindo6601StoriesModalProps> =
 
     // Speak initial line
     if (story.lines[0]) {
-      speakText(story.lines[0].text, currentCourse.id);
+      const firstText = story.lines[0].text;
+      speakText(firstText, /[\u0400-\u04FF]/.test(firstText) ? 'ru' : currentCourse.id);
     }
   };
 
@@ -183,7 +184,8 @@ export const DuoWindo6601StoriesModal: React.FC<DuoWindo6601StoriesModalProps> =
     if (currentLineIndex < activeStory.lines.length - 1) {
       const nextIndex = currentLineIndex + 1;
       setCurrentLineIndex(nextIndex);
-      speakText(activeStory.lines[nextIndex].text, currentCourse.id);
+      const nextText = activeStory.lines[nextIndex].text;
+      speakText(nextText, /[\u0400-\u04FF]/.test(nextText) ? 'ru' : currentCourse.id);
     } else if (!showQuestion) {
       setShowQuestion(true);
       playSound('fanfare');
@@ -396,7 +398,7 @@ export const DuoWindo6601StoriesModal: React.FC<DuoWindo6601StoriesModalProps> =
                           </span>
                           <button
                             type="button"
-                            onClick={() => speakText(line.text, currentCourse.id)}
+                            onClick={() => speakText(line.text, /[\u0400-\u04FF]/.test(line.text) ? 'ru' : currentCourse.id)}
                             className="p-1 text-gray-400 hover:text-white transition-colors cursor-pointer"
                             title="Озвучить"
                           >

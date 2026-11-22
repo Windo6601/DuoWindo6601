@@ -11,6 +11,7 @@ import {
   VolumeIcon
 } from './Icons';
 import { speakText } from '../services/geminiService';
+import { playKlingonSpeech } from '../services/klingonSpeechService';
 import { 
   getWorldLockedLanguages, 
   getCisLockedLanguages, 
@@ -45,7 +46,7 @@ const DEFAULT_BETA_COURSES: Course[] = [
   { id: 'no', name: 'Norwegian', localName: 'Норвежский (Norsk)', flagCode: 'no', themeColor: 'bg-red-600', themeBorder: 'border-red-800', mascotVariant: 'default', isBeta: true, betaTag: 'Скандинавский', betaVersion: 'v0.9.0 Beta', betaFeedbackCount: 84, writingRestrictionNotice: 'Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год' },
   { id: 'tt', name: 'Tatar', localName: 'Татарский (Татар теле)', flagCode: 'ru', themeColor: 'bg-teal-600', themeBorder: 'border-teal-800', mascotVariant: 'default', isBeta: true, betaTag: 'Тюркский', betaVersion: 'v0.9.5 Beta', betaFeedbackCount: 230, writingRestrictionNotice: 'Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год' },
   { id: 'hv', name: 'High Valyrian', localName: 'Высокий валирийский (Valyrio)', flagCode: 'gb', themeColor: 'bg-purple-700', themeBorder: 'border-purple-900', mascotVariant: 'default', isBeta: true, betaTag: 'Вымышленный', betaVersion: 'v0.8.0 Beta', betaFeedbackCount: 76, writingRestrictionNotice: 'Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год' },
-  { id: 'tlh', name: 'Klingon', localName: 'Клингонский (tlhIngan Hol)', flagCode: 'us', themeColor: 'bg-stone-700', themeBorder: 'border-stone-900', mascotVariant: 'default', isBeta: true, betaTag: 'Вымышленный', betaVersion: 'v0.7.3 Beta', betaFeedbackCount: 63, writingRestrictionNotice: 'Клиентский Speech + шрифт pIqaD/Klingon во время урока + словарь слов и аудио-файлы hol.kag.org (режим Речи отключён)' },
+  { id: 'tlh', name: 'Klingon', localName: 'Клингонский (tlhIngan Hol)', flagCode: 'us', themeColor: 'bg-stone-700', themeBorder: 'border-stone-900', mascotVariant: 'default', isBeta: true, betaTag: 'Вымышленный', betaVersion: 'v0.7.3 Beta', betaFeedbackCount: 63, writingRestrictionNotice: 'SAM (Software Automatic Mouth) + шрифт pIqaD/Klingon во время урока + словарь слов и аудио-файлы hol.kag.org (Речь во время урока полностью убрана)' },
   { id: 'yi', name: 'Yiddish', localName: 'Идиш (ייִדיш)', flagCode: 'il', themeColor: 'bg-indigo-600', themeBorder: 'border-indigo-800', mascotVariant: 'default', isBeta: true, betaTag: 'Германский / Еврейский', betaVersion: 'v0.9.2 Beta', betaFeedbackCount: 91, writingRestrictionNotice: 'Ограничение раздел письма и во время урока будут доступ до 1 ноября 2026 год' }
 ];
 
@@ -419,16 +420,29 @@ export const BetaModal: React.FC<BetaModalProps> = ({
                             <span className="font-klingon text-xs">tlhIngan Hol</span>
                             <span className="text-[8px] text-purple-300">Шрифт Klingon Font</span>
                           </div>
-                          <a
-                            href="https://hol.kag.org/page/sentenceplayer"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="px-2 py-0.5 rounded-lg bg-sky-950/60 border border-sky-500/40 text-[9px] text-sky-300 hover:text-white font-bold flex items-center justify-between hover:bg-sky-900/60 transition-colors"
-                          >
-                            <span>🔊 Speech hol.kag.org Sentence Player</span>
-                            <span className="text-[8px]">↗</span>
-                          </a>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void playKlingonSpeech('nuqneH', false, 'hol');
+                              }}
+                              className="flex-1 px-2 py-0.5 rounded-lg bg-sky-950/60 border border-sky-500/40 text-[9px] text-sky-300 hover:text-white font-bold flex items-center justify-between hover:bg-sky-900/60 transition-colors cursor-pointer"
+                            >
+                              <span>🎧 hol.kag.org → SAM Speech</span>
+                              <span className="text-[8px]">▶</span>
+                            </button>
+                            <a
+                              href="https://hol.kag.org/page/sentenceplayer"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="px-2 py-0.5 rounded-lg bg-indigo-950/60 border border-indigo-500/40 text-[9px] text-indigo-300 hover:text-white font-bold hover:bg-indigo-900/60 transition-colors"
+                              title="hol.kag.org Sentence Player"
+                            >
+                              ↗
+                            </a>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -831,16 +845,29 @@ export const BetaModal: React.FC<BetaModalProps> = ({
                         <span className="font-klingon text-sm">tlhIngan Hol</span>
                         <span className="text-[8px] text-emerald-400">Шрифт Klingon Font активирован</span>
                       </div>
-                      <a
-                        href="https://hol.kag.org/page/sentenceplayer"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-[9px] text-sky-300 hover:text-white font-bold bg-sky-950/60 border border-sky-500/40 px-2 py-1 rounded-lg flex items-center justify-between hover:bg-sky-900/60 transition-colors"
-                      >
-                        <span>🔊 API-Speech hol.kag.org Sentence Player</span>
-                        <span className="text-[8px]">↗</span>
-                      </a>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void playKlingonSpeech('nuqneH', false, 'hol');
+                          }}
+                          className="flex-1 text-[9px] text-sky-300 hover:text-white font-bold bg-sky-950/60 border border-sky-500/40 px-2 py-1 rounded-lg flex items-center justify-between hover:bg-sky-900/60 transition-colors cursor-pointer"
+                        >
+                          <span>🎧 hol.kag.org → SAM Software Automatic Mouth</span>
+                          <span className="text-[8px]">▶</span>
+                        </button>
+                        <a
+                          href="https://hol.kag.org/page/sentenceplayer"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-[9px] text-indigo-300 hover:text-white font-bold bg-indigo-950/60 border border-indigo-500/40 px-2 py-1 rounded-lg hover:bg-indigo-900/60 transition-colors"
+                          title="hol.kag.org Sentence Player"
+                        >
+                          ↗
+                        </a>
+                      </div>
                     </div>
                   )}
                 </div>
