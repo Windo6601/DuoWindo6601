@@ -364,7 +364,7 @@ export const BETA_WRITING_RESTRICTED_COURSES: Record<string, BetaCourseLockInfo>
     name: 'Klingon',
     localName: 'Клингонский (tlhIngan Hol)',
     version: 'v0.7.3 Beta',
-    restrictionNotice: 'В разработке • Доступно 1 ноября 2026 г.',
+    restrictionNotice: 'ВидеоЗвонок, Roleplays и речь ограничены • hol.kag.org + SAM',
     flagCode: 'us',
     hasSpecialFont: true,
     specialFontName: 'Klingon',

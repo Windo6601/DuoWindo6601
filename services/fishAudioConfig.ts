@@ -1,4 +1,4 @@
-import { SubscriptionTier, UserProgress } from '../types';
+import type { SubscriptionTier, UserProgress } from '../types.ts';
 
 export type FishModelId = 's2.1-pro-free' | 'drama-3' | 's2.1-pro' | 's2-pro';
 

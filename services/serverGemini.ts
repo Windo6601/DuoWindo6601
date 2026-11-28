@@ -13,7 +13,7 @@ import {
 export const MODEL_FREE = 'gemini-4-hydrogen';
 export const MODEL_PRO = 'gemini-4-argon';
 export const FAST_FALLBACK_MODEL = 'gemini-3.1-flash-lite';
-export const SECONDARY_FALLBACK_MODEL = 'gemini-2.5-flash';
+export const SECONDARY_FALLBACK_MODEL = 'gemini-4-hydrogen';
 export const TTS_MODEL = 'gemini-3.8-flash-lite-tts';
 export const TTS_FALLBACK_MODEL = 'gemini-3.8-flash-tts';
 export const LIVE_MODEL = 'gemini-3.8-live';
@@ -148,29 +148,109 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): P
   }
 }
 
+export function isValidGoogleApiKeyFormat(key?: string): boolean {
+  const trimmed = String(key || '').trim();
+  return /^((AIza)[0-9A-Za-z_-]{20,}|(AQ\.)[0-9A-Za-z_.-]{20,})$/.test(trimmed);
+}
+
+export function getRawServerEnvGeminiKey(): string {
+  return (
+    process.env.GEMINI_API_KEY ||
+    process.env.API_KEY ||
+    process.env.VITE_GEMINI_API_KEY ||
+    ''
+  ).trim();
+}
+
+export function isAuthKeyError(err: any): boolean {
+  const status = Number(err?.status || err?.code || 0);
+  const msg = String(err?.message || err || '');
+  return (
+    status === 401 ||
+    status === 403 ||
+    msg.includes('UNAUTHENTICATED') ||
+    msg.includes('PERMISSION_DENIED') ||
+    msg.includes('SERVICE_DISABLED') ||
+    msg.includes('ACCESS_TOKEN_TYPE_UNSUPPORTED') ||
+    msg.includes('API_KEY_INVALID') ||
+    msg.includes('API key not valid')
+  );
+}
+
+export function buildInvalidKeyErrorPayload(apiKey: string, err?: any): {
+  httpStatus: number;
+  message: string;
+  code: string;
+} {
+  const trimmed = String(apiKey || '').trim();
+  const errMsg = String(err?.message || err || '');
+  const status = Number(err?.status || 0) === 403 ? 403 : 401;
+
+  if (errMsg.includes('SERVICE_DISABLED') || errMsg.includes('has not been used in project')) {
+    const urlMatch = errMsg.match(/https:\/\/console\.developers\.google\.com\/apis\/api\/generativelanguage\.googleapis\.com\/[^\s"\\]+/);
+    const activationLink = urlMatch ? ` (${urlMatch[0]})` : '';
+    return {
+      httpStatus: 403,
+      code: 'SERVICE_DISABLED',
+      message:
+        `Generative Language API (Gemini API) отключён в Google Cloud проекте для этого ключа. Включите generativelanguage.googleapis.com в Google Cloud Console${activationLink} и повторите через минуту.`,
+    };
+  }
+
+  if (errMsg.includes('ACCESS_TOKEN_TYPE_UNSUPPORTED')) {
+    return {
+      httpStatus: 401,
+      code: 'INVALID_API_KEY',
+      message:
+        'Ключ GEMINI_API_KEY в Settings > Secrets отклонён шлюзом Gemini API (ACCESS_TOKEN_TYPE_UNSUPPORTED). Проверьте, что это действующий ключ Gemini API (с включённым Generative Language API) в Settings > Secrets.',
+    };
+  }
+
+  if (trimmed && !isValidGoogleApiKeyFormat(trimmed)) {
+    return {
+      httpStatus: 401,
+      code: 'INVALID_API_KEY',
+      message:
+        'GEMINI_API_KEY в Settings > Secrets имеет неподдерживаемый формат (ожидается ключ Gemini API, начинающийся на AIza... или AQ....). Проверьте ключ в Settings > Secrets.',
+    };
+  }
+
+  return {
+    httpStatus: status,
+    code: status === 403 ? 'PERMISSION_DENIED' : 'INVALID_API_KEY',
+    message:
+      'Gemini API отклонил ключ (401/403). Пожалуйста, проверьте или выберите действующий GEMINI_API_KEY в панели Settings > Secrets.',
+  };
+}
+
 /**
  * Returns the effective Gemini API key configured on the server.
  * Never exposed to the browser.
  */
 export function getServerGeminiKey(overrideKey?: string): string {
   const custom = (overrideKey || '').trim();
-  if (custom && custom !== 'SYSTEM_FREE_TRAFFIC' && custom !== 'undefined' && custom !== 'null') {
+  const serverKey = getRawServerEnvGeminiKey();
+  if (isValidGoogleApiKeyFormat(custom)) {
     return custom;
   }
-  return (
-    process.env.GEMINI_API_KEY ||
-    process.env.API_KEY ||
-    process.env.VITE_GEMINI_API_KEY ||
-    'AQ.Ab8RN6IQIn-mUHgR1BxMRDNo1Ylta9NTdBqZQ2dzG1VBmbxdbg'
-  ).trim();
+  if (serverKey) {
+    return serverKey;
+  }
+  if (custom && custom !== 'SYSTEM_FREE_TRAFFIC' && custom !== 'undefined' && custom !== 'null' && !custom.includes('••••')) {
+    return custom;
+  }
+  return '';
 }
 
 /**
- * Factory creating the shared server-side GoogleGenAI client
+ * Factory creating a server-side GoogleGenAI client
  * with mandatory telemetry header 'User-Agent': 'aistudio-build'.
  */
 export function createServerGenAiClient(customKey?: string): GoogleGenAI {
-  const apiKey = getServerGeminiKey(customKey) || 'SYSTEM_FREE_TRAFFIC';
+  const apiKey = getServerGeminiKey(customKey);
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is not configured on the server.');
+  }
   return new GoogleGenAI({
     apiKey,
     httpOptions: {
@@ -181,10 +261,23 @@ export function createServerGenAiClient(customKey?: string): GoogleGenAI {
   });
 }
 
-/**
- * Shared singleton server AI client.
- */
-export const serverAi = createServerGenAiClient();
+let cachedDefaultServerAi: GoogleGenAI | null = null;
+let cachedDefaultServerKey: string = '';
+
+export function getServerAiClient(customKey?: string): GoogleGenAI {
+  const resolvedKey = getServerGeminiKey(customKey);
+  if (!resolvedKey) {
+    throw new Error('GEMINI_API_KEY is not configured on the server.');
+  }
+  if (isValidGoogleApiKeyFormat(customKey)) {
+    return createServerGenAiClient(customKey);
+  }
+  if (!cachedDefaultServerAi || cachedDefaultServerKey !== resolvedKey) {
+    cachedDefaultServerAi = createServerGenAiClient();
+    cachedDefaultServerKey = resolvedKey;
+  }
+  return cachedDefaultServerAi;
+}
 
 /**
  * POST /api/gemini/generate
@@ -206,7 +299,22 @@ export async function handleGeminiGenerate(req: Request, res: Response): Promise
     });
     return;
   }
-  const ai = customKey ? createServerGenAiClient(customKey) : serverAi;
+
+  const serverEnvKey = getRawServerEnvGeminiKey();
+  if (!isValidGoogleApiKeyFormat(apiKey)) {
+    const payload = buildInvalidKeyErrorPayload(apiKey);
+    res.status(payload.httpStatus).json({
+      error: {
+        message: payload.message,
+        status: payload.httpStatus,
+        code: payload.code,
+      },
+    });
+    return;
+  }
+
+  let activeClient = getServerAiClient(customKey);
+  let activeKey = apiKey;
 
   const {
     model = MODEL_FREE,
@@ -239,15 +347,16 @@ export async function handleGeminiGenerate(req: Request, res: Response): Promise
   try {
     let response: any = null;
     let lastError: any = null;
+    let retriedWithServerKey = false;
 
     for (let idx = 0; idx < modelChain.length; idx++) {
       const candidateModel = modelChain[idx];
       const attemptConfig = buildModelConfig(mergedConfig, candidateModel, isAudioTtsRequest);
-      const timeoutMs = idx === 0 ? 9500 : 11000;
+      const timeoutMs = idx === 0 ? 15000 : 15000;
 
       try {
         response = await withTimeout(
-          ai.models.generateContent({
+          activeClient.models.generateContent({
             model: candidateModel,
             contents: effectiveContents,
             config: Object.keys(attemptConfig).length > 0 ? attemptConfig : undefined,
@@ -258,6 +367,18 @@ export async function handleGeminiGenerate(req: Request, res: Response): Promise
         break;
       } catch (err: any) {
         lastError = err;
+        if (
+          isAuthKeyError(err) &&
+          !retriedWithServerKey &&
+          isValidGoogleApiKeyFormat(serverEnvKey) &&
+          activeKey !== serverEnvKey
+        ) {
+          retriedWithServerKey = true;
+          activeClient = getServerAiClient();
+          activeKey = serverEnvKey;
+          idx -= 1;
+          continue;
+        }
         const msg = String(err?.message || '');
         // Some gateway routes reject speechConfig on TTS models; retry once without speechConfig
         if (isAudioTtsRequest && msg.includes('speechConfig') && attemptConfig.speechConfig) {
@@ -265,7 +386,7 @@ export async function handleGeminiGenerate(req: Request, res: Response): Promise
             const strippedConfig = { ...attemptConfig };
             delete strippedConfig.speechConfig;
             response = await withTimeout(
-              ai.models.generateContent({
+              activeClient.models.generateContent({
                 model: candidateModel,
                 contents: effectiveContents,
                 config: Object.keys(strippedConfig).length > 0 ? strippedConfig : undefined,
@@ -311,6 +432,18 @@ export async function handleGeminiGenerate(req: Request, res: Response): Promise
       usageMetadata: response.usageMetadata,
     });
   } catch (err: any) {
+    if (isAuthKeyError(err)) {
+      const payload = buildInvalidKeyErrorPayload(activeKey, err);
+      console.warn('[Server Gemini Auth Error]:', payload.code, payload.httpStatus);
+      res.status(payload.httpStatus).json({
+        error: {
+          message: payload.message,
+          status: payload.httpStatus,
+          code: payload.code,
+        },
+      });
+      return;
+    }
     console.error('[Server Gemini Generate Error]:', err?.message || err);
     res.status(err?.status || 500).json({
       error: {
@@ -342,7 +475,20 @@ export async function handleGeminiStream(req: Request, res: Response): Promise<v
     });
     return;
   }
-  const ai = customKey ? createServerGenAiClient(customKey) : serverAi;
+  if (!isValidGoogleApiKeyFormat(apiKey)) {
+    const payload = buildInvalidKeyErrorPayload(apiKey);
+    res.status(payload.httpStatus).json({
+      error: {
+        message: payload.message,
+        status: payload.httpStatus,
+        code: payload.code,
+      },
+    });
+    return;
+  }
+  const serverEnvKey = getRawServerEnvGeminiKey();
+  let activeClient = getServerAiClient(customKey);
+  let activeKey = apiKey;
 
   const {
     model = MODEL_FREE,
@@ -379,6 +525,7 @@ export async function handleGeminiStream(req: Request, res: Response): Promise<v
   try {
     let streamedAnyText = false;
     let lastError: any = null;
+    let retriedWithServerKey = false;
 
     for (let idx = 0; idx < modelChain.length; idx++) {
       if (isAborted) break;
@@ -386,12 +533,12 @@ export async function handleGeminiStream(req: Request, res: Response): Promise<v
       const attemptConfig = buildModelConfig(mergedConfig, candidateModel, false);
       try {
         const responseStream = await withTimeout(
-          ai.models.generateContentStream({
+          activeClient.models.generateContentStream({
             model: candidateModel,
             contents: effectiveContents,
             config: Object.keys(attemptConfig).length > 0 ? attemptConfig : undefined,
           }),
-          idx === 0 ? 9000 : 11000,
+          15000,
           idx === 0 ? 'STREAM' : `STREAM_FALLBACK_${idx}`
         );
 
@@ -409,6 +556,19 @@ export async function handleGeminiStream(req: Request, res: Response): Promise<v
         }
       } catch (err: any) {
         lastError = err;
+        if (
+          !streamedAnyText &&
+          isAuthKeyError(err) &&
+          !retriedWithServerKey &&
+          isValidGoogleApiKeyFormat(serverEnvKey) &&
+          activeKey !== serverEnvKey
+        ) {
+          retriedWithServerKey = true;
+          activeClient = getServerAiClient();
+          activeKey = serverEnvKey;
+          idx -= 1;
+          continue;
+        }
         if (!streamedAnyText && idx < modelChain.length - 1 && isFailoverEligibleError(err)) {
           console.warn(`[Server Gemini Stream Failover]: ${candidateModel} -> ${modelChain[idx + 1]}`);
           continue;
@@ -428,11 +588,13 @@ export async function handleGeminiStream(req: Request, res: Response): Promise<v
       res.write('data: [DONE]\n\n');
     }
   } catch (err: any) {
-    console.error('[Server Gemini Stream Error]:', err?.message || err);
+    const errPayload = isAuthKeyError(err) ? buildInvalidKeyErrorPayload(activeKey, err) : null;
+    const msg = errPayload ? errPayload.message : (err?.message || 'Streaming failed');
+    console.error('[Server Gemini Stream Error]:', msg);
     if (!res.headersSent) {
-      res.status(500).json({ error: { message: err?.message || 'Streaming failed' } });
+      res.status(errPayload?.httpStatus || 500).json({ error: { message: msg } });
     } else if (!res.writableEnded) {
-      res.write(`data: ${JSON.stringify({ error: err?.message || 'Stream error' })}\n\n`);
+      res.write(`data: ${JSON.stringify({ error: msg })}\n\n`);
     }
   } finally {
     if (res.headersSent && !res.writableEnded) {
@@ -498,16 +660,6 @@ export async function handleGeminiTTS(req: Request, res: Response): Promise<void
     (req.query?.key as string) ||
     (req.query?.apiKey as string);
   const apiKey = getServerGeminiKey(customKey);
-  if (!apiKey) {
-    res.status(503).json({
-      error: {
-        message: 'GEMINI_API_KEY is not configured on the server. Please attach an API key in Settings > Secrets or server environment.',
-        code: 'MISSING_API_KEY',
-      },
-    });
-    return;
-  }
-  const ai = customKey ? createServerGenAiClient(customKey) : serverAi;
 
   const { text, voiceName = 'Kore', lang } = req.body || {};
   if (!text || typeof text !== 'string') {
@@ -521,7 +673,7 @@ export async function handleGeminiTTS(req: Request, res: Response): Promise<void
   }
 
   const safeVoice = normalizeVoiceName(voiceName, 'Kore');
-  const ttsModels = ['gemini-2.5-flash-preview-tts', TTS_MODEL, TTS_FALLBACK_MODEL];
+  const ttsModels = [TTS_MODEL, TTS_FALLBACK_MODEL];
   const langLabel = TTS_LANGUAGE_LABELS[normalizedLang];
   const geminiPromptText =
     normalizedLang !== 'en' && langLabel
@@ -531,7 +683,8 @@ export async function handleGeminiTTS(req: Request, res: Response): Promise<void
   try {
     let lastError: any = null;
 
-    if (customKey || !defaultServerGeminiTtsMissing) {
+    if (isValidGoogleApiKeyFormat(apiKey) && (customKey || !defaultServerGeminiTtsMissing)) {
+      const ai = getServerAiClient(customKey);
       let all404 = true;
       for (const candidateModel of ttsModels) {
         try {
@@ -710,7 +863,20 @@ export async function handleGeminiChat(req: Request, res: Response): Promise<voi
     });
     return;
   }
-  const ai = customKey ? createServerGenAiClient(customKey) : serverAi;
+  if (!isValidGoogleApiKeyFormat(apiKey)) {
+    const payload = buildInvalidKeyErrorPayload(apiKey);
+    res.status(payload.httpStatus).json({
+      error: {
+        message: payload.message,
+        status: payload.httpStatus,
+        code: payload.code,
+      },
+    });
+    return;
+  }
+  const serverEnvKey = getRawServerEnvGeminiKey();
+  let activeClient = getServerAiClient(customKey);
+  let activeKey = apiKey;
 
   const {
     model = MODEL_FREE,
@@ -730,13 +896,14 @@ export async function handleGeminiChat(req: Request, res: Response): Promise<voi
   try {
     let response: any = null;
     let lastError: any = null;
+    let retriedWithServerKey = false;
 
     for (let idx = 0; idx < modelChain.length; idx++) {
       const candidateModel = modelChain[idx];
       const baseCfg: any = systemInstruction ? { systemInstruction } : {};
       const chatCfg = buildModelConfig(baseCfg, candidateModel, false);
       try {
-        const chat = ai.chats.create({
+        const chat = activeClient.chats.create({
           model: candidateModel,
           config: Object.keys(chatCfg).length > 0 ? chatCfg : undefined,
           history: Array.isArray(history) && history.length > 0 ? history : undefined,
@@ -749,6 +916,18 @@ export async function handleGeminiChat(req: Request, res: Response): Promise<voi
         break;
       } catch (err: any) {
         lastError = err;
+        if (
+          isAuthKeyError(err) &&
+          !retriedWithServerKey &&
+          isValidGoogleApiKeyFormat(serverEnvKey) &&
+          activeKey !== serverEnvKey
+        ) {
+          retriedWithServerKey = true;
+          activeClient = getServerAiClient();
+          activeKey = serverEnvKey;
+          idx -= 1;
+          continue;
+        }
         if (idx < modelChain.length - 1 && isFailoverEligibleError(err)) {
           console.warn(`[Server Gemini Chat Failover]: ${candidateModel} -> ${modelChain[idx + 1]}`);
           continue;
@@ -763,6 +942,13 @@ export async function handleGeminiChat(req: Request, res: Response): Promise<voi
 
     res.json({ text: response.text || '' });
   } catch (err: any) {
+    if (isAuthKeyError(err)) {
+      const payload = buildInvalidKeyErrorPayload(activeKey, err);
+      res.status(payload.httpStatus).json({
+        error: { message: payload.message, status: payload.httpStatus, code: payload.code },
+      });
+      return;
+    }
     console.error('[Server Gemini Chat Error]:', err?.message || err);
     res.status(err?.status || 500).json({
       error: { message: err?.message || 'Gemini chat failed' },
@@ -789,17 +975,31 @@ export async function handleGeminiPing(req: Request, res: Response): Promise<voi
     });
     return;
   }
+  if (!isValidGoogleApiKeyFormat(apiKey)) {
+    const payload = buildInvalidKeyErrorPayload(apiKey);
+    res.status(payload.httpStatus).json({
+      ok: false,
+      latencyMs: 0,
+      code: payload.code,
+      message: payload.message,
+    });
+    return;
+  }
 
-  const ai = customKey ? createServerGenAiClient(customKey as string) : serverAi;
+  const serverEnvKey = getRawServerEnvGeminiKey();
+  let activeClient = getServerAiClient(customKey as string);
+  let activeKey = apiKey;
+  let retriedWithServerKey = false;
   const startTime = Date.now();
-  const pingModels = [FAST_FALLBACK_MODEL, MODEL_FREE, SECONDARY_FALLBACK_MODEL];
+  const pingModels = [FAST_FALLBACK_MODEL, MODEL_FREE];
 
   let lastError: any = null;
-  for (const usedModel of pingModels) {
+  for (let idx = 0; idx < pingModels.length; idx++) {
+    const usedModel = pingModels[idx];
     try {
       const cfg = buildModelConfig({}, usedModel, false);
       const response = await withTimeout(
-        ai.models.generateContent({
+        activeClient.models.generateContent({
           model: usedModel,
           contents: 'Reply with the single word: ONLINE',
           config: Object.keys(cfg).length > 0 ? cfg : undefined,
@@ -819,10 +1019,32 @@ export async function handleGeminiPing(req: Request, res: Response): Promise<voi
       return;
     } catch (err: any) {
       lastError = err;
+      if (
+        isAuthKeyError(err) &&
+        !retriedWithServerKey &&
+        isValidGoogleApiKeyFormat(serverEnvKey) &&
+        activeKey !== serverEnvKey
+      ) {
+        retriedWithServerKey = true;
+        activeClient = getServerAiClient();
+        activeKey = serverEnvKey;
+        idx -= 1;
+        continue;
+      }
     }
   }
 
   const latencyMs = Date.now() - startTime;
+  if (isAuthKeyError(lastError)) {
+    const payload = buildInvalidKeyErrorPayload(activeKey, lastError);
+    res.status(payload.httpStatus).json({
+      ok: false,
+      latencyMs,
+      code: payload.code,
+      message: payload.message,
+    });
+    return;
+  }
   console.error('[Server Gemini Ping Error]:', lastError?.message || lastError);
   res.status(502).json({
     ok: false,
@@ -870,8 +1092,11 @@ export function setupLiveApiWebSocket(httpServer: HttpServer): WebSocketServer {
         if (!apiKey) {
           throw new Error('GEMINI_API_KEY is not configured on the server.');
         }
+        if (!isValidGoogleApiKeyFormat(apiKey)) {
+          throw new Error(buildInvalidKeyErrorPayload(apiKey).message);
+        }
 
-        const liveSession = await serverAi.live.connect({
+        const liveSession = await getServerAiClient().live.connect({
           model: LIVE_MODEL,
           config: {
             responseModalities: [Modality.AUDIO],

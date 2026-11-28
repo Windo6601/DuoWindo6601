@@ -1,7 +1,9 @@
-import { APP_VERSION, APP_PWA_CORE_VERSION, APP_BUILD_CODE } from './appVersionService';
+import { APP_VERSION, APP_BETA_VERSION, APP_PWA_CORE_VERSION, APP_BUILD_CODE } from './appVersionService';
 
 export const PENDING_PWA_UPDATE_KEY = 'duowindo_pending_pwa_update_v1';
 export const LAST_PWA_PATCH_KEY = 'duowindo_last_pwa_patch_v1';
+
+export type AppReleaseChannel = 'stable' | 'beta';
 
 export interface PendingPwaUpdatePayload {
   startedAt: number;
@@ -9,6 +11,7 @@ export interface PendingPwaUpdatePayload {
   pwaCoreVersion: string;
   buildCode: string;
   lang: string;
+  channel?: AppReleaseChannel;
   status: 'pending_post_reload' | 'installing';
 }
 
@@ -18,17 +21,19 @@ export interface InstalledPwaPatchInfo {
   version: string;
   pwaCoreVersion: string;
   buildCode: string;
+  channel?: AppReleaseChannel;
   signatureShort: string;
   modules: string[];
 }
 
-export function setPendingPwaUpdate(lang: string = 'ru'): PendingPwaUpdatePayload {
+export function setPendingPwaUpdate(lang: string = 'ru', channel: AppReleaseChannel = 'stable'): PendingPwaUpdatePayload {
   const payload: PendingPwaUpdatePayload = {
     startedAt: Date.now(),
-    version: APP_VERSION,
+    version: channel === 'beta' ? APP_BETA_VERSION : APP_VERSION,
     pwaCoreVersion: APP_PWA_CORE_VERSION,
     buildCode: APP_BUILD_CODE,
     lang,
+    channel,
     status: 'pending_post_reload',
   };
 
@@ -89,16 +94,18 @@ export function clearPendingPwaUpdate(): void {
   }
 }
 
-export function saveInstalledPwaPatch(signatureShort: string): InstalledPwaPatchInfo {
+export function saveInstalledPwaPatch(signatureShort: string, channel: AppReleaseChannel = 'stable'): InstalledPwaPatchInfo {
+  const targetVersion = channel === 'beta' ? APP_BETA_VERSION : APP_VERSION;
   const info: InstalledPwaPatchInfo = {
     installedAt: new Date().toLocaleString(),
     timestamp: Date.now(),
-    version: APP_VERSION,
+    version: targetVersion,
     pwaCoreVersion: APP_PWA_CORE_VERSION,
     buildCode: APP_BUILD_CODE,
+    channel,
     signatureShort,
     modules: [
-      'UI & PWA Core',
+      channel === 'beta' ? `UI & PWA Beta Core (${APP_BETA_VERSION})` : 'UI & PWA Core',
       'Audio Engine (Fish Audio & WebAudio)',
       'Firestore Security Rules v2',
       'SHA-256 & TLS 1.3 Signature',

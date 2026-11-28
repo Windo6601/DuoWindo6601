@@ -28,6 +28,7 @@ import {
   resolvePhoneticTtsTarget,
 } from "./multilingualTtsHelper";
 import { getRandomProgrammingFallbackExercise } from "./programmingCurriculum";
+import { DUOWINDO6601_OFFICIAL_CATALOG } from "./duowindo6601Catalog";
 
 export enum Type {
   STRING = "STRING",
@@ -188,6 +189,10 @@ export interface ServerGeminiResponse {
   error?: { message?: string; status?: number; code?: string };
 }
 
+const isValidGoogleApiKeyFormat = (key?: string): boolean => {
+  return /^((AIza)[0-9A-Za-z_-]{20,}|(AQ\.)[0-9A-Za-z_.-]{20,})$/.test(String(key || '').trim());
+};
+
 /**
  * Executes a Gemini request via the backend proxy endpoint /api/gemini/generate.
  * Keeps all API keys and SDK instances securely on the server.
@@ -204,7 +209,7 @@ export async function callServerGemini(params: {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
-  if (customKey && customKey !== 'SYSTEM_FREE_TRAFFIC' && !customKey.includes('••••')) {
+  if (isValidGoogleApiKeyFormat(customKey)) {
     headers['x-goog-api-key'] = customKey;
   }
 
@@ -254,7 +259,7 @@ export async function* generateContentStream(params: {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
-  if (customKey && customKey !== 'SYSTEM_FREE_TRAFFIC' && !customKey.includes('••••')) {
+  if (isValidGoogleApiKeyFormat(customKey)) {
     headers['x-goog-api-key'] = customKey;
   }
 
@@ -452,14 +457,20 @@ export async function fetchGeminiWithRetry<T>(
       const errorStatus = error?.status || 0;
 
       const isPermissionDenied = 
+        errorStatus === 401 ||
         errorStatus === 403 || 
         errorMessage.includes('permission denied') || 
         errorMessage.includes('PERMISSION_DENIED') ||
+        errorMessage.includes('SERVICE_DISABLED') ||
+        errorMessage.includes('UNAUTHENTICATED') ||
+        errorMessage.includes('ACCESS_TOKEN_TYPE_UNSUPPORTED') ||
+        errorMessage.includes('INVALID_API_KEY') ||
+        errorMessage.includes('MISSING_API_KEY') ||
         errorMessage.includes('API_KEY_INVALID') ||
         errorMessage.includes('API key not valid');
 
       if (isPermissionDenied) {
-        console.warn("Gemini API permission/key error, falling back smoothly:", errorMessage);
+        console.warn("Gemini API authentication/key error:", errorMessage);
         throw error;
       }
 
@@ -1132,6 +1143,11 @@ export const speakText = async (
 
   const effectiveLang = resolveSpeechLanguage(cleanText, lang);
 
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    notifyNetworkOffline();
+    return;
+  }
+
   if (effectiveLang === 'tlh' || effectiveLang === 'klingon') {
     await playKlingonSpeech(cleanText, slow);
     return;
@@ -1171,7 +1187,11 @@ export const speakText = async (
     }
   }
 
-  if ((typeof navigator !== 'undefined' && !navigator.onLine) || provider === 'google' || provider === 'yandex' || provider === 'system' || provider === 'sapi53') {
+  if (provider === 'google' || provider === 'yandex' || provider === 'system' || provider === 'sapi53') {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        notifyNetworkOffline();
+        return;
+      }
       fallbackSpeak(cleanText, effectiveLang, slow, (provider === 'google' || provider === 'yandex') ? provider : 'system');
       return;
   }
@@ -1185,7 +1205,7 @@ export const speakText = async (
     const timer = setTimeout(() => controller.abort(), 6000);
     const customKey = getApiKey();
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (customKey && customKey !== 'SYSTEM_FREE_TRAFFIC' && !customKey.includes('••••')) {
+    if (isValidGoogleApiKeyFormat(customKey)) {
       headers['x-goog-api-key'] = customKey;
     }
 
@@ -1235,174 +1255,47 @@ export const speakText = async (
     } catch (fishErr) {
       console.warn("Fish Audio fallback failed, using Web Speech:", fishErr);
     }
+    if ((typeof navigator !== 'undefined' && !navigator.onLine) || isNetworkDisconnectError(error)) {
+      notifyNetworkOffline();
+      return;
+    }
     console.warn("TTS failed, using system speech fallback:", error);
     fallbackSpeak(cleanText, effectiveLang, slow, 'system');
   }
 };
 
-// --- LOCAL OFFLINE LESSON CACHE SYSTEM ---
+// --- ONLINE-ONLY LESSON SYSTEM (OFFLINE CACHE REMOVED) ---
 const LESSON_CACHE_KEY = 'duowindo_lesson_cache_v2';
 
-export const saveLessonToCache = (subjectId: string, exercise: Exercise) => {
-  try {
-    if (!exercise || !exercise.originalSentence) return;
-    const raw = localStorage.getItem(LESSON_CACHE_KEY);
-    const cache: Record<string, Exercise[]> = raw ? JSON.parse(raw) : {};
-    if (!cache[subjectId]) cache[subjectId] = [];
-    
-    // Avoid exact duplicate
-    const exists = cache[subjectId].some(e => e.originalSentence === exercise.originalSentence && e.type === exercise.type);
-    if (!exists) {
-      const cleanExercise: Exercise = {
-        ...exercise,
-        originalSentence: exercise.originalSentence?.replace(/Speak clearly and easily in English[:.]?/gi, '').trim() || '',
-        targetTranslation: exercise.targetTranslation?.replace(/Speak clearly and easily in English[:.]?/gi, '').trim() || '',
-        id: exercise.id || crypto.randomUUID(),
-        isFallback: false,
-        isCached: true
-      };
-      cache[subjectId].unshift(cleanExercise);
-      // Keep up to 30 cached exercises per course
-      if (cache[subjectId].length > 30) {
-        cache[subjectId] = cache[subjectId].slice(0, 30);
-      }
-      localStorage.setItem(LESSON_CACHE_KEY, JSON.stringify(cache));
-    }
-  } catch (e) {
-    console.warn("Failed to save lesson to cache:", e);
-  }
+export const saveLessonToCache = (_subjectId: string, _exercise: Exercise) => {
+  // Offline lesson cache intentionally disabled for all courses
 };
 
 const shownExerciseSentences = new Set<string>();
 
-export const getCachedExercise = (subjectId: string, type?: Exercise['type']): Exercise | null => {
-  try {
-    const raw = localStorage.getItem(LESSON_CACHE_KEY);
-    if (!raw) return null;
-    const cache: Record<string, Exercise[]> = JSON.parse(raw);
-    const list = cache[subjectId] || [];
-    if (list.length === 0) return null;
-    
-    const filtered = type ? list.filter(e => e.type === type) : list;
-    const pool = filtered.length > 0 ? filtered : list;
-    
-    // Pick unshown exercise if possible
-    let unshown = pool.filter(e => !shownExerciseSentences.has(e.originalSentence));
-    if (unshown.length === 0) {
-      pool.forEach(e => shownExerciseSentences.delete(e.originalSentence));
-      unshown = pool;
-    }
-    
-    const item = unshown[Math.floor(Math.random() * unshown.length)];
-    if (item) {
-      shownExerciseSentences.add(item.originalSentence);
-      return { ...item, id: crypto.randomUUID(), isCached: true, isFallback: false };
-    }
-    return null;
-  } catch (e) {
-    console.warn("Failed to read lesson from cache:", e);
-    return null;
-  }
+export const getCachedExercise = (_subjectId: string, _type?: Exercise['type']): Exercise | null => {
+  return null;
 };
 
-export const getCachedLessonsCount = (subjectId?: string): number => {
-  try {
-    const raw = localStorage.getItem(LESSON_CACHE_KEY);
-    if (!raw) return 0;
-    const cache: Record<string, Exercise[]> = JSON.parse(raw);
-    if (subjectId) {
-      return (cache[subjectId] || []).length;
-    }
-    return Object.values(cache).reduce((acc, curr) => acc + curr.length, 0);
-  } catch {
-    return 0;
-  }
+export const getCachedLessonsCount = (_subjectId?: string): number => {
+  return 0;
 };
 
 export const clearLessonCache = () => {
   try {
-    localStorage.removeItem(LESSON_CACHE_KEY);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(LESSON_CACHE_KEY);
+      localStorage.removeItem('duowindo_lesson_cache_v1');
+    }
   } catch {}
 };
 
 export const preseedDefaultLessonCache = () => {
-  try {
-    const raw = localStorage.getItem(LESSON_CACHE_KEY);
-    if (raw && Object.keys(JSON.parse(raw)).length > 3) {
-      return; // Already preseeded
-    }
-
-    const defaultSeed: Record<string, Exercise[]> = {
-      'en': [
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'The cat sleeps on the sofa', targetTranslation: 'Кошка спит на диване', wordBank: ['Кошка', 'спит', 'на', 'диване', 'собака', 'ест', 'в'], isCached: true },
-        { id: crypto.randomUUID(), type: 'listening', originalSentence: 'I drink water every morning', targetTranslation: 'Я пью воду каждое утро', wordBank: ['Я', 'пью', 'воду', 'каждое', 'утро', 'чай', 'он'], isCached: true },
-        { id: crypto.randomUUID(), type: 'speech', originalSentence: 'Good morning, how are you today?', targetTranslation: 'Доброе утро, как ваши дела сегодня?', wordBank: ['Доброе', 'утро', 'как', 'дела', 'хорошо'], isCached: true },
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'She reads an interesting book', targetTranslation: 'Она читает интересную книгу', wordBank: ['Она', 'читает', 'интересную', 'книгу', 'он', 'журнал', 'пишет'], isCached: true },
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'We travel to new cities in summer', targetTranslation: 'Мы путешествуем в новые города летом', wordBank: ['Мы', 'путешествуем', 'в', 'новые', 'города', 'летом', 'зимой', 'они'], isCached: true },
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'He plays guitar in the evening', targetTranslation: 'Он играет на гитаре вечером', wordBank: ['Он', 'играет', 'на', 'гитаре', 'вечером', 'утром', 'она'], isCached: true },
-        { id: crypto.randomUUID(), type: 'listening', originalSentence: 'They buy fresh apples at the market', targetTranslation: 'Они покупают свежие яблоки на рынке', wordBank: ['Они', 'покупают', 'свежие', 'яблоки', 'на', 'рынке', 'груши'], isCached: true },
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'My sister learns foreign languages with pleasure', targetTranslation: 'Моя сестра учит иностранные языки с удовольствием', wordBank: ['Моя', 'сестра', 'учит', 'иностранные', 'языки', 'с', 'удовольствием'], isCached: true },
-        { id: crypto.randomUUID(), type: 'speech', originalSentence: 'The doctor opens a large window in the office', targetTranslation: 'Врач открывает большое окно в кабинете', wordBank: ['Врач', 'открывает', 'большое', 'окно', 'в', 'кабинете'], isCached: true },
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'We walk in the green park on weekends', targetTranslation: 'Мы гуляем в зеленом парке по выходным', wordBank: ['Мы', 'гуляем', 'в', 'зеленом', 'парке', 'по', 'выходным'], isCached: true },
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'I enjoy hot coffee after work', targetTranslation: 'Я наслаждаюсь горячим кофе после работы', wordBank: ['Я', 'наслаждаюсь', 'горячим', 'кофе', 'после', 'работы'], isCached: true },
-        { id: crypto.randomUUID(), type: 'listening', originalSentence: 'She writes a long letter to her friend', targetTranslation: 'Она пишет длинное письмо своему другу', wordBank: ['Она', 'пишет', 'длинное', 'письмо', 'своему', 'другу'], isCached: true },
-      ],
-      'ru': [
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'Привет, как тебя зовут?', targetTranslation: 'Hello, what is your name?', wordBank: ['Hello', 'what', 'is', 'your', 'name', 'how', 'old'], isCached: true },
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'Это мой лучший друг', targetTranslation: 'This is my best friend', wordBank: ['This', 'is', 'my', 'best', 'friend', 'brother', 'good'], isCached: true },
-        { id: crypto.randomUUID(), type: 'listening', originalSentence: 'Сегодня прекрасная погода', targetTranslation: 'Today is wonderful weather', wordBank: ['Today', 'is', 'wonderful', 'weather', 'cold', 'rain'], isCached: true },
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'Мы любим путешествовать летом', targetTranslation: 'We love to travel in summer', wordBank: ['We', 'love', 'to', 'travel', 'in', 'summer', 'winter'], isCached: true },
-      ],
-      'de': [
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'Guten Tag, wie geht es Ihnen?', targetTranslation: 'Добрый день, как ваши дела?', wordBank: ['Добрый', 'день', 'как', 'ваши', 'дела', 'вечер', 'плохо'], isCached: true },
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'Ich lerne gerne Deutsch', targetTranslation: 'Я с удовольствием учу немецкий', wordBank: ['Я', 'с', 'удовольствием', 'учу', 'немецкий', 'он', 'английский'], isCached: true },
-        { id: crypto.randomUUID(), type: 'listening', originalSentence: 'Das Haus ist sehr groß und schön', targetTranslation: 'Дом очень большой и красивый', wordBank: ['Дом', 'очень', 'большой', 'и', 'красивый', 'маленький', 'сад'], isCached: true },
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'Wir trinken morgens frischen Tee', targetTranslation: 'Мы пьем свежий чай по утрам', wordBank: ['Мы', 'пьем', 'свежий', 'чай', 'по', 'утрам'], isCached: true },
-      ],
-      'fr': [
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'Bonjour, comment allez-vous?', targetTranslation: 'Здравствуйте, как ваши дела?', wordBank: ['Здравствуйте', 'как', 'ваши', 'дела', 'Привет', 'он'], isCached: true },
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'J\'aime la musique et les voyages', targetTranslation: 'Я люблю музыку и путешествия', wordBank: ['Я', 'люблю', 'музыку', 'и', 'путешествия', 'книги', 'еду'], isCached: true },
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'Nous regardons un film intéressant ce soir', targetTranslation: 'Мы смотрим интересный фильм сегодня вечером', wordBank: ['Мы', 'смотрим', 'интересный', 'фильм', 'сегодня', 'вечером'], isCached: true }
-      ],
-      'es': [
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'Hola, ¿cómo estás hoy?', targetTranslation: 'Привет, как ты сегодня?', wordBank: ['Привет', 'как', 'ты', 'сегодня', 'он', 'хорошо'], isCached: true },
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'El perro corre en el parque', targetTranslation: 'Собака бегает в парке', wordBank: ['Собака', 'бегает', 'в', 'парке', 'кошка', 'спит', 'на'], isCached: true },
-        { id: crypto.randomUUID(), type: 'listening', originalSentence: 'Nosotros viajamos a nuevas ciudades en verano', targetTranslation: 'Мы путешествуем в новые города летом', wordBank: ['Мы', 'путешествуем', 'в', 'новые', 'города', 'летом'], isCached: true }
-      ],
-      'zh': [
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: '你好，很高兴认识你', targetTranslation: 'Привет, приятно познакомиться', wordBank: ['Привет', 'приятно', 'познакомиться', 'с', 'тобой', 'друг'], isCached: true },
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: '我想喝一杯水', targetTranslation: 'Я хочу выпить стакан воды', wordBank: ['Я', 'хочу', 'выпить', 'стакан', 'воды', 'чай', 'он'], isCached: true }
-      ],
-      'ja': [
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'こんにちは、元気ですか？', targetTranslation: 'Привет, как дела?', wordBank: ['Привет', 'как', 'дела', 'хорошо', 'спасибо', 'друг'], isCached: true },
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: '猫は部屋で眠っています', targetTranslation: 'Кошка спит в комнате', wordBank: ['Кошка', 'спит', 'в', 'комнате', 'собака', 'ест', 'на'], isCached: true }
-      ],
-      'ar': [
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'مرحبا، كيف حالك؟', targetTranslation: 'Привет, как твои дела?', wordBank: ['Привет', 'как', 'твои', 'дела', 'хорошо', 'друг'], isCached: true },
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'هذا بيت جميل وكبير', targetTranslation: 'Это красивый и большой дом', wordBank: ['Это', 'красивый', 'и', 'большой', 'дом', 'сад', 'новый'], isCached: true }
-      ],
-      'math': [
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: '15 + 27 = ?', targetTranslation: '42', wordBank: ['42', '41', '43', '32'], isCached: true },
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: '8 × 7 = ?', targetTranslation: '56', wordBank: ['56', '54', '64', '48'], isCached: true },
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: '100 - 36 = ?', targetTranslation: '64', wordBank: ['64', '74', '54', '66'], isCached: true }
-      ],
-      'music': [
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'Какая нота пишется на первой линейке нотного стана?', targetTranslation: 'Ми', wordBank: ['Ми', 'Фа', 'Соль', 'Ре'], isCached: true },
-        { id: crypto.randomUUID(), type: 'translation', originalSentence: 'Какой знак повышает ноту на полутон?', targetTranslation: 'Диез', wordBank: ['Диез', 'Бемоль', 'Бекар', 'Фермата'], isCached: true }
-      ]
-    };
-
-    localStorage.setItem(LESSON_CACHE_KEY, JSON.stringify(defaultSeed));
-  } catch (e) {
-    console.warn("Could not preseed default lessons:", e);
-  }
+  clearLessonCache();
 };
 
-// Automatically seed cache on module load if available in browser
 if (typeof window !== 'undefined') {
-  setTimeout(() => {
-    preseedDefaultLessonCache();
-  }, 1000);
+  clearLessonCache();
 }
 
 export const getFallbackExercise = (
@@ -1413,17 +1306,22 @@ export const getFallbackExercise = (
   customTopic?: string,
   difficultyLevel: 'easy' | 'hard' = 'easy'
 ): Exercise => {
-    if (subjectId === 'coding') {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+    }
+
+    // Resolve catalog items (UUID itemId -> learningLanguage)
+    let resolvedSubjectKey = subjectId;
+    const catalogItem = DUOWINDO6601_OFFICIAL_CATALOG.find(c => c.itemId === subjectId);
+    if (catalogItem) {
+      resolvedSubjectKey = catalogItem.learningLanguage;
+    }
+
+    if (resolvedSubjectKey === 'coding') {
       return getRandomProgrammingFallbackExercise(customTopic || subjectName, difficultyLevel);
     }
 
-    // 1. Try local cache first!
-    const cached = getCachedExercise(subjectId, type);
-    if (cached) {
-      return cached;
-    }
-
-    if (subjectId === 'math') {
+    if (resolvedSubjectKey === 'math') {
         const mathType = Math.random();
         if (mathType < 0.25) {
             // 🔢 Арифметика (1-6 класс)
@@ -1479,7 +1377,7 @@ export const getFallbackExercise = (
             };
         }
     }
-    if (subjectId === 'music') {
+    if (resolvedSubjectKey === 'music') {
         const notes = [
             { note: "До (C)", question: "Какая нота идет первой в гамме До-мажор?", answer: "До" },
             { note: "Ре (D)", question: "Какая нота находится между До и Ми?", answer: "Ре" },
@@ -1576,7 +1474,7 @@ export const getFallbackExercise = (
         { orig: "Kucing makan ikan di rumah", trans: "Кот ест рыбу дома", bank: ["Кот", "ест", "рыбу", "дома", "собака"] }
       ],
       en: [
-        { orig: "The cat sleeps on the sofa", trans: "Кошка спит на диване", bank: ["Кошка", "спит", "на", "диване", "собака", "кровать"] },
+        { orig: "Welcome to your English language lesson", trans: "Добро пожаловать на ваш урок английского языка", bank: ["Добро", "пожаловать", "на", "ваш", "урок", "английского", "языка", "школа"] },
         { orig: "I drink warm tea every morning", trans: "Я пью тёплый чай каждое утро", bank: ["Я", "пью", "тёплый", "чай", "каждое", "утро", "кофе"] },
         { orig: "She reads an interesting book", trans: "Она читает интересную книгу", bank: ["Она", "читает", "интересную", "книгу", "он", "пишет"] },
         { orig: "Good morning, how are you today?", trans: "Доброе утро, как твои дела сегодня?", bank: ["Доброе", "утро,", "как", "твои", "дела", "сегодня?"] }
@@ -1740,16 +1638,44 @@ export const getFallbackExercise = (
         trans: userLanguage === 'en' ? s.en : s.ru,
         bank: userLanguage === 'en' ? s.bankEn : s.bankRu,
       })),
+      el: [
+        { orig: "Γεια σας! Πώς είστε;", trans: "Здравствуйте! Как ваши дела?", bank: ["Здравствуйте!", "Как", "ваши", "дела?", "καλά"] },
+        { orig: "Μαθαίνω την ελληνική γλώσσα", trans: "Я изучаю греческий язык", bank: ["Я", "изучаю", "греческий", "язык", "εμείς"] }
+      ],
+      nl: [
+        { orig: "Hallo! Hoe gaat het met je?", trans: "Привет! Как твои дела?", bank: ["Привет!", "Как", "твои", "дела?", "goed"] },
+        { orig: "Ik leer de Nederlandse taal", trans: "Я изучаю нидерландский язык", bank: ["Я", "изучаю", "нидерландский", "язык", "wij"] }
+      ],
+      da: [
+        { orig: "Hej! Hvordan har du det?", trans: "Привет! Как дела?", bank: ["Привет!", "Как", "дела?", "godt"] },
+        { orig: "Jeg lærer dansk med glæde", trans: "Я с радостью учу датский язык", bank: ["Я", "с", "радостью", "учу", "датский", "язык"] }
+      ],
+      hi: [
+        { orig: "नमस्ते! आप कैसे हैं?", trans: "Здравствуйте! Как ваши дела?", bank: ["Здравствуйте!", "Как", "ваши", "дела?", "अच्छा"] },
+        { orig: "मैं हिन्दी सीख रहा हूँ", trans: "Я изучаю язык хинди", bank: ["Я", "изучаю", "язык", "хинди", "हम"] }
+      ],
+      vi: [
+        { orig: "Xin chào! Bạn khỏe không?", trans: "Привет! Как поживаешь?", bank: ["Привет!", "Как", "поживаешь?", "tốt"] },
+        { orig: "Tôi đang học tiếng Việt", trans: "Я изучаю вьетнамский язык", bank: ["Я", "изучаю", "вьетнамский", "язык", "chúng"] }
+      ],
+      ro: [
+        { orig: "Salut! Ce mai faci astăzi?", trans: "Привет! Как дела сегодня?", bank: ["Привет!", "Как", "дела", "сегодня?", "bine"] },
+        { orig: "Învăț limba română cu drag", trans: "Я с удовольствием учу румынский язык", bank: ["Я", "с", "удовольствием", "учу", "румынский", "язык"] }
+      ],
+      cs: [
+        { orig: "Ahoj! Jak se máš dnes?", trans: "Привет! Как дела сегодня?", bank: ["Привет!", "Как", "дела", "сегодня?", "dobře"] },
+        { orig: "Učím se český jazyk", trans: "Я изучаю чешский язык", bank: ["Я", "изучаю", "чешский", "язык", "my"] }
+      ],
       art: [
         { orig: "Какие три цвета являются основными в живописи?", trans: "Красный, жёлтый, синий", bank: ["Красный,", "жёлтый,", "синий", "Зелёный"] },
         { orig: "Как называется техника письма по сырой штукатурке?", trans: "Фреска", bank: ["Фреска", "Акварель", "Гравюра", "Пастель"] }
       ]
     };
 
-    const effectiveBankKey = subjectId in hardestFallbacks
-      ? subjectId
-      : subjectId.startsWith('rf-')
-        ? (subjectId.includes('chuvash') ? 'cv' : 'ru')
+    const effectiveBankKey = resolvedSubjectKey in hardestFallbacks
+      ? resolvedSubjectKey
+      : resolvedSubjectKey.startsWith('rf-')
+        ? (resolvedSubjectKey.includes('chuvash') ? 'cv' : 'ru')
         : '';
 
     if (effectiveBankKey && hardestFallbacks[effectiveBankKey]) {
@@ -1757,7 +1683,7 @@ export const getFallbackExercise = (
       const item = list[Math.floor(Math.random() * list.length)];
       // Klingon course removes speaking ('speech') exercises and converts them to listening/translation
       const safeType =
-        subjectId === 'tlh'
+        resolvedSubjectKey === 'tlh'
           ? (type === 'listening' ? 'listening' : 'translation')
           : ((type === 'listening' || type === 'speech') ? type : 'translation');
       return {
@@ -1770,78 +1696,97 @@ export const getFallbackExercise = (
       };
     }
 
-    if (subjectId.startsWith('rf-')) {
+    if (resolvedSubjectKey.startsWith('rf-')) {
         return {
             id: crypto.randomUUID(), type: 'translation', originalSentence: `Это регион РФ: ${sanitizeSubjectName(subjectName)}?`,
             targetTranslation: "Да", wordBank: ["Да", "Нет", "Возможно", "Не знаю"], isFallback: true
         };
     }
 
-    // Dynamic procedural sentence builder (for 'en'/'ru'/unknown only if not covered above)
-    const procSubjects = [
-      { en: "I", ru: "Я" },
-      { en: "She", ru: "Она" },
-      { en: "He", ru: "Он" },
-      { en: "We", ru: "Мы" },
-      { en: "They", ru: "Они" },
-      { en: "My friend", ru: "Мой друг" },
-      { en: "The teacher", ru: "Учитель" },
-      { en: "My sister", ru: "Моя сестра" },
-      { en: "My brother", ru: "Мой брат" },
-      { en: "The doctor", ru: "Врач" }
-    ];
+    // Dynamic procedural sentence builder strictly for 'en' and 'ru'
+    if (resolvedSubjectKey === 'en' || resolvedSubjectKey === 'ru') {
+      const procSubjects = [
+        { en: "I", ru: "Я" },
+        { en: "She", ru: "Она" },
+        { en: "He", ru: "Он" },
+        { en: "We", ru: "Мы" },
+        { en: "They", ru: "Они" },
+        { en: "My friend", ru: "Мой друг" },
+        { en: "The teacher", ru: "Учитель" },
+        { en: "My sister", ru: "Моя сестра" },
+        { en: "My brother", ru: "Мой брат" },
+        { en: "The doctor", ru: "Врач" }
+      ];
 
-    const procActions = [
-      { en: "reads an interesting book", ru: "читает интересную книгу" },
-      { en: "travels to new cities", ru: "путешествует в новые города" },
-      { en: "drinks hot coffee", ru: "пьёт горячий кофе" },
-      { en: "listens to quiet music", ru: "слушает тихую музыку" },
-      { en: "cooks a tasty dinner", ru: "готовит вкусный ужин" },
-      { en: "buys fresh fruits", ru: "покупает свежие фрукты" },
-      { en: "walks in the green park", ru: "гуляет в зеленом парке" },
-      { en: "plays guitar", ru: "играет на гитаре" },
-      { en: "writes a long letter", ru: "пишет длинное письмо" },
-      { en: "watches a funny comedy", ru: "смотрит веселую комедию" }
-    ];
+      const procActions = [
+        { en: "reads an interesting book", ru: "читает интересную книгу" },
+        { en: "travels to new cities", ru: "путешествует в новые города" },
+        { en: "drinks hot coffee", ru: "пьёт горячий кофе" },
+        { en: "listens to quiet music", ru: "слушает тихую музыку" },
+        { en: "cooks a tasty dinner", ru: "готовит вкусный ужин" },
+        { en: "buys fresh fruits", ru: "покупает свежие фрукты" },
+        { en: "walks in the green park", ru: "гуляет в зеленом парке" },
+        { en: "plays guitar", ru: "играет на гитаре" },
+        { en: "writes a long letter", ru: "пишет длинное письмо" },
+        { en: "watches a funny comedy", ru: "смотрит веселую комедию" }
+      ];
 
-    const procModifiers = [
-      { en: "every morning", ru: "каждое утро" },
-      { en: "in summer", ru: "летом" },
-      { en: "in winter", ru: "зимой" },
-      { en: "after work", ru: "после работы" },
-      { en: "on weekends", ru: "по выходным" },
-      { en: "today", ru: "сегодня" },
-      { en: "in the evening", ru: "вечером" }
-    ];
+      const procModifiers = [
+        { en: "every morning", ru: "каждое утро" },
+        { en: "in summer", ru: "летом" },
+        { en: "in winter", ru: "зимой" },
+        { en: "after work", ru: "после работы" },
+        { en: "on weekends", ru: "по выходным" },
+        { en: "today", ru: "сегодня" },
+        { en: "in the evening", ru: "вечером" }
+      ];
 
-    const subj = procSubjects[Math.floor(Math.random() * procSubjects.length)];
-    const act = procActions[Math.floor(Math.random() * procActions.length)];
-    const mod = procModifiers[Math.floor(Math.random() * procModifiers.length)];
+      const subj = procSubjects[Math.floor(Math.random() * procSubjects.length)];
+      const act = procActions[Math.floor(Math.random() * procActions.length)];
+      const mod = procModifiers[Math.floor(Math.random() * procModifiers.length)];
 
-    const isEngUi = userLanguage === 'en';
-    const isRuTarget = subjectId === 'ru';
-    const orig = isRuTarget ? `${subj.ru} ${act.ru} ${mod.ru}` : `${subj.en} ${act.en} ${mod.en}`;
-    const target = isRuTarget ? `${subj.en} ${act.en} ${mod.en}` : (isEngUi ? `${subj.en} ${act.en} ${mod.en}` : `${subj.ru} ${act.ru} ${mod.ru}`);
+      const isEngUi = userLanguage === 'en';
+      const isRuTarget = resolvedSubjectKey === 'ru';
+      const orig = isRuTarget ? `${subj.ru} ${act.ru} ${mod.ru}` : `${subj.en} ${act.en} ${mod.en}`;
+      const target = isRuTarget ? `${subj.en} ${act.en} ${mod.en}` : (isEngUi ? `${subj.en} ${act.en} ${mod.en}` : `${subj.ru} ${act.ru} ${mod.ru}`);
 
-    const rawTokens = target.split(' ').filter(Boolean);
-    const distractorsPool = isRuTarget || isEngUi
-      ? ["quickly", "slowly", "yesterday", "tomorrow", "happy", "home"]
-      : ["быстро", "медленно", "дома", "вчера", "завтра", "очень", "друзья"];
-    const extraDistractors = distractorsPool.filter(d => !rawTokens.includes(d)).slice(0, 3);
-    const wordBank = [...rawTokens, ...extraDistractors].sort(() => Math.random() - 0.5);
+      const rawTokens = target.split(' ').filter(Boolean);
+      const distractorsPool = isRuTarget || isEngUi
+        ? ["quickly", "slowly", "yesterday", "tomorrow", "happy", "home"]
+        : ["быстро", "медленно", "дома", "вчера", "завтра", "очень", "друзья"];
+      const extraDistractors = distractorsPool.filter(d => !rawTokens.includes(d)).slice(0, 3);
+      const wordBank = [...rawTokens, ...extraDistractors].sort(() => Math.random() - 0.5);
 
+      return {
+          id: crypto.randomUUID(), 
+          type: type || 'translation', 
+          originalSentence: orig, 
+          targetTranslation: target,
+          wordBank, 
+          isFallback: true
+      };
+    }
+
+    // For any other language or beta discipline: generate an authentic subject-specific exercise
+    const cleanName = sanitizeSubjectName(subjectName) || 'Курс';
+    const isRuTarget = userLanguage === 'ru';
     return {
-        id: crypto.randomUUID(), 
-        type: type || 'translation', 
-        originalSentence: orig, 
-        targetTranslation: target,
-        wordBank, 
-        isFallback: true
+      id: crypto.randomUUID(),
+      type: type || 'translation',
+      originalSentence: isRuTarget ? `Урок курса: ${cleanName}` : `Lesson: ${cleanName}`,
+      targetTranslation: isRuTarget ? `Я изучаю курс ${cleanName}` : `I am learning ${cleanName}`,
+      wordBank: (isRuTarget ? ["Я", "изучаю", "курс", cleanName, "язык", "слова"] : ["I", "am", "learning", cleanName, "lesson", "words"]).sort(() => Math.random() - 0.5),
+      isFallback: true
     };
 };
 
 export const OFFLINE_INTERNET_REQUIRED_MESSAGE =
   'Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова';
+
+export const isRuntimeOnline = (): boolean => {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return false;
+  return true;
+};
 
 export const notifyNetworkOffline = (): void => {
   if (typeof window !== 'undefined') {
@@ -1857,7 +1802,15 @@ export const isNetworkDisconnectError = (err: unknown): boolean => {
     msg.includes('networkerror') ||
     msg.includes('load failed') ||
     msg.includes('err_internet_disconnected') ||
-    msg.includes('network request failed')
+    msg.includes('err_network_changed') ||
+    msg.includes('err_connection') ||
+    msg.includes('err_timed_out') ||
+    msg.includes('econnrefused') ||
+    msg.includes('enetunreach') ||
+    msg.includes('network request failed') ||
+    msg.includes('network timeout') ||
+    msg.includes('нет подключения к интернету') ||
+    msg.includes('no internet connection')
   );
 };
 
@@ -1865,7 +1818,7 @@ export const generateExercise = async (
     targetSubject: string, subjectId: string, isLanguage: boolean = true,
     type: Exercise['type'] = 'translation', isPro: boolean = false, customTopic?: string,
     userLanguage: string = 'ru',
-    difficultyLevel: 'easy' | 'hard' = 'easy'
+    difficultyLevel: 'easy' | 'hard' = 'hard'
 ): Promise<Exercise> => {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
@@ -1877,8 +1830,8 @@ export const generateExercise = async (
   const nonce = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
 
   const difficultyInstruction = difficultyLevel === 'hard'
-    ? 'УРОВЕНЬ СЛОЖНОСТИ: СЛОЖНЫЙ УРОВЕНЬ (Hard B2–C1). Используй более длинные, содержательные и грамматически богатые предложения (8–14 слов), продвинутую лексику, сложные времена/обороты и тонкие, близкие по форме слова-дистракторы.'
-    : 'УРОВЕНЬ СЛОЖНОСТИ: ЛЁГКИЙ УРОВЕНЬ (Easy A1). Используй короткие, простые и понятные начинающим фразы (3–5 слов), базовую повседневную лексику и простые слова-дистракторы.';
+    ? 'УРОВЕНЬ СЛОЖНОСТИ: СЛОЖНЫЙ УРОВЕНЬ (Hard B2–C1). Создавай ДЛИННЫЕ, развёрнутые, многострочные и грамматически сложные задания (15–26 слов: 2–3 связанных предложения или сложноподчинённые конструкции, разделённые переносом строки \\n), с продвинутой лексикой, идиомами, сложными временами/падежами и тонкими словами-дистракторами. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО выдавать короткие простые фразы из 3–6 слов!'
+    : 'УРОВЕНЬ СЛОЖНОСТИ: БАЗОВЫЙ УРОВЕНЬ (Easy A2). Используй полноценные естественные предложения (7–12 слов, минимум 1–2 осмысленные части), понятную повседневную лексику и правдоподобные слова-дистракторы.';
 
   const speakerLangNames: Record<string, string> = {
     ru: 'русский язык (Russian)',
@@ -1930,45 +1883,45 @@ ${difficultyInstruction}
   } else if (subjectId === 'math') {
     prompt = `Сгенерируй случайное математическое задание для школьного курса "Математика (1–11 классы)".
 ${difficultyLevel === 'hard'
-  ? 'УРОВЕНЬ СЛОЖНОСТИ: СЛОЖНЫЙ (Hard • 8–11 классы, олимпиадные задачи, логарифмы, тригонометрия, степени, квадратные уравнения, производные).'
-  : 'УРОВЕНЬ СЛОЖНОСТИ: ЛЁГКИЙ (Easy • 1–5 классы, простая арифметика, устный счёт, простые дроби и базовые уравнения).'}
-Оригинал ("originalSentence") — математическое выражение или условие задачи на языке ${translationLangName}.
+  ? 'УРОВЕНЬ СЛОЖНОСТИ: СЛОЖНЫЙ (Hard • 8–11 классы, многошаговые олимпиадные задачи, логарифмы, тригонометрия, степени, квадратные уравнения, производные и текстовые задачи в 2–3 строки через \\n).'
+  : 'УРОВЕНЬ СЛОЖНОСТИ: БАЗОВЫЙ (Easy • 4–6 классы, многошаговая арифметика, дроби, проценты и текстовые задачи).'}
+Оригинал ("originalSentence") — развёрнутое математическое выражение или условие задачи в 2–3 строки (\\n) на языке ${translationLangName}.
 Перевод ("targetTranslation") — правильный числовой ответ или формула.
 "wordBank" — массив, содержащий правильный ответ и 3 разумных числовых дистрактора.
 Код уникальности: ${nonce}.`;
   } else if (subjectId === 'music') {
-    prompt = `Сгенерируй обучающее задание по МУЗЫКЕ (нотная грамота, сольфеджио, теория музыки, интервалы, аккорды, длительности, музыкальные инструменты, композиторы) для обучающегося на языке ${translationLangName}.
+    prompt = `Сгенерируй развёрнутое обучающее задание по МУЗЫКЕ (нотная грамота, сольфеджио, теория музыки, гармония, интервалы, сложные аккорды, длительности, музыкальные инструменты, композиторы) для обучающегося на языке ${translationLangName}.
 ${difficultyInstruction}
-Оригинал ("originalSentence") — вопрос или задача по музыке на языке ${translationLangName}.
-Перевод ("targetTranslation") — правильный ответ на языке ${translationLangName}.
-"wordBank" — массив из 4 вариантов (правильный ответ и 3 правдоподобных дистрактора).
+Оригинал ("originalSentence") — подробный музыкальный сценарий или вопрос из 2–3 строк (\\n) на языке ${translationLangName}.
+Перевод ("targetTranslation") — точный развёрнутый ответ на языке ${translationLangName}.
+"wordBank" — массив из отдельных слов правильного ответа и 3–4 правдоподобных дистракторов.
 Код уникальности: ${nonce}.`;
   } else if (subjectId === 'chess') {
-    prompt = `Сгенерируй обучающее задание по ШАХМАТАМ (тактика, дебюты, шахматные правила, ценность фигур, термины, матовые конструкции) для обучающегося на языке ${translationLangName}.
+    prompt = `Сгенерируй развёрнутое обучающее задание по ШАХМАТАМ (сложная тактика, дебютная теория, эндшпиль, стратегия, матовые комбинации) для обучающегося на языке ${translationLangName}.
 ${difficultyInstruction}
-Оригинал ("originalSentence") — шахматная задача или вопрос на языке ${translationLangName}.
-Перевод ("targetTranslation") — правильный ответ на языке ${translationLangName}.
-"wordBank" — массив из 4 вариантов (правильный ответ и 3 дистрактора).
+Оригинал ("originalSentence") — подробная шахматная ситуация или задача в 2–3 строки (\\n) на языке ${translationLangName}.
+Перевод ("targetTranslation") — точный правильный ответ на языке ${translationLangName}.
+"wordBank" — массив из слов правильного ответа и 3–4 дистракторов.
 Код уникальности: ${nonce}.`;
   } else if (subjectId === 'coding') {
     const codingFocus = (customTopic && customTopic.trim())
       ? customTopic
       : 'Lua (скрипты для игр, расширение приложений, легковесный код), Swift и экосистема Apple (iOS/macOS, Objective-C, Xcode только на Mac, SwiftUI, UIKit, AppKit), Android (Kotlin, Java, C++ через Android NDK, Android Studio, Gradle, Jetpack Compose, XML, Flutter на Dart, React Native на JS), 5 этапов создания приложения (.aab), и сборка APK (build.gradle.kts, app-debug.apk, KeyStore .jks, ./gradlew assembleDebug / assembleRelease, Windows gradlew, конструктор Andromo)';
-    prompt = `Сгенерируй УНИКАЛЬНОЕ обучающее задание по ПРОГРАММИРОВАНИЮ И РАЗРАБОТКЕ ПРИЛОЖЕНИЙ на языке ${translationLangName}.
+    prompt = `Сгенерируй УНИКАЛЬНОЕ, подробное и сложное обучающее задание по ПРОГРАММИРОВАНИЮ И РАЗРАБОТКЕ ПРИЛОЖЕНИЙ на языке ${translationLangName}.
 ${difficultyInstruction}
 Фокус темы: ${codingFocus}.
 Обязательно опирайся на реальные инструменты стека: Lua, Swift, Xcode, SwiftUI, UIKit, AppKit, Objective-C, Kotlin, Java, C++ Android NDK, Android Studio, Gradle, Jetpack Compose, XML, Flutter (Dart), React Native, Android App Bundle (.aab), build.gradle.kts, app-debug.apk, KeyStore (.jks), ./gradlew assembleDebug / assembleRelease, конструкторы вроде Andromo.
 Строгая структура JSON:
-- originalSentence: чёткий технический вопрос или мини-задача по выбранной теме на ${translationLangName}.
-- targetTranslation: краткий точный правильный ответ (1–4 слова) на ${translationLangName} или название инструмента/команды.
-- wordBank: массив слов из правильного ответа (или 1-4 токена) + 3 правдоподобных дистрактора из того же стека технологий.
+- originalSentence: развёрнутый многострочный технический сценарий или задача с деталями архитектуры/отладки (2–3 строки через \\n) на ${translationLangName}.
+- targetTranslation: точный правильный ответ или формулировка решения (${difficultyLevel === 'hard' ? '4–10 слов' : '2–5 слов'}) на ${translationLangName}.
+- wordBank: массив отдельных слов/токенов из targetTranslation + 3–4 правдоподобных дистрактора из того же стека технологий.
 Код уникальности: ${nonce}.`;
   } else if (subjectId === 'art') {
-    prompt = `Сгенерируй обучающее задание по предмету "${cleanTargetSubject}" на языке ${translationLangName}.
+    prompt = `Сгенерируй развёрнутое обучающее задание по предмету "${cleanTargetSubject}" на языке ${translationLangName}.
 ${difficultyInstruction}
-Оригинал ("originalSentence") — вопрос или задача по предмету на языке ${translationLangName}.
-Перевод ("targetTranslation") — краткий правильный ответ (1–3 слова) на языке ${translationLangName}.
-"wordBank" — массив из слов правильного ответа и 3 дистракторов.
+Оригинал ("originalSentence") — подробный вопрос, анализ техники или художественная задача в 2–3 строки (\\n) на языке ${translationLangName}.
+Перевод ("targetTranslation") — точный развёрнутый ответ (${difficultyLevel === 'hard' ? '4–10 слов' : '2–5 слов'}) на языке ${translationLangName}.
+"wordBank" — массив из слов правильного ответа и 3–4 дистракторов.
 Код уникальности: ${nonce}.`;
   } else if (isLanguage) {
     const isSameLang = subjectId === userLanguage;
@@ -2018,7 +1971,7 @@ ${difficultyInstruction}
         }
       });
       return extractJsonSafe<any>(response.text || '{}', {});
-    }), 20000);
+    }), 25000);
 
     const orig = String(data?.originalSentence || '').trim();
     const trans = String(data?.targetTranslation || '').trim();
@@ -2043,14 +1996,13 @@ ${difficultyInstruction}
       difficultyLevel
     };
     shownExerciseSentences.add(exercise.originalSentence);
-    saveLessonToCache(subjectId, exercise);
     return exercise;
   } catch (error) {
-    if (isNetworkDisconnectError(error)) {
+    if (isNetworkDisconnectError(error) || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      notifyNetworkOffline();
       throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
     }
-    console.warn("API exercise generation failed/timed out, returning backup exercise:", error);
-    return { ...getFallbackExercise(subjectId, effectiveType, cleanTargetSubject, userLanguage, customTopic, difficultyLevel), difficultyLevel };
+    throw error instanceof Error ? error : new Error('Ошибка генерации онлайн-упражнения');
   }
 };
 
@@ -2060,25 +2012,17 @@ export const checkAnswerWithAI = async (
   correctAnswer: string,
   isMax: boolean = false
 ): Promise<{ isCorrect: boolean; feedback: string; isFallback?: boolean }> => {
-  // Simple check first
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+  }
+
+  // Simple exact check first (online-only)
   if (!userAnswer) return { isCorrect: false, feedback: "No answer provided" };
   const normUser = userAnswer.trim().toLowerCase().replace(/[.,!?;]/g, '');
   const normCorrect = correctAnswer.trim().toLowerCase().replace(/[.,!?;]/g, '');
   
   if (normUser === normCorrect) {
       return { isCorrect: true, feedback: "Верно!" };
-  }
-
-  // Fast offline return when physically offline
-  if (typeof navigator !== 'undefined' && !navigator.onLine) {
-    const isClose = normUser === normCorrect || 
-      normUser.replace(/\s+/g, '') === normCorrect.replace(/\s+/g, '') ||
-      (normCorrect.includes(normUser) && normUser.length >= 3);
-    return { 
-      isCorrect: isClose, 
-      feedback: isClose ? "Правильно!" : `Правильный ответ: ${correctAnswer}`, 
-      isFallback: false 
-    };
   }
 
   try {
@@ -2115,6 +2059,10 @@ export const checkAnswerWithAI = async (
     }
     throw new Error('Invalid check JSON');
   } catch (e) {
+    if (isNetworkDisconnectError(e) || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      notifyNetworkOffline();
+      throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+    }
     const isCorrect = normUser === normCorrect || (normCorrect.includes(normUser) && normUser.length >= 3);
     return { 
         isCorrect, 
@@ -2132,6 +2080,9 @@ export const generateLocalMistakeExplanation = (
     isCorrectAnswer: boolean = false,
     exerciseType?: string
 ): string => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+    }
     const isRu = userLanguage === 'Russian' || userLanguage === 'ru';
     const cleanUser = (userAnswer || "").trim();
     const cleanCorrect = (correctAnswer || "").trim();
@@ -2140,13 +2091,13 @@ export const generateLocalMistakeExplanation = (
     // 1. Ishihara Test
     if (exerciseType === 'ishihara' || cleanOriginal.toLowerCase().includes('ishihara')) {
         if (isRu) {
-            return `⚡ **Офлайн-разбор (Цветовой тест Ишихары):**\n\n` +
+            return `⚡ **Разбор DuoWindo6601 (Цветовой тест Ишихары):**\n\n` +
                    `• **Ваш ввод:** "${cleanUser || 'Пусто'}"\n` +
                    `• **Правильное число:** **${cleanCorrect}**\n\n` +
                    `🔍 **Пояснение:** Тестовая таблица Ишихары состоит из разноцветных точек разного диаметра. Число составлено из цветовых оттенков спектра, которые позволяют оценить восприятие красного и зеленого спектров.\n\n` +
                    `📌 **Совет:** Проверяйте таблицы при хорошем освещении экрана.`;
         } else {
-            return `⚡ **Offline Breakdown (Ishihara Color Test):**\n\n` +
+            return `⚡ **DuoWindo6601 Breakdown (Ishihara Color Test):**\n\n` +
                    `• **Your input:** "${cleanUser || 'None'}"\n` +
                    `• **Correct number:** **${cleanCorrect}**\n\n` +
                    `🔍 **Explanation:** Ishihara plates use specific color-spectrum dots to test red-green color perception.\n\n` +
@@ -2157,12 +2108,12 @@ export const generateLocalMistakeExplanation = (
     // 2. Chess Exercises
     if (exerciseType === 'chess') {
         if (isRu) {
-            return `⚡ **Офлайн-анализ позиции DuoWindo6601:**\n\n` +
+            return `⚡ **Анализ позиции DuoWindo6601:**\n\n` +
                    `♟️ **Тема:** Тактический мотив и развитие фигур.\n` +
                    `• **Ключевая идея:** Контроль центральных полей, безопасность короля и создание связок против фигур соперника.\n\n` +
                    `💡 **Совет гроссмейстера:** Перед каждым ходом проверяйте, какие фигуры соперника остались без защиты (висячие фигуры) и есть ли возможность поставить шах или мат.`;
         } else {
-            return `⚡ **Offline Chess Analysis:**\n\n` +
+            return `⚡ **DuoWindo6601 Chess Analysis:**\n\n` +
                    `♟️ **Topic:** Tactical motif & piece coordination.\n` +
                    `• **Key Idea:** Control central squares, ensure king safety, and seek undefended pieces.\n\n` +
                    `💡 **Grandmaster Tip:** Before committing a move, check for opponent checks, captures, and tactical threats.`;
@@ -2172,13 +2123,13 @@ export const generateLocalMistakeExplanation = (
     // 3. Drawing Exercises
     if (exerciseType === 'drawing') {
         if (isRu) {
-            return `⚡ **Офлайн-разбор написания символа:**\n\n` +
+            return `⚡ **Разбор написания символа DuoWindo6601:**\n\n` +
                    `• **Символ:** **${cleanCorrect}**\n` +
                    `• **Оригинал:** ${cleanOriginal}\n\n` +
                    `✍️ **Правило написания:** Соблюдайте порядок штрихов — сверху вниз и слева направо. Четкие пропорции помогают мгновенно распознавать символ в текстах.\n\n` +
                    `🌟 **Практика:** Попробуйте нарисовать символ еще раз для закрепления мышечной памяти!`;
         } else {
-            return `⚡ **Offline Character Breakdown:**\n\n` +
+            return `⚡ **DuoWindo6601 Character Breakdown:**\n\n` +
                    `• **Target Character:** **${cleanCorrect}**\n` +
                    `• **Prompt:** ${cleanOriginal}\n\n` +
                    `✍️ **Stroke Rule:** Write strokes from top to bottom and left to right.\n\n` +
@@ -2189,12 +2140,12 @@ export const generateLocalMistakeExplanation = (
     // 4. Speech / Pronunciation
     if (exerciseType === 'speech') {
         if (isRu) {
-            return `⚡ **Офлайн-разбор произношения:**\n\n` +
+            return `⚡ **Разбор произношения DuoWindo6601:**\n\n` +
                    `• **Произнесенная фраза:** "${cleanUser || 'Речь не распознана'}"\n` +
                    `• **Эталонная фраза:** "${cleanCorrect}"\n\n` +
                    `🎙️ **Рекомендация:** Старайтесь произносить слова плавно, соблюдая ударение в ключевых слогах. Нажмите на иконку динамика 🔊, чтобы прослушать эталонную интонацию еще раз.`;
         } else {
-            return `⚡ **Offline Pronunciation Breakdown:**\n\n` +
+            return `⚡ **DuoWindo6601 Pronunciation Breakdown:**\n\n` +
                    `• **Your Speech:** "${cleanUser || 'No speech detected'}"\n` +
                    `• **Target Phrase:** "${cleanCorrect}"\n\n` +
                    `🎙️ **Tip:** Focus on word stress and syllable rhythm. Tap the speaker icon 🔊 to listen to native audio again.`;
@@ -2208,7 +2159,7 @@ export const generateLocalMistakeExplanation = (
     // When the user answered correctly
     if (isCorrectAnswer || normUser === normCorrect) {
         if (isRu) {
-            let res = `🎉 **Отличный ответ! (Офлайн-анализ):**\n\n`;
+            let res = `🎉 **Отличный ответ! (Разбор DuoWindo6601):**\n\n`;
             res += `• **Исходная фраза:** "${cleanOriginal}"\n`;
             res += `• **Ваш правильный перевод:** "${cleanCorrect}"\n\n`;
             res += `📚 **Грамматический разбор:**\n`;
@@ -2216,7 +2167,7 @@ export const generateLocalMistakeExplanation = (
             res += `✨ **Совет:** Продолжайте в том же духе, вы уверенно осваиваете эту тему!`;
             return res;
         } else {
-            let res = `🎉 **Great Job! (Offline Breakdown):**\n\n`;
+            let res = `🎉 **Great Job! (DuoWindo6601 Breakdown):**\n\n`;
             res += `• **Original:** "${cleanOriginal}"\n`;
             res += `• **Your Correct Translation:** "${cleanCorrect}"\n\n`;
             res += `📚 **Grammar Analysis:**\n`;
@@ -2229,8 +2180,8 @@ export const generateLocalMistakeExplanation = (
     // If answer was empty
     if (!cleanUser || cleanUser === "(No speech detected)" || cleanUser === "No input") {
         return isRu
-            ? `⚡ **Офлайн-анализ ответа:**\n\nВы не ввели ответ или не выбрали карточки со словами.\n\n✅ **Правильный ответ:** ${cleanCorrect}\n📌 **Оригинальная фраза:** ${cleanOriginal}\n\n💡 **Совет:** Составьте фразу, выбирая предложенные блоки по порядку.`
-            : `⚡ **Offline Answer Breakdown:**\n\nNo words or input were selected.\n\n✅ **Correct Answer:** ${cleanCorrect}\n📌 **Original Phrase:** ${cleanOriginal}\n\n💡 **Tip:** Tap the word bank tokens in sequential order.`;
+            ? `⚡ **Разбор ответа DuoWindo6601:**\n\nВы не ввели ответ или не выбрали карточки со словами.\n\n✅ **Правильный ответ:** ${cleanCorrect}\n📌 **Оригинальная фраза:** ${cleanOriginal}\n\n💡 **Совет:** Составьте фразу, выбирая предложенные блоки по порядку.`
+            : `⚡ **DuoWindo6601 Answer Breakdown:**\n\nNo words or input were selected.\n\n✅ **Correct Answer:** ${cleanCorrect}\n📌 **Original Phrase:** ${cleanOriginal}\n\n💡 **Tip:** Tap the word bank tokens in sequential order.`;
     }
 
     // Compare words
@@ -2241,7 +2192,7 @@ export const generateLocalMistakeExplanation = (
     const extraWords = userWords.filter(uw => !correctWords.includes(uw));
 
     if (isRu) {
-        let text = `⚡ **Офлайн-анализ ошибки DuoWindo6601:**\n\n`;
+        let text = `⚡ **Разбор ошибки DuoWindo6601:**\n\n`;
         text += `• **Фраза для перевода:** "${cleanOriginal}"\n`;
         text += `• **Ваш ответ:** "${cleanUser}"\n`;
         text += `• **Правильный эталон:** "${cleanCorrect}"\n\n`;
@@ -2258,7 +2209,7 @@ export const generateLocalMistakeExplanation = (
         text += `\n📌 **Совет:** Обратите внимание на согласование частей речи и порядок слов в предложении.`;
         return text;
     } else {
-        let text = `⚡ **Offline Mistake Breakdown:**\n\n`;
+        let text = `⚡ **DuoWindo6601 Mistake Breakdown:**\n\n`;
         text += `• **Original Phrase:** "${cleanOriginal}"\n`;
         text += `• **Your Answer:** "${cleanUser}"\n`;
         text += `• **Target Translation:** "${cleanCorrect}"\n\n`;
@@ -2284,9 +2235,9 @@ export const getMistakeExplanation = async (
     userLanguage: string,
     isCorrectAnswer: boolean = false,
     exerciseType?: string,
-    isOffline: boolean = false
+    _isOffline: boolean = false
 ): Promise<string> => {
-    if (isOffline || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
         throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
     }
 
@@ -2295,22 +2246,20 @@ export const getMistakeExplanation = async (
         const isRu = userLanguage === 'Russian' || userLanguage === 'ru';
         
         const prompt = isCorrectAnswer
-          ? `You are DuoWindo6601, a friendly language tutor similar to Duolingo Max.
+          ? `You are DuoWindo6601, a thorough and supportive language tutor.
 The student answered CORRECTLY!
 Original phrase: "${original}"
 Correct answer: "${correctAnswer}"
-Explain briefly and clearly (max 60 words) why this answer is correct, highlighting key grammar or vocabulary points.
-Respond in this language: ${isRu ? 'Russian' : 'English'}.
-Be enthusiastic, encouraging, and clear.`
-          : `You are DuoWindo6601, a friendly language tutor similar to Duolingo Max.
+Provide a rich, multi-line explanation (3–5 clear lines/bullet points, 90–140 words) detailing why this answer is correct, breaking down the grammar rules, word order, nuance/idioms, and giving 1 additional example sentence.
+Respond in this language: ${isRu ? 'Russian' : 'English'}.`
+          : `You are DuoWindo6601, a thorough and supportive language tutor.
 The student made a mistake in their exercise.
 Original phrase: "${original}"
 Student's answer: "${userAnswer}"
 Correct answer: "${correctAnswer}"
 
-Explain briefly and clearly (max 60 words) why the student's answer is incorrect, how the grammar or vocabulary works, and give a friendly tip.
-Respond in this language: ${isRu ? 'Russian' : 'English'}.
-Do not be overly technical, be supportive.`;
+Provide a detailed, structured multi-line explanation (3–5 clear lines/bullet points, 90–150 words) explaining why the student's answer is incorrect, how the grammar, tenses, cases, or vocabulary work here, and provide a practical tip plus 1 helpful example sentence.
+Respond in this language: ${isRu ? 'Russian' : 'English'}.`;
 
         try {
             const response = await ai.models.generateContent({
@@ -2327,78 +2276,75 @@ Do not be overly technical, be supportive.`;
             if (response.text?.trim()) return response.text.trim();
         }
     } catch (err) {
-        if (isNetworkDisconnectError(err)) {
+        if (isNetworkDisconnectError(err) || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+            notifyNetworkOffline();
             throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
         }
         console.warn("Gemini explanation error:", err);
         throw err;
     }
 
-    return generateLocalMistakeExplanation(original, userAnswer, correctAnswer, userLanguage, isCorrectAnswer, exerciseType);
-};
-
-const CIS_OFFLINE_DICTIONARY: Record<string, Record<string, string>> = {
-  'привет': {
-    'be': 'Прывітанне', 'uk': 'Привіт', 'mo': 'Salut', 'lt': 'Labas', 'lv': 'Sveiki',
-    'et': 'Tere', 'ka': 'გამარჯობა (Gamarjoba)', 'hy': 'Բարև (Barev)', 'az': 'Salam',
-    'kk': 'Сәлем', 'uz': 'Salom', 'tk': 'Salam', 'ky': 'Салам', 'tg': 'Салом',
-    'en': 'Hello', 'de': 'Hallo', 'fr': 'Bonjour', 'es': 'Hola', 'zh': '你好', 'ja': 'こんにちは', 'ar': 'مرحبا',
-    'hu': 'Szia', 'fi': 'Hei', 'is': 'Halló', 'pl': 'Cześć', 'eu': 'Kaixo', 'nv': 'Yáʼátʼééh', 'tab': 'Салам'
-  },
-  'спасибо': {
-    'be': 'Дзякуй', 'uk': 'Дякую', 'mo': 'Mulțumesc', 'lt': 'Ačiū', 'lv': 'Paldies',
-    'et': 'Aitäh', 'ka': 'მადლობა (Madloba)', 'hy': 'Շնորհակալություն (Shnorhakalutyun)', 'az': 'Təşəkkür edirəm',
-    'kk': 'Рахмет', 'uz': 'Rahmat', 'tk': 'Sag boluň', 'ky': 'Рахмат', 'tg': 'Раҳмат',
-    'en': 'Thank you', 'de': 'Danke', 'fr': 'Merci', 'es': 'Gracias', 'zh': '谢谢', 'ja': 'ありがとう', 'ar': 'شكرا',
-    'hu': 'Köszönöm', 'fi': 'Kiitos', 'is': 'Takk fyrir', 'pl': 'Dziękuję', 'eu': 'Eskerrik asko', 'nv': 'Ahéheeʼ', 'tab': 'Чугъул сагъул'
-  },
-  'как дела': {
-    'be': 'Як справы?', 'uk': 'Як справи?', 'mo': 'Ce mai faci?', 'lt': 'Kaip sekasi?', 'lv': 'Kā iet?',
-    'et': 'Kuidas läheb?', 'ka': 'როგორ ხარ? (Rogor khar?)', 'hy': 'Ինչպե՞ս ես (Inchpes es?)', 'az': 'Necəsən?',
-    'kk': 'Қалың қалай?', 'uz': 'Ishlar qalay?', 'tk': 'Ýagdaýlar nähili?', 'ky': 'Кандайсың?', 'tg': 'Аҳвол чӣ хел?',
-    'en': 'How are you?', 'de': 'Wie geht es dir?', 'fr': 'Comment vas-tu?', 'es': '¿Cómo estás?', 'zh': '你好吗？', 'ja': 'お元気ですか？', 'ar': 'كيف حالك؟',
-    'hu': 'Hogy vagy?', 'fi': 'Mitä kuuluu?', 'is': 'Hvernig hefurðu það?', 'pl': 'Jak się masz?', 'eu': 'Zer moduz?', 'nv': 'Haash yinilyé?', 'tab': 'Фици вува?'
-  },
-  'до свидания': {
-    'be': 'Да пабачэння', 'uk': 'До побачення', 'mo': 'La revedere', 'lt': 'Viso gero', 'lv': 'Uz redzēšanos',
-    'et': 'Head aega', 'ka': 'ნახვამდის (Nakhvamdis)', 'hy': 'Ցտեսություն (Tstesutyun)', 'az': 'Sağ olun',
-    'kk': 'Сау болыңыз', 'uz': 'Xayr', 'tk': 'Hoş gal', 'ky': 'Кош болуңуз', 'tg': 'Хайр',
-    'en': 'Goodbye', 'de': 'Auf Wiedersehen', 'fr': 'Au revoir', 'es': 'Adiós', 'zh': '再见', 'ja': 'さようなら', 'ar': 'مع السلامة',
-    'hu': 'Viszlát', 'fi': 'Näkemiin', 'is': 'Bless', 'pl': 'Do widzenia', 'eu': 'Agur', 'nv': 'Hagóóneeʼ', 'tab': 'Сагъвалди'
-  }
+    throw new Error('Не удалось получить объяснение от сервера AI');
 };
 
 export const translateText = async (text: string, targetLang: string, sourceLang?: string): Promise<string> => {
   if (!text || !text.trim()) return "";
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    notifyNetworkOffline();
+    throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+  }
+  const targetLower = targetLang.toLowerCase();
+  let langStyleHint = '';
+  if (targetLower.includes('valyrian') || targetLower.includes('valyrio') || targetLower.includes('валирий')) {
+    langStyleHint = ' Use authentic High Valyrian (Valyrio) grammar and vocabulary with proper macrons (ā, ē, ī, ō, ū, ȳ).';
+  } else if (targetLower.includes('klingon') || targetLower.includes('tlhingan') || targetLower.includes('клингон')) {
+    langStyleHint = ' Use canonical Klingon (tlhIngan Hol) tlh_Latn case-sensitive orthography (D, H, I, Q, S, ch, gh, ng, tlh, ’).';
+  } else if (targetLower.includes('yiddish') || targetLower.includes('идиш') || targetLower.includes('ייִדיш')) {
+    langStyleHint = ' Output authentic Yiddish written in standard Hebrew script (ייִדיש).';
+  } else if (targetLower.includes('latin') || targetLower.includes('латынь')) {
+    langStyleHint = ' Use classical Latin (Lingua Latina) grammar and vocabulary.';
+  } else if (targetLower.includes('esperanto') || targetLower.includes('эсперанто')) {
+    langStyleHint = ' Use standard Esperanto with proper diacritics (ĉ, ĝ, ĥ, ĵ, ŝ, ŭ).';
+  }
+
   try {
     const ai = createGenAiClient();
-    const response = await callGeminiWithRetry(async () => {
+    const response = await fetchWithTimeout(callGeminiWithRetry(async () => {
         const fromClause = sourceLang && sourceLang !== 'auto' ? `from ${sourceLang} ` : '';
         return ai.models.generateContent({
             model: MODEL_FREE,
-            contents: `Translate the following text ${fromClause}into ${targetLang}. Preserve tone and natural grammar. Return ONLY the translation, with no explanation or conversational preamble.\n\nText:\n${text}`
+            contents: `Translate the following text ${fromClause}into ${targetLang}.${langStyleHint} Preserve tone and natural grammar. Return ONLY the translation, with no explanation or conversational preamble.\n\nText:\n${text}`
         });
-    });
-    return response.text?.trim() || "Error translating.";
+    }), 15000);
+    const out = response.text?.trim();
+    if (!out) {
+      throw new Error('Empty translation response');
+    }
+    return out;
   } catch (e) {
-    if (isNetworkDisconnectError(e)) {
+    if (isNetworkDisconnectError(e) || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      notifyNetworkOffline();
       throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
     }
-    const cleaned = text.trim().toLowerCase().replace(/[.,!?;:]/g, '');
-    if (CIS_OFFLINE_DICTIONARY[cleaned] && CIS_OFFLINE_DICTIONARY[cleaned][targetLang]) {
-      return CIS_OFFLINE_DICTIONARY[cleaned][targetLang];
-    }
-    return text;
+    throw e instanceof Error ? e : new Error('Ошибка онлайн-перевода Gemini AI');
   }
 }
 
-export const startRoleplay = async (subject: string, subjectId: string, userLanguage: string = 'ru'): Promise<Exercise> => {
+export const startRoleplay = async (
+    subject: string,
+    subjectId: string,
+    userLanguage: string = 'ru',
+    difficultyLevel: 'easy' | 'hard' = 'hard'
+): Promise<Exercise> => {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
         throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
     }
 
     const cleanSubject = sanitizeSubjectName(subject);
     const sId = (subjectId || '').toLowerCase();
+    if (sId === 'tlh') {
+        throw new Error(userLanguage === 'en' ? 'Roleplays are restricted for Beta Klingon!' : 'Roleplays ограничены для Бета-курса клингонского языка!');
+    }
     const isNonLang = ['math', 'music', 'chess', 'coding', 'art'].includes(sId) || /матем|музык|шахмат|программ|рисован|каллиграф/i.test(subject);
     const isRuUi = userLanguage === 'ru' || userLanguage === 'Russian';
     const isArabic = sId === 'ar' || cleanSubject.toLowerCase().includes('араб') || cleanSubject.toLowerCase().includes('arabic');
@@ -2423,19 +2369,23 @@ export const startRoleplay = async (subject: string, subjectId: string, userLang
         : isArabic
             ? arabicScenarios[Math.floor(Math.random() * arabicScenarios.length)]
             : isNonLang
-                ? `${cleanSubject}: ${isRuUi ? 'Практический разбор темы' : 'Interactive Practice'}`
-                : `${cleanSubject}: Everyday Conversation`;
+                ? `${cleanSubject}: ${isRuUi ? 'Глубокий практический разбор темы' : 'In-Depth Interactive Practice'}`
+                : `${cleanSubject}: Complex Real-Life Dialogue`;
+
+    const lengthRule = difficultyLevel === 'hard'
+        ? 'Write a LONG, rich, expressive multi-line opening (4–6 complex, detailed sentences organized into 2–3 paragraphs separated by \\n\\n) with advanced vocabulary, realistic setting details, and thoughtful open-ended follow-up questions. NEVER write a short 1-2 line response.'
+        : 'Write a natural, well-developed opening (3–4 full sentences across 2 paragraphs separated by \\n\\n) with an engaging follow-up question.';
 
     try {
         const firstMessage = await fetchWithTimeout(callGeminiWithRetry(async () => {
             const ai = createGenAiClient();
             const prompt = isNonLang
-                ? `You are a friendly ${cleanSubject} tutor in an interactive dialogue. Communicate in ${isRuUi ? 'Russian' : 'English'}. Start with an engaging warm greeting and 1 interesting question or mini-challenge about ${cleanSubject}. Keep it 1-2 sentences.`
+                ? `You are an expert, friendly ${cleanSubject} tutor in an interactive dialogue. Communicate in ${isRuUi ? 'Russian' : 'English'}. ${lengthRule}`
                 : isChuvash
-                    ? `Ты дружелюбный собеседник на ЧУВАШСКОМ ЯЗЫКЕ (Чӑвашла). Тема: "${scenario}". Поприветствуй собеседника на правильном чувашском языке (с буквами Ӑ, Ӗ, Ҫ, Ӳ), в скобках можно краткий перевод на русский. 1-2 коротких предложения. НИКАКОГО АНГЛИЙСКОГО!`
+                    ? `Ты дружелюбный, эрудированный собеседник на ЧУВАШСКОМ ЯЗЫКЕ (Чӑвашла). Тема: "${scenario}". Напиши развёрнутое, живое и содержательное приветствие из ${difficultyLevel === 'hard' ? '4–6 сложных предложений в 2 абзаца (через \\n\\n)' : '3–4 полных предложений'} на правильном чувашском языке (с буквами Ӑ, Ӗ, Ҫ, Ӳ), в скобках добавь перевод на русский и задай интересный вопрос. НИКАКОГО АНГЛИЙСКОГО!`
                     : isArabic
-                        ? `You are an AI Arabic conversation partner in a roleplay. Scenario: "${scenario}". Greet the student in warm natural Arabic (with Russian/English translation in parentheses). When mentioning numbers or prices, display dual numerals: Western/European digits on the left and Eastern Arabic digits on the right (e.g. 1 / ١, 5 / ٥, 10 / ١٠). Do not replace modern European digits. Keep it 1-2 short sentences.`
-                        : `Act as a friendly native tutor who speaks ${cleanSubject} (course code: ${subjectId}). Start a natural conversation STRICTLY in ${cleanSubject} on a realistic everyday topic (do NOT use generic placeholder phrases like "ready to order a coffee?" or "Welcome to conversation practice"). Keep it 1-2 short sentences and invite the student to reply in ${cleanSubject}.`;
+                        ? `You are an AI Arabic conversation partner in a roleplay. Scenario: "${scenario}". Greet the student in rich, natural Arabic (with Russian/English translation in parentheses). When mentioning numbers or prices, display dual numerals: Western/European digits on the left and Eastern Arabic digits on the right (e.g. 1 / ١, 5 / ٥, 10 / ١٠). Do not replace modern European digits. ${lengthRule}`
+                        : `Act as an articulate native tutor who speaks ${cleanSubject} (course code: ${subjectId}). Start a rich, immersive conversation STRICTLY in ${cleanSubject} on a realistic complex topic (do NOT use generic placeholder phrases like "ready to order a coffee?" or "Hello! Welcome to conversation practice. How can I help you today?"). ${lengthRule} Invite the student to reply in detail in ${cleanSubject}.`;
 
             const response = await ai.models.generateContent({ model: MODEL_FREE, contents: prompt });
             const text = response.text?.trim();
@@ -2443,13 +2393,15 @@ export const startRoleplay = async (subject: string, subjectId: string, userLang
                 throw new Error('Empty Gemini response');
             }
             return text;
-        }), 20000);
+        }), 25000);
         return {
             id: crypto.randomUUID(), type: 'roleplay', originalSentence: scenario, targetTranslation: "", wordBank: [],
+            difficultyLevel,
             roleplayData: { topic: scenario, messages: [{ role: 'model', text: firstMessage }], userTurn: true }
         };
     } catch (e) {
-        if (isNetworkDisconnectError(e)) {
+        if (isNetworkDisconnectError(e) || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+            notifyNetworkOffline();
             throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
         }
         throw e;
@@ -2462,29 +2414,37 @@ export const replyToRoleplay = async (
     subject: string,
     isMax: boolean,
     userLanguage: string = 'ru',
-    subjectId: string = ''
+    subjectId: string = '',
+    difficultyLevel: 'easy' | 'hard' = 'hard'
 ): Promise<RoleplayMessage> => {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
         throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
     }
     const cleanSubject = sanitizeSubjectName(subject);
     const sId = (subjectId || '').toLowerCase();
+    if (sId === 'tlh') {
+        throw new Error(userLanguage === 'en' ? 'Roleplays are restricted for Beta Klingon!' : 'Roleplays ограничены для Бета-курса клингонского языка!');
+    }
     const isNonLang = ['math', 'music', 'chess', 'coding', 'art'].includes(sId) || /матем|музык|шахмат|программ|рисован|каллиграф/i.test(subject);
     const isRuUi = userLanguage === 'ru' || userLanguage === 'Russian';
     const isArabic = sId === 'ar' || cleanSubject.toLowerCase().includes('араб') || cleanSubject.toLowerCase().includes('arabic');
     const isChuvash = sId === 'cv' || sId === 'rf-chuvash' || cleanSubject.toLowerCase().includes('чуваш') || cleanSubject.toLowerCase().includes('chuvash');
+
+    const replyDepthRule = difficultyLevel === 'hard'
+        ? 'Write a LONG, detailed, multi-line reply (4–6 rich complex sentences across 2 paragraphs separated by \\n\\n) with nuanced idioms, subordinate clauses, and thought-provoking follow-up questions. NEVER reply with only 1-2 short lines.'
+        : 'Write a clear, natural reply (3–4 full sentences across 2 paragraphs separated by \\n\\n) with an engaging follow-up question.';
 
     try {
          const data = await fetchWithTimeout(callGeminiWithRetry(async () => {
              const ai = createGenAiClient();
              const context = history.map(m => `${m.role}: ${m.text}`).join('\n');
              const roleInstruction = isNonLang
-               ? `You are a warm, knowledgeable ${cleanSubject} tutor. Respond directly to what the user said in ${isRuUi ? 'Russian' : 'English'} with a helpful insight and a follow-up question.`
+               ? `You are a knowledgeable ${cleanSubject} tutor. Respond directly to what the user said in ${isRuUi ? 'Russian' : 'English'}. ${replyDepthRule}`
                : isChuvash
-                 ? 'You are a warm friendly Chuvash language tutor from Cheboksary. Reply in natural authentic Chuvash (Чӑвашла) using letters Ӑ, Ӗ, Ҫ, Ӳ with brief Russian translation in parentheses. NEVER USE ENGLISH.'
+                 ? `You are a warm, articulate Chuvash language tutor from Cheboksary. Reply in rich natural Chuvash (Чӑвашла) using letters Ӑ, Ӗ, Ҫ, Ӳ with Russian translation in parentheses. ${replyDepthRule} NEVER USE ENGLISH.`
                  : isArabic
-                   ? 'You are a friendly Arabic language tutor. Reply in clear natural Arabic with RTL formatting. If numbers, prices or counts are mentioned, use dual Arabic numerals: European/Western digits on the left and Eastern Arabic digits on the right (e.g. 1 / ١, 5 / ٥, 10 / ١٠). Do not break modern digits. If user made a mistake in Arabic, provide a brief correction.'
-                   : `You are a native tutor in ${cleanSubject}. Reply naturally, warmly, and directly to what the user just said STRICTLY in ${cleanSubject}. Never use generic canned placeholders. If the user made a grammar or vocabulary mistake, give a friendly concise correction.`;
+                   ? `You are an articulate Arabic language tutor. Reply in rich natural Arabic with RTL formatting. If numbers, prices or counts are mentioned, use dual Arabic numerals: European/Western digits on the left and Eastern Arabic digits on the right (e.g. 1 / ١, 5 / ٥, 10 / ١٠). Do not break modern digits. ${replyDepthRule} If user made a mistake in Arabic, provide a detailed grammar correction.`
+                   : `You are a native tutor in ${cleanSubject}. Reply naturally, richly, and directly to what the user just said STRICTLY in ${cleanSubject}. ${replyDepthRule} NEVER use generic canned English placeholders like "Hello! Welcome to conversation practice. How can I help you today?" or "That's wonderful! Tell me more about it, I'm listening.". If the user made any grammar, tense, or vocabulary mistake, explain it thoroughly in "correction".`;
 
              const prompt = `${context}\nUser: ${userMessageText}\n${roleInstruction}\nReturn valid JSON: { "text": "...", "correction": "..." }`;
 
@@ -2526,13 +2486,14 @@ export const replyToRoleplay = async (
                  return parsed;
              }
              return { text: raw };
-         }), 20000);
+         }), 25000);
          if (!data?.text) {
              throw new Error('Empty Gemini roleplay response');
          }
          return { role: 'model', text: data.text, correction: data.correction };
     } catch (e) {
-        if (isNetworkDisconnectError(e)) {
+        if (isNetworkDisconnectError(e) || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+            notifyNetworkOffline();
             throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
         }
         throw e;
@@ -2720,6 +2681,9 @@ const getCuratedIllusion = (subject: string, subjectId: string): { soundText: st
 };
 
 export const generateIllusion = async (subject: string, subjectId: string): Promise<Exercise> => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+    }
     const cleanSubject = sanitizeSubjectName(subject);
     try {
         const data = await fetchWithTimeout(callGeminiWithRetry(async () => {
@@ -2769,16 +2733,11 @@ Return valid JSON.`,
             }
         };
     } catch (e) {
-        const curated = getCuratedIllusion(cleanSubject, subjectId);
-        return {
-            id: crypto.randomUUID(),
-            type: 'illusion',
-            originalSentence: "Sound Illusion",
-            targetTranslation: "",
-            wordBank: [],
-            isFallback: true,
-            illusionData: curated
-        };
+        if (isNetworkDisconnectError(e) || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+            notifyNetworkOffline();
+            throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+        }
+        throw e instanceof Error ? e : new Error('Ошибка генерации звуковой иллюзии');
     }
 };
 
@@ -2869,6 +2828,9 @@ export const getFallbackCharForLanguage = (subjectId: string): string => {
 };
 
 export const generateDrawing = async (subject: string, subjectId: string, specificChar?: string, userLanguage: string = 'ru'): Promise<Exercise> => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+    }
     const cleanSubject = sanitizeSubjectName(subject);
     const isRuUi = userLanguage === 'ru' || userLanguage === 'Russian';
     try {
@@ -2906,23 +2868,18 @@ export const generateDrawing = async (subject: string, subjectId: string, specif
 
         return { id: crypto.randomUUID(), type: 'drawing', originalSentence: "Draw", targetTranslation: "", wordBank: [], drawingData: { character, instruction } };
     } catch (e) {
-        const fallbackChar = specificChar || getFallbackCharForLanguage(subjectId);
-        return {
-            id: 'fb-dr',
-            type: 'drawing',
-            originalSentence: "Draw",
-            targetTranslation: "",
-            wordBank: [],
-            isFallback: true,
-            drawingData: {
-                character: fallbackChar,
-                instruction: isRuUi ? `Нарисуйте символ: ${fallbackChar}` : `Draw the character: ${fallbackChar}`
-            }
-        };
+        if (isNetworkDisconnectError(e) || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+            notifyNetworkOffline();
+            throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+        }
+        throw e instanceof Error ? e : new Error('Ошибка загрузки задания для письма');
     }
 };
 
 export const checkDrawing = async (base64Image: string, targetCharacter: string): Promise<{ isCorrect: boolean; feedback: string; isFallback?: boolean }> => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+    }
     try {
         const result = await fetchWithTimeout(callGeminiWithRetry(async () => {
             const ai = createGenAiClient();
@@ -2951,12 +2908,19 @@ export const checkDrawing = async (base64Image: string, targetCharacter: string)
         }), 12000);
         return result;
     } catch (e) {
-        return { isCorrect: true, feedback: `Отличная работа! Символ "${targetCharacter}" нарисован.`, isFallback: true };
+        if (isNetworkDisconnectError(e) || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+            notifyNetworkOffline();
+            throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+        }
+        throw e instanceof Error ? e : new Error('Ошибка проверки рисунка на сервере AI');
     }
 };
 
 // --- ISHIHARA SERVICE ---
 export const generateIshihara = async (subjectId: string): Promise<Exercise> => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+    }
     const number = Math.floor(Math.random() * 90) + 10; // 10-99
     try {
         const ai = createGenAiClient();
@@ -2983,6 +2947,9 @@ export const generateIshihara = async (subjectId: string): Promise<Exercise> => 
             };
         }
     } catch (e) {
+        if (isNetworkDisconnectError(e) || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+            throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+        }
         console.log("Using procedural Ishihara plate generator for test");
     }
 
@@ -2999,7 +2966,15 @@ export const generateIshihara = async (subjectId: string): Promise<Exercise> => 
 
 // --- CHESS SERVICES ---
 
-export const generateReading = async (subject: string, subjectId: string, userLanguage: string = 'ru'): Promise<Exercise> => {
+export const generateReading = async (
+    subject: string,
+    subjectId: string,
+    userLanguage: string = 'ru',
+    difficultyLevel: 'easy' | 'hard' = 'hard'
+): Promise<Exercise> => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+    }
     const mode = Math.random() > 0.5 ? 'fill-blanks' : 'write';
     const topic = TOPICS[Math.floor(Math.random() * TOPICS.length)];
     const cleanSubject = sanitizeSubjectName(subject);
@@ -3007,6 +2982,7 @@ export const generateReading = async (subject: string, subjectId: string, userLa
     const isRuUi = userLanguage === 'ru' || userLanguage === 'Russian';
     const isNonLang = ['math', 'music', 'chess', 'coding', 'art'].includes(sId) || /матем|музык|шахмат|программ|рисован|каллиграф/i.test(subject);
     const isRf = sId.startsWith('rf-') || sId === 'cv' || subject.toLowerCase().includes('республик') || subject.toLowerCase().includes('чуваш') || subject.toLowerCase().includes('татар') || subject.toLowerCase().includes('башкир');
+    const isHard = difficultyLevel !== 'easy';
 
     try {
         const ai = createGenAiClient();
@@ -3014,28 +2990,33 @@ export const generateReading = async (subject: string, subjectId: string, userLa
         let schema: any = {};
 
         if (mode === 'fill-blanks') {
+            const sentenceSpecRu = isHard
+              ? 'ДЛИННЫЙ, содержательный и сложный многоабзацный текст (3–4 абзаца, разделённых двойным переносом строки \\n\\n, всего 8–12 развёрнутых предложений со сложной грамматикой и терминологией)'
+              : 'развёрнутый многострочный текст (2 абзаца, разделённых \\n\\n, 5–7 полноценных предложений)';
+            const blanksCountRu = isHard ? '5–7 ключевых слов' : '4–5 ключевых слов';
+
             prompt = isNonLang
-                ? `Создай короткое упражнение на чтение с пропусками по предмету "${cleanSubject}" (тема: "${topic}") на языке: ${isRuUi ? 'Русский' : 'English'}.
-                Напиши 2-4 предложения с пропусками "___".
-                Верни JSON: title, text (с "___"), blanks ([{ id: "b1", word: "..." }]), wordBank (правильные слова + дистракторы).`
+                ? `Создай подробное, сложное упражнение на чтение с пропусками по предмету "${cleanSubject}" (тема: "${topic}") на языке: ${isRuUi ? 'Русский' : 'English'}.
+                Напиши ${sentenceSpecRu}, выделив ${blanksCountRu} для пропусков "___". НЕ делай короткий текст из 1–3 строк!
+                Верни JSON: title, text (многоабзацный текст через \\n\\n с маркерами "___"), blanks ([{ id: "b1", word: "..." }]), wordBank (все правильные слова + 4–5 сложных дистракторов).`
                 : isRf
-                ? `Создай короткое упражнение на чтение для курса "${cleanSubject}" на тему: "${topic}".
-                Напиши короткий текст (3-5 предложений) на целевом языке или языке региона.
-                Выдели 3-4 ключевых слова для пропусков ("___").
+                ? `Создай развёрнутое, глубокое упражнение на чтение для курса "${cleanSubject}" на тему: "${topic}".
+                Напиши ${sentenceSpecRu} на целевом языке или языке региона.
+                Выдели ${blanksCountRu} для пропусков ("___"). НЕ пиши короткий обрывочный текст!
                 Верни JSON:
-                - title: Короткий заголовок.
-                - text: Текст, где пропущенные слова заменены на "___".
-                - blanks: Массив объектов { id: "b1", word: "правильноеСлово" }.
-                - wordBank: Массив строк, включающий правильные слова и 3-4 похожих дистрактора.
+                - title: Выразительный заголовок.
+                - text: Многоабзацный текст (через \\n\\n), где пропущенные слова заменены на "___".
+                - blanks: Массив объектов { id: "b1", word: "правильноеСлово" } по порядку пропусков.
+                - wordBank: Массив строк, включающий все правильные слова и 4–5 правдоподобных дистракторов.
                 КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО ИСПОЛЬЗОВАТЬ АНГЛИЙСКИЙ ЯЗЫК!`
-                : `Generate a short reading exercise STRICTLY in ${cleanSubject} (code: ${subjectId}) about ${topic}.
-                Create a short text (3-5 sentences) in ${cleanSubject}.
-                Identify 3-4 key words to be replaced with exact placeholder "___".
+                : `Generate a LONG, rich, complex multi-paragraph reading comprehension exercise STRICTLY in ${cleanSubject} (code: ${subjectId}) about ${topic}.
+                Create a detailed text (${isHard ? '3–4 full paragraphs separated by \\n\\n, 8–12 complex multi-clause sentences with advanced B2–C1 vocabulary' : '2 paragraphs separated by \\n\\n, 5–7 complete sentences'}) in ${cleanSubject}. NEVER output a short 1-3 line stub!
+                Identify ${isHard ? '5–7' : '4–5'} key words to be replaced with exact placeholder "___".
                 Return JSON with:
-                - title: A short title in ${cleanSubject}.
-                - text: The text with blanks replaced by exact "___" markers.
-                - blanks: An array of objects { id: "b1", word: "correctWord" } matching the count of "___".
-                - wordBank: An array of strings in ${cleanSubject} including all correct blank words plus 3 distractors.`;
+                - title: A descriptive title in ${cleanSubject}.
+                - text: The full multi-paragraph text (with \\n\\n line breaks) with blanks replaced by exact "___" markers.
+                - blanks: An array of objects { id: "b1", word: "correctWord" } matching the exact count and order of "___".
+                - wordBank: An array of strings in ${cleanSubject} including all correct blank words plus 4–5 subtle distractors.`;
             schema = {
                 type: Type.OBJECT,
                 properties: {
@@ -3047,21 +3028,29 @@ export const generateReading = async (subject: string, subjectId: string, userLa
                 required: ["title", "text", "blanks", "wordBank"]
             };
         } else {
+            const contextSpecRu = isHard
+              ? 'подробный многострочный литературный или аналитический контекст (3 абзаца через \\n\\n, 7–10 сложных развёрнутых предложений)'
+              : 'развёрнутый многострочный контекст (2 абзаца через \\n\\n, 4–6 предложений)';
+
             prompt = isNonLang
-                ? `Создай творческое письменное задание по предмету "${cleanSubject}" (тема: "${topic}") на языке: ${isRuUi ? 'Русский' : 'English'}.
-                Верни JSON: title, text (короткий контекст 1-2 предложения), prompt (конкретное задание для ответа).`
-                : isRf
-                ? `Создай творческое задание по письму для курса "${cleanSubject}" на тему: "${topic}".
+                ? `Создай сложное, развёрнутое письменное задание по предмету "${cleanSubject}" (тема: "${topic}") на языке: ${isRuUi ? 'Русский' : 'English'}.
                 Верни JSON:
-                - title: Короткий заголовок.
-                - text: Вводный текст или контекст (1-2 предложения на целевом языке).
-                - prompt: Конкретное задание для пользователя (например, "Опишите природу родного края", "Напишите письмо другу").
+                - title: Выразительный заголовок.
+                - text: ${contextSpecRu}.
+                - prompt: Подробное многосоставное задание для развёрнутого письменного ответа (5–8 предложений с аргументацией и примерами).`
+                : isRf
+                ? `Создай сложное, содержательное творческое задание по письму для курса "${cleanSubject}" на тему: "${topic}".
+                Верни JSON:
+                - title: Выразительный заголовок.
+                - text: ${contextSpecRu} на целевом языке.
+                - prompt: Детальное задание на русском языке, требующее развёрнутого эссе или письма (минимум 5–8 предложений на целевом языке с примерами и деталями).
                 КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО ИСПОЛЬЗОВАТЬ АНГЛИЙСКИЙ ЯЗЫК!`
-                : `Generate a creative writing prompt in ${cleanSubject} (code: ${subjectId}) about ${topic}.
+                : `Generate a rich, complex creative writing and reading prompt in ${cleanSubject} (code: ${subjectId}) about ${topic}.
+                NEVER generate a tiny 1-2 sentence context.
                 Return JSON with:
-                - title: A short title in ${cleanSubject}.
-                - text: A story starter or context (1-2 sentences in ${cleanSubject}).
-                - prompt: A specific instruction (in ${isRuUi ? 'Russian' : 'English'}) explaining what the student should write in ${cleanSubject}.`;
+                - title: A vivid title in ${cleanSubject}.
+                - text: ${isHard ? 'A long, immersive multi-paragraph passage or scenario (3 paragraphs separated by \\n\\n, 7–10 complex multi-clause sentences in ' + cleanSubject + ')' : 'A well-developed context (2 paragraphs separated by \\n\\n, 4–6 sentences in ' + cleanSubject + ')'}.
+                - prompt: A detailed, multi-part instruction (in ${isRuUi ? 'Russian' : 'English'}) asking the student to write an extended, structured response (6–10 complex sentences in ${cleanSubject} with arguments and specific details).`;
             schema = {
                 type: Type.OBJECT,
                 properties: {
@@ -3075,14 +3064,14 @@ export const generateReading = async (subject: string, subjectId: string, userLa
 
         const response = await fetchWithTimeout(callGeminiWithRetry(async () => {
              return ai.models.generateContent({
-                model: MODEL_FREE,
+                model: isHard ? MODEL_PRO : MODEL_FREE,
                 contents: prompt,
                 config: {
                     responseMimeType: "application/json",
                     responseSchema: schema
                 }
             });
-        }), 15000);
+        }), 25000);
         const data = extractJsonSafe<any>(response.text || '', {});
 
         if (!data || typeof data.text !== 'string' || !data.text.trim()) {
@@ -3112,6 +3101,7 @@ export const generateReading = async (subject: string, subjectId: string, userLa
                 originalSentence: String(data.title || cleanSubject),
                 targetTranslation: fullText,
                 wordBank: bank,
+                difficultyLevel,
                 readingData: {
                     title: String(data.title || cleanSubject),
                     text: data.text,
@@ -3127,63 +3117,28 @@ export const generateReading = async (subject: string, subjectId: string, userLa
             originalSentence: String(data.title || cleanSubject),
             targetTranslation: data.text,
             wordBank: [],
+            difficultyLevel,
             readingData: {
                 title: String(data.title || cleanSubject),
                 text: data.text,
                 mode: 'write',
-                prompt: String(data.prompt || (isRuUi ? `Напишите короткий ответ на ${cleanSubject}` : `Write a short response in ${cleanSubject}`))
+                prompt: String(data.prompt || (isRuUi ? `Напишите развёрнутый ответ на ${cleanSubject} (6–10 предложений)` : `Write a detailed extended response in ${cleanSubject}`))
             }
         };
 
     } catch (e) {
-        const readingFallbacks: Record<string, { title: string; text: string; full: string; blanks: string[]; distractors: string[] }> = {
-            cv: { title: "Шкулти пурнӑҫ", text: "Эпӗ паян ___ каятӑп тата ___ вулатӑп.", full: "Эпӗ паян шкула каятӑп тата кӗнеке вулатӑп.", blanks: ['шкула', 'кӗнеке'], distractors: ['паян', 'ҫӑкӑр', 'юлташ'] },
-            es: { title: "Un día soleado", text: "Hoy ___ un café y leo un ___ interesante.", full: "Hoy tomo un café y leo un libro interesante.", blanks: ['tomo', 'libro'], distractors: ['agua', 'perro', 'casa'] },
-            de: { title: "Mein Morgen", text: "Am Morgen trinke ich ___ und lese die ___.", full: "Am Morgen trinke ich Kaffee und lese die Zeitung.", blanks: ['Kaffee', 'Zeitung'], distractors: ['Wasser', 'Haus', 'Apfel'] },
-            fr: { title: "Le matin", text: "Le matin, je mange du ___ et je bois du ___.", full: "Le matin, je mange du pain et je bois du thé.", blanks: ['pain', 'thé'], distractors: ['chat', 'livre', 'soleil'] },
-            it: { title: "In piazza", text: "Oggi vado al ___ per comprare un ___ fresco.", full: "Oggi vado al mercato per comprare un pane fresco.", blanks: ['mercato', 'pane'], distractors: ['mare', 'treno', 'casa'] },
-            pt: { title: "Café da manhã", text: "Eu gosto de tomar ___ e comer ___ pela manhã.", full: "Eu gosto de tomar café e comer pão pela manhã.", blanks: ['café', 'pão'], distractors: ['livro', 'gato', 'água'] },
-            tr: { title: "Sabah Kahvaltısı", text: "Sabah sıcak ___ içiyorum ve taze ___ yiyorum.", full: "Sabah sıcak çay içiyorum ve taze ekmek yiyorum.", blanks: ['çay', 'ekmek'], distractors: ['su', 'kitap', 'ev'] },
-            ar: { title: "في الصباح", text: "في الصباح أشرب ___ وأقرأ ___.", full: "في الصباح أشرب القهوة وأقرأ الكتاب.", blanks: ['القهوة', 'الكتاب'], distractors: ['الماء', 'البحر', 'البيت'] },
-            zh: { title: "早晨", text: "我早上喝___，然后去___。", full: "我早上喝茶，然后去学校。", blanks: ['茶', '学校'], distractors: ['书', '猫', '水'] },
-            ja: { title: "朝の習慣", text: "私は朝、___を飲んで___を読みます。", full: "私は朝、お茶を飲んで本を読みます。", blanks: ['お茶', '本'], distractors: ['水', '猫', '駅'] },
-            ko: { title: "아침 시간", text: "아침에 따뜻한 ___를 마시고 ___을 읽어요.", full: "아침에 따뜻한 차를 마시고 책을 읽어요.", blanks: ['차', '책'], distractors: ['물', '집', '친구'] },
-            uk: { title: "Ранкова прогулянка", text: "Сьогодні я п'ю гарячий ___ та читаю цікаву ___.", full: "Сьогодні я п'ю гарячий чай та читаю цікаву книгу.", blanks: ['чай', 'книгу'], distractors: ['вікно', 'стіл', 'вода'] },
-            kk: { title: "Таңғы уақыт", text: "Мен таңертең ___ ішіп, қызықты ___ оқимын.", full: "Мен таңертең шай ішіп, қызықты кітап оқимын.", blanks: ['шай', 'кітап'], distractors: ['су', 'үй', 'нан'] },
-            eo: { title: "Bona mateno", text: "Hodiaŭ mi trinkas ___ kaj legas bonan ___.", full: "Hodiaŭ mi trinkas teon kaj legas bonan libron.", blanks: ['teon', 'libron'], distractors: ['panon', 'katon', 'akvon'] },
-            id: { title: "Pagi Hari", text: "Pagi ini saya minum ___ dan membaca ___.", full: "Pagi ini saya minum teh dan membaca buku.", blanks: ['teh', 'buku'], distractors: ['air', 'rumah', 'roti'] },
-            ru: { title: "Утренняя привычка", text: "Утром я люблю пить тёплый ___ и читать интересную ___.", full: "Утром я люблю пить тёплый чай и читать интересную книгу.", blanks: ['чай', 'книгу'], distractors: ['окно', 'стол', 'море'] },
-            en: { title: "Morning Routine", text: "In the morning I drink warm ___ and read a good ___.", full: "In the morning I drink warm tea and read a good book.", blanks: ['tea', 'book'], distractors: ['apple', 'window', 'chair'] },
-            math: { title: "Геометрия", text: "Сумма углов треугольника равна ___ градусам, а площадь квадрата — квадрату его ___.", full: "Сумма углов треугольника равна 180 градусам, а площадь квадрата — квадрату его стороны.", blanks: ['180', 'стороны'], distractors: ['90', 'радиуса', '360'] },
-            chess: { title: "Шахматная стратегия", text: "В дебюте важно занять ___ и защитить своего ___ рокировкой.", full: "В дебюте важно занять центр и защитить своего короля рокировкой.", blanks: ['центр', 'короля'], distractors: ['ферзя', 'фланг', 'пешку'] },
-            music: { title: "Теория музыки", text: "Скрипичный ключ указывает на ноту ___, а мажорное трезвучие звучит ___.", full: "Скрипичный ключ указывает на ноту соль, а мажорное трезвучие звучит светло.", blanks: ['соль', 'светло'], distractors: ['фа', 'грустно', 'до'] },
-            coding: { title: "Основы кода", text: "Цикл позволяет повторять блок ___, а условие проверяет истинность ___.", full: "Цикл позволяет повторять блок кода, а условие проверяет истинность выражения.", blanks: ['кода', 'выражения'], distractors: ['класса', 'окна', 'числа'] },
-            art: { title: "Основы живописи", text: "Смешивание синего и жёлтого даёт ___ цвет, а светлые блики создают ___.", full: "Смешивание синего и жёлтого даёт зелёный цвет, а светлые блики создают объём.", blanks: ['зелёный', 'объём'], distractors: ['красный', 'угол', 'линию'] }
-        };
-
-        const isChuvash = sId === 'cv' || sId === 'rf-chuvash' || subject.toLowerCase().includes('чуваш');
-        const key = isChuvash ? 'cv' : (readingFallbacks[sId] ? sId : (sId.startsWith('rf-') ? 'ru' : 'en'));
-        const fb = readingFallbacks[key] || readingFallbacks.en;
-        const wordBank = [...fb.blanks, ...fb.distractors].sort(() => Math.random() - 0.5);
-
-        return {
-            id: `fallback-reading-${key}`,
-            type: 'reading',
-            originalSentence: fb.title,
-            targetTranslation: fb.full,
-            wordBank,
-            isFallback: true,
-            readingData: {
-                title: fb.title,
-                text: fb.text,
-                mode: 'fill-blanks',
-                blanks: fb.blanks.map((word, idx) => ({ id: `b${idx + 1}`, word }))
-            }
-        };
+        if (isNetworkDisconnectError(e) || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+            notifyNetworkOffline();
+            throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+        }
+        throw e instanceof Error ? e : new Error('Ошибка генерации задания по чтению');
     }
 }
 
 export const getChessMove = async (fen: string, history: string[]): Promise<string> => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+    }
     try {
         const ai = createGenAiClient();
         const prompt = `Current FEN: ${fen}. History: ${history.join(' ')}.
@@ -3207,12 +3162,18 @@ export const getChessMove = async (fen: string, history: string[]): Promise<stri
         }
         return "";
     } catch (e) {
+        if (isNetworkDisconnectError(e) || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+            throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+        }
         console.error("Chess AI Error", e);
         return "";
     }
 }
 
 export const getChessChatReply = async (fen: string, history: string[], chatHistory: RoleplayMessage[], userMessage?: string): Promise<string> => {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+  }
   try {
     const ai = createGenAiClient();
     const prevChat = chatHistory.map(m => `${m.role === 'user' ? 'User' : 'Duo'}: ${m.text}`).join('\n');
@@ -3241,6 +3202,9 @@ export const getChessChatReply = async (fen: string, history: string[], chatHist
     });
     return response.text?.trim() || "Your turn!";
   } catch (e) {
+    if (isNetworkDisconnectError(e) || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+    }
     return "Thinking...";
   }
 };
@@ -3251,6 +3215,9 @@ export const getChessTutorialHint = async (
   lang: string = 'ru',
   scenarioMessage?: string
 ): Promise<string> => {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+  }
   try {
     const ai = createGenAiClient();
     const isRu = lang === 'ru';
@@ -3276,6 +3243,9 @@ Keep it encouraging, concise (1-2 sentences, max 25 words).`;
       ? '💡 Подсказка: Развивайте фигуры в центре (e4 / d4 / Nf3) и готовьте рокировку!'
       : '💡 Hint: Develop your central pieces (e4 / d4 / Nf3) and prepare to castle!';
   } catch (e) {
+    if (isNetworkDisconnectError(e) || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+    }
     return lang === 'ru'
       ? '💡 Подсказка: Сделайте ход пешкой в центр или выведите коня на f3!'
       : '💡 Hint: Control the center with a pawn or develop your knight to f3!';
@@ -3295,6 +3265,9 @@ export const analyzeChessPosition = async (
   lastMove?: string,
   history: string[] = []
 ): Promise<ChessAiMoveAnalysis> => {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+  }
   try {
     const ai = createGenAiClient();
     const prompt = `Ты — гроссмейстер и шахматный тренер DuoWindo6601.
@@ -3330,6 +3303,9 @@ FEN: ${fen}
       threats: parsed.threats || ''
     };
   } catch (e) {
+    if (isNetworkDisconnectError(e) || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+    }
     console.error("Chess Position Analysis error:", e);
     return {
       eval: 0,
@@ -3349,6 +3325,10 @@ export const analyzeFullChessGameWithAI = async (
   summary: string;
   verdictRu: string;
 }> => {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    notifyNetworkOffline();
+    throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+  }
   try {
     const ai = createGenAiClient();
     const prompt = `Ты — главный шахматный аналитик и гроссмейстер DuoWindo6601.
@@ -3381,45 +3361,63 @@ export const analyzeFullChessGameWithAI = async (
       verdictRu: parsed.verdictRu || 'Качественная боевая партия!'
     };
   } catch (e) {
-    console.error("Full Chess Game Analysis error:", e);
-    return {
-      whiteAccuracy: 80,
-      blackAccuracy: 75,
-      summary: 'Анализ ходов партии показывает упорную борьбу за ключевые поля и диагонали.',
-      verdictRu: 'Боевая партия гроссмейстерского уровня!'
-    };
+    if (isNetworkDisconnectError(e) || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      notifyNetworkOffline();
+      throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+    }
+    throw e instanceof Error ? e : new Error('Ошибка анализа шахматной партии');
   }
 };
 
 // --- INTERVIEW SERVICES ---
 
 export const generateInterviewQuestion = async (topic: string = "general programming"): Promise<string> => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        notifyNetworkOffline();
+        throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+    }
     try {
         const ai = createGenAiClient();
         const response = await callGeminiWithRetry(async () => {
             return ai.models.generateContent({
-                model: MODEL_FREE,
-                contents: `Generate a challenging technical interview question about ${topic}. Return ONLY the question text. Be professional but concise.`
+                model: MODEL_PRO,
+                contents: `Generate a challenging, in-depth multi-line technical interview scenario/question about ${topic} (3–5 sentences across 2 paragraphs, including architecture/edge-case constraints). Return ONLY the question text.`
             });
         });
-        return response.text?.trim() || "Tell me about your experience.";
+        const text = response.text?.trim();
+        if (!text) throw new Error('Empty interview question');
+        return text;
     } catch (e) {
-        return "Describe IDEMPOTENCY in HTTP methods.";
+        if (isNetworkDisconnectError(e) || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+            notifyNetworkOffline();
+            throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+        }
+        throw e instanceof Error ? e : new Error('Ошибка генерации вопроса');
     }
 };
 
 export const getInterviewHint = async (question: string): Promise<string> => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        notifyNetworkOffline();
+        throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+    }
     try {
         const ai = createGenAiClient();
         const response = await fetchWithTimeout(callGeminiWithRetry(async () => {
             return ai.models.generateContent({
                 model: MODEL_FREE,
-                contents: `Provide a brief, helpful "cheat sheet" reply idea (2-3 short bullet points, concise enough to glance at during a call) for this prompt: "${question}".`
+                contents: `Provide a detailed, well-structured cheat-sheet reply guide (4–5 substantive bullet points with concrete concepts and trade-offs) for this prompt: "${question}".`
             });
-        }), 10000);
-        return response.text?.trim() || "• Ответьте коротко и по сути\n• Используйте знакомые слова";
+        }), 15000);
+        const text = response.text?.trim();
+        if (!text) throw new Error('Empty hint');
+        return text;
     } catch (e) {
-        return "• Ответьте простыми фразами по теме\n• Поделитесь примером из жизни";
+        if (isNetworkDisconnectError(e) || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+            notifyNetworkOffline();
+            throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+        }
+        throw e instanceof Error ? e : new Error('Ошибка подсказки AI');
     }
 };
 
@@ -3428,7 +3426,8 @@ export const generateVideoCallRoleplayResponse = async (
     history: RoleplayMessage[],
     userText: string,
     language: string,
-    userLanguage: string = 'ru'
+    userLanguage: string = 'ru',
+    difficultyLevel: 'easy' | 'hard' = 'hard'
 ): Promise<{ text: string; correction?: string }> => {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
         throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
@@ -3437,6 +3436,9 @@ export const generateVideoCallRoleplayResponse = async (
     const isNonLang = /матем|музык|шахмат|программ|рисован|каллиграф|math|music|chess|programming|art/i.test(language);
     const isRuUi = userLanguage === 'ru' || userLanguage === 'Russian';
     const targetSpeakLang = isNonLang ? (isRuUi ? 'Russian' : 'English') : cleanLanguage;
+    const spokenLengthRule = difficultyLevel === 'hard'
+      ? 'Use 3–4 rich, expressive, complex multi-clause sentences with advanced vocabulary and thoughtful follow-up questions (never just 1 short line).'
+      : 'Use 2–3 complete, natural sentences with a clear follow-up question.';
 
     try {
         const ai = createGenAiClient();
@@ -3446,11 +3448,11 @@ export const generateVideoCallRoleplayResponse = async (
         const prompt = isInitialGreeting
           ? (isNonLang
               ? `You are DuoWindo6601, an AI tutor starting a LIVE interactive Video Call about "${cleanLanguage}". Topic: "${topic}".
-Greet the student warmly in ${targetSpeakLang} (1-2 short sentences) and ask an engaging opening question about "${cleanLanguage}".
+Greet the student warmly in ${targetSpeakLang} and ask an engaging, substantive opening question about "${cleanLanguage}". ${spokenLengthRule}
 Return JSON with { "text": "..." }`
               : `You are DuoWindo6601, an AI language tutor starting a LIVE interactive Video Call with a student learning ${targetSpeakLang}.
 Topic: "${topic}".
-Greet the student naturally and warmly STRICTLY in ${targetSpeakLang} (1-2 sentences max) and ask an engaging opening question about "${topic}". Do not use generic canned English templates if studying another language.
+Greet the student naturally and warmly STRICTLY in ${targetSpeakLang} and ask a detailed opening question about "${topic}". ${spokenLengthRule} Do not use generic canned English templates if studying another language.
 Return JSON with { "text": "..." }`)
           : (isNonLang
               ? `You are DuoWindo6601, an AI tutor in a LIVE Video Call teaching "${cleanLanguage}".
@@ -3458,16 +3460,16 @@ Topic: "${topic}".
 Recent conversation:
 ${context}
 User said during video call: "${userText}"
-Reply naturally, warmly, and concisely in ${targetSpeakLang} (1-2 short sentences). Return JSON with { "text": "...", "correction": "..." }`
+Reply naturally, richly, and warmly in ${targetSpeakLang}. ${spokenLengthRule} Return JSON with { "text": "...", "correction": "..." }`
               : `You are DuoWindo6601, an AI language tutor in a LIVE interactive Video Call with a student learning ${targetSpeakLang}. 
 Current topic/scenario: "${topic}".
 Recent conversation:
 ${context}
 User said during video call: "${userText}"
 
-Reply naturally, warmly, and concisely as DuoWindo6601 STRICTLY in ${targetSpeakLang} (1-2 sentences max for spoken video call). Do not use generic canned placeholders.
+Reply naturally, richly, and directly as DuoWindo6601 STRICTLY in ${targetSpeakLang}. ${spokenLengthRule} NEVER use generic canned English placeholders like "Hello! Welcome to conversation practice. How can I help you today?" or "That's wonderful! Tell me more about it, I'm listening.".
 ${isArabic ? 'For Arabic language practice: when mentioning numbers, prices, or time, show dual numerals with European/Western digits on the left and Eastern Arabic digits on the right (e.g. 1 / ١, 5 / ٥, 10 / ١٠). Do not remove modern European digits.' : ''}
-If user made a language/grammar mistake, provide a very brief friendly correction.
+If user made a language/grammar mistake, provide a detailed friendly correction.
 Return JSON with { "text": "...", "correction": "..." }`);
 
         const response = await fetchWithTimeout(callGeminiWithRetry(async () => {
@@ -3486,7 +3488,7 @@ Return JSON with { "text": "...", "correction": "..." }`);
                     }
                 }
             });
-        }), 20000);
+        }), 25000);
         const raw = (response.text || '').trim();
         const data = extractJsonSafe<any>(raw, null);
         if (data && typeof data.text === 'string' && data.text.trim()) {
@@ -3497,7 +3499,8 @@ Return JSON with { "text": "...", "correction": "..." }`);
         }
         throw new Error('Empty Gemini video call response');
     } catch (e) {
-        if (isNetworkDisconnectError(e)) {
+        if (isNetworkDisconnectError(e) || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+            notifyNetworkOffline();
             throw new Error(OFFLINE_INTERNET_REQUIRED_MESSAGE);
         }
         throw e;
@@ -3523,7 +3526,7 @@ export const pingGeminiApi = async (customKeyToTest?: string): Promise<{ ok: boo
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 12000);
     const headers: Record<string, string> = {};
-    if (customKey && customKey !== 'SYSTEM_FREE_TRAFFIC' && !customKey.includes('••••')) {
+    if (isValidGoogleApiKeyFormat(customKey)) {
       headers['x-goog-api-key'] = customKey;
     }
 

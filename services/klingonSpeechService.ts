@@ -8,14 +8,16 @@
 
 import SamJs from 'sam-js';
 import { isPIqaDText, pIqaDToTlh, splitKlingonPhonemes } from './klingonDictionaryService.ts';
+import { isAppOnlineNow, setAppOnlineState } from './networkState.ts';
 
 export const KLINGON_SENTENCE_PLAYER_BASE = 'https://hol.kag.org/sentence/';
-export const KLINGON_HOL_HELLO_URL = 'https://hol.kag.org/sentence/Hello';
+export const KLINGON_HOL_NUQNEH_URL = 'https://hol.kag.org/sentence/nuqneH';
+export const KLINGON_HOL_HELLO_URL = KLINGON_HOL_NUQNEH_URL;
 export const KLINGON_SAM_HOMEPAGE = 'https://discordier.github.io/sam/';
 
 export type KlingonSpeechSource = 'auto' | 'client' | 'hol';
 
-const KLINGON_SPEECH_MODE_STORAGE_KEY = 'duo_klingon_speech_mode';
+const KLINGON_SPEECH_MODE_STORAGE_KEY = 'duo_klingon_speech_mode_v2';
 let activeKlingonSpeechMode: KlingonSpeechSource = (() => {
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -23,7 +25,7 @@ let activeKlingonSpeechMode: KlingonSpeechSource = (() => {
       if (saved === 'hol' || saved === 'client' || saved === 'auto') return saved;
     }
   } catch {}
-  return 'client';
+  return 'hol';
 })();
 
 export const getKlingonSpeechMode = (): KlingonSpeechSource => activeKlingonSpeechMode;
@@ -46,7 +48,7 @@ export interface KlingonAudioInfo {
 }
 
 const SAMPLE_RATE = 22050;
-const remoteAudioBlobCache = new Map<string, Blob>();
+const remoteAudioBlobCache = new Map<string, { blob: Blob; source: 'hol-mp3' | 'hol-sam-wav' }>();
 const clientWavBlobCache = new Map<string, Blob>();
 let activeAudioEl: HTMLAudioElement | null = null;
 let activeAudioUrl: string | null = null;
@@ -54,17 +56,64 @@ let lastAudioInfo: KlingonAudioInfo | null = null;
 
 export const getKlingonLastAudioInfo = (): KlingonAudioInfo | null => lastAudioInfo;
 
-export const getKlingonSentencePlayerUrl = (text: string): string => {
-  const clean = normalizeToTlhLatin(text);
-  if (!clean) return KLINGON_HOL_HELLO_URL;
-  return `${KLINGON_SENTENCE_PLAYER_BASE}?sent=${encodeURIComponent(clean.replace(/’/g, "'"))}`;
-};
-
 export const normalizeToTlhLatin = (input: string): string => {
   const trimmed = (input || '').trim();
   if (!trimmed) return '';
   const converted = isPIqaDText(trimmed) ? pIqaDToTlh(trimmed) : trimmed;
-  return converted.replace(/’/g, "'").replace(/\s+/g, ' ').trim();
+  return converted.replace(/[’‘`´]/g, "'").replace(/\s+/g, ' ').trim();
+};
+
+const KLINGON_SINGLE_LETTER_NAMES: Record<string, string> = {
+  a: 'a',
+  b: 'ba',
+  ch: 'cha',
+  D: 'Da',
+  e: 'e',
+  gh: 'gha',
+  H: 'Ha',
+  I: 'I',
+  j: 'ja',
+  l: 'la',
+  m: 'ma',
+  n: 'na',
+  ng: 'nga',
+  o: 'o',
+  p: 'pa',
+  q: 'qa',
+  Q: 'Qa',
+  r: 'ra',
+  S: 'Sa',
+  t: 'ta',
+  tlh: 'tlha',
+  u: 'u',
+  v: 'va',
+  w: 'wa',
+  y: 'ya',
+  "'": "'a'",
+};
+
+export const resolveKlingonSpeakableText = (input: string): string => {
+  const normalized = normalizeToTlhLatin(input);
+  if (!normalized) return '';
+  if (Object.prototype.hasOwnProperty.call(KLINGON_SINGLE_LETTER_NAMES, normalized)) {
+    return KLINGON_SINGLE_LETTER_NAMES[normalized];
+  }
+  return normalized;
+};
+
+export const cleanTextForHolUrl = (input: string): string => {
+  const normalized = normalizeToTlhLatin(input);
+  if (!normalized) return '';
+  return normalized
+    .replace(/[?!.,:;—–…"«»()\[\]{}]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+export const getKlingonSentencePlayerUrl = (text: string): string => {
+  const clean = cleanTextForHolUrl(resolveKlingonSpeakableText(text));
+  if (!clean) return KLINGON_HOL_NUQNEH_URL;
+  return `${KLINGON_SENTENCE_PLAYER_BASE}${encodeURIComponent(clean)}`;
 };
 
 const VOWEL_FORMANTS: Record<string, { f1: number; f2: number; f3: number; dur: number }> = {
@@ -535,73 +584,100 @@ const playBlobViaWebAudio = async (blob: Blob, playbackRate: number = 1.0): Prom
   }
 };
 
-const fetchHolKlingonSamBlob = async (normalizedTlh: string, isSlow: boolean = false): Promise<Blob | null> => {
-  if (!normalizedTlh || typeof fetch === 'undefined') return null;
+const fetchHolKlingonAudioBlob = async (
+  normalizedTlh: string,
+  isSlow: boolean = false
+): Promise<{ blob: Blob; source: 'hol-mp3' | 'hol-sam-wav' } | null> => {
+  if (!normalizedTlh || typeof fetch === 'undefined' || !isAppOnlineNow()) return null;
   const cacheKey = `${normalizedTlh.toLowerCase()}__${isSlow ? 'slow' : 'norm'}`;
   const cached = remoteAudioBlobCache.get(cacheKey);
   if (cached) return cached;
 
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 2500);
+    const timer = setTimeout(() => controller.abort(), 7500);
     const res = await fetch(`/api/tts/klingon?text=${encodeURIComponent(normalizedTlh)}${isSlow ? '&slow=1' : ''}`, {
+      cache: 'no-store',
       signal: controller.signal,
     });
     clearTimeout(timer);
 
     if (!res.ok) return null;
-    const contentType = res.headers.get('content-type') || '';
+    const contentType = (res.headers.get('content-type') || '').toLowerCase();
     if (!contentType.includes('audio')) return null;
 
     const blob = await res.blob();
     if (!blob || blob.size < 256) return null;
+    const headerSrc = (res.headers.get('x-klingon-audio-source') || '').toLowerCase();
+    const source: 'hol-mp3' | 'hol-sam-wav' =
+      contentType.includes('mpeg') || contentType.includes('mp3') || headerSrc === 'hol.kag.org'
+        ? 'hol-mp3'
+        : 'hol-sam-wav';
+
     if (remoteAudioBlobCache.size > 100) {
       const first = remoteAudioBlobCache.keys().next().value;
       if (first) remoteAudioBlobCache.delete(first);
     }
-    remoteAudioBlobCache.set(cacheKey, blob);
-    return blob;
+    const entry = { blob, source };
+    remoteAudioBlobCache.set(cacheKey, entry);
+    return entry;
   } catch {
     return null;
   }
 };
 
+const notifyKlingonOffline = () => {
+  setAppOnlineState(false, true);
+};
+
 /**
- * Generates a downloadable Klingon audio file using SAM (Software Automatic Mouth).
- * Both direct client synthesis and hol.kag.org proxy (/api/tts/klingon) deliver SAM .wav audio.
+ * Generates a downloadable Klingon audio file:
+ * - Real hol.kag.org .mp3 when hol.kag.org mode is active & online
+ * - SAM (Software Automatic Mouth) .wav when client mode is selected while online
  */
 export const generateKlingonAudioFileBlob = async (
   text: string,
   isSlow: boolean = false,
   sourcePref: KlingonSpeechSource = 'auto'
-): Promise<{ blob: Blob; filename: string; mimeType: string; source: 'hol-sam-wav' | 'client-wav' }> => {
-  const normalizedTlh = normalizeToTlhLatin(text);
-  const safeSlug = normalizedTlh.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'klingon';
+): Promise<{ blob: Blob; filename: string; mimeType: string; source: 'hol-mp3' | 'hol-sam-wav' | 'client-wav' }> => {
+  if (!isAppOnlineNow()) {
+    notifyKlingonOffline();
+    throw new Error('Нет подключения к интернету');
+  }
+  const speakableTlh = resolveKlingonSpeakableText(text);
+  const safeSlug = speakableTlh.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'klingon';
   const effectivePref = sourcePref === 'auto' ? getKlingonSpeechMode() : sourcePref;
 
-  if (effectivePref === 'hol' && typeof navigator !== 'undefined' && navigator.onLine) {
-    const holSamBlob = await fetchHolKlingonSamBlob(normalizedTlh, isSlow);
-    if (holSamBlob) {
-      const filename = `klingon_${safeSlug}${isSlow ? '_slow' : ''}_sam.wav`;
-      lastAudioInfo = { text, normalizedTlh, source: 'hol-sam-wav', mimeType: holSamBlob.type || 'audio/wav', filename };
-      return { blob: holSamBlob, filename, mimeType: holSamBlob.type || 'audio/wav', source: 'hol-sam-wav' };
+  if (effectivePref !== 'client' && isAppOnlineNow()) {
+    const remote = await fetchHolKlingonAudioBlob(speakableTlh, isSlow);
+    if (remote) {
+      const isMp3 = remote.source === 'hol-mp3' || remote.blob.type.includes('mpeg');
+      const ext = isMp3 ? 'hol.mp3' : 'sam.wav';
+      const filename = `klingon_${safeSlug}${isSlow ? '_slow' : ''}_${ext}`;
+      const mimeType = remote.blob.type || (isMp3 ? 'audio/mpeg' : 'audio/wav');
+      lastAudioInfo = { text, normalizedTlh: speakableTlh, source: remote.source, mimeType, filename };
+      return { blob: remote.blob, filename, mimeType, source: remote.source };
     }
   }
 
-  const wavBlob = synthesizeClientKlingonWavBlob(normalizedTlh, isSlow);
+  const wavBlob = synthesizeClientKlingonWavBlob(speakableTlh, isSlow);
   const filename = `klingon_${safeSlug}${isSlow ? '_slow' : ''}_sam.wav`;
-  lastAudioInfo = { text, normalizedTlh, source: 'client-wav', mimeType: 'audio/wav', filename };
+  lastAudioInfo = { text, normalizedTlh: speakableTlh, source: 'client-wav', mimeType: 'audio/wav', filename };
   return { blob: wavBlob, filename, mimeType: 'audio/wav', source: 'client-wav' };
 };
 
 /**
- * Triggers browser download of the generated Klingon audio file (SAM .wav).
+ * Triggers browser download of the generated Klingon audio file (.mp3 from hol.kag.org or SAM .wav).
  */
 export const downloadKlingonAudioFile = async (
   text: string,
   isSlow: boolean = false,
   sourcePref: KlingonSpeechSource = 'auto'
-): Promise<{ filename: string; source: 'hol-sam-wav' | 'client-wav' }> => {
+): Promise<{ filename: string; source: 'hol-mp3' | 'hol-sam-wav' | 'client-wav' }> => {
+  if (!isAppOnlineNow()) {
+    notifyKlingonOffline();
+    throw new Error('Нет подключения к интернету');
+  }
   const file = await generateKlingonAudioFileBlob(text, isSlow, sourcePref);
   if (typeof document !== 'undefined') {
     const url = URL.createObjectURL(file.blob);
@@ -617,43 +693,48 @@ export const downloadKlingonAudioFile = async (
 };
 
 /**
- * Primary Klingon Speech entry point.
- * Both client-side playback ('auto' / 'client') AND connected hol.kag.org ('hol')
- * output SAM (Software Automatic Mouth) speech.
+ * Primary Klingon Speech entry point (online-only):
+ * - 'hol' (default): plays authentic hol.kag.org MP3 voice (/api/tts/klingon), falling back to SAM WAV when online.
+ * - 'client': plays SAM (Software Automatic Mouth) WAV directly when online.
  */
 export const playKlingonSpeech = async (
   text: string,
   isSlow: boolean = false,
   sourcePref: KlingonSpeechSource = 'auto'
 ): Promise<boolean> => {
-  const normalizedTlh = normalizeToTlhLatin(text);
-  if (!normalizedTlh) return false;
-  const safeSlug = normalizedTlh.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'klingon';
+  if (!isAppOnlineNow()) {
+    notifyKlingonOffline();
+    return false;
+  }
+  const speakableTlh = resolveKlingonSpeakableText(text);
+  if (!speakableTlh) return false;
+  const safeSlug = speakableTlh.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'klingon';
   const effectivePref = sourcePref === 'auto' ? getKlingonSpeechMode() : sourcePref;
 
-  // Connected hol.kag.org route: /api/tts/klingon validates against hol.kag.org AND outputs SAM Software Automatic Mouth
-  if (effectivePref === 'hol' && typeof navigator !== 'undefined' && navigator.onLine) {
-    const holSamBlob = await fetchHolKlingonSamBlob(normalizedTlh, isSlow);
-    if (holSamBlob) {
+  if (effectivePref !== 'client' && isAppOnlineNow()) {
+    const remote = await fetchHolKlingonAudioBlob(speakableTlh, isSlow);
+    if (remote) {
+      const isMp3 = remote.source === 'hol-mp3' || remote.blob.type.includes('mpeg');
+      const playbackRate = isMp3 && isSlow ? 0.78 : 1.0;
       lastAudioInfo = {
         text,
-        normalizedTlh,
-        source: 'hol-sam-wav',
-        mimeType: holSamBlob.type || 'audio/wav',
-        filename: `klingon_${safeSlug}${isSlow ? '_slow' : ''}_sam.wav`,
+        normalizedTlh: speakableTlh,
+        source: remote.source,
+        mimeType: remote.blob.type || (isMp3 ? 'audio/mpeg' : 'audio/wav'),
+        filename: `klingon_${safeSlug}${isSlow ? '_slow' : ''}_${isMp3 ? 'hol.mp3' : 'sam.wav'}`,
       };
-      const played = await playBlobViaHtmlAudio(holSamBlob, 1.0);
+      const played = await playBlobViaHtmlAudio(remote.blob, playbackRate);
       if (played) return true;
-      const webAudioPlayed = await playBlobViaWebAudio(holSamBlob, 1.0);
+      const webAudioPlayed = await playBlobViaWebAudio(remote.blob, playbackRate);
       if (webAudioPlayed) return true;
     }
   }
 
-  // Direct Client-Side SAM (Software Automatic Mouth) Synthesizer (also fallback for offline/hol)
-  const wavBlob = synthesizeClientKlingonWavBlob(normalizedTlh, isSlow);
+  // Client-Side SAM (Software Automatic Mouth) Synthesizer (online-only)
+  const wavBlob = synthesizeClientKlingonWavBlob(speakableTlh, isSlow);
   lastAudioInfo = {
     text,
-    normalizedTlh,
+    normalizedTlh: speakableTlh,
     source: effectivePref === 'hol' ? 'hol-sam-wav' : 'client-wav',
     mimeType: 'audio/wav',
     filename: `klingon_${safeSlug}${isSlow ? '_slow' : ''}_sam.wav`,

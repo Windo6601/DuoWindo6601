@@ -10,6 +10,7 @@
   --font-hebrew: Rubik, "Noto Sans Hebrew", sans-serif;
   --font-chinese: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "ZCOOL KuaiLe", "Ma Shan Zheng", sans-serif;
   --font-japanese: "Zen Maru Gothic", "M PLUS Rounded 1c", "Noto Sans JP", "Hiragino Sans", Meiryo, sans-serif;
+  --font-valyrian: "Cormorant Garamond", "Cinzel", "Noto Serif", Georgia, serif;
 
   --color-duo-dark: #131F24;
   --color-duo-card: #202F36;
@@ -371,6 +372,12 @@ html.light body,
 .font-piqad {
   font-family: 'pIqaD', 'Klingon', sans-serif !important;
   letter-spacing: 0.04em;
+}
+
+/* High Valyrian font (Высокий валирийский шрифт) */
+.font-valyrian, [data-lang="hv"], :lang(hv), .lang-hv, [data-course-script="valyrian"], [data-course="hv"] {
+  font-family: "Cormorant Garamond", "Cinzel", "Noto Serif", Georgia, serif !important;
+  letter-spacing: 0.02em;
 }
 
 /* ==========================================================================

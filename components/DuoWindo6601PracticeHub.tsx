@@ -18,6 +18,7 @@ import { DuoWindo6601MistakesModal } from './DuoWindo6601MistakesModal';
 import { DuoWindo6601PoemModal } from './DuoWindo6601PoemModal';
 import { DuoWindo6601RadioModal } from './DuoWindo6601RadioModal';
 import { ArabicNumeralsConverter } from './ArabicNumeralsConverter';
+import { notifyNetworkOffline, OFFLINE_INTERNET_REQUIRED_MESSAGE } from '../services/geminiService';
 
 interface DuoWindo6601PracticeHubProps {
   user: UserProgress;
@@ -464,50 +465,115 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
             );
           })()}
 
-          {/* 1. ВидеоЗвонок (Живое общение с AI партнером) */}
-          <button 
-            type="button"
-            onClick={() => startVideoCall(t('videoCall'))} 
-            className="bg-gradient-to-r from-purple-700 via-indigo-700 to-blue-700 p-6 md:p-8 rounded-[2.5rem] border-b-8 border-purple-900 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center justify-between shadow-2xl group relative overflow-hidden cursor-pointer"
-          >
-            <div className="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest animate-pulse border border-white/20">
-              NEW DuoWindo6601
-            </div>
-            <div className="flex items-center space-x-5 relative z-10">
-              <div className="bg-white/20 p-4 rounded-3xl group-hover:scale-110 transition-transform">
-                <VideoIcon className="w-10 h-10 text-white" />
-              </div>
-              <div>
-                <div className="flex items-center space-x-2 mb-1">
-                  <h3 className="text-2xl md:text-3xl font-black text-white">{t('videoCall')}</h3>
+          {/* 1. ВидеоЗвонок (Ограничено для Бета Клингонский tlh) */}
+          {currentCourse.id === 'tlh' ? (
+            <button
+              type="button"
+              onClick={() => {
+                playSound('wrong');
+                setToast(
+                  isRu
+                    ? '🔒 Для Бета-курса клингонского языка ВидеоЗвонок и Roleplays ограничены!'
+                    : '🔒 Video Call and Roleplays are restricted for Beta Klingon!'
+                );
+              }}
+              className="bg-gradient-to-r from-gray-900/95 via-[#18232c] to-amber-950/90 p-6 md:p-8 rounded-[2.5rem] border-2 border-amber-500/40 text-left opacity-85 hover:border-amber-400 transition-all flex items-center justify-between shadow-xl group relative overflow-hidden cursor-not-allowed"
+            >
+              <div className="flex items-center space-x-5 relative z-10">
+                <div className="bg-amber-500/20 border border-amber-500/40 p-4 rounded-3xl shrink-0">
+                  <span className="text-3xl">🔒</span>
                 </div>
-                <p className="opacity-90 font-bold text-xs md:text-sm text-purple-200">
-                  {t('videoCallDesc')}
-                </p>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <h3 className="text-2xl md:text-3xl font-black text-white">{t('videoCall')}</h3>
+                    <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">
+                      🔒 {isRu ? 'Клингонский Бета' : 'Klingon Beta'}
+                    </span>
+                  </div>
+                  <p className="font-bold text-xs md:text-sm text-amber-200/80">
+                    {isRu ? 'ВидеоЗвонок ограничен для Бета-курса клингонского языка' : 'Video Call is restricted for Beta Klingon'}
+                  </p>
+                </div>
               </div>
-            </div>
-          </button>
+            </button>
+          ) : (
+            <button 
+              type="button"
+              onClick={() => startVideoCall(t('videoCall'))} 
+              className="bg-gradient-to-r from-purple-700 via-indigo-700 to-blue-700 p-6 md:p-8 rounded-[2.5rem] border-b-8 border-purple-900 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center justify-between shadow-2xl group relative overflow-hidden cursor-pointer"
+            >
+              <div className="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest animate-pulse border border-white/20">
+                NEW DuoWindo6601
+              </div>
+              <div className="flex items-center space-x-5 relative z-10">
+                <div className="bg-white/20 p-4 rounded-3xl group-hover:scale-110 transition-transform">
+                  <VideoIcon className="w-10 h-10 text-white" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2 mb-1">
+                    <h3 className="text-2xl md:text-3xl font-black text-white">{t('videoCall')}</h3>
+                  </div>
+                  <p className="opacity-90 font-bold text-xs md:text-sm text-purple-200">
+                    {t('videoCallDesc')}
+                  </p>
+                </div>
+              </div>
+            </button>
+          )}
 
-          {/* 2. Roleplays MAX (Начни говорить →) */}
-          <button 
-            type="button"
-            onClick={() => startTraining('roleplay')} 
-            className="bg-gradient-to-r from-purple-600 to-pink-600 p-6 md:p-8 rounded-[2.5rem] border-b-8 border-purple-800 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center justify-between shadow-2xl group cursor-pointer"
-          >
-            <div className="flex items-center space-x-5">
-              <div className="bg-white/20 p-4 rounded-3xl group-hover:rotate-6 transition-transform">
-                <ChatBubbleIcon className="w-10 h-10 text-white" />
-              </div>
-              <div>
-                <div className="flex items-center space-x-2 mb-1">
-                  <h3 className="text-2xl md:text-3xl font-black text-white">{t('roleplays')}</h3>
-                  {user.subscription === 'max' && <span className="bg-black text-duo-blue text-[10px] px-2 py-0.5 rounded font-black border border-duo-blue">MAX</span>}
+          {/* 2. Roleplays MAX (Ограничено для Бета Клингонский tlh) */}
+          {currentCourse.id === 'tlh' ? (
+            <button
+              type="button"
+              onClick={() => {
+                playSound('wrong');
+                setToast(
+                  isRu
+                    ? '🔒 Для Бета-курса клингонского языка ВидеоЗвонок и Roleplays ограничены!'
+                    : '🔒 Video Call and Roleplays are restricted for Beta Klingon!'
+                );
+              }}
+              className="bg-gradient-to-r from-gray-900/95 via-[#18232c] to-amber-950/90 p-6 md:p-8 rounded-[2.5rem] border-2 border-amber-500/40 text-left opacity-85 hover:border-amber-400 transition-all flex items-center justify-between shadow-xl group cursor-not-allowed"
+            >
+              <div className="flex items-center space-x-5">
+                <div className="bg-amber-500/20 border border-amber-500/40 p-4 rounded-3xl shrink-0">
+                  <span className="text-3xl">🔒</span>
                 </div>
-                <p className="opacity-90 font-bold text-xs md:text-sm text-white/80">{t('startSpeak')}</p>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <h3 className="text-2xl md:text-3xl font-black text-white">{t('roleplays')}</h3>
+                    <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">
+                      🔒 {isRu ? 'Клингонский Бета' : 'Klingon Beta'}
+                    </span>
+                  </div>
+                  <p className="font-bold text-xs md:text-sm text-amber-200/80">
+                    {isRu ? 'Roleplays ограничен для Бета-курса клингонского языка' : 'Roleplays are restricted for Beta Klingon'}
+                  </p>
+                </div>
               </div>
-            </div>
-            <Mascot emotion="happy" className="w-20 h-20 hidden sm:block" variant={currentCourse.mascotVariant} />
-          </button>
+              <Mascot emotion="thinking" className="w-20 h-20 hidden sm:block opacity-75" variant={currentCourse.mascotVariant} />
+            </button>
+          ) : (
+            <button 
+              type="button"
+              onClick={() => startTraining('roleplay')} 
+              className="bg-gradient-to-r from-purple-600 to-pink-600 p-6 md:p-8 rounded-[2.5rem] border-b-8 border-purple-800 text-left hover:brightness-110 active:translate-y-2 transition-all flex items-center justify-between shadow-2xl group cursor-pointer"
+            >
+              <div className="flex items-center space-x-5">
+                <div className="bg-white/20 p-4 rounded-3xl group-hover:rotate-6 transition-transform">
+                  <ChatBubbleIcon className="w-10 h-10 text-white" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2 mb-1">
+                    <h3 className="text-2xl md:text-3xl font-black text-white">{t('roleplays')}</h3>
+                    {user.subscription === 'max' && <span className="bg-black text-duo-blue text-[10px] px-2 py-0.5 rounded font-black border border-duo-blue">MAX</span>}
+                  </div>
+                  <p className="opacity-90 font-bold text-xs md:text-sm text-white/80">{t('startSpeak')}</p>
+                </div>
+              </div>
+              <Mascot emotion="happy" className="w-20 h-20 hidden sm:block" variant={currentCourse.mascotVariant} />
+            </button>
+          )}
 
           {/* 3. Аудио (Что вы услышали?) */}
           <button 
@@ -571,7 +637,7 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
             </div>
           </button>
 
-          {/* 7. Переводчик (AI и Словари без интернета) */}
+          {/* 7. Переводчик (Gemini AI Онлайн — Без VPN и с VPN) */}
           <button 
             type="button"
             onClick={() => setScreen(AppScreen.TRANSLATOR)} 
@@ -614,7 +680,25 @@ export const DuoWindo6601PracticeHub: React.FC<DuoWindo6601PracticeHubProps> = (
           {/* 9. Нарисовать буквы (Практика письма) */}
           <button 
             type="button"
-            onClick={() => startTraining('drawing')} 
+            onClick={() => {
+              if (typeof navigator !== 'undefined' && !navigator.onLine) {
+                playSound('wrong');
+                notifyNetworkOffline();
+                setToast(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+                return;
+              }
+              const isNonLang = currentCourse.id === 'math' || currentCourse.id === 'chess' || currentCourse.id === 'music' || currentCourse.id === 'coding' || currentCourse.id === 'art';
+              if (isNonLang) {
+                playSound('wrong');
+                setToast(
+                  isRu 
+                    ? `🔒 Раздел «Письмо» доступен только для языковых курсов. В курсе «${currentCourse.localName || currentCourse.name}» нет алфавита или букв.`
+                    : `🔒 Writing section is only available for language courses. Course "${currentCourse.name}" has no alphabet or letters.`
+                );
+                return;
+              }
+              startTraining('drawing');
+            }} 
             className="bg-pink-600 p-8 md:p-10 rounded-[2.5rem] border-b-8 border-pink-800 text-left hover:brightness-110 active:translate-y-2 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xl cursor-pointer md:col-span-2 group relative overflow-hidden"
           >
             <div className="flex items-center space-x-6">

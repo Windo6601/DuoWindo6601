@@ -30,12 +30,15 @@ import {
   downloadKlingonAudioFile,
   getKlingonSentencePlayerUrl,
   getKlingonSpeechMode,
-  KLINGON_HOL_HELLO_URL,
+  KLINGON_HOL_NUQNEH_URL,
   KLINGON_SAM_HOMEPAGE,
   KlingonSpeechSource,
   playKlingonSpeech,
   setKlingonSpeechMode,
 } from '../services/klingonSpeechService';
+import { notifyNetworkOffline, OFFLINE_INTERNET_REQUIRED_MESSAGE } from '../services/geminiService';
+import { DUOWINDO6601_OFFICIAL_CATALOG } from '../services/duowindo6601Catalog';
+import { useOnlineStatus } from './OfflineIndicator';
 
 interface LettersScreenProps {
   currentCourse: Course;
@@ -96,7 +99,33 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
   const [courseCategoryTab, setCourseCategoryTab] = useState<'cis' | 'russia' | 'world' | 'easiest' | 'hardest' | 'beta'>('cis');
   const [klingonSpeechMode, setKlingonSpeechModeState] = useState<KlingonSpeechSource>(() => getKlingonSpeechMode());
 
+  const isOnline = useOnlineStatus();
+
+  useEffect(() => {
+    setKlingonSpeechModeState(getKlingonSpeechMode());
+  }, [currentCourse.id, activeLesson, lettersSectionTab]);
+
+  useEffect(() => {
+    if (!isOnline) {
+      stopActiveIllusion();
+      setActiveLesson(false);
+      setLessonCompleted(false);
+      setSelectedLetter(null);
+    }
+  }, [isOnline]);
+
+  const requireOnline = (): boolean => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      playSound('wrong');
+      triggerHapticFeedback('warning');
+      notifyNetworkOffline();
+      return false;
+    }
+    return true;
+  };
+
   const handleSwitchKlingonSpeechMode = (mode: KlingonSpeechSource, sampleText?: string) => {
+    if (!requireOnline()) return;
     playSound('select');
     setKlingonSpeechMode(mode);
     setKlingonSpeechModeState(mode);
@@ -163,6 +192,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
   const difficultyLevel: 'easy' | 'hard' = user.difficultyLevel === 'hard' ? 'hard' : 'easy';
 
   const handleSwitchDifficulty = (level: 'easy' | 'hard') => {
+    if (!requireOnline()) return;
     playSound('select');
     const updatedUser: UserProgress = { ...user, difficultyLevel: level };
     setUser(updatedUser);
@@ -170,6 +200,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
   };
 
   const handleSelectSectionTab = (tab: 'letters' | 'words' | 'illusion' | 'audio') => {
+    if (!requireOnline()) return;
     playSound('click');
     if (tab !== 'illusion') {
       stopActiveIllusion();
@@ -224,9 +255,23 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
   };
 
   // Get Alphabet list for current course
+  const isNonLangCourse = currentCourse.id === 'math' || currentCourse.id === 'chess' || currentCourse.id === 'music' || currentCourse.id === 'coding' || currentCourse.id === 'art';
+
   const alphabetCategories: AlphabetCategory[] = useMemo(() => {
+    if (isNonLangCourse) {
+      return [];
+    }
+
     let rawCats: AlphabetCategory[] = [];
-    if (CIS_ALPHABET_DATA[currentCourse.id]) {
+    let lookupLang = currentCourse.id;
+    const catalogItem = DUOWINDO6601_OFFICIAL_CATALOG.find(c => c.itemId === currentCourse.id);
+    if (catalogItem) {
+      lookupLang = catalogItem.learningLanguage;
+    }
+
+    if (CIS_ALPHABET_DATA[lookupLang]) {
+      rawCats = CIS_ALPHABET_DATA[lookupLang];
+    } else if (CIS_ALPHABET_DATA[currentCourse.id]) {
       rawCats = CIS_ALPHABET_DATA[currentCourse.id];
     } else {
       // Fallback for languages with standard Latin or generic alphabet
@@ -316,12 +361,23 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
   // Play letter pronunciation
   const handlePlayLetterAudio = (char: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      playSound('wrong');
+      notifyNetworkOffline();
+      return;
+    }
     playSound('click');
     speakText(char, currentCourse.id, false, user.preferredVoice, user.voiceProvider);
   };
 
   // Build Interactive Letters Lesson Exercises
   const startLetterLesson = (specificChar?: string) => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      playSound('wrong');
+      triggerHapticFeedback('warning');
+      notifyNetworkOffline();
+      return;
+    }
     if (isBetaRestricted) {
       playSound('wrong');
       triggerHapticFeedback('warning');
@@ -660,6 +716,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
 
   // Canvas Drawing Handlers
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!requireOnline()) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -715,6 +772,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
 
   // Pair Matching Logic
   const handleSelectLeftPair = (id: string) => {
+    if (!requireOnline()) return;
     if (matchedPairIds.includes(id)) return;
     playSound('click');
     setSelectedPairLeft(id);
@@ -725,6 +783,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
   };
 
   const handleSelectRightPair = (id: string) => {
+    if (!requireOnline()) return;
     if (matchedPairIds.includes(id)) return;
     playSound('click');
     setSelectedPairRight(id);
@@ -761,6 +820,11 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
   // Check Answer Handler
   const handleCheckAnswer = () => {
     if (!currentExercise) return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      playSound('wrong');
+      notifyNetworkOffline();
+      return;
+    }
 
     if (currentExercise.type === 'trace') {
       playSound('correct');
@@ -796,6 +860,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
 
   // Next / Continue Exercise
   const handleContinueExercise = () => {
+    if (!requireOnline()) return;
     playSound('click');
     if (currentExerciseIdx + 1 < lessonQueue.length) {
       setCurrentExerciseIdx(prev => prev + 1);
@@ -814,6 +879,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
 
   // Skip Exercise
   const handleSkipExercise = () => {
+    if (!requireOnline()) return;
     playSound('click');
     triggerHapticFeedback('light');
     handleContinueExercise();
@@ -830,11 +896,12 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
     return char;
   };
 
-  // Dedicated font typography classes for Chinese, Japanese, Arabic, and Klingon
+  // Dedicated font typography classes for Chinese, Japanese, Arabic, High Valyrian, and Klingon
   const getScriptFontClass = (courseId: string) => {
     if (courseId === 'zh') return 'font-chinese';
     if (courseId === 'ja') return 'font-japanese';
     if (courseId === 'ar') return 'font-arabic';
+    if (courseId === 'hv') return 'font-valyrian';
     if (courseId === 'tlh') return 'font-klingon';
     return '';
   };
@@ -1071,8 +1138,47 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
     );
   }
 
+  if (isNonLangCourse) {
+    return (
+      <div className={`min-h-screen w-full flex flex-col items-center justify-center p-6 text-center space-y-5 ${isLightMode ? 'bg-[#F7F9FA] text-slate-900' : 'bg-[#131F24] text-white'}`}>
+        <div className="w-20 h-20 rounded-3xl bg-amber-500/20 border-2 border-amber-500/50 flex items-center justify-center text-4xl shadow-xl">
+          🔒
+        </div>
+        <div className="space-y-2 max-w-md">
+          <h2 className="text-2xl font-black">
+            {user.language === 'ru' ? 'Раздел «Письмо» доступен только для языковых курсов' : 'Writing Section Only for Language Courses'}
+          </h2>
+          <p className="text-sm font-bold text-gray-400 leading-relaxed">
+            {user.language === 'ru'
+              ? `Курс «${currentCourse.localName || currentCourse.name}» относится к разделу «Предметы & Игры» (не языковой курс). В данном предмете нет алфавита или букв.`
+              : `The course "${currentCourse.name}" belongs to "Subjects & Games" (non-language course). There is no alphabet or letters in this subject.`}
+          </p>
+        </div>
+        {onBackToPath && (
+          <button
+            type="button"
+            onClick={onBackToPath}
+            className="px-8 py-3.5 rounded-2xl bg-duo-green hover:brightness-110 text-white font-black text-sm uppercase tracking-wider border-b-4 border-duo-greenDark active:border-b-0 active:translate-y-1 transition-all cursor-pointer shadow-lg"
+          >
+            {user.language === 'ru' ? '← Назад к курсу' : '← Back to Course'}
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className={`min-h-screen w-full ${isLightMode ? 'bg-[#F7F9FA] text-slate-900' : 'bg-[#131F24] text-white'} selection:bg-duo-blue/30 pb-28 md:pb-12 transition-colors`}>
+      {!isOnline && (
+        <div className="max-w-4xl mx-auto px-4 pt-4">
+          <div className="bg-red-500/20 border border-red-500/50 text-red-200 px-4 py-3 rounded-2xl text-xs font-bold flex items-center justify-between shadow-lg">
+            <span className="flex items-center gap-2">
+              <span className="text-base">📡</span>
+              <span>{user.language === 'ru' ? 'Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет.' : 'No internet connection. DuoWindo6601 requires internet.'}</span>
+            </span>
+          </div>
+        </div>
+      )}
       
       {/* ========================================================================= */}
       {/* 1. LESSON COMPLETE CELEBRATION SCREEN (With Post-Lesson Modes)            */}
@@ -1248,6 +1354,65 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Active Klingon Voice & Audio-File Bar inside Writing Lesson */}
+          {currentCourse.id === 'tlh' && (
+            <div className="mb-4 p-2.5 bg-[#182329] border border-purple-500/40 rounded-2xl flex flex-wrap items-center justify-between gap-2 shadow">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => handleSwitchKlingonSpeechMode('hol', currentExercise.targetChar || currentExercise.targetWord || 'nuqneH')}
+                  className={`px-2.5 py-1 rounded-xl text-[11px] font-black border transition-all cursor-pointer ${
+                    klingonSpeechMode !== 'client'
+                      ? 'bg-indigo-600/85 border-indigo-400 text-white shadow'
+                      : 'bg-gray-800 hover:bg-gray-700 border-gray-700 text-indigo-200'
+                  }`}
+                  title="hol.kag.org (https://hol.kag.org/sentence/nuqneH)"
+                >
+                  🎧 hol.kag.org
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSwitchKlingonSpeechMode('client', currentExercise.targetChar || currentExercise.targetWord || 'nuqneH')}
+                  className={`px-2.5 py-1 rounded-xl text-[11px] font-black border transition-all cursor-pointer ${
+                    klingonSpeechMode === 'client'
+                      ? 'bg-sky-600/80 border-sky-400 text-white shadow'
+                      : 'bg-gray-800 hover:bg-gray-700 border-gray-700 text-sky-200'
+                  }`}
+                  title="SAM Software Automatic Mouth (https://discordier.github.io/sam/)"
+                >
+                  🔊 SAM Speech
+                </button>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <a
+                  href={getKlingonSentencePlayerUrl(currentExercise.targetChar || currentExercise.targetWord || 'nuqneH')}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2 py-1 rounded-xl text-[10px] font-black bg-indigo-950/70 hover:bg-indigo-800 border border-indigo-500/40 text-indigo-300 hover:text-white transition-colors"
+                  title="https://hol.kag.org/sentence/nuqneH"
+                >
+                  hol.kag.org ↗
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!requireOnline()) return;
+                    playSound('click');
+                    void downloadKlingonAudioFile(
+                      currentExercise.targetChar || currentExercise.targetWord || 'nuqneH',
+                      false,
+                      klingonSpeechMode
+                    ).catch(() => {});
+                  }}
+                  className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-gray-800 hover:bg-gray-700 text-emerald-300 border border-emerald-500/40 transition-colors cursor-pointer"
+                  title={user.language !== 'en' ? 'Скачать аудио-файл клингонский' : 'Download Klingon audio file'}
+                >
+                  💾 {user.language !== 'en' ? 'Аудио-файл' : 'Audio File'}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Exercise Content Area */}
           <div className="flex-1 flex flex-col justify-center my-auto py-4">
@@ -1676,6 +1841,12 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                     <span className="text-[11px] text-gray-300">• Шрифт Klingon Font подключен (fontomania.ru/17807-klingon.html)</span>
                   </div>
                 )}
+                {currentCourse.id === 'hv' && (
+                  <div className="pt-2 flex items-center justify-center gap-2 text-xs text-emerald-300 font-bold border-t border-emerald-500/20">
+                    <span className="font-valyrian text-lg font-semibold">Valyrio • Zaldrīzes</span>
+                    <span className="text-[11px] text-gray-300">• Высокий валирийский шрифт подключен</span>
+                  </div>
+                )}
               </div>
             ) : null}
 
@@ -1848,7 +2019,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                 </div>
               </div>
             )}
-            {/* Klingon Client SAM Speech, hol.kag.org Switcher, Font & Audio File Bar (Раздел Письмо) */}
+            {/* Klingon hol.kag.org Voice, SAM Speech, PanderMusubi/klingon (tlh_Latn / tlh) & Audio File Bar (Раздел Письмо) */}
             {currentCourse.id === 'tlh' && lettersSectionTab !== 'illusion' && (
               <div className="w-full max-w-2xl mt-4 p-3.5 bg-[#182329] border border-purple-500/40 rounded-2xl flex flex-col gap-2.5 shadow-lg text-left">
                 <div className="flex items-center justify-between flex-wrap gap-2">
@@ -1856,13 +2027,19 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                     <span className="text-lg">🖖</span>
                     <span className="text-xs font-black text-purple-300 uppercase tracking-wider">
                       {user.language !== 'en'
-                        ? 'Раздел Письмо • SAM Speech + hol.kag.org (SAM)'
-                        : 'Writing • SAM Speech + hol.kag.org (SAM)'}
+                        ? 'Раздел Письмо • hol.kag.org + SAM + tlh_Latn / tlh'
+                        : 'Writing • hol.kag.org + SAM + tlh_Latn / tlh'}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="font-piqad text-sm px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-200 border border-purple-500/30">
                       {tlhToPIqaD('tlhIngan Hol')}
+                    </span>
+                    <span
+                      className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-emerald-950/70 border border-emerald-500/40 text-emerald-300"
+                      title="hunspell -d tlh_Latn /usr/share/dict/klingon-latin • nuspell -d tlh /usr/share/dict/klingon"
+                    >
+                      tlh_Latn • hunspell/nuspell
                     </span>
                     <a
                       href={KLINGON_SAM_HOMEPAGE}
@@ -1874,11 +2051,11 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                       SAM ↗
                     </a>
                     <a
-                      href={KLINGON_HOL_HELLO_URL}
+                      href={KLINGON_HOL_NUQNEH_URL}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-indigo-950/70 border border-indigo-500/40 text-indigo-300 hover:text-white transition-colors"
-                      title="hol.kag.org Sentence Player (https://hol.kag.org/sentence/Hello)"
+                      title="hol.kag.org Sentence Player (https://hol.kag.org/sentence/nuqneH)"
                     >
                       hol.kag.org ↗
                     </a>
@@ -1887,9 +2064,22 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => handleSwitchKlingonSpeechMode('client', 'nuqneH, Qapla’')}
+                    onClick={() => handleSwitchKlingonSpeechMode('hol', 'nuqneH')}
+                    className={`flex-1 min-w-[140px] py-2 px-3 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-all border ${
+                      klingonSpeechMode !== 'client'
+                        ? 'bg-indigo-600/85 border-indigo-400 text-white shadow-md'
+                        : 'bg-gray-800 hover:bg-gray-700 border-gray-700 text-indigo-200'
+                    }`}
+                    title="hol.kag.org (https://hol.kag.org/sentence/nuqneH)"
+                  >
+                    <span>🎧</span>
+                    <span>hol.kag.org</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSwitchKlingonSpeechMode('client', 'nuqneH')}
                     className={`flex-1 min-w-[130px] py-2 px-3 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-all border ${
-                      klingonSpeechMode !== 'hol'
+                      klingonSpeechMode === 'client'
                         ? 'bg-sky-600/80 border-sky-400 text-white shadow-md'
                         : 'bg-gray-800 hover:bg-gray-700 border-gray-700 text-sky-200'
                     }`}
@@ -1900,20 +2090,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleSwitchKlingonSpeechMode('hol', 'nuqneH, Qapla’')}
-                    className={`flex-1 min-w-[140px] py-2 px-3 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-all border ${
-                      klingonSpeechMode === 'hol'
-                        ? 'bg-indigo-600/85 border-indigo-400 text-white shadow-md'
-                        : 'bg-gray-800 hover:bg-gray-700 border-gray-700 text-indigo-200'
-                    }`}
-                    title="hol.kag.org → SAM Software Automatic Mouth (https://hol.kag.org/sentence/Hello)"
-                  >
-                    <span>🎧</span>
-                    <span>hol.kag.org (SAM)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handlePlayLetterAudio('nuqneH, Qapla’')}
+                    onClick={() => handlePlayLetterAudio('nuqneH')}
                     className="py-2 px-3 rounded-xl bg-purple-600/80 hover:bg-purple-500 text-white text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-all"
                   >
                     <VolumeIcon className="w-4 h-4" />
@@ -1922,8 +2099,9 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                   <button
                     type="button"
                     onClick={() => {
+                      if (!requireOnline()) return;
                       playSound('click');
-                      void downloadKlingonAudioFile('nuqneH, Qapla’', false, klingonSpeechMode);
+                      void downloadKlingonAudioFile('nuqneH', false, klingonSpeechMode).catch(() => {});
                     }}
                     className="py-2 px-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-emerald-300 border border-emerald-500/40 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-all"
                   >
@@ -1976,6 +2154,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                     <button
                       key={cat.title}
                       onClick={() => {
+                        if (!requireOnline()) return;
                         playSound('click');
                         setSelectedCategoryIdx(idx);
                       }}
@@ -2001,6 +2180,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                     <div
                       key={`${item.char}_${idx}`}
                       onClick={() => {
+                        if (!requireOnline()) return;
                         setSelectedLetter(item);
                         handlePlayLetterAudio(item.char);
                       }}
@@ -2108,7 +2288,7 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                           type="button"
                           onClick={() => handleSwitchKlingonSpeechMode('client', selectedLetter.word || selectedLetter.char)}
                           className={`px-2 py-1.5 rounded-xl text-[10px] font-black border transition-colors cursor-pointer ${
-                            klingonSpeechMode !== 'hol'
+                            klingonSpeechMode === 'client'
                               ? 'bg-sky-600/70 border-sky-400 text-white'
                               : 'bg-gray-800 hover:bg-sky-700 border-gray-700 text-sky-200'
                           }`}
@@ -2120,11 +2300,11 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                           type="button"
                           onClick={() => handleSwitchKlingonSpeechMode('hol', selectedLetter.word || selectedLetter.char)}
                           className={`px-2 py-1.5 rounded-xl text-[10px] font-black border transition-colors cursor-pointer ${
-                            klingonSpeechMode === 'hol'
+                            klingonSpeechMode !== 'client'
                               ? 'bg-indigo-600/80 border-indigo-400 text-white'
                               : 'bg-gray-800 hover:bg-indigo-700 border-gray-700 text-indigo-200'
                           }`}
-                          title="hol.kag.org → SAM"
+                          title="hol.kag.org (https://hol.kag.org/sentence/nuqneH)"
                         >
                           🎧 hol.kag.org
                         </button>
@@ -2133,15 +2313,16 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                           target="_blank"
                           rel="noopener noreferrer"
                           className="px-2 py-1.5 bg-gray-800 hover:bg-indigo-700 text-indigo-300 hover:text-white rounded-xl transition-colors text-[10px] font-black"
-                          title="https://hol.kag.org/sentence/Hello"
+                          title="https://hol.kag.org/sentence/nuqneH"
                         >
                           ↗
                         </a>
                         <button
                           type="button"
                           onClick={() => {
+                            if (!requireOnline()) return;
                             playSound('click');
-                            void downloadKlingonAudioFile(selectedLetter.word || selectedLetter.char, false, klingonSpeechMode);
+                            void downloadKlingonAudioFile(selectedLetter.word || selectedLetter.char, false, klingonSpeechMode).catch(() => {});
                           }}
                           className="p-2.5 bg-gray-800 hover:bg-emerald-700 text-emerald-300 hover:text-white rounded-xl transition-colors cursor-pointer text-xs font-black"
                           title={user.language !== 'en' ? 'Скачать аудио-файл клингонский' : 'Download Klingon audio file'}
@@ -2328,6 +2509,12 @@ export const LettersScreen: React.FC<LettersScreenProps> = ({
                               <div className="mt-1 text-[9px] text-emerald-300 font-bold flex items-center gap-1">
                                 <span className="font-klingon text-xs">tlhIngan Hol</span>
                                 <span>• Шрифт Klingon Font</span>
+                              </div>
+                            )}
+                            {c.id === 'hv' && (
+                              <div className="mt-1 text-[9px] text-emerald-300 font-bold flex items-center gap-1">
+                                <span className="font-valyrian text-xs font-semibold">Valyrio</span>
+                                <span>• Высокий валирийский шрифт</span>
                               </div>
                             )}
                           </div>

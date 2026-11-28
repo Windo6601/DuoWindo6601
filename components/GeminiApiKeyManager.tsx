@@ -359,7 +359,7 @@ export const GeminiApiKeyManager: React.FC<GeminiApiKeyManagerProps> = ({
               </a>
             </li>
             <li>{isRu ? 'Войдите в аккаунт Google и нажмите синюю кнопку «Create API key».' : 'Sign in to your Google account and click "Create API key".'}</li>
-            <li>{isRu ? 'Скопируйте полученный ключ (начинается на AIzaSy...) и вставьте в поле ниже.' : 'Copy the generated key (starts with AIzaSy...) and paste it below.'}</li>
+            <li>{isRu ? 'Скопируйте полученный ключ (начинается на AIzaSy... или AQ....) и вставьте в поле ниже.' : 'Copy the generated key (starts with AIzaSy... or AQ....) and paste it below.'}</li>
             <li>
               <strong className="text-emerald-400">
                 {isRu ? 'Бесплатный ключ (Free tier)' : 'Free tier key'}
@@ -459,7 +459,7 @@ export const GeminiApiKeyManager: React.FC<GeminiApiKeyManagerProps> = ({
             type={showKey ? 'text' : 'password'}
             value={inputKey}
             onChange={(e) => setInputKey(e.target.value)}
-            placeholder={isRu ? "Вставьте ваш ключ: AIzaSy..." : "Paste your key: AIzaSy..."}
+            placeholder={isRu ? "Вставьте ваш ключ: AIzaSy... / AQ...." : "Paste your key: AIzaSy... / AQ...."}
             className="w-full pl-11 pr-24 py-3.5 bg-[#101018] border-2 border-gray-700 focus:border-purple-500 rounded-2xl text-sm text-white font-mono placeholder:text-gray-600 transition-all outline-none shadow-inner"
           />
           <div className="absolute right-3 flex items-center space-x-1.5">

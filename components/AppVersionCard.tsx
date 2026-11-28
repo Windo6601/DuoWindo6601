@@ -15,6 +15,11 @@ import {
   collectAppDiagnostics,
   formatDiagnosticsReport
 } from '../services/appVersionService';
+import {
+  computePatchSha256Short,
+  saveInstalledPwaPatch,
+  preparePwaCachesAndWorker
+} from '../services/pwaUpdateService';
 import { CheckCircleIcon, ShieldIcon, SparklesIcon } from './Icons';
 import { PWAInstallButton } from './PWAInstallButton';
 
@@ -27,6 +32,7 @@ interface AppVersionCardProps {
   onOpenSystemChecker: () => void;
   onOpenBetaCenter?: () => void;
   onToggleBetaTesting?: (join: boolean) => void;
+  onInstallChannel?: (channel: 'stable' | 'beta') => void;
 }
 
 export const AppVersionCard: React.FC<AppVersionCardProps> = ({
@@ -37,13 +43,23 @@ export const AppVersionCard: React.FC<AppVersionCardProps> = ({
   setToast,
   onOpenSystemChecker,
   onOpenBetaCenter,
-  onToggleBetaTesting
+  onToggleBetaTesting,
+  onInstallChannel
 }) => {
   const isRu = user.language !== 'en';
   const isBetaMember = Boolean(user.isBetaTester);
+  const isBetaBuildInstalled = Boolean(
+    isBetaMember &&
+      user.installedAppChannel === 'beta' &&
+      user.betaBuildInstalledVersion === APP_BETA_VERSION
+  );
+  const activeVersionLabel = isBetaBuildInstalled ? APP_BETA_VERSION : APP_VERSION;
   const [activeTab, setActiveTab] = useState<'overview' | 'changelog' | 'diagnostics'>('overview');
   const [diagnostics, setDiagnostics] = useState<AppRuntimeDiagnostics | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isInstallingBeta, setIsInstallingBeta] = useState(false);
+  const [betaInstallProgress, setBetaInstallProgress] = useState(0);
+  const [betaInstallStep, setBetaInstallStep] = useState('');
 
   const runDiagnostics = useCallback(
     async (withFeedback: boolean) => {
@@ -97,13 +113,121 @@ export const AppVersionCard: React.FC<AppVersionCardProps> = ({
   };
 
   const formattedBetaJoinDate = React.useMemo(() => {
-    if (!user.betaJoinedAt) return null;
+    if (!isBetaMember) return null;
     try {
-      return new Date(user.betaJoinedAt).toLocaleDateString(isRu ? 'ru-RU' : 'en-US');
+      const parsed = user.betaJoinedAt ? new Date(user.betaJoinedAt) : new Date();
+      if (Number.isNaN(parsed.getTime())) {
+        return new Date().toLocaleDateString(isRu ? 'ru-RU' : 'en-US');
+      }
+      return parsed.toLocaleDateString(isRu ? 'ru-RU' : 'en-US');
+    } catch {
+      return new Date().toLocaleDateString(isRu ? 'ru-RU' : 'en-US');
+    }
+  }, [isBetaMember, user.betaJoinedAt, isRu]);
+
+  const formattedBetaInstallDate = React.useMemo(() => {
+    if (!user.betaBuildInstalledAt) return null;
+    try {
+      const parsed = new Date(user.betaBuildInstalledAt);
+      if (Number.isNaN(parsed.getTime())) return null;
+      return parsed.toLocaleString(isRu ? 'ru-RU' : 'en-US');
     } catch {
       return null;
     }
-  }, [user.betaJoinedAt, isRu]);
+  }, [user.betaBuildInstalledAt, isRu]);
+
+  const handleInstallBetaVersion = () => {
+    if (!isBetaMember) {
+      playSound('wrong');
+      setToast(
+        isRu
+          ? `🔒 Вы не присоединились к бета-тестированию: установка ${APP_BETA_VERSION} и функции бета-тестирования недоступны!`
+          : `🔒 Not joined to App Beta Testing: installing ${APP_BETA_VERSION} and beta features are locked!`
+      );
+      return;
+    }
+    if (!systemInfo.pwaUpdateSupported) {
+      playSound('wrong');
+      setToast(
+        isRu
+          ? `🛑 Старые системы не поддерживаются для установки PWA Бета-канала (${APP_BETA_VERSION}).`
+          : `🛑 Legacy systems are unsupported for PWA Beta Channel (${APP_BETA_VERSION}) installation.`
+      );
+      return;
+    }
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      playSound('wrong');
+      setToast(
+        isRu
+          ? '📡 Нет подключения к интернету для загрузки Бета-версии PWA.'
+          : '📡 No internet connection to download Beta PWA build.'
+      );
+      return;
+    }
+    if (isInstallingBeta) return;
+
+    playSound('click');
+    setIsInstallingBeta(true);
+    setBetaInstallProgress(12);
+    setBetaInstallStep(
+      isRu
+        ? `Подготовка установки Бета-канала DuoWindo6601 (${APP_BETA_VERSION})...`
+        : `Preparing DuoWindo6601 Beta Channel (${APP_BETA_VERSION}) installation...`
+    );
+
+    void preparePwaCachesAndWorker();
+
+    let progress = 12;
+    const timer = window.setInterval(async () => {
+      progress += 22;
+      if (progress < 45) {
+        setBetaInstallProgress(progress);
+        setBetaInstallStep(
+          isRu
+            ? `Загрузка раннего обновления PWA v${APP_BETA_VERSION}...`
+            : `Downloading early PWA build v${APP_BETA_VERSION}...`
+        );
+      } else if (progress < 78) {
+        setBetaInstallProgress(progress);
+        setBetaInstallStep(
+          isRu
+            ? 'Подключение Бета-Центра, 8 бета-курсов и ранних модулей PWA...'
+            : 'Activating Beta Center, 8 beta courses & early PWA modules...'
+        );
+      } else if (progress < 100) {
+        setBetaInstallProgress(progress);
+        setBetaInstallStep(
+          isRu
+            ? 'Проверка цифровой подписи SHA-256 и применение сборки...'
+            : 'Verifying SHA-256 signature & applying build...'
+        );
+      } else {
+        window.clearInterval(timer);
+        setBetaInstallProgress(100);
+        const sha = await computePatchSha256Short();
+        saveInstalledPwaPatch(sha, 'beta');
+        onInstallChannel?.('beta');
+        setIsInstallingBeta(false);
+        setBetaInstallStep('');
+        playSound('fanfare');
+        setToast(
+          isRu
+            ? `✅ Установлена Версия Приложения DuoWindo6601 Бета-канал (${APP_BETA_VERSION})!`
+            : `✅ DuoWindo6601 App Version Beta Channel (${APP_BETA_VERSION}) installed!`
+        );
+      }
+    }, 280);
+  };
+
+  const handleSwitchToStable = () => {
+    playSound('click');
+    onInstallChannel?.('stable');
+    setToast(
+      isRu
+        ? `↩️ Восстановлена стабильная версия DuoWindo6601 v${APP_VERSION}`
+        : `↩️ Switched back to stable DuoWindo6601 v${APP_VERSION}`
+    );
+  };
 
   const cardSurface = isLightMode
     ? 'bg-white border-2 border-indigo-200 text-slate-900'
@@ -127,7 +251,7 @@ export const AppVersionCard: React.FC<AppVersionCardProps> = ({
                 {isRu ? `Версия Приложения ${APP_NAME}` : `${APP_NAME} App Version`}
               </h3>
               <span className="text-[11px] font-mono font-black px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
-                v{APP_VERSION} • {APP_PWA_CORE_VERSION}
+                v{activeVersionLabel} • {APP_PWA_CORE_VERSION}
               </span>
               <span
                 className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider border ${
@@ -142,6 +266,11 @@ export const AppVersionCard: React.FC<AppVersionCardProps> = ({
                   ? (isRu ? `🧪 Бета-канал (${APP_BETA_VERSION})` : `🧪 Beta (${APP_BETA_VERSION})`)
                   : (isRu ? 'Стабильный релиз' : 'Stable Release')}
               </span>
+              {isBetaBuildInstalled && (
+                <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider border bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-400/50">
+                  {isRu ? '✅ Бета установлена' : '✅ Beta Installed'}
+                </span>
+              )}
               <a
                 href={APP_GITHUB_REPO_URL}
                 target="_blank"
@@ -215,21 +344,128 @@ export const AppVersionCard: React.FC<AppVersionCardProps> = ({
                   }`}
                 >
                   {isBetaMember
-                    ? (isRu ? '✅ Вы присоединились' : '✅ Joined')
-                    : (isRu ? '🔒 Не присоединены' : '🔒 Not Joined')}
+                    ? (isRu ? '✅ Присоединились' : '✅ Joined')
+                    : (isRu ? '🔒 Не присоединился' : '🔒 Not Joined')}
                 </span>
               </div>
               <p className={`text-xs font-semibold mt-1 leading-relaxed ${isBetaMember ? (isLightMode ? 'text-purple-900' : 'text-purple-100/90') : (isLightMode ? 'text-amber-900' : 'text-amber-200/90')}`}>
                 {isBetaMember
                   ? (isRu
-                      ? `Вы участник бета-тестирования DuoWindo6601 Progressive Web App${formattedBetaJoinDate ? ` (с ${formattedBetaJoinDate})` : ''}. Все функции бета-тестирования доступны: Бета-Центр, 8 бета-курсов и ранние обновления PWA.`
-                      : `You are enrolled in DuoWindo6601 PWA Beta Testing${formattedBetaJoinDate ? ` (since ${formattedBetaJoinDate})` : ''}. All beta features, Beta Center, and 8 beta courses are unlocked.`)
+                      ? `Вы участник бета-тестирования DuoWindo6601 Progressive Web App (с ${formattedBetaJoinDate}). Все функции бета-тестирования доступны: Бета-Центр, 8 бета-курсов и ранние обновления PWA.`
+                      : `You are a DuoWindo6601 Progressive Web App Beta Tester (since ${formattedBetaJoinDate}). All beta features are available: Beta Center, 8 beta courses, and early PWA updates.`)
                   : (isRu
-                      ? 'Кто не присоединился к бета-тестированию приложения — функции бета-тестирования недоступны (Бета-Центр, бета-курсы языков, ранние функции PWA и тест-инструменты заблокированы).'
-                      : 'If you have not joined App Beta Testing, all beta testing features (Beta Center, beta courses, early PWA features, and tester tools) remain unavailable.')}
+                      ? 'Не присоединился — функция бета-тестирования недоступна (установка Бета-канала 1.0.5-beta.1, Бета-Центр, 8 бета-курсов и ранние обновления PWA заблокированы).'
+                      : 'Not joined — beta testing features are unavailable (Beta Channel 1.0.5-beta.1 installation, Beta Center, 8 beta courses, and early PWA updates are locked).')}
               </p>
             </div>
           </div>
+        </div>
+
+        {/* INSTALLABLE BETA CHANNEL BUILD PANEL (1.0.5-beta.1) */}
+        <div
+          className={`rounded-xl p-3.5 border space-y-2.5 ${
+            isBetaMember
+              ? isLightMode
+                ? 'bg-white/90 border-purple-300 text-slate-900'
+                : 'bg-black/45 border-purple-500/50 text-white'
+              : isLightMode
+                ? 'bg-slate-100 border-slate-300 text-slate-600'
+                : 'bg-black/40 border-gray-800 text-gray-400'
+          }`}
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-black uppercase tracking-wider">
+                  {isRu
+                    ? `Версия Приложения DuoWindo6601 • Бета-канал (${APP_BETA_VERSION})`
+                    : `DuoWindo6601 App Version • Beta Channel (${APP_BETA_VERSION})`}
+                </span>
+                <span
+                  className={`text-[10px] font-mono font-black px-2 py-0.5 rounded-md border ${
+                    isBetaBuildInstalled
+                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                      : isBetaMember
+                        ? 'bg-indigo-500/20 text-indigo-300 border-indigo-400/40'
+                        : 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+                  }`}
+                >
+                  {isBetaBuildInstalled
+                    ? (isRu ? `✅ Установлена v${APP_BETA_VERSION}` : `✅ Installed v${APP_BETA_VERSION}`)
+                    : isBetaMember
+                      ? (isRu ? `Готова к установке` : `Ready to Install`)
+                      : (isRu ? `🔒 Недоступно` : `🔒 Locked`)}
+                </span>
+              </div>
+              <p className={`text-[11px] font-medium mt-0.5 ${mutedText}`}>
+                {isBetaBuildInstalled
+                  ? (isRu
+                      ? `Установлена ранняя бета-сборка PWA v${APP_BETA_VERSION}${formattedBetaInstallDate ? ` (${formattedBetaInstallDate})` : ''}.`
+                      : `Early PWA Beta build v${APP_BETA_VERSION} is active${formattedBetaInstallDate ? ` (${formattedBetaInstallDate})` : ''}.`)
+                  : isBetaMember
+                    ? (isRu
+                        ? `Нажмите «Установить», чтобы перейти со стабильной v${APP_VERSION} на Бета-канал v${APP_BETA_VERSION}.`
+                        : `Click Install to upgrade from stable v${APP_VERSION} to Beta Channel v${APP_BETA_VERSION}.`)
+                    : (isRu
+                        ? 'Присоединитесь к бета-тестированию ниже, чтобы разблокировать установку версии 1.0.5-beta.1.'
+                        : 'Join App Beta Testing below to unlock installing version 1.0.5-beta.1.')}
+              </p>
+            </div>
+
+            {!isInstallingBeta && (
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleInstallBetaVersion}
+                  className={`px-3.5 py-2 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 ${
+                    isBetaMember
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 text-black border-b-4 border-emerald-800 active:border-b-0 active:translate-y-0.5 shadow-md cursor-pointer'
+                      : isLightMode
+                        ? 'bg-slate-200 text-slate-500 border border-slate-300 cursor-not-allowed'
+                        : 'bg-gray-800 text-gray-500 border border-gray-700 cursor-not-allowed'
+                  }`}
+                >
+                  <span>{isBetaMember ? (isBetaBuildInstalled ? '🔄' : '⬇️') : '🔒'}</span>
+                  <span>
+                    {isBetaMember
+                      ? isBetaBuildInstalled
+                        ? (isRu ? `Переустановить ${APP_BETA_VERSION}` : `Reinstall ${APP_BETA_VERSION}`)
+                        : (isRu ? `Установить ${APP_BETA_VERSION}` : `Install ${APP_BETA_VERSION}`)
+                      : (isRu ? `Установить ${APP_BETA_VERSION} (Недоступно)` : `Install ${APP_BETA_VERSION} (Locked)`)}
+                  </span>
+                </button>
+
+                {isBetaBuildInstalled && (
+                  <button
+                    type="button"
+                    onClick={handleSwitchToStable}
+                    className={`px-3 py-2 rounded-xl font-bold text-[11px] uppercase tracking-wider border transition-all cursor-pointer ${
+                      isLightMode
+                        ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                        : 'bg-gray-800 hover:bg-gray-700 text-gray-200 border-gray-700'
+                    }`}
+                  >
+                    ↩️ {isRu ? `Версия ${APP_VERSION}` : `Stable ${APP_VERSION}`}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {isInstallingBeta && (
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between text-[11px] font-bold text-emerald-400">
+                <span className="truncate">{betaInstallStep}</span>
+                <span className="font-mono ml-2">{betaInstallProgress}%</span>
+              </div>
+              <div className="w-full h-2.5 bg-gray-800 rounded-full overflow-hidden border border-gray-700">
+                <div
+                  className="h-full bg-gradient-to-r from-purple-500 via-indigo-400 to-emerald-400 rounded-full transition-all duration-300"
+                  style={{ width: `${betaInstallProgress}%` }}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 pt-1">
@@ -320,7 +556,7 @@ export const AppVersionCard: React.FC<AppVersionCardProps> = ({
                 {isRu ? 'Версия ядра' : 'Core Version'}
               </span>
               <span className="font-mono font-black text-sm text-emerald-400">
-                v{APP_VERSION}
+                v{activeVersionLabel}
               </span>
             </div>
             <div className={`${subSurface} p-3 rounded-2xl`}>
@@ -341,8 +577,12 @@ export const AppVersionCard: React.FC<AppVersionCardProps> = ({
               <span className={`block text-[10px] font-bold uppercase ${mutedText}`}>
                 {isRu ? 'Канал бета-теста' : 'Beta Channel'}
               </span>
-              <span className={`font-black text-sm ${isBetaMember ? 'text-purple-400' : 'text-amber-400'}`}>
-                {isBetaMember ? (isRu ? 'Подключён' : 'Active') : (isRu ? 'Недоступно' : 'Locked')}
+              <span className={`font-black text-sm ${isBetaBuildInstalled ? 'text-emerald-400' : isBetaMember ? 'text-purple-400' : 'text-amber-400'}`}>
+                {isBetaBuildInstalled
+                  ? (isRu ? `Установлен (${APP_BETA_VERSION})` : `Installed (${APP_BETA_VERSION})`)
+                  : isBetaMember
+                    ? (isRu ? 'Доступен' : 'Unlocked')
+                    : (isRu ? 'Недоступно' : 'Locked')}
               </span>
             </div>
           </div>

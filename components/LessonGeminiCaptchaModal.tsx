@@ -111,7 +111,7 @@ export const LessonGeminiCaptchaModal: React.FC<LessonGeminiCaptchaModalProps> =
     const trimmed = keyInput.trim();
     if (!trimmed || trimmed.length < 10) {
       playSound('wrong');
-      if (onToast) onToast(isRu ? 'Введите корректный ключ API (AIzaSy...)' : 'Please enter a valid API key');
+      if (onToast) onToast(isRu ? 'Введите корректный ключ API (AIzaSy... или AQ....)' : 'Please enter a valid API key');
       return;
     }
 
@@ -281,7 +281,7 @@ export const LessonGeminiCaptchaModal: React.FC<LessonGeminiCaptchaModalProps> =
               type="password"
               value={keyInput}
               onChange={(e) => setKeyInput(e.target.value)}
-              placeholder="AIzaSy..."
+              placeholder="AIzaSy... / AQ...."
               className="w-full bg-gray-950 border border-gray-700 focus:border-purple-500 rounded-xl px-3 py-2 text-xs font-mono text-white placeholder-gray-600 outline-none"
             />
             <div className="flex items-center gap-2">

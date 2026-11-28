@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Course, UserProgress } from '../types';
 import { VolumeIcon, CloseIcon, SparklesIcon, CheckCircleIcon } from './Icons';
 import { 
@@ -18,6 +18,8 @@ import {
   playKlingonSpeech,
   setKlingonSpeechMode,
 } from '../services/klingonSpeechService';
+import { isRuntimeOnline, notifyNetworkOffline } from '../services/geminiService';
+import { useOnlineStatus } from './OfflineIndicator';
 
 interface LetterWordsLearningProps {
   currentCourse: Course;
@@ -46,9 +48,30 @@ export const LetterWordsLearning: React.FC<LetterWordsLearningProps> = ({
   const [assembledLetters, setAssembledLetters] = useState<{ id: string; letter: string }[]>([]);
   const [quizFeedback, setQuizFeedback] = useState<'idle' | 'correct' | 'wrong'>('idle');
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
+  const isOnline = useOnlineStatus();
   const [klingonSpeechMode, setKlingonSpeechModeState] = useState<KlingonSpeechSource>(() => getKlingonSpeechMode());
+  useEffect(() => {
+    setKlingonSpeechModeState(getKlingonSpeechMode());
+  }, [currentCourse.id]);
+
+  useEffect(() => {
+    if (!isOnline) {
+      setActiveQuizExercise(null);
+      setSelectedWord(null);
+    }
+  }, [isOnline]);
+
+  const requireOnline = (): boolean => {
+    if (!isOnline || !isRuntimeOnline()) {
+      playSound('wrong');
+      notifyNetworkOffline();
+      return false;
+    }
+    return true;
+  };
 
   const handleSwitchKlingonMode = (mode: KlingonSpeechSource, sampleText?: string) => {
+    if (!requireOnline()) return;
     playSound('select');
     setKlingonSpeechMode(mode);
     setKlingonSpeechModeState(mode);
@@ -70,11 +93,13 @@ export const LetterWordsLearning: React.FC<LetterWordsLearningProps> = ({
 
   const handlePlayAudio = (text: string, isSlow: boolean = false, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    if (!requireOnline()) return;
     playSound('click');
     speakText(text, currentCourse.id, isSlow, user.preferredVoice, user.voiceProvider);
   };
 
   const handleSwitchDifficulty = (level: 'easy' | 'hard') => {
+    if (!requireOnline()) return;
     playSound('select');
     const updatedUser: UserProgress = { ...user, difficultyLevel: level };
     setUser(updatedUser);
@@ -82,6 +107,7 @@ export const LetterWordsLearning: React.FC<LetterWordsLearningProps> = ({
   };
 
   const startWordQuiz = (specificWord?: LetterWordItem) => {
+    if (!requireOnline()) return;
     playSound('select');
     const ex = generateWordExercise(currentCourse.id, specificWord, difficultyLevel);
     setActiveQuizExercise(ex);
@@ -91,17 +117,20 @@ export const LetterWordsLearning: React.FC<LetterWordsLearningProps> = ({
   };
 
   const handleTileClick = (tile: { id: string; letter: string }) => {
+    if (!requireOnline()) return;
     playSound('click');
     setAssembledLetters(prev => [...prev, tile]);
   };
 
   const handleRemoveTile = (index: number) => {
+    if (!requireOnline()) return;
     playSound('click');
     setAssembledLetters(prev => prev.filter((_, idx) => idx !== index));
   };
 
   const handleCheckAssembledWord = () => {
     if (!activeQuizExercise) return;
+    if (!requireOnline()) return;
     const currentStr = assembledLetters.map(t => t.letter).join('').toLowerCase();
     const targetStr = activeQuizExercise.targetWord.word.toLowerCase();
 
@@ -121,6 +150,7 @@ export const LetterWordsLearning: React.FC<LetterWordsLearningProps> = ({
   };
 
   const handleCheckOption = (opt: { id: string; text: string; isCorrect: boolean }) => {
+    if (!requireOnline()) return;
     setSelectedOptionId(opt.id);
     const xpReward = difficultyLevel === 'hard' ? 35 : 20;
     if (opt.isCorrect) {
@@ -227,6 +257,7 @@ export const LetterWordsLearning: React.FC<LetterWordsLearningProps> = ({
           <div
             key={item.id}
             onClick={() => {
+              if (!requireOnline()) return;
               setSelectedWord(item);
               handlePlayAudio(item.word);
             }}
@@ -345,8 +376,9 @@ export const LetterWordsLearning: React.FC<LetterWordsLearningProps> = ({
                 <button
                   type="button"
                   onClick={() => {
+                    if (!requireOnline()) return;
                     playSound('click');
-                    void downloadKlingonAudioFile(selectedWord.word, false, klingonSpeechMode);
+                    void downloadKlingonAudioFile(selectedWord.word, false, klingonSpeechMode).catch(() => {});
                   }}
                   className="py-3 px-3 bg-emerald-950/80 hover:bg-emerald-800 text-emerald-200 font-black text-xs uppercase tracking-wider rounded-2xl border border-emerald-500/40 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                 >
@@ -360,25 +392,27 @@ export const LetterWordsLearning: React.FC<LetterWordsLearningProps> = ({
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => handleSwitchKlingonMode('client', selectedWord.word)}
-                  className={`flex-1 py-2 px-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider border transition-all cursor-pointer ${
-                    klingonSpeechMode !== 'hol'
-                      ? 'bg-sky-600/80 border-sky-400 text-white'
-                      : 'bg-gray-800 border-gray-700 text-sky-200 hover:bg-gray-700'
-                  }`}
-                >
-                  🔊 SAM Speech
-                </button>
-                <button
-                  type="button"
                   onClick={() => handleSwitchKlingonMode('hol', selectedWord.word)}
                   className={`flex-1 py-2 px-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider border transition-all cursor-pointer ${
-                    klingonSpeechMode === 'hol'
+                    klingonSpeechMode !== 'client'
                       ? 'bg-indigo-600/85 border-indigo-400 text-white'
                       : 'bg-gray-800 border-gray-700 text-indigo-200 hover:bg-gray-700'
                   }`}
+                  title="hol.kag.org (https://hol.kag.org/sentence/nuqneH)"
                 >
-                  🎧 hol.kag.org (SAM)
+                  🎧 hol.kag.org
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSwitchKlingonMode('client', selectedWord.word)}
+                  className={`flex-1 py-2 px-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider border transition-all cursor-pointer ${
+                    klingonSpeechMode === 'client'
+                      ? 'bg-sky-600/80 border-sky-400 text-white'
+                      : 'bg-gray-800 border-gray-700 text-sky-200 hover:bg-gray-700'
+                  }`}
+                  title="SAM Software Automatic Mouth (https://discordier.github.io/sam/)"
+                >
+                  🔊 SAM Speech
                 </button>
                 <a
                   href={KLINGON_SAM_HOMEPAGE}
@@ -393,6 +427,7 @@ export const LetterWordsLearning: React.FC<LetterWordsLearningProps> = ({
                   target="_blank"
                   rel="noopener noreferrer"
                   className="py-2 px-2.5 rounded-xl bg-gray-800 hover:bg-indigo-700 text-indigo-300 hover:text-white border border-gray-700 text-[10px] font-black"
+                  title="https://hol.kag.org/sentence/nuqneH"
                 >
                   hol.kag.org ↗
                 </a>

@@ -1,17 +1,19 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { APP_VERSION, APP_PWA_CORE_VERSION, APP_BUILD_CODE } from '../services/appVersionService';
+import { APP_VERSION, APP_BETA_VERSION, APP_PWA_CORE_VERSION, APP_BUILD_CODE } from '../services/appVersionService';
 import {
   clearPendingPwaUpdate,
   computePatchSha256Short,
   verifyServiceWorkerRegistration,
   saveInstalledPwaPatch,
   InstalledPwaPatchInfo,
+  AppReleaseChannel,
 } from '../services/pwaUpdateService';
 import { playSound } from '../services/audioService';
 import { CheckCircleIcon, ShieldIcon, WarningIcon } from './Icons';
 
 interface PwaUpdateProcessOverlayProps {
   lang?: string;
+  channel?: AppReleaseChannel;
   onComplete: (patchInfo?: InstalledPwaPatchInfo) => void;
 }
 
@@ -66,9 +68,11 @@ const UPDATE_STEPS: UpdateStepItem[] = [
 
 export const PwaUpdateProcessOverlay: React.FC<PwaUpdateProcessOverlayProps> = ({
   lang = 'ru',
+  channel = 'stable',
   onComplete,
 }) => {
   const isRu = lang !== 'en';
+  const targetVersion = channel === 'beta' ? APP_BETA_VERSION : APP_VERSION;
   const [phase, setPhase] = useState<'installing' | 'completed' | 'offline_error'>('installing');
   const [progress, setProgress] = useState<number>(8);
   const [activeStepIndex, setActiveStepIndex] = useState<number>(0);
@@ -155,7 +159,7 @@ export const PwaUpdateProcessOverlay: React.FC<PwaUpdateProcessOverlayProps> = (
       setSignatureShort(sha);
       setProgress(100);
 
-      const saved = saveInstalledPwaPatch(sha);
+      const saved = saveInstalledPwaPatch(sha, channel);
       clearPendingPwaUpdate();
 
       if (!cancelled && mountedRef.current) {
@@ -216,7 +220,7 @@ export const PwaUpdateProcessOverlay: React.FC<PwaUpdateProcessOverlayProps> = (
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[10px] font-mono font-black uppercase tracking-widest px-2.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                PWA & Security Patch • v{APP_VERSION} ({APP_PWA_CORE_VERSION})
+                {channel === 'beta' ? 'Beta Channel • ' : 'PWA & Security Patch • '}v{targetVersion} ({APP_PWA_CORE_VERSION})
               </span>
             </div>
             <h1
@@ -359,8 +363,8 @@ export const PwaUpdateProcessOverlay: React.FC<PwaUpdateProcessOverlayProps> = (
               <ShieldIcon className="w-6 h-6 text-emerald-400 shrink-0" />
               <p className="text-xs font-bold text-emerald-100 leading-relaxed">
                 {isRu
-                  ? `Пакет обновления PWA (v${APP_VERSION}) и патч безопасности (SHA-256: ${signatureShort}) успешно установлены. Ваш прогресс сохранён.`
-                  : `Full PWA Update (v${APP_VERSION}) and Security Patch (SHA-256: ${signatureShort}) installed. Your progress is safe.`}
+                  ? `Пакет обновления PWA (v${targetVersion}) и патч безопасности (SHA-256: ${signatureShort}) успешно установлены. Ваш прогресс сохранён.`
+                  : `Full PWA Update (v${targetVersion}) and Security Patch (SHA-256: ${signatureShort}) installed. Your progress is safe.`}
               </p>
             </div>
 

@@ -10,6 +10,8 @@ import {
   stopActiveIllusion
 } from '../services/soundIllusionService';
 import { playSound, triggerHapticFeedback } from '../services/audioService';
+import { isRuntimeOnline, notifyNetworkOffline } from '../services/geminiService';
+import { useOnlineStatus } from './OfflineIndicator';
 
 interface SoundIllusionLabProps {
   user: UserProgress;
@@ -33,9 +35,20 @@ export const SoundIllusionLab: React.FC<SoundIllusionLabProps> = ({
   const [activeTab, setActiveTab] = useState<'explore' | 'quiz'>('explore');
   const [quizAnsweredId, setQuizAnsweredId] = useState<string | null>(null);
   const [revealedReality, setRevealedReality] = useState<boolean>(false);
+  const isOnline = useOnlineStatus();
   const playTimerRef = useRef<any>(null);
 
+  const requireOnline = (): boolean => {
+    if (!isOnline || !isRuntimeOnline()) {
+      playSound('wrong');
+      notifyNetworkOffline();
+      return false;
+    }
+    return true;
+  };
+
   const handleSwitchDifficulty = (level: 'easy' | 'hard') => {
+    if (!requireOnline()) return;
     playSound('select');
     const updatedUser: UserProgress = { ...user, difficultyLevel: level };
     setUser(updatedUser);
@@ -43,6 +56,14 @@ export const SoundIllusionLab: React.FC<SoundIllusionLabProps> = ({
   };
 
   const currentIllusion: SoundIllusionItem = SOUND_ILLUSIONS_CATALOG[selectedIllusionIdx] || SOUND_ILLUSIONS_CATALOG[0];
+
+  useEffect(() => {
+    if (!isOnline) {
+      stopActiveIllusion();
+      if (playTimerRef.current) clearTimeout(playTimerRef.current);
+      setIsPlaying(false);
+    }
+  }, [isOnline]);
 
   useEffect(() => {
     return () => {
@@ -58,6 +79,7 @@ export const SoundIllusionLab: React.FC<SoundIllusionLabProps> = ({
   };
 
   const handlePlayIllusion = () => {
+    if (!requireOnline()) return;
     handleStopAudio();
     playSound('click');
     setIsPlaying(true);
@@ -86,6 +108,7 @@ export const SoundIllusionLab: React.FC<SoundIllusionLabProps> = ({
   };
 
   const handleSelectIllusion = (idx: number) => {
+    if (!requireOnline()) return;
     handleStopAudio();
     playSound('select');
     setSelectedIllusionIdx(idx);
@@ -94,6 +117,7 @@ export const SoundIllusionLab: React.FC<SoundIllusionLabProps> = ({
   };
 
   const handleQuizChoice = (opt: { id: string; text: string; isReal: boolean; explanation: string }) => {
+    if (!requireOnline()) return;
     setQuizAnsweredId(opt.id);
     setRevealedReality(true);
     if (opt.isReal) {
@@ -162,7 +186,7 @@ export const SoundIllusionLab: React.FC<SoundIllusionLabProps> = ({
             <div className="flex items-center bg-gray-900/80 p-1.5 rounded-2xl border border-gray-700/80 shrink-0">
               <button
                 type="button"
-                onClick={() => { playSound('click'); setActiveTab('explore'); }}
+                onClick={() => { if (!requireOnline()) return; playSound('click'); setActiveTab('explore'); }}
                 className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
                   activeTab === 'explore'
                     ? 'bg-purple-600 text-white shadow-md'
@@ -173,7 +197,7 @@ export const SoundIllusionLab: React.FC<SoundIllusionLabProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => { playSound('click'); setActiveTab('quiz'); }}
+                onClick={() => { if (!requireOnline()) return; playSound('click'); setActiveTab('quiz'); }}
                 className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
                   activeTab === 'quiz'
                     ? 'bg-purple-600 text-white shadow-md'

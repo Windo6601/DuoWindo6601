@@ -16,6 +16,8 @@ import {
   playKlingonSpeech,
   setKlingonSpeechMode,
 } from '../services/klingonSpeechService';
+import { isRuntimeOnline, notifyNetworkOffline } from '../services/geminiService';
+import { useOnlineStatus } from './OfflineIndicator';
 
 interface AudioWhatHeardQuizProps {
   currentCourse: Course;
@@ -77,10 +79,32 @@ export const AudioWhatHeardQuiz: React.FC<AudioWhatHeardQuizProps> = ({
 
   const safeIdx = exercises.length > 0 ? currentIdx % exercises.length : 0;
   const currentExercise = exercises[safeIdx];
+  const isOnline = useOnlineStatus();
   const isKlingonAudio = (currentExercise?.courseId || currentCourse.id) === 'tlh';
   const [klingonSpeechMode, setKlingonSpeechModeState] = useState<KlingonSpeechSource>(() => getKlingonSpeechMode());
+  useEffect(() => {
+    setKlingonSpeechModeState(getKlingonSpeechMode());
+  }, [currentCourse.id]);
+
+  useEffect(() => {
+    if (!isOnline) {
+      setCurrentIdx(0);
+      setSelectedChoice(null);
+      setFeedbackStatus('idle');
+    }
+  }, [isOnline]);
+
+  const requireOnline = (): boolean => {
+    if (!isOnline || !isRuntimeOnline()) {
+      playSound('wrong');
+      notifyNetworkOffline();
+      return false;
+    }
+    return true;
+  };
 
   const handleSwitchKlingonMode = (mode: KlingonSpeechSource, sampleText?: string) => {
+    if (!requireOnline()) return;
     playSound('select');
     setKlingonSpeechMode(mode);
     setKlingonSpeechModeState(mode);
@@ -90,6 +114,7 @@ export const AudioWhatHeardQuiz: React.FC<AudioWhatHeardQuizProps> = ({
   };
 
   const handleSwitchDifficulty = (level: 'easy' | 'hard') => {
+    if (!requireOnline()) return;
     playSound('select');
     if (level === 'hard') setIsSlowMode(false);
     const updatedUser: UserProgress = { ...user, difficultyLevel: level };
@@ -104,6 +129,7 @@ export const AudioWhatHeardQuiz: React.FC<AudioWhatHeardQuizProps> = ({
     exerciseLang?: string
   ) => {
     if (e) e.stopPropagation();
+    if (!requireOnline()) return;
     playSound('click');
     speakText(
       text,
@@ -116,6 +142,7 @@ export const AudioWhatHeardQuiz: React.FC<AudioWhatHeardQuizProps> = ({
 
   const handleSelectOption = (choice: 'A' | 'B' | 'C') => {
     if (feedbackStatus !== 'idle') return;
+    if (!requireOnline()) return;
     setSelectedChoice(choice);
     const isCorrect = choice === currentExercise.correctOptionId;
     const xpReward = difficultyLevel === 'hard' ? 35 : 20;
@@ -138,6 +165,7 @@ export const AudioWhatHeardQuiz: React.FC<AudioWhatHeardQuizProps> = ({
 
   const handleNextExercise = () => {
     if (exercises.length === 0) return;
+    if (!requireOnline()) return;
     playSound('select');
     const nextIdx = (safeIdx + 1) % exercises.length;
     const nextExercise = exercises[nextIdx];
@@ -281,6 +309,7 @@ export const AudioWhatHeardQuiz: React.FC<AudioWhatHeardQuizProps> = ({
             <button
               type="button"
               onClick={() => {
+                if (!requireOnline()) return;
                 const next = !isSlowMode;
                 setIsSlowMode(next);
                 handlePlaySound(currentExercise.soundText, next);
@@ -301,8 +330,9 @@ export const AudioWhatHeardQuiz: React.FC<AudioWhatHeardQuizProps> = ({
               <button
                 type="button"
                 onClick={() => {
+                  if (!requireOnline()) return;
                   playSound('click');
-                  void downloadKlingonAudioFile(currentExercise.soundText, isSlowMode);
+                  void downloadKlingonAudioFile(currentExercise.soundText, isSlowMode, klingonSpeechMode).catch(() => {});
                 }}
                 className="p-3 rounded-2xl border bg-emerald-950/70 hover:bg-emerald-800 border-emerald-500/40 text-emerald-300 transition-all cursor-pointer flex flex-col items-center justify-center"
                 title={isRu ? 'Скачать аудио-файл клингонский' : 'Download Klingon audio file'}
@@ -317,27 +347,27 @@ export const AudioWhatHeardQuiz: React.FC<AudioWhatHeardQuizProps> = ({
             <div className="flex flex-wrap items-center justify-center gap-2">
               <button
                 type="button"
+                onClick={() => handleSwitchKlingonMode('hol', currentExercise.soundText)}
+                className={`px-3 py-1 rounded-xl text-[11px] font-black border transition-all cursor-pointer ${
+                  klingonSpeechMode !== 'client'
+                    ? 'bg-indigo-600/85 border-indigo-400 text-white shadow'
+                    : 'bg-indigo-600/20 hover:bg-indigo-600/40 border-indigo-500/40 text-indigo-200'
+                }`}
+                title="hol.kag.org (https://hol.kag.org/sentence/nuqneH)"
+              >
+                🎧 hol.kag.org
+              </button>
+              <button
+                type="button"
                 onClick={() => handleSwitchKlingonMode('client', currentExercise.soundText)}
                 className={`px-3 py-1 rounded-xl text-[11px] font-black border transition-all cursor-pointer ${
-                  klingonSpeechMode !== 'hol'
+                  klingonSpeechMode === 'client'
                     ? 'bg-sky-600/80 border-sky-400 text-white shadow'
                     : 'bg-sky-600/20 hover:bg-sky-600/40 border-sky-500/40 text-sky-200'
                 }`}
                 title="SAM Software Automatic Mouth (https://discordier.github.io/sam/)"
               >
                 🔊 SAM Speech
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSwitchKlingonMode('hol', currentExercise.soundText)}
-                className={`px-3 py-1 rounded-xl text-[11px] font-black border transition-all cursor-pointer ${
-                  klingonSpeechMode === 'hol'
-                    ? 'bg-indigo-600/85 border-indigo-400 text-white shadow'
-                    : 'bg-indigo-600/20 hover:bg-indigo-600/40 border-indigo-500/40 text-indigo-200'
-                }`}
-                title="hol.kag.org → SAM Software Automatic Mouth (https://hol.kag.org/sentence/Hello)"
-              >
-                🎧 hol.kag.org (SAM)
               </button>
               <a
                 href={KLINGON_SAM_HOMEPAGE}
@@ -352,6 +382,7 @@ export const AudioWhatHeardQuiz: React.FC<AudioWhatHeardQuizProps> = ({
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-2 py-1 rounded-xl text-[10px] font-black bg-indigo-950/60 hover:bg-indigo-800/70 border border-indigo-500/40 text-indigo-300 hover:text-white transition-all"
+                title="https://hol.kag.org/sentence/nuqneH"
               >
                 hol.kag.org ↗
               </a>

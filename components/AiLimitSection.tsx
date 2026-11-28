@@ -126,7 +126,7 @@ export const AiLimitSection: React.FC<AiLimitSectionProps> = ({
         <div className="animate-in fade-in">
           <GeminiRefillSection
             user={user}
-            setUser={setUser}
+            setUser={setUser ?? (() => {})}
             playSound={playSound}
             onToast={onToast}
           />

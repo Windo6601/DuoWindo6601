@@ -3,6 +3,8 @@ import { UserProgress } from '../types';
 import { CloseIcon, VolumeIcon, SparklesIcon, CheckCircleIcon, ArrowRightIcon } from './Icons';
 import { Mascot } from './Mascot';
 import confetti from 'canvas-confetti';
+import { isRuntimeOnline, notifyNetworkOffline } from '../services/geminiService';
+import { isAppOnlineNow, useOnlineStatus } from './OfflineIndicator';
 
 interface MusicStudioModalProps {
   isOpen: boolean;
@@ -135,7 +137,28 @@ export const MusicStudioModal: React.FC<MusicStudioModalProps> = ({
   const [repeatScore, setRepeatScore] = useState<number>(0);
   const [repeatStage, setRepeatStage] = useState<'idle' | 'playing' | 'waiting' | 'success' | 'fail'>('idle');
 
+  const isOnline = useOnlineStatus();
   const audioCtxRef = useRef<AudioContext | null>(null);
+
+  useEffect(() => {
+    if (isOpen && !isOnline) {
+      setIsPlayingMelody(false);
+      setRepeatStage('idle');
+      notifyNetworkOffline();
+      onClose();
+    }
+  }, [isOpen, isOnline, onClose]);
+
+  const requireOnline = (): boolean => {
+    if (!isOnline || !isRuntimeOnline()) {
+      setIsPlayingMelody(false);
+      setRepeatStage('idle');
+      notifyNetworkOffline();
+      onClose();
+      return false;
+    }
+    return true;
+  };
 
   useEffect(() => {
     if (!audioCtxRef.current) {
@@ -175,6 +198,7 @@ export const MusicStudioModal: React.FC<MusicStudioModalProps> = ({
   };
 
   const handleKeyPress = (note: string, freq: number) => {
+    if (!requireOnline()) return;
     setActiveKey(note);
     playTone(freq, 400);
     setTimeout(() => setActiveKey(null), 200);
@@ -214,9 +238,16 @@ export const MusicStudioModal: React.FC<MusicStudioModalProps> = ({
   };
 
   const playFullMelody = async (melody: MelodySong) => {
+    if (!requireOnline()) return;
     setIsPlayingMelody(true);
     setCurrentNoteIndex(0);
     for (let i = 0; i < melody.notes.length; i++) {
+      if (!isRuntimeOnline()) {
+        setIsPlayingMelody(false);
+        notifyNetworkOffline();
+        onClose();
+        return;
+      }
       setCurrentNoteIndex(i);
       playTone(melody.notes[i].freq, melody.notes[i].duration);
       await new Promise(r => setTimeout(r, melody.notes[i].duration + 100));
@@ -225,6 +256,7 @@ export const MusicStudioModal: React.FC<MusicStudioModalProps> = ({
   };
 
   const startRepeatChallenge = () => {
+    if (!requireOnline()) return;
     setRepeatStage('playing');
     setUserRepeatIndex(0);
     
@@ -350,6 +382,7 @@ export const MusicStudioModal: React.FC<MusicStudioModalProps> = ({
                   <div
                     key={item.note}
                     onClick={() => {
+                      if (!requireOnline()) return;
                       playTone(item.freq, 500);
                       setActiveKey(item.note);
                       setTimeout(() => setActiveKey(null), 300);

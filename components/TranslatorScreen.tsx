@@ -20,6 +20,8 @@ export interface LanguageCountryOption {
   countryRu: string;
   countryEn: string;
   fontClass?: string;
+  isBeta?: boolean;
+  dir?: 'ltr' | 'rtl';
 }
 
 export const TRANSLATION_LANGUAGES: LanguageCountryOption[] = [
@@ -30,7 +32,7 @@ export const TRANSLATION_LANGUAGES: LanguageCountryOption[] = [
   { code: 'es', flagCode: 'es', nameRu: 'Español', nameEn: 'Spanish', countryRu: 'Испания', countryEn: 'Spain' },
   { code: 'zh', flagCode: 'cn', nameRu: '中文', nameEn: 'Chinese', countryRu: 'Китай', countryEn: 'China', fontClass: 'font-chinese' },
   { code: 'ja', flagCode: 'jp', nameRu: '日本語', nameEn: 'Japanese', countryRu: 'Япония', countryEn: 'Japan', fontClass: 'font-japanese' },
-  { code: 'ar', flagCode: 'sa', nameRu: 'العربية', nameEn: 'Arabic', countryRu: 'Саудовская Аравия', countryEn: 'Saudi Arabia', fontClass: 'font-arabic' },
+  { code: 'ar', flagCode: 'sa', nameRu: 'العربية', nameEn: 'Arabic', countryRu: 'Саудовская Аравия', countryEn: 'Saudi Arabia', fontClass: 'font-arabic', dir: 'rtl' },
   { code: 'kk', flagCode: 'kz', nameRu: 'Қазақша', nameEn: 'Kazakh', countryRu: 'Казахстан', countryEn: 'Kazakhstan' },
   { code: 'uz', flagCode: 'uz', nameRu: "O'zbek", nameEn: 'Uzbek', countryRu: 'Узбекистан', countryEn: 'Uzbekistan' },
   { code: 'it', flagCode: 'it', nameRu: 'Italiano', nameEn: 'Italian', countryRu: 'Италия', countryEn: 'Italy' },
@@ -40,6 +42,14 @@ export const TRANSLATION_LANGUAGES: LanguageCountryOption[] = [
   { code: 'az', flagCode: 'az', nameRu: 'Азербайджанский', nameEn: 'Azerbaijani', countryRu: 'Азербайджан', countryEn: 'Azerbaijan' },
   { code: 'am', flagCode: 'am', nameRu: 'Армянский', nameEn: 'Armenian', countryRu: 'Армения', countryEn: 'Armenia' },
   { code: 'ge', flagCode: 'ge', nameRu: 'Грузинский', nameEn: 'Georgian', countryRu: 'Грузия', countryEn: 'Georgia' },
+  // Курс язык (Бета)
+  { code: 'eo', flagCode: 'eu', nameRu: 'Эсперанто (Esperanto)', nameEn: 'Esperanto', countryRu: 'Международный • Курс Бета', countryEn: 'International • Beta Course', isBeta: true },
+  { code: 'la', flagCode: 'it', nameRu: 'Латынь (Lingua Latina)', nameEn: 'Latin (Lingua Latina)', countryRu: 'Классический • Курс Бета', countryEn: 'Classical • Beta Course', isBeta: true },
+  { code: 'sv', flagCode: 'se', nameRu: 'Шведский (Svenska)', nameEn: 'Swedish (Svenska)', countryRu: 'Швеция • Курс Бета', countryEn: 'Sweden • Beta Course', isBeta: true },
+  { code: 'no', flagCode: 'no', nameRu: 'Норвежский (Norsk)', nameEn: 'Norwegian (Norsk)', countryRu: 'Норвегия • Курс Бета', countryEn: 'Norway • Beta Course', isBeta: true },
+  { code: 'hv', flagCode: 'gb', nameRu: 'Высокий валирийский (Valyrio)', nameEn: 'High Valyrian (Valyrio)', countryRu: 'Валирия • Шрифт Бета', countryEn: 'Valyria • Beta Font', fontClass: 'font-valyrian', isBeta: true },
+  { code: 'tlh', flagCode: 'us', nameRu: 'Клингонский (tlhIngan Hol)', nameEn: 'Klingon (tlhIngan Hol)', countryRu: 'Клингон • Шрифт Бета', countryEn: 'Qo’noS • Beta Font', fontClass: 'font-klingon', isBeta: true },
+  { code: 'yi', flagCode: 'il', nameRu: 'Идиш (ייִדיш)', nameEn: 'Yiddish (ייִדיш)', countryRu: 'Идиш • Курс Бета', countryEn: 'Yiddish • Beta Course', fontClass: 'font-hebrew', dir: 'rtl', isBeta: true },
 ];
 
 export const TranslatorScreen: React.FC<TranslatorScreenProps> = ({
@@ -63,8 +73,9 @@ export const TranslatorScreen: React.FC<TranslatorScreenProps> = ({
   const [isSwapping, setIsSwapping] = useState<boolean>(false);
   const [translationSourceInfo, setTranslationSourceInfo] = useState<string>('');
 
-  // Quick switch assign mode: whether tapping top ribbon sets Target or Source
+  // Quick switch assign mode & separated translator category filter
   const [ribbonAssignMode, setRibbonAssignMode] = useState<'target' | 'source'>('target');
+  const [languageCategory, setLanguageCategory] = useState<'all' | 'standard' | 'beta'>('all');
 
   // Selector modal states
   const [showSourceSelector, setShowSourceSelector] = useState<boolean>(false);
@@ -212,8 +223,8 @@ export const TranslatorScreen: React.FC<TranslatorScreenProps> = ({
     const sourceOpt = TRANSLATION_LANGUAGES.find(l => l.code === overrideSource) || getSourceOption();
 
     try {
-      const targetLangName = isRu ? targetOpt.nameRu : targetOpt.nameEn;
-      const sourceLangName = isRu ? sourceOpt.nameRu : sourceOpt.nameEn;
+      const targetLangName = targetOpt.nameEn;
+      const sourceLangName = sourceOpt.nameEn;
       const res = await translateText(cleanText, targetLangName, sourceLangName);
 
       setOutputText(res);
@@ -304,14 +315,14 @@ export const TranslatorScreen: React.FC<TranslatorScreenProps> = ({
         </div>
 
         {/* ============================================================== */}
-        {/* FAST COUNTRY SWITCH RIBBON: "Быстро приключить язык стран перевода" */}
+        {/* FAST COUNTRY SWITCH RIBBON: Separated Standard & Beta Languages */}
         {/* ============================================================== */}
         <div className="bg-gray-850 border-2 border-sky-500/40 rounded-3xl p-4 sm:p-5 mb-6 shadow-xl space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center space-x-2">
               <span className="text-amber-400 text-lg">⚡</span>
               <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-white">
-                {isRu ? 'Быстро приключить язык стран перевода:' : 'Quick-Switch Country Language:'}
+                {isRu ? 'Разделение Переводчика — быстрый выбор языка:' : 'Separated Translator — Quick Language Switch:'}
               </h2>
             </div>
 
@@ -342,14 +353,57 @@ export const TranslatorScreen: React.FC<TranslatorScreenProps> = ({
             </div>
           </div>
 
+          {/* Separated Category Filter Tabs */}
+          <div className="flex flex-wrap items-center gap-1.5 bg-gray-900/90 p-1.5 rounded-2xl border border-gray-800">
+            <button
+              type="button"
+              onClick={() => { playSound('click'); setLanguageCategory('all'); }}
+              className={`px-3 py-1.5 rounded-xl text-[11px] font-black transition-all cursor-pointer ${
+                languageCategory === 'all'
+                  ? 'bg-sky-600 text-white shadow'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              {isRu ? `Все (${TRANSLATION_LANGUAGES.length})` : `All (${TRANSLATION_LANGUAGES.length})`}
+            </button>
+            <button
+              type="button"
+              onClick={() => { playSound('click'); setLanguageCategory('standard'); }}
+              className={`px-3 py-1.5 rounded-xl text-[11px] font-black transition-all cursor-pointer ${
+                languageCategory === 'standard'
+                  ? 'bg-emerald-600 text-white shadow'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              🌐 {isRu ? `Основные языки (${TRANSLATION_LANGUAGES.filter(l => !l.isBeta).length})` : `Main Languages (${TRANSLATION_LANGUAGES.filter(l => !l.isBeta).length})`}
+            </button>
+            <button
+              type="button"
+              onClick={() => { playSound('click'); setLanguageCategory('beta'); }}
+              className={`px-3 py-1.5 rounded-xl text-[11px] font-black transition-all cursor-pointer ${
+                languageCategory === 'beta'
+                  ? 'bg-purple-600 text-white shadow'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              🧪 {isRu ? `Курс язык (Бета) (${TRANSLATION_LANGUAGES.filter(l => l.isBeta).length})` : `Beta Language Courses (${TRANSLATION_LANGUAGES.filter(l => l.isBeta).length})`}
+            </button>
+          </div>
+
           {/* Horizontally scrollable country pills */}
           <div className="flex items-center space-x-2 overflow-x-auto pb-2 pt-1 no-scrollbar">
-            {TRANSLATION_LANGUAGES.map(lang => {
+            {TRANSLATION_LANGUAGES.filter(l =>
+              languageCategory === 'all' ? true : languageCategory === 'beta' ? Boolean(l.isBeta) : !l.isBeta
+            ).map(lang => {
               const isSelectedTarget = targetLang === lang.code;
               const isSelectedSource = sourceLang === lang.code;
 
-              let activeBorder = 'border-gray-700/80 hover:border-gray-500';
-              let activeBg = 'bg-gray-800/90 text-gray-200';
+              let activeBorder = lang.isBeta
+                ? 'border-purple-500/40 hover:border-purple-400'
+                : 'border-gray-700/80 hover:border-gray-500';
+              let activeBg = lang.isBeta
+                ? 'bg-purple-950/35 text-purple-100'
+                : 'bg-gray-800/90 text-gray-200';
 
               if (ribbonAssignMode === 'target' && isSelectedTarget) {
                 activeBorder = 'border-emerald-400 ring-2 ring-emerald-400/40';
@@ -373,10 +427,17 @@ export const TranslatorScreen: React.FC<TranslatorScreenProps> = ({
                     className="w-5 h-3.5 object-cover rounded-xs shadow-xs shrink-0" 
                   />
                   <div className="text-left">
-                    <span className="text-xs font-black block leading-none">
-                      {lang.code.toUpperCase()} • {isRu ? lang.nameRu : lang.nameEn}
-                    </span>
-                    <span className="text-[10px] text-gray-400 font-bold block truncate max-w-[110px] leading-tight">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-xs font-black leading-none ${lang.fontClass || ''}`}>
+                        {lang.code.toUpperCase()} • {isRu ? lang.nameRu : lang.nameEn}
+                      </span>
+                      {lang.isBeta && (
+                        <span className="px-1.5 py-0.2 rounded bg-purple-500/30 border border-purple-400/50 text-[9px] font-black text-purple-200 uppercase">
+                          BETA
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-gray-400 font-bold block truncate max-w-[140px] leading-tight mt-0.5">
                       {isRu ? lang.countryRu : lang.countryEn}
                     </span>
                   </div>
@@ -397,7 +458,7 @@ export const TranslatorScreen: React.FC<TranslatorScreenProps> = ({
 
           <div className="flex items-center justify-between text-[11px] text-gray-400 font-bold pt-1 border-t border-gray-800">
             <span>
-              {isRu ? 'Нажмите на любую страну выше для мгновенного приключения языка!' : 'Tap any country above to instantly switch translation language!'}
+              {isRu ? 'Основные языки и курсы языка Бета разделены — нажмите для мгновенного выбора!' : 'Main & Beta language courses are separated — tap to switch instantly!'}
             </span>
             <span className="text-sky-400">
               {ribbonAssignMode === 'target' 
@@ -490,37 +551,64 @@ export const TranslatorScreen: React.FC<TranslatorScreenProps> = ({
                       className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-sky-500"
                     />
 
-                    <div className="space-y-1">
-                      {TRANSLATION_LANGUAGES
-                        .filter(l => 
-                          l.nameRu.toLowerCase().includes(selectorSearch.toLowerCase()) ||
-                          l.nameEn.toLowerCase().includes(selectorSearch.toLowerCase()) ||
-                          l.countryRu.toLowerCase().includes(selectorSearch.toLowerCase()) ||
-                          l.countryEn.toLowerCase().includes(selectorSearch.toLowerCase())
-                        )
-                        .map(lang => (
-                          <button
-                            key={lang.code}
-                            type="button"
-                            onClick={() => {
-                              playSound('select');
-                              setSourceLang(lang.code);
-                              setShowSourceSelector(false);
-                            }}
-                            className={`w-full p-2 rounded-xl flex items-center justify-between text-left transition-colors cursor-pointer ${
-                              sourceLang === lang.code ? 'bg-sky-600 text-white font-black' : 'hover:bg-gray-800 text-gray-200'
-                            }`}
-                          >
-                            <div className="flex items-center space-x-2.5">
-                              <img src={`https://flagcdn.com/w40/${lang.flagCode}.png`} className="w-5 h-3.5 rounded-sm object-cover" alt="" />
-                              <div>
-                                <span className="text-xs font-bold block">{isRu ? lang.nameRu : lang.nameEn}</span>
-                                <span className="text-[10px] text-gray-400 block">{isRu ? lang.countryRu : lang.countryEn}</span>
-                              </div>
-                            </div>
-                            {sourceLang === lang.code && <span className="text-xs">✓</span>}
-                          </button>
-                        ))}
+                    <div className="space-y-3">
+                      {[
+                        {
+                          title: isRu ? '🌐 Основные языки мира и СНГ' : '🌐 Main World & CIS Languages',
+                          isBetaGroup: false,
+                          items: TRANSLATION_LANGUAGES.filter(l => !l.isBeta)
+                        },
+                        {
+                          title: isRu ? '🧪 Курсы языков (Бета)' : '🧪 Beta Language Courses',
+                          isBetaGroup: true,
+                          items: TRANSLATION_LANGUAGES.filter(l => Boolean(l.isBeta))
+                        }
+                      ].map(group => {
+                        const q = selectorSearch.toLowerCase();
+                        const filtered = group.items.filter(l =>
+                          l.nameRu.toLowerCase().includes(q) ||
+                          l.nameEn.toLowerCase().includes(q) ||
+                          l.countryRu.toLowerCase().includes(q) ||
+                          l.countryEn.toLowerCase().includes(q) ||
+                          l.code.toLowerCase().includes(q)
+                        );
+                        if (filtered.length === 0) return null;
+                        return (
+                          <div key={group.title} className="space-y-1">
+                            <p className={`text-[10px] font-black uppercase tracking-wider px-1 ${group.isBetaGroup ? 'text-purple-300' : 'text-sky-300'}`}>
+                              {group.title}
+                            </p>
+                            {filtered.map(lang => (
+                              <button
+                                key={lang.code}
+                                type="button"
+                                onClick={() => {
+                                  playSound('select');
+                                  setSourceLang(lang.code);
+                                  setShowSourceSelector(false);
+                                }}
+                                className={`w-full p-2 rounded-xl flex items-center justify-between text-left transition-colors cursor-pointer ${
+                                  sourceLang === lang.code ? 'bg-sky-600 text-white font-black' : 'hover:bg-gray-800 text-gray-200'
+                                }`}
+                              >
+                                <div className="flex items-center space-x-2.5">
+                                  <img src={`https://flagcdn.com/w40/${lang.flagCode}.png`} className="w-5 h-3.5 rounded-sm object-cover" alt="" />
+                                  <div>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className={`text-xs font-bold block ${lang.fontClass || ''}`}>{isRu ? lang.nameRu : lang.nameEn}</span>
+                                      {lang.isBeta && (
+                                        <span className="px-1 py-0.2 rounded bg-purple-500/30 border border-purple-400/50 text-[8px] font-black text-purple-200 uppercase">BETA</span>
+                                      )}
+                                    </div>
+                                    <span className="text-[10px] text-gray-400 block">{isRu ? lang.countryRu : lang.countryEn}</span>
+                                  </div>
+                                </div>
+                                {sourceLang === lang.code && <span className="text-xs">✓</span>}
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -567,7 +655,7 @@ export const TranslatorScreen: React.FC<TranslatorScreenProps> = ({
                       className="w-6 h-4 object-cover rounded-sm shadow-sm shrink-0" 
                     />
                     <div className="truncate">
-                      <span className="font-black text-sm text-white block truncate">
+                      <span className={`font-black text-sm text-white block truncate ${getTargetOption().fontClass || ''}`}>
                         {isRu ? getTargetOption().nameRu : getTargetOption().nameEn}
                       </span>
                       <span className="text-[11px] text-gray-400 font-bold block truncate">
@@ -598,39 +686,66 @@ export const TranslatorScreen: React.FC<TranslatorScreenProps> = ({
                       className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
                     />
 
-                    <div className="space-y-1">
-                      {TRANSLATION_LANGUAGES
-                        .filter(l => 
-                          l.nameRu.toLowerCase().includes(selectorSearch.toLowerCase()) ||
-                          l.nameEn.toLowerCase().includes(selectorSearch.toLowerCase()) ||
-                          l.countryRu.toLowerCase().includes(selectorSearch.toLowerCase()) ||
-                          l.countryEn.toLowerCase().includes(selectorSearch.toLowerCase())
-                        )
-                        .map(lang => (
-                          <button
-                            key={lang.code}
-                            type="button"
-                            onClick={() => {
-                              playSound('select');
-                              setTargetLang(lang.code);
-                              setShowTargetSelector(false);
-                            }}
-                            className={`w-full p-2 rounded-xl flex items-center justify-between text-left transition-colors cursor-pointer ${
-                              targetLang === lang.code ? 'bg-emerald-600 text-white font-black' : 'hover:bg-gray-800 text-gray-200'
-                            }`}
-                          >
-                            <div className="flex items-center space-x-2.5">
-                              <img src={`https://flagcdn.com/w40/${lang.flagCode}.png`} className="w-5 h-3.5 rounded-sm object-cover" alt="" />
-                              <div>
-                                <span className="text-xs font-bold block">{isRu ? lang.nameRu : lang.nameEn}</span>
-                                <span className="text-[10px] text-gray-400 block">{isRu ? lang.countryRu : lang.countryEn}</span>
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-1.5">
-                              {targetLang === lang.code && <span className="text-xs">✓</span>}
-                            </div>
-                          </button>
-                        ))}
+                    <div className="space-y-3">
+                      {[
+                        {
+                          title: isRu ? '🌐 Основные языки мира и СНГ' : '🌐 Main World & CIS Languages',
+                          isBetaGroup: false,
+                          items: TRANSLATION_LANGUAGES.filter(l => !l.isBeta)
+                        },
+                        {
+                          title: isRu ? '🧪 Курсы языков (Бета)' : '🧪 Beta Language Courses',
+                          isBetaGroup: true,
+                          items: TRANSLATION_LANGUAGES.filter(l => Boolean(l.isBeta))
+                        }
+                      ].map(group => {
+                        const q = selectorSearch.toLowerCase();
+                        const filtered = group.items.filter(l =>
+                          l.nameRu.toLowerCase().includes(q) ||
+                          l.nameEn.toLowerCase().includes(q) ||
+                          l.countryRu.toLowerCase().includes(q) ||
+                          l.countryEn.toLowerCase().includes(q) ||
+                          l.code.toLowerCase().includes(q)
+                        );
+                        if (filtered.length === 0) return null;
+                        return (
+                          <div key={group.title} className="space-y-1">
+                            <p className={`text-[10px] font-black uppercase tracking-wider px-1 ${group.isBetaGroup ? 'text-purple-300' : 'text-emerald-300'}`}>
+                              {group.title}
+                            </p>
+                            {filtered.map(lang => (
+                              <button
+                                key={lang.code}
+                                type="button"
+                                onClick={() => {
+                                  playSound('select');
+                                  setTargetLang(lang.code);
+                                  setShowTargetSelector(false);
+                                }}
+                                className={`w-full p-2 rounded-xl flex items-center justify-between text-left transition-colors cursor-pointer ${
+                                  targetLang === lang.code ? 'bg-emerald-600 text-white font-black' : 'hover:bg-gray-800 text-gray-200'
+                                }`}
+                              >
+                                <div className="flex items-center space-x-2.5">
+                                  <img src={`https://flagcdn.com/w40/${lang.flagCode}.png`} className="w-5 h-3.5 rounded-sm object-cover" alt="" />
+                                  <div>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className={`text-xs font-bold block ${lang.fontClass || ''}`}>{isRu ? lang.nameRu : lang.nameEn}</span>
+                                      {lang.isBeta && (
+                                        <span className="px-1 py-0.2 rounded bg-purple-500/30 border border-purple-400/50 text-[8px] font-black text-purple-200 uppercase">BETA</span>
+                                      )}
+                                    </div>
+                                    <span className="text-[10px] text-gray-400 block">{isRu ? lang.countryRu : lang.countryEn}</span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center space-x-1.5">
+                                  {targetLang === lang.code && <span className="text-xs">✓</span>}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -643,8 +758,9 @@ export const TranslatorScreen: React.FC<TranslatorScreenProps> = ({
             <textarea
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
+              dir={getSourceOption().dir || 'ltr'}
               placeholder={isRu ? "Введите текст или выберите быструю фразу для перевода..." : "Enter text to translate or tap a quick phrase..."}
-              className="w-full h-36 bg-gray-800 border-2 border-gray-700 focus:border-sky-500 rounded-2xl p-4 text-base md:text-lg font-bold text-white focus:outline-none resize-none placeholder-gray-500 transition-colors shadow-inner"
+              className={`w-full h-36 bg-gray-800 border-2 border-gray-700 focus:border-sky-500 rounded-2xl p-4 text-base md:text-lg font-bold text-white focus:outline-none resize-none placeholder-gray-500 transition-colors shadow-inner ${getSourceOption().fontClass || ''}`}
             />
             {inputText && (
               <button
@@ -761,7 +877,10 @@ export const TranslatorScreen: React.FC<TranslatorScreenProps> = ({
               </div>
 
               {/* TRANSLATED PHRASE */}
-              <p className={`text-xl sm:text-2xl font-black text-white leading-relaxed select-text ${getTargetOption().fontClass || ''}`}>
+              <p
+                dir={getTargetOption().dir || 'ltr'}
+                className={`text-xl sm:text-2xl font-black text-white leading-relaxed select-text ${getTargetOption().fontClass || ''}`}
+              >
                 {outputText}
               </p>
 
@@ -776,39 +895,91 @@ export const TranslatorScreen: React.FC<TranslatorScreenProps> = ({
           )}
         </div>
 
-        {/* ONLINE LANGUAGES DIRECTORY (WORKS WITHOUT VPN AND WITH VPN) */}
-        <div className="bg-gray-900/80 border border-sky-500/30 rounded-3xl p-5 sm:p-6 shadow-xl space-y-4">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div>
-              <h2 className="text-lg font-black text-white uppercase tracking-tight">
-                {isRu ? '🌐 Доступные языки онлайн-переводчика' : '🌐 Supported Online Translator Languages'}
-              </h2>
-              <p className="text-xs text-gray-400 font-bold">
-                {isRu
-                  ? 'Для перевода требуется подключение к интернету. Сервер работает без VPN и с VPN.'
-                  : 'Internet connection required for translation. Server works without VPN and with VPN.'}
-              </p>
+        {/* SEPARATED ONLINE LANGUAGES DIRECTORY (STANDARD + BETA COURSES) */}
+        <div className="space-y-5">
+          {/* 1. Основные языки мира и СНГ */}
+          <div className="bg-gray-900/80 border border-sky-500/30 rounded-3xl p-5 sm:p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h2 className="text-lg font-black text-white uppercase tracking-tight">
+                  {isRu ? '🌐 Основные языки онлайн-переводчика' : '🌐 Standard Online Translator Languages'}
+                </h2>
+                <p className="text-xs text-gray-400 font-bold">
+                  {isRu
+                    ? 'Для перевода требуется подключение к интернету. Работает без VPN и использует VPN.'
+                    : 'Internet connection required for translation. Works without VPN and with VPN.'}
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+              {TRANSLATION_LANGUAGES.filter(l => !l.isBeta).map((lang) => (
+                <button
+                  key={lang.code}
+                  type="button"
+                  onClick={() => handleSwitchLanguage(lang.code, ribbonAssignMode === 'target')}
+                  className={`p-3 rounded-2xl border text-left flex items-center space-x-2.5 transition-all cursor-pointer ${
+                    targetLang === lang.code
+                      ? 'bg-emerald-950/70 border-emerald-400 text-emerald-200'
+                      : 'bg-gray-850 border-gray-700/70 hover:border-sky-500/60 text-gray-200'
+                  }`}
+                >
+                  <img src={`https://flagcdn.com/w40/${lang.flagCode}.png`} alt="" className="w-6 h-4 rounded-xs object-cover shrink-0" />
+                  <div className="min-w-0">
+                    <span className={`text-xs font-black block truncate ${lang.fontClass || ''}`}>{isRu ? lang.nameRu : lang.nameEn}</span>
+                    <span className="text-[10px] text-gray-400 font-bold block truncate">{isRu ? lang.countryRu : lang.countryEn}</span>
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
-            {TRANSLATION_LANGUAGES.map((lang) => (
-              <button
-                key={lang.code}
-                type="button"
-                onClick={() => handleSwitchLanguage(lang.code, true)}
-                className={`p-3 rounded-2xl border text-left flex items-center space-x-2.5 transition-all cursor-pointer ${
-                  targetLang === lang.code
-                    ? 'bg-emerald-950/70 border-emerald-400 text-emerald-200'
-                    : 'bg-gray-850 border-gray-700/70 hover:border-sky-500/60 text-gray-200'
-                }`}
-              >
-                <img src={`https://flagcdn.com/w40/${lang.flagCode}.png`} alt="" className="w-6 h-4 rounded-xs object-cover shrink-0" />
-                <div className="min-w-0">
-                  <span className="text-xs font-black block truncate">{isRu ? lang.nameRu : lang.nameEn}</span>
-                  <span className="text-[10px] text-gray-400 font-bold block truncate">{isRu ? lang.countryRu : lang.countryEn}</span>
-                </div>
-              </button>
-            ))}
+
+          {/* 2. Курсы языков (Бета) */}
+          <div className="bg-gradient-to-br from-purple-950/50 via-gray-900 to-indigo-950/50 border-2 border-purple-500/40 rounded-3xl p-5 sm:p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h2 className="text-lg font-black text-purple-200 uppercase tracking-tight flex items-center gap-2">
+                  <span>🧪</span>
+                  <span>{isRu ? 'Курс язык (Бета) — Переводчик' : 'Beta Language Courses — Translator'}</span>
+                </h2>
+                <p className="text-xs text-purple-200/80 font-bold">
+                  {isRu
+                    ? 'Эсперанто (Esperanto), Латынь (Lingua Latina), Шведский, Норвежский (Norsk), Высокий валирийский (шрифт), Клингонский (шрифт), Идиш'
+                    : 'Esperanto, Latin (Lingua Latina), Swedish, Norwegian (Norsk), High Valyrian (custom font), Klingon (custom font), Yiddish'}
+                </p>
+              </div>
+              <span className="px-3 py-1 rounded-full bg-purple-500/20 border border-purple-400/50 text-[10px] font-black text-purple-200 uppercase">
+                BETA • ONLINE
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+              {TRANSLATION_LANGUAGES.filter(l => l.isBeta).map((lang) => (
+                <button
+                  key={lang.code}
+                  type="button"
+                  onClick={() => handleSwitchLanguage(lang.code, ribbonAssignMode === 'target')}
+                  className={`p-3.5 rounded-2xl border-2 text-left flex items-center justify-between gap-2 transition-all cursor-pointer ${
+                    targetLang === lang.code
+                      ? 'bg-emerald-950/75 border-emerald-400 text-emerald-200'
+                      : 'bg-gray-900/90 border-purple-500/35 hover:border-purple-400 text-gray-100'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2.5 min-w-0">
+                    <img src={`https://flagcdn.com/w40/${lang.flagCode}.png`} alt="" className="w-6 h-4 rounded-xs object-cover shrink-0" />
+                    <div className="min-w-0">
+                      <span className={`text-sm font-black block truncate ${lang.fontClass || ''}`}>
+                        {isRu ? lang.nameRu : lang.nameEn}
+                      </span>
+                      <span className="text-[10px] text-purple-300/80 font-bold block truncate">
+                        {isRu ? lang.countryRu : lang.countryEn}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-md bg-purple-600/30 border border-purple-400/50 text-[9px] font-black text-purple-200 uppercase shrink-0">
+                    BETA
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

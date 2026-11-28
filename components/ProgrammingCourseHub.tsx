@@ -9,6 +9,8 @@ import {
 import { downloadDebugApk, APK_TROUBLESHOOTING_STEPS, isAppleDevice } from '../services/apkDownloadService';
 import { CheckCircleIcon } from './Icons';
 import { usePWAInstall } from './usePWAInstall';
+import { isAppOnlineNow, useOnlineStatus } from './OfflineIndicator';
+import { isRuntimeOnline, notifyNetworkOffline, OFFLINE_INTERNET_REQUIRED_MESSAGE } from '../services/geminiService';
 
 interface ProgrammingCourseHubProps {
   language?: string;
@@ -28,6 +30,7 @@ export const ProgrammingCourseHub: React.FC<ProgrammingCourseHubProps> = ({
   setToast,
 }) => {
   const isRu = language !== 'en';
+  const isOnline = useOnlineStatus();
   const isApple = isAppleDevice();
   const { install: installPWA } = usePWAInstall();
   const [activeModuleId, setActiveModuleId] = useState<ProgrammingModuleId>('lua');
@@ -43,6 +46,16 @@ export const ProgrammingCourseHub: React.FC<ProgrammingCourseHubProps> = ({
   const [showAppleSafariModal, setShowAppleSafariModal] = useState(false);
   const [notificationTime, setNotificationTime] = useState<string>('10:55');
 
+  const requireOnline = (): boolean => {
+    if (!isOnline || !isAppOnlineNow()) {
+      playSound('wrong');
+      notifyNetworkOffline();
+      setToast(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+      return false;
+    }
+    return true;
+  };
+
   const activeModule: ProgrammingModule =
     PROGRAMMING_MODULES.find((m) => m.id === activeModuleId) || PROGRAMMING_MODULES[0];
 
@@ -53,6 +66,7 @@ export const ProgrammingCourseHub: React.FC<ProgrammingCourseHubProps> = ({
     LIFECYCLE_STEPS_DETAIL.find((s) => s.step === selectedLifecycleStep) || LIFECYCLE_STEPS_DETAIL[0];
 
   const handleSelectModule = (id: ProgrammingModuleId) => {
+    if (!requireOnline()) return;
     playSound('click');
     setActiveModuleId(id);
     setApkBuildStage('idle');
@@ -93,6 +107,7 @@ export const ProgrammingCourseHub: React.FC<ProgrammingCourseHubProps> = ({
   };
 
   const handleDownloadApkDirect = (filename: string = 'app-debug.apk') => {
+    if (!requireOnline()) return;
     try {
       playSound('select');
     } catch {
@@ -143,6 +158,7 @@ export const ProgrammingCourseHub: React.FC<ProgrammingCourseHubProps> = ({
                 <button
                   type="button"
                   onClick={() => {
+                    if (!requireOnline()) return;
                     playSound('click');
                     onChangeDifficulty('easy');
                   }}
@@ -157,6 +173,7 @@ export const ProgrammingCourseHub: React.FC<ProgrammingCourseHubProps> = ({
                 <button
                   type="button"
                   onClick={() => {
+                    if (!requireOnline()) return;
                     playSound('click');
                     onChangeDifficulty('hard');
                   }}
@@ -184,6 +201,7 @@ export const ProgrammingCourseHub: React.FC<ProgrammingCourseHubProps> = ({
               <button
                 type="button"
                 onClick={() => {
+                  if (!requireOnline()) return;
                   playSound('select');
                   onStartLesson(activeModule.topicPrompt);
                 }}
@@ -589,6 +607,7 @@ export const ProgrammingCourseHub: React.FC<ProgrammingCourseHubProps> = ({
             <button
               type="button"
               onClick={() => {
+                if (!requireOnline()) return;
                 playSound('select');
                 onStartLesson(activeModule.topicPrompt);
               }}
@@ -602,6 +621,7 @@ export const ProgrammingCourseHub: React.FC<ProgrammingCourseHubProps> = ({
             <button
               type="button"
               onClick={() => {
+                if (!requireOnline()) return;
                 playSound('select');
                 onStartLesson(
                   'Lua, Swift, Xcode, SwiftUI, UIKit, AppKit, Kotlin, Java, C++ Android NDK, Android Studio, Gradle, Jetpack Compose, Flutter, React Native, .aab, build.gradle.kts, KeyStore .jks, app-debug.apk, gradlew, Andromo'

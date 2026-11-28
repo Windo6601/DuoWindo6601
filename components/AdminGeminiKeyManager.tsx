@@ -852,7 +852,7 @@ export const AdminGeminiKeyManager: React.FC<AdminGeminiKeyManagerProps> = ({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-black uppercase text-gray-300 tracking-wider">
-                  Секретный токен API (AIzaSy...):
+                  Секретный токен API (AIzaSy... / AQ....):
                 </label>
                 {adminKeyDetails.isSet && (
                   <span className="text-[11px] text-emerald-400 font-bold flex items-center space-x-1">
@@ -867,7 +867,7 @@ export const AdminGeminiKeyManager: React.FC<AdminGeminiKeyManagerProps> = ({
                   type={showAdminKey ? 'text' : 'password'}
                   value={adminKeyInput}
                   onChange={(e) => setAdminKeyInput(e.target.value)}
-                  placeholder="AIzaSy..."
+                  placeholder="AIzaSy... / AQ...."
                   className="w-full bg-gray-800/90 border-2 border-gray-700 focus:border-amber-500 rounded-2xl py-3 px-4 pr-24 text-sm font-mono text-white placeholder-gray-500 focus:outline-none transition-all shadow-inner"
                 />
                 <div className="absolute right-2 top-2 flex items-center space-x-1">
@@ -1015,7 +1015,7 @@ export const AdminGeminiKeyManager: React.FC<AdminGeminiKeyManagerProps> = ({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-black uppercase text-gray-300 tracking-wider">
-                  Секретный токен разработчика (AIzaSy...):
+                  Секретный токен разработчика (AIzaSy... / AQ....):
                 </label>
                 {devKeyDetails.isSet && (
                   <span className="text-[11px] text-cyan-400 font-bold flex items-center space-x-1">
@@ -1030,7 +1030,7 @@ export const AdminGeminiKeyManager: React.FC<AdminGeminiKeyManagerProps> = ({
                   type={showDevKey ? 'text' : 'password'}
                   value={devKeyInput}
                   onChange={(e) => setDevKeyInput(e.target.value)}
-                  placeholder="AIzaSy..."
+                  placeholder="AIzaSy... / AQ...."
                   className="w-full bg-gray-800/90 border-2 border-gray-700 focus:border-cyan-500 rounded-2xl py-3 px-4 pr-24 text-sm font-mono text-white placeholder-gray-500 focus:outline-none transition-all shadow-inner"
                 />
                 <div className="absolute right-2 top-2 flex items-center space-x-1">

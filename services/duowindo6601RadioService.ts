@@ -1595,20 +1595,24 @@ export function buildLocalDynamicRadioEpisode(
 export async function generateDuoRadioEpisodeAI(
   course: Course,
   userLanguage: string = 'ru',
-  difficultyLevel: 'easy' | 'hard' = 'easy',
+  difficultyLevel: 'easy' | 'hard' = 'hard',
   langSection: number = 1,
   customEpisodeText?: string
 ): Promise<DuoRadioEpisode> {
   const isRu = userLanguage !== 'en';
   const targetLangName = course.name || course.localName || 'English';
   const hostLangName = isRu ? 'Russian' : 'English';
-  const levelLabel = difficultyLevel === 'hard' ? 'B1-B2' : `A${Math.min(2, Math.max(1, Math.ceil(langSection / 2)))}`;
+  const levelLabel = difficultyLevel === 'hard' ? 'B2-C1' : `A${Math.min(2, Math.max(1, Math.ceil(langSection / 2)))}`;
   const owlSpeaker = isRu ? 'Сова DuoWindo6601' : 'Owl DuoWindo6601';
   const trimmedCustom = (customEpisodeText || '').trim();
 
   const customDirective = trimmedCustom
     ? `\nUSER-PROVIDED EPISODE TEXT / TOPIC (IMPORTANT — MUST USE THIS):\n"""\n${trimmedCustom.slice(0, 1200)}\n"""\nIf the user provided sentences or dialogue lines, turn/adapt them into the target-language cues (isFamiliarLang: false) in ${targetLangName} (or keep the exact target lines if already in ${targetLangName}). If the user provided a topic/prompt, write the entire episode about that topic.`
     : '';
+
+  const complexityRule = difficultyLevel === 'hard'
+    ? `Make every target-language cue (Cue 1, Cue 2, Cue 4) rich, long, and complex: 3-4 detailed multi-clause sentences with advanced vocabulary, idioms, and natural connectors (do NOT output short 1-line phrases).`
+    : `Make every target-language cue clear, natural, and well-structured: 2-3 complete sentences.`;
 
   const prompt = `Create an engaging listening podcast episode called "DuoWindo6601Radio".
 CRITICAL RULE: Do NOT use any third-party trademarked characters.
@@ -1617,14 +1621,15 @@ The ONLY mascot/main character is the Owl "Сова DuoWindo6601" (or "Owl DuoWi
 Target language being learned: ${targetLangName} (course id: ${course.id}).
 Listener's native/familiar UI language: ${hostLangName}.
 Difficulty: ${difficultyLevel} (${levelLabel}), Section ${langSection} of 8.${customDirective}
+${complexityRule}
 
 Requirements:
 1. Total 5 cues:
-   - Cue 0: Host "${owlSpeaker}" (role: "host", avatar: "🦉", isFamiliarLang: true) introduces the episode in ${hostLangName} and tells the learner what to listen for.
-   - Cue 1: "${owlSpeaker}" (role: "character", avatar: "🦉", isFamiliarLang: false) speaks in ${targetLangName}.
-   - Cue 2: "${isRu ? 'Гость эфира' : 'Radio Guest'}" (role: "character", avatar: "🎙️", isFamiliarLang: false) replies in ${targetLangName}.
-   - Cue 3: Host "${owlSpeaker}" (role: "host", avatar: "🦉", isFamiliarLang: true) gives a brief 1-sentence listening tip in ${hostLangName}.
-   - Cue 4: "${owlSpeaker}" (role: "character", avatar: "🦉", isFamiliarLang: false) concludes the mini dialogue in ${targetLangName}.
+   - Cue 0: Host "${owlSpeaker}" (role: "host", avatar: "🦉", isFamiliarLang: true) introduces the episode in ${hostLangName} (2-3 detailed sentences) and tells the learner what to listen for.
+   - Cue 1: "${owlSpeaker}" (role: "character", avatar: "🦉", isFamiliarLang: false) speaks extensively in ${targetLangName}.
+   - Cue 2: "${isRu ? 'Гость эфира' : 'Radio Guest'}" (role: "character", avatar: "🎙️", isFamiliarLang: false) replies extensively in ${targetLangName}.
+   - Cue 3: Host "${owlSpeaker}" (role: "host", avatar: "🦉", isFamiliarLang: true) gives a detailed 2-sentence listening analysis & grammar tip in ${hostLangName}.
+   - Cue 4: "${owlSpeaker}" (role: "character", avatar: "🦉", isFamiliarLang: false) concludes the rich dialogue in ${targetLangName}.
 2. Include 2 listening comprehension questions:
    - Question 0 (stage: "mid", afterCueIndex: 2, replayCueIndex: 2)
    - Question 1 (stage: "final", afterCueIndex: 4, replayCueIndex: 1)

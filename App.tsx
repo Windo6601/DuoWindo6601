@@ -6,9 +6,11 @@ import { doc, getDoc, setDoc, onSnapshot, serverTimestamp } from 'firebase/fires
 import { signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db, googleProvider, handleFirestoreError, OperationType } from './firebase';
 import { MultiUserShareModal } from './components/MultiUserShareModal';
-import { AppScreen, Exercise, UserProgress, Course, WordToken, LeaderboardEntry, SubscriptionTier, RoleplayMessage, CharacterAvatarConfig } from './types';
+import { AppScreen, Exercise, MathDifficulty, UserProgress, Course, WordToken, LeaderboardEntry, SubscriptionTier, RoleplayMessage, CharacterAvatarConfig } from './types';
 import { Chess, Square } from 'chess.js';
-import { generateExercise, checkAnswerWithAI, pingGeminiApi, speakText, startRoleplay, replyToRoleplay, generateIllusion, generateDrawing, checkDrawing, getFallbackExercise, getChessMove, getChessChatReply, getChessTutorialHint, translateText, getMistakeExplanation, generateLocalMistakeExplanation, generateIshihara, generateInterviewQuestion, getInterviewHint, generateReading, generateVideoCallRoleplayResponse } from './services/geminiService';
+import { generateExercise, checkAnswerWithAI, pingGeminiApi, speakText, startRoleplay, replyToRoleplay, generateIllusion, generateDrawing, checkDrawing, getChessMove, getChessChatReply, getChessTutorialHint, translateText, getMistakeExplanation, generateIshihara, generateInterviewQuestion, getInterviewHint, generateReading, generateVideoCallRoleplayResponse, notifyNetworkOffline, OFFLINE_INTERNET_REQUIRED_MESSAGE, isNetworkDisconnectError, clearLessonCache } from './services/geminiService';
+import { generateMathExercise, getMathDifficultyMeta, MathTopic } from './services/mathExerciseService';
+import { TypewriterText } from './components/TypewriterText';
 
 import { detectSystemCompatibility, SimulationMode, SystemCompatibilityResult } from "./services/systemCompatibilityService";
 import { SystemCompatibilityBanner } from "./components/SystemCompatibilityBanner";
@@ -17,14 +19,14 @@ import { PwaUpdateSecuritySection } from "./components/PwaUpdateSecuritySection"
 import { PwaUpdateProcessOverlay } from "./components/PwaUpdateProcessOverlay";
 import { readPendingPwaUpdate, clearPendingPwaUpdate, InstalledPwaPatchInfo } from "./services/pwaUpdateService";
 import { AppVersionCard } from "./components/AppVersionCard";
-import { APP_VERSION } from "./services/appVersionService";
+import { APP_VERSION, APP_BETA_VERSION } from "./services/appVersionService";
 import { BetaModal } from "./components/BetaModal";
 import { tlhToPIqaD, isPIqaDText } from './services/klingonDictionaryService';
 import {
   downloadKlingonAudioFile,
   getKlingonSentencePlayerUrl,
   getKlingonSpeechMode,
-  KLINGON_HOL_HELLO_URL,
+  KLINGON_HOL_NUQNEH_URL,
   KLINGON_SAM_HOMEPAGE,
   KlingonSpeechSource,
   playKlingonSpeech,
@@ -2120,8 +2122,8 @@ const TRANSLATIONS: Record<string, any> = {
     duowindoModesDesc: 'Все специальные AI и интерактивные форматы обучения сохранены',
     arabicHandbook: 'Конвертер (0-99) и Справочник арабских цифр',
     arabicHandbookDesc: 'Западные цифры слева (0-99) и восточно-арабские справа (٠-٩٩) • Интерактивный ползунок, озвучка и поиск',
-    offlineDictTitle: 'СЛОВАРИ БЕЗ ИНТЕРНЕТА 💾',
-    offlineDictDesc: 'Переключение языков стран ⇄ и офлайн-пакеты',
+    offlineDictTitle: 'GEMINI AI ОНЛАЙН 🌐',
+    offlineDictDesc: 'Работает без VPN и использует VPN • Без офлайн-режима',
     openBtn: 'Открыть',
     lockedBtn: 'Заблокировано',
     unitReviewToast: '⚡ Повторение раздела {unit}: +20 очков!',
@@ -2362,8 +2364,8 @@ const TRANSLATIONS: Record<string, any> = {
     duowindoModesDesc: 'All special AI & interactive learning formats preserved intact',
     arabicHandbook: 'Arabic Numerals Converter (0-99) & Handbook',
     arabicHandbookDesc: 'Western digits on left (0-99) & Eastern Arabic on right (٠-٩٩) • Interactive slider, speech & search',
-    offlineDictTitle: 'OFFLINE DICTIONARIES 💾',
-    offlineDictDesc: 'Country language switching ⇄ & offline packs',
+    offlineDictTitle: 'GEMINI AI ONLINE 🌐',
+    offlineDictDesc: 'Works without VPN & with VPN • Online only',
     openBtn: 'Open',
     lockedBtn: 'Locked',
     unitReviewToast: '⚡ Unit {unit} Review: +20 XP!',
@@ -3484,13 +3486,6 @@ function App() {
 
   const [screen, setScreen] = useState<AppScreen>(AppScreen.PATH);
   const [lettersTabRequest, setLettersTabRequest] = useState<{ tab: 'letters' | 'words' | 'illusion' | 'audio'; nonce: number }>({ tab: 'letters', nonce: 0 });
-  const [offlineMode, setOfflineMode] = useState<boolean>(() => {
-    if (isOnlineHostedEnvironment()) return false;
-    if (typeof navigator !== 'undefined') {
-      return !navigator.onLine;
-    }
-    return false;
-  });
   
   // Mobile test simulator states
   const [simulatorMode, setSimulatorMode] = useState<'none' | 'android' | 'ios'>('none');
@@ -3527,12 +3522,16 @@ function App() {
   const [musicSection, setMusicSection] = useState<number>(() => {
     return Number(localStorage.getItem('duo_music_section_6601') || '1');
   });
-  // Math: Классы 2-11 & Темы (🔢 Арифметика / 📐 Алгебра / 📏 Геометрия / 📈 Анализ)
+  // Math: Классы 2-11 & Темы (🔢 Арифметика / 📐 Алгебра / 📏 Геометрия / 📈 Анализ) & Сложность (Easy / Medium / Hard)
   const [mathGrade, setMathGrade] = useState<number>(() => {
     return Number(localStorage.getItem('duo_math_grade_6601') || '2');
   });
-  const [mathTopic, setMathTopic] = useState<'arithmetic' | 'algebra' | 'geometry' | 'analysis'>(() => {
-    return (localStorage.getItem('duo_math_topic_6601') as any) || 'arithmetic';
+  const [mathTopic, setMathTopic] = useState<MathTopic>(() => {
+    return (localStorage.getItem('duo_math_topic_6601') as MathTopic) || 'arithmetic';
+  });
+  const [mathDifficulty, setMathDifficulty] = useState<MathDifficulty>(() => {
+    const saved = localStorage.getItem('duo_math_difficulty_6601');
+    return saved === 'medium' || saved === 'hard' ? saved : 'easy';
   });
   // Languages: Раздел 1-8 (A1-B2)
   const [langSection, setLangSection] = useState<number>(() => {
@@ -3543,563 +3542,23 @@ function App() {
     return Number(localStorage.getItem('duo_chess_section_6601') || '6');
   });
 
-  const generateMathExercise = (grade: number, topic: 'arithmetic' | 'algebra' | 'geometry' | 'analysis'): Exercise => {
-    let question = "";
-    let answer = "";
-    let distractors: string[] = [];
-
-    if (topic === 'arithmetic') {
-      if (grade === 2) {
-        const mode = Math.random();
-        if (mode < 0.4) {
-          const a = Math.floor(Math.random() * 40) + 12;
-          const b = Math.floor(Math.random() * 40) + 10;
-          question = `${a} + ${b} = ?`;
-          answer = (a + b).toString();
-        } else if (mode < 0.7) {
-          const a = Math.floor(Math.random() * 50) + 30;
-          const b = Math.floor(Math.random() * 25) + 5;
-          question = `${a} - ${b} = ?`;
-          answer = (a - b).toString();
-        } else {
-          const a = Math.floor(Math.random() * 8) + 2;
-          const b = Math.random() > 0.5 ? 2 : 3;
-          question = `${a} × ${b} = ?`;
-          answer = (a * b).toString();
-        }
-      } else if (grade === 3) {
-        const isDiv = Math.random() > 0.5;
-        const a = Math.floor(Math.random() * 8) + 2;
-        const b = Math.floor(Math.random() * 8) + 2;
-        if (isDiv) {
-          question = `${a * b} ÷ ${a} = ?`;
-          answer = b.toString();
-        } else {
-          question = `${a} × ${b} = ?`;
-          answer = (a * b).toString();
-        }
-      } else if (grade === 4) {
-        const type = Math.random();
-        if (type < 0.5) {
-          const a = Math.floor(Math.random() * 70) + 25;
-          const b = Math.floor(Math.random() * 8) + 3;
-          question = `${a} × ${b} = ?`;
-          answer = (a * b).toString();
-        } else {
-          const den = 8;
-          const n1 = Math.floor(Math.random() * 3) + 1;
-          const n2 = Math.floor(Math.random() * 3) + 1;
-          question = `${n1}/${den} + ${n2}/${den} = ?`;
-          answer = `${n1 + n2}/${den}`;
-          distractors = [`${n1 + n2 + 1}/${den}`, `${n1 + n2}/${den * 2}`, `${Math.max(1, n1 + n2 - 1)}/${den}`];
-        }
-      } else if (grade === 5) {
-        const type = Math.random();
-        if (type < 0.5) {
-          const a = (Math.floor(Math.random() * 50) + 10) / 10;
-          const b = (Math.floor(Math.random() * 50) + 10) / 10;
-          question = `${a} + ${b} = ?`;
-          answer = (parseFloat((a + b).toFixed(1))).toString();
-        } else {
-          const pct = [10, 20, 25, 50][Math.floor(Math.random() * 4)];
-          const total = [100, 200, 400, 600][Math.floor(Math.random() * 4)];
-          question = `${pct}% от ${total} = ?`;
-          answer = ((pct / 100) * total).toString();
-        }
-      } else if (grade === 6) {
-        const type = Math.random();
-        if (type < 0.5) {
-          const a = -(Math.floor(Math.random() * 20) + 5);
-          const b = Math.floor(Math.random() * 30) + 10;
-          question = `${a} + ${b} = ?`;
-          answer = (a + b).toString();
-        } else {
-          const a = -(Math.floor(Math.random() * 6) + 2);
-          const b = -(Math.floor(Math.random() * 6) + 2);
-          question = `(${a}) × (${b}) = ?`;
-          answer = (a * b).toString();
-        }
-      } else if (grade === 7) {
-        const base = [2, 3, 5, 10][Math.floor(Math.random() * 4)];
-        const exp = base === 10 ? 3 : [2, 3, 4][Math.floor(Math.random() * 3)];
-        question = `${base}^${exp} = ?`;
-        answer = Math.pow(base, exp).toString();
-      } else if (grade === 8) {
-        const num = [16, 25, 36, 49, 64, 81, 100, 121, 144][Math.floor(Math.random() * 9)];
-        const plus = Math.floor(Math.random() * 15) + 5;
-        question = `√${num} + ${plus} = ?`;
-        answer = (Math.sqrt(num) + plus).toString();
-      } else if (grade === 9) {
-        const mode = Math.random();
-        if (mode < 0.5) {
-          const a1 = Math.floor(Math.random() * 5) + 1;
-          const d = Math.floor(Math.random() * 4) + 2;
-          const n = 4;
-          question = `Прогрессия: a₁ = ${a1}, d = ${d}. a₄ = ?`;
-          answer = (a1 + (n - 1) * d).toString();
-        } else {
-          const baseOptions = [
-            { q: '√8 × √2 = ?', a: '4' },
-            { q: '√18 × √2 = ?', a: '6' },
-            { q: '√50 × √2 = ?', a: '10' },
-            { q: '√72 / √2 = ?', a: '6' }
-          ];
-          const chosen = baseOptions[Math.floor(Math.random() * baseOptions.length)];
-          question = chosen.q;
-          answer = chosen.a;
-        }
-      } else if (grade === 10) {
-        // 10 класс: Арифметика / высшие вычисления (логарифмы, комбинаторика, степени)
-        const mode = Math.random();
-        if (mode < 0.4) {
-          const logs = [
-            { q: 'log₂(16) = ?', a: '4' },
-            { q: 'log₃(27) = ?', a: '3' },
-            { q: 'log₅(25) = ?', a: '2' },
-            { q: 'log₁₀(1000) = ?', a: '3' },
-            { q: 'log₂(64) = ?', a: '6' },
-            { q: 'log₄(64) = ?', a: '3' },
-            { q: 'log₇(49) = ?', a: '2' }
-          ];
-          const chosen = logs[Math.floor(Math.random() * logs.length)];
-          question = chosen.q;
-          answer = chosen.a;
-        } else if (mode < 0.7) {
-          const powers = [
-            { q: '27^(2/3) = ?', a: '9' },
-            { q: '16^(3/4) = ?', a: '8' },
-            { q: '4^(3/2) = ?', a: '8' },
-            { q: '8^(4/3) = ?', a: '16' },
-            { q: '2⁴ + 3² = ?', a: '25' },
-            { q: '5³ - 5² = ?', a: '100' }
-          ];
-          const chosen = powers[Math.floor(Math.random() * powers.length)];
-          question = chosen.q;
-          answer = chosen.a;
-        } else {
-          const facts = [
-            { q: 'P₃ = 3! (факториал) = ?', a: '6' },
-            { q: 'P₄ = 4! (факториал) = ?', a: '24' },
-            { q: '5! / 4! = ?', a: '5' },
-            { q: 'Сочетания C(4, 2) = ?', a: '6' },
-            { q: 'Сочетания C(5, 2) = ?', a: '10' }
-          ];
-          const chosen = facts[Math.floor(Math.random() * facts.length)];
-          question = chosen.q;
-          answer = chosen.a;
-        }
-      } else {
-        // 11 класс: Арифметика / прикладная математика (вероятности, лимиты, проценты)
-        const mode = Math.random();
-        if (mode < 0.4) {
-          const probs = [
-            { q: 'Бросок кубика: P(выпадет число 6) = 1/?', a: '6' },
-            { q: 'Бросок 2 монет: P(два орла) = 1/?', a: '4' },
-            { q: 'В урне 3 белых и 7 синих шаров. P(белый) = ?', a: '0.3' },
-            { q: 'Бросок кубика: P(чётное число) = ?', a: '0.5' },
-            { q: 'В колоде 36 карт. Карт каждой масти = ?', a: '9' }
-          ];
-          const chosen = probs[Math.floor(Math.random() * probs.length)];
-          question = chosen.q;
-          answer = chosen.a;
-        } else if (mode < 0.7) {
-          const limits = [
-            { q: 'lim(x→∞) (3x + 6)/(x + 1) = ?', a: '3' },
-            { q: 'lim(x→∞) (4x² + 5)/(2x² + 1) = ?', a: '2' },
-            { q: 'lim(x→0) sin(x)/x = ?', a: '1' },
-            { q: 'lim(x→2) (x² - 4)/(x - 2) = ?', a: '4' },
-            { q: 'lim(x→∞) 10/x = ?', a: '0' }
-          ];
-          const chosen = limits[Math.floor(Math.random() * limits.length)];
-          question = chosen.q;
-          answer = chosen.a;
-        } else {
-          const finance = [
-            { q: 'Вклад 1000₽ под 10% годовых на 2 года: 1000 × 1.1² = ?', a: '1210' },
-            { q: 'Вклад 2000₽ под 10% на 1 год: 2000 × 1.1 = ?', a: '2200' },
-            { q: 'Сложные проценты: 500 × 1.2 = ?', a: '600' },
-            { q: 'Сумма 1000₽ при росте 20%: 1000 × 1.2 = ?', a: '1200' }
-          ];
-          const chosen = finance[Math.floor(Math.random() * finance.length)];
-          question = chosen.q;
-          answer = chosen.a;
-        }
-      }
-    } else if (topic === 'algebra') {
-      if (grade === 2) {
-        const a = Math.floor(Math.random() * 10) + 3;
-        const x = Math.floor(Math.random() * 15) + 2;
-        question = `x + ${a} = ${x + a}, x = ?`;
-        answer = x.toString();
-      } else if (grade === 3) {
-        const a = Math.floor(Math.random() * 7) + 2;
-        const x = Math.floor(Math.random() * 8) + 2;
-        question = `${a} × x = ${a * x}, x = ?`;
-        answer = x.toString();
-      } else if (grade === 4) {
-        const a = Math.floor(Math.random() * 6) + 2;
-        const b = Math.floor(Math.random() * 4) + 2;
-        const x = Math.floor(Math.random() * 8) + 2;
-        question = `(x + ${a}) × ${b} = ${(x + a) * b}, x = ?`;
-        answer = x.toString();
-      } else if (grade === 5) {
-        const a = Math.floor(Math.random() * 3) + 2;
-        const b = Math.floor(Math.random() * 4) + 1;
-        const x = Math.floor(Math.random() * 7) + 2;
-        question = `${a}x + ${b}x = ${(a + b) * x}, x = ?`;
-        answer = x.toString();
-      } else if (grade === 6) {
-        const x = Math.floor(Math.random() * 6) + 2;
-        const c = 2 * x;
-        question = `4x - 8 = 2x + ${c - 8}, x = ?`;
-        answer = x.toString();
-      } else if (grade === 7) {
-        const a = [2, 3, 4, 5][Math.floor(Math.random() * 4)];
-        question = `(x + ${a})² = x² + ?x + ${a * a}`;
-        answer = (2 * a).toString();
-      } else if (grade === 8) {
-        const x1 = Math.floor(Math.random() * 4) + 1;
-        const x2 = Math.floor(Math.random() * 5) + 2;
-        const sum = x1 + x2;
-        const prod = x1 * x2;
-        question = `x² - ${sum}x + ${prod} = 0, x₁ + x₂ = ?`;
-        answer = sum.toString();
-      } else if (grade === 9) {
-        const mode = Math.random();
-        if (mode < 0.5) {
-          const roots = [
-            { q: 'x² - 25 = 0, при x > 0: x = ?', a: '5' },
-            { q: 'x² - 49 = 0, при x > 0: x = ?', a: '7' },
-            { q: 'x² - 64 = 0, |x| = ?', a: '8' },
-            { q: 'x² - 6x = 0, ненулевой корень x = ?', a: '6' }
-          ];
-          const chosen = roots[Math.floor(Math.random() * roots.length)];
-          question = chosen.q;
-          answer = chosen.a;
-        } else {
-          const vieta = [
-            { q: 'x² - 8x + 15 = 0, произведение x₁ · x₂ = ?', a: '15' },
-            { q: 'x² - 5x + 6 = 0, сумма x₁ + x₂ = ?', a: '5' },
-            { q: '(x - 4)(x + 2) = 0, положительный корень x = ?', a: '4' }
-          ];
-          const chosen = vieta[Math.floor(Math.random() * vieta.length)];
-          question = chosen.q;
-          answer = chosen.a;
-        }
-      } else if (grade === 10) {
-        // 10 класс: Алгебра (тригонометрия, тождества, показательные уравнения)
-        const mode = Math.random();
-        if (mode < 0.4) {
-          const trigs = [
-            { q: 'sin(30°) = ?', a: '0.5' },
-            { q: 'cos(60°) = ?', a: '0.5' },
-            { q: 'sin(90°) = ?', a: '1' },
-            { q: 'cos(0°) = ?', a: '1' },
-            { q: 'tan(45°) = ?', a: '1' },
-            { q: 'sin²(α) + cos²(α) = ?', a: '1' }
-          ];
-          const chosen = trigs[Math.floor(Math.random() * trigs.length)];
-          question = chosen.q;
-          answer = chosen.a;
-        } else if (mode < 0.7) {
-          const exps = [
-            { q: '2^(x) = 16, x = ?', a: '4' },
-            { q: '3^(x) = 27, x = ?', a: '3' },
-            { q: '5^(x-1) = 25, x = ?', a: '3' },
-            { q: 'log₂(x) = 4, x = ?', a: '16' },
-            { q: 'log₃(x) = 3, x = ?', a: '27' },
-            { q: '4^(x) = 64, x = ?', a: '3' }
-          ];
-          const chosen = exps[Math.floor(Math.random() * exps.length)];
-          question = chosen.q;
-          answer = chosen.a;
-        } else {
-          const eqTrig = [
-            { q: '2 · sin(x) = 1 (в I четверти), sin(x) = ?', a: '0.5' },
-            { q: '2 · cos(x) = 1 (в I четверти), cos(x) = ?', a: '0.5' },
-            { q: '1 - cos²(x) при sin(x) = 0.8 равно ?', a: '0.64' },
-            { q: '2 · sin(x) · cos(x) = sin(?x)', a: '2' }
-          ];
-          const chosen = eqTrig[Math.floor(Math.random() * eqTrig.length)];
-          question = chosen.q;
-          answer = chosen.a;
-        }
-      } else {
-        // 11 класс: Алгебра (производные, экстремумы, интегралы)
-        const mode = Math.random();
-        if (mode < 0.4) {
-          const derivs = [
-            { q: 'f(x) = x⁴, f\'(x) = ?x³', a: '4' },
-            { q: 'f(x) = 3x², производная f\'(4) = 6·4 = ?', a: '24' },
-            { q: 'f(x) = x², f\'(5) = 2·5 = ?', a: '10' },
-            { q: 'f(x) = 2x³ - 5x, f\'(1) = 6·1² - 5 = ?', a: '1' },
-            { q: 'f(x) = x³ - 3x, f\'(2) = 3·4 - 3 = ?', a: '9' },
-            { q: '(sin x)\' = cos x; при x=0: cos(0) = ?', a: '1' }
-          ];
-          const chosen = derivs[Math.floor(Math.random() * derivs.length)];
-          question = chosen.q;
-          answer = chosen.a;
-        } else if (mode < 0.7) {
-          const integrals = [
-            { q: '∫ 2x dx = x² + C; при x=4: 4² = ?', a: '16' },
-            { q: '∫₀² 3x² dx = [x³]₀² = 2³ - 0 = ?', a: '8' },
-            { q: '∫₁³ 2x dx = [x²]₁³ = 9 - 1 = ?', a: '8' },
-            { q: '∫₀¹ 4x³ dx = [x⁴]₀¹ = 1 - 0 = ?', a: '1' },
-            { q: '∫ 3x² dx = x³ + C; при x=3: 3³ = ?', a: '27' }
-          ];
-          const chosen = integrals[Math.floor(Math.random() * integrals.length)];
-          question = chosen.q;
-          answer = chosen.a;
-        } else {
-          const extrema = [
-            { q: 'Парабола f(x) = x² - 6x + 5: точка минимума x = ?', a: '3' },
-            { q: 'f(x) = -x² + 8x - 2: точка максимума x = ?', a: '4' },
-            { q: 'f(x) = x² - 4x: производная f\'(x) = 0 при x = ?', a: '2' },
-            { q: 'f(x) = x³ - 12x: f\'(x) = 3x² - 12 = 0 при x>0: x = ?', a: '2' }
-          ];
-          const chosen = extrema[Math.floor(Math.random() * extrema.length)];
-          question = chosen.q;
-          answer = chosen.a;
-        }
-      }
-    } else if (topic === 'geometry') {
-      if (grade === 2) {
-        const mode = Math.random();
-        if (mode < 0.5) {
-          const a = Math.floor(Math.random() * 6) + 3;
-          question = `Квадрат со стороной ${a} см. Периметр P = 4 × ${a} = ?`;
-          answer = (4 * a).toString();
-        } else {
-          const a = Math.floor(Math.random() * 4) + 2;
-          const b = Math.floor(Math.random() * 4) + 5;
-          question = `Прямоугольник ${a} см и ${b} см. Периметр P = 2·(a+b) = ?`;
-          answer = (2 * (a + b)).toString();
-        }
-      } else if (grade === 3) {
-        const mode = Math.random();
-        if (mode < 0.5) {
-          const a = Math.floor(Math.random() * 6) + 3;
-          const b = Math.floor(Math.random() * 5) + 2;
-          question = `Прямоугольник со сторонами ${a} и ${b}. Площадь S = a × b = ?`;
-          answer = (a * b).toString();
-        } else {
-          const a = Math.floor(Math.random() * 5) + 3;
-          question = `Квадрат со стороной ${a} см. Площадь S = a² = ?`;
-          answer = (a * a).toString();
-        }
-      } else if (grade === 4) {
-        const mode = Math.random();
-        if (mode < 0.5) {
-          const a = Math.floor(Math.random() * 3) + 2;
-          question = `Куб с ребром ${a} см. Объём V = a³ = ?`;
-          answer = (a * a * a).toString();
-        } else {
-          const a = 2, b = 3, c = Math.floor(Math.random() * 4) + 4;
-          question = `Параллелепипед ${a} × ${b} × ${c}. Объём V = ?`;
-          answer = (a * b * c).toString();
-        }
-      } else if (grade === 5) {
-        const mode = Math.random();
-        if (mode < 0.5) {
-          const angle = [30, 45, 60, 70, 80][Math.floor(Math.random() * 5)];
-          question = `Смежный угол к углу ${angle}° равен 180° - ${angle}° = ?°`;
-          answer = (180 - angle).toString();
-        } else {
-          const opt = [
-            { q: 'Градусная мера прямого угла = ?°', a: '90' },
-            { q: 'Градусная мера развёрнутого угла = ?°', a: '180' },
-            { q: 'В одном метре = ? сантиметров', a: '100' }
-          ];
-          const chosen = opt[Math.floor(Math.random() * opt.length)];
-          question = chosen.q;
-          answer = chosen.a;
-        }
-      } else if (grade === 6) {
-        const mode = Math.random();
-        if (mode < 0.5) {
-          const r = Math.floor(Math.random() * 7) + 3;
-          question = `Окружность с радиусом R = ${r}. Диаметр D = 2R = ?`;
-          answer = (2 * r).toString();
-        } else {
-          const r = [2, 3, 4][Math.floor(Math.random() * 3)];
-          question = `Круг с радиусом R = ${r}. При π ≈ 3 площадь S ≈ 3 × R² = ?`;
-          answer = (3 * r * r).toString();
-        }
-      } else if (grade === 7) {
-        const mode = Math.random();
-        if (mode < 0.5) {
-          const a1 = 50, a2 = 60;
-          question = `В треугольнике углы ${a1}° и ${a2}°. Третий угол = ?°`;
-          answer = (180 - a1 - a2).toString();
-        } else {
-          const acute = [30, 40, 45, 60][Math.floor(Math.random() * 4)];
-          question = `Прямоугольный треугольник: острый угол ${acute}°. Второй угол = ?°`;
-          answer = (90 - acute).toString();
-        }
-      } else if (grade === 8) {
-        const mode = Math.random();
-        if (mode < 0.5) {
-          const pyth = [
-            { a: 3, b: 4, c: 5 },
-            { a: 6, b: 8, c: 10 },
-            { a: 5, b: 12, c: 13 }
-          ][Math.floor(Math.random() * 3)];
-          question = `Теорема Пифагора: катеты ${pyth.a} и ${pyth.b}. Гипотенуза c = ?`;
-          answer = pyth.c.toString();
-        } else {
-          const base = 8, h = 5;
-          question = `Треугольник: основание a = ${base}, высота h = ${h}. Площадь S = (a·h)/2 = ?`;
-          answer = ((base * h) / 2).toString();
-        }
-      } else if (grade === 9) {
-        const mode = Math.random();
-        if (mode < 0.5) {
-          const arc = [60, 80, 100, 120][Math.floor(Math.random() * 4)];
-          question = `Вписанный угол опирается на дугу ${arc}°. Его величина = ?°`;
-          answer = (arc / 2).toString();
-        } else {
-          const vec = [
-            { q: 'Длина вектора a(3, 4): |a| = √(3² + 4²) = ?', a: '5' },
-            { q: 'Длина вектора b(6, 8): |b| = √(6² + 8²) = ?', a: '10' },
-            { q: 'Скалярное произведение a(2, 3) и b(4, 1): 2·4 + 3·1 = ?', a: '11' }
-          ];
-          const chosen = vec[Math.floor(Math.random() * vec.length)];
-          question = chosen.q;
-          answer = chosen.a;
-        }
-      } else if (grade === 10) {
-        // 10 класс: Стереометрия
-        const opts = [
-          { q: 'Куб со стороной a = 3. Площадь поверхности 6a² = ?', a: '54' },
-          { q: 'Куб со стороной a = 4. Площадь поверхности 6a² = ?', a: '96' },
-          { q: 'Сколько граней у правильного тетраэдра?', a: '4' },
-          { q: 'Сколько рёбер у прямоугольного параллелепипеда?', a: '12' },
-          { q: 'Сколько вершин у куба?', a: '8' },
-          { q: 'Параллелепипед 2×3×6: диагональ d = √(4 + 9 + 36) = ?', a: '7' }
-        ];
-        const chosen = opts[Math.floor(Math.random() * opts.length)];
-        question = chosen.q;
-        answer = chosen.a;
-      } else {
-        // 11 класс: Тела вращения
-        const opts = [
-          { q: 'Цилиндр: R = 2, h = 5. При π ≈ 3 объём V ≈ 3 × R² × h = ?', a: '60' },
-          { q: 'Конус: радиус R = 3, высота h = 4. Образующая L = √(9 + 16) = ?', a: '5' },
-          { q: 'Шар радиуса R = 2. При π ≈ 3 площадь сферы S ≈ 4 × 3 × R² = ?', a: '48' },
-          { q: 'Конус: радиус R = 6, высота h = 8. Образующая L = √(36 + 64) = ?', a: '10' },
-          { q: 'Сечение шара радиуса 5 на расстоянии 3: радиус сечения r = √(25 - 9) = ?', a: '4' }
-        ];
-        const chosen = opts[Math.floor(Math.random() * opts.length)];
-        question = chosen.q;
-        answer = chosen.a;
-      }
-    } else {
-      // topic === 'analysis' (📈 Анализ)
-      if (grade === 2) {
-        const seqs = [
-          { q: 'Числовой ряд: 2, 4, 6, 8, ?', a: '10' },
-          { q: 'Числовой ряд: 5, 10, 15, 20, ?', a: '25' },
-          { q: 'Числовой ряд: 10, 20, 30, 40, ?', a: '50' },
-          { q: 'Числовой ряд: 1, 3, 5, 7, ?', a: '9' }
-        ];
-        const chosen = seqs[Math.floor(Math.random() * seqs.length)];
-        question = chosen.q;
-        answer = chosen.a;
-      } else if (grade === 3) {
-        const a = Math.floor(Math.random() * 4) + 2;
-        const x = Math.floor(Math.random() * 5) + 3;
-        question = `Функция y = ${a}x. При x = ${x} значение y = ?`;
-        answer = (a * x).toString();
-      } else if (grade === 4) {
-        const s = [24, 36, 48, 60][Math.floor(Math.random() * 4)];
-        const t = [2, 3, 4][Math.floor(Math.random() * 3)];
-        question = `Скорость v = S/t: путь ${s} км за ${t} ч. v = ? км/ч`;
-        answer = (s / t).toString();
-      } else if (grade === 5) {
-        const n1 = 10, n2 = 20, n3 = 30;
-        question = `Среднее арифметическое чисел ${n1}, ${n2}, ${n3} = ?`;
-        answer = ((n1 + n2 + n3) / 3).toString();
-      } else if (grade === 6) {
-        const k = Math.floor(Math.random() * 4) + 2;
-        const x = Math.floor(Math.random() * 5) + 3;
-        question = `Прямая пропорциональность y = ${k}x. При x = ${x}: y = ?`;
-        answer = (k * x).toString();
-      } else if (grade === 7) {
-        const k = Math.floor(Math.random() * 5) + 2;
-        const b = Math.floor(Math.random() * 7) + 1;
-        question = `Линейная функция y = ${k}x + ${b}. Угловой коэффициент k = ?`;
-        answer = k.toString();
-      } else if (grade === 8) {
-        const root = [2, 3, 4, 5][Math.floor(Math.random() * 4)];
-        question = `Нули функции f(x) = x² - ${root * root}: положительный ноль x = ?`;
-        answer = root.toString();
-      } else if (grade === 9) {
-        const x0 = [2, 3, 4][Math.floor(Math.random() * 3)];
-        question = `Вершина параболы y = (x - ${x0})² + 5: координата вершины x₀ = ?`;
-        answer = x0.toString();
-      } else if (grade === 10) {
-        // 10 класс: Анализ (пределы в точке, приращение, угловой коэффициент касательной)
-        const lims = [
-          { q: 'Предел lim(x→3) (x² - 9)/(x - 3) = lim(x→3)(x + 3) = ?', a: '6' },
-          { q: 'Предел lim(x→2) (x² - 4)/(x - 2) = lim(x→2)(x + 2) = ?', a: '4' },
-          { q: 'Предел lim(x→0) (8x)/x = ?', a: '8' },
-          { q: 'Касательная под углом 45°: угловой коэффициент k = tan(45°) = ?', a: '1' },
-          { q: 'Предел lim(x→∞) (6x + 5)/(2x + 1) = ?', a: '3' }
-        ];
-        const chosen = lims[Math.floor(Math.random() * lims.length)];
-        question = chosen.q;
-        answer = chosen.a;
-      } else {
-        // 11 класс: Анализ (дифференцирование, интегралы, экстремумы)
-        const opts = [
-          { q: 'Производная f(x) = x⁵: показатель степени в f\'(x) = 5x^? равен ?', a: '4' },
-          { q: 'f(x) = 3x²: значение производной f\'(5) = 6·5 = ?', a: '30' },
-          { q: 'Критическая точка f(x) = x³ - 3x: f\'(x) = 3x² - 3 = 0, при x > 0: x = ?', a: '1' },
-          { q: 'Интеграл Ньютона-Лейбница: ∫₁² 3x² dx = [x³]₁² = 8 - 1 = ?', a: '7' },
-          { q: 'Площадь под параболой y = x² от x=0 до x=3: ∫₀³ x² dx = [x³/3]₀³ = ?', a: '9' },
-          { q: 'Вторая производная f\'\'(x): f(x) = x³, f\'\'(2) = 6·2 = ?', a: '12' }
-        ];
-        const chosen = opts[Math.floor(Math.random() * opts.length)];
-        question = chosen.q;
-        answer = chosen.a;
-      }
+  const startMathTraining = (
+    grade: number = mathGrade,
+    topic: MathTopic = mathTopic,
+    difficulty: MathDifficulty = mathDifficulty
+  ) => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      playSound('wrong');
+      notifyNetworkOffline();
+      setToast(
+        user.language === 'ru'
+          ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
+          : '📡 No internet connection. DuoWindo6601 requires internet. Turn on Wi-Fi or mobile data and try again.'
+      );
+      return;
     }
-
-    const numAns = parseFloat(answer);
-    if (!isNaN(numAns) && distractors.length === 0) {
-      if (Number.isInteger(numAns)) {
-        distractors = [
-          (numAns + 1).toString(),
-          (numAns - 1).toString(),
-          (numAns + (numAns > 10 ? 10 : 2)).toString(),
-          (Math.max(0, numAns - 2)).toString()
-        ].filter(d => d !== answer).slice(0, 3);
-      } else {
-        distractors = [
-          (parseFloat((numAns + 0.1).toFixed(2))).toString(),
-          (parseFloat((Math.max(0, numAns - 0.1)).toFixed(2))).toString(),
-          (parseFloat((numAns + 0.25).toFixed(2))).toString(),
-          '1',
-          '0'
-        ].filter(d => d !== answer).slice(0, 3);
-      }
-    }
-
-    const wordBank = [answer, ...distractors].sort(() => Math.random() - 0.5);
-
-    return {
-      id: crypto.randomUUID(),
-      type: 'translation',
-      originalSentence: question,
-      targetTranslation: answer,
-      wordBank,
-      isFallback: true
-    };
-  };
-
-  const startMathTraining = (grade: number = mathGrade, topic: 'arithmetic' | 'algebra' | 'geometry' | 'analysis' = mathTopic) => {
     playSound('click');
-    const ex = generateMathExercise(grade, topic);
+    const ex = generateMathExercise(grade, topic, difficulty);
     setCurrentExercise(ex);
     setAvailableTokens((ex.wordBank || []).map(w => ({ id: crypto.randomUUID(), text: w })));
     setSelectedWordIds([]);
@@ -4153,6 +3612,7 @@ const getTodayChallenge = () => {
           ...defaultChessSettings,
           ...parsed,
           language: safeLang,
+          difficultyLevel: parsed.difficultyLevel === 'easy' ? 'easy' : 'hard',
           chessStats: parsed.chessStats || { games: 265, wins: 134, elo: 590 },
         };
       } catch (e) {
@@ -4167,6 +3627,7 @@ const getTodayChallenge = () => {
       completedLessons: [], mistakes: [], learnedWords: [], achievements: [],
       subscription: 'free', doubleXPActive: false,
       language: 'ru', 
+      difficultyLevel: 'hard',
       country: 'Russia',
       preferredVoice: 'Kore',
       voiceProvider: 'gemini',
@@ -4298,12 +3759,15 @@ const getTodayChallenge = () => {
 
   const handleToggleBetaTesting = (join: boolean) => {
     const isRuLang = user.language !== 'en';
-    const joinedAt = join ? new Date().toISOString() : undefined;
+    const joinedAt = join ? (user.betaJoinedAt || new Date().toISOString()) : undefined;
     setUser(prev => {
       const updated: UserProgress = {
         ...prev,
         isBetaTester: join,
-        betaJoinedAt: joinedAt
+        betaJoinedAt: joinedAt,
+        installedAppChannel: join ? (prev.installedAppChannel || 'stable') : 'stable',
+        betaBuildInstalledVersion: join ? prev.betaBuildInstalledVersion : undefined,
+        betaBuildInstalledAt: join ? prev.betaBuildInstalledAt : undefined
       };
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
@@ -4322,17 +3786,42 @@ const getTodayChallenge = () => {
       playSound('correct');
       setToast(
         isRuLang
-          ? '🧪 Вы присоединились к бета-тестированию приложения DuoWindo6601 PWA! Функции бета-тестирования разблокированы.'
-          : '🧪 You joined DuoWindo6601 PWA App Beta Testing! Beta features are now unlocked.'
+          ? `🧪 Вы присоединились к бета-тестированию приложения DuoWindo6601 PWA! Теперь доступна установка Бета-канала (${APP_BETA_VERSION}), Бета-Центр и 8 бета-курсов.`
+          : `🧪 You joined DuoWindo6601 PWA App Beta Testing! Beta Channel (${APP_BETA_VERSION}), Beta Center & 8 beta courses are unlocked.`
       );
     } else {
       playSound('click');
       setToast(
         isRuLang
-          ? '🔒 Вы вышли из бета-тестирования. Функции бета-тестирования снова недоступны.'
-          : '🔒 You left App Beta Testing. Beta features are now locked.'
+          ? '🔒 Вы вышли из бета-тестирования. Функции бета-тестирования и Бета-канал снова недоступны.'
+          : '🔒 You left App Beta Testing. Beta features and Beta Channel are now locked.'
       );
     }
+  };
+
+  const handleInstallAppChannel = (channel: 'stable' | 'beta') => {
+    const isRuLang = user.language !== 'en';
+    if (channel === 'beta' && !user.isBetaTester) {
+      playSound('wrong');
+      setToast(
+        isRuLang
+          ? `🔒 Не присоединились к бета-тестированию: установка ${APP_BETA_VERSION} недоступна!`
+          : `🔒 Not joined to App Beta Testing: installing ${APP_BETA_VERSION} is unavailable!`
+      );
+      return;
+    }
+    setUser(prev => {
+      const updated: UserProgress = {
+        ...prev,
+        installedAppChannel: channel,
+        betaBuildInstalledVersion: channel === 'beta' ? APP_BETA_VERSION : undefined,
+        betaBuildInstalledAt: channel === 'beta' ? new Date().toISOString() : undefined
+      };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
   };
 
   const goToSettingsVersion = () => {
@@ -4417,10 +3906,9 @@ const getTodayChallenge = () => {
     });
   }, []);
 
-  // Listen for online and offline network events to seamlessly sync internet availability
+  // Listen for online and offline network events to enforce strictly online lessons & writing
   useEffect(() => {
     const handleOnline = () => {
-      setOfflineMode(false);
       setToast(
         user.language === 'ru'
           ? '🌐 Подключение к интернету восстановлено! Работает без VPN и использует VPN.'
@@ -4429,7 +3917,7 @@ const getTodayChallenge = () => {
     };
 
     const handleOffline = () => {
-      setOfflineMode(true);
+      notifyNetworkOffline();
       setToast(
         user.language === 'ru'
           ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
@@ -4439,11 +3927,6 @@ const getTodayChallenge = () => {
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-
-    // Initial check: disabled offline mode on us-east1.run.app / ai.studio when online
-    if (typeof navigator !== 'undefined') {
-      setOfflineMode(isOnlineHostedEnvironment() && navigator.onLine ? false : !navigator.onLine);
-    }
 
     return () => {
       window.removeEventListener('online', handleOnline);
@@ -4686,6 +4169,9 @@ const getTodayChallenge = () => {
   const [showKlingonPIqaD, setShowKlingonPIqaD] = useState(true);
   const [showKlingonFont, setShowKlingonFont] = useState(true);
   const [klingonSpeechMode, setKlingonSpeechModeState] = useState<KlingonSpeechSource>(() => getKlingonSpeechMode());
+  useEffect(() => {
+    setKlingonSpeechModeState(getKlingonSpeechMode());
+  }, [currentCourse.id, screen]);
   const handleSwitchKlingonSpeechMode = (mode: KlingonSpeechSource, sampleText?: string) => {
     playSound('select');
     setKlingonSpeechMode(mode);
@@ -5077,22 +4563,9 @@ const getTodayChallenge = () => {
       setIsAiLimitModalOpen(true);
     };
 
-    const handleDisableOffline = () => {
-      setOfflineMode(false);
-    };
-
-    // If key is already skipped or user is super/max, disable offline mode automatically
-    if (isCustomApiKeySkipped() || user.subscription === 'super' || user.subscription === 'max') {
-      setOfflineMode(false);
-    }
-
     window.addEventListener('duowindo_ai_limit_reached', handleAiLimitEvent);
-    window.addEventListener('duowindo_disable_offline_mode', handleDisableOffline);
-    window.addEventListener('duowindo_api_key_changed', handleDisableOffline);
     return () => {
       window.removeEventListener('duowindo_ai_limit_reached', handleAiLimitEvent);
-      window.removeEventListener('duowindo_disable_offline_mode', handleDisableOffline);
-      window.removeEventListener('duowindo_api_key_changed', handleDisableOffline);
     };
   }, [user]);
 
@@ -5432,17 +4905,28 @@ const getTodayChallenge = () => {
 
   const handleFetchChessTutorialHint = async () => {
     if (tutorialHintLoading) return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      playSound('wrong');
+      notifyNetworkOffline();
+      setTutorialHintText('');
+      return;
+    }
     playSound('click');
     setTutorialHintLoading(true);
     try {
       const hint = await getChessTutorialHint(chessFen, chessHistory, user.language, tutorialMessage);
       setTutorialHintText(hint);
     } catch (err) {
-      setTutorialHintText(
-        user.language === 'ru'
-          ? "💡 Подсказка: Развивайте фигуры ближе к центру!"
-          : "💡 Hint: Develop your pieces towards the center!"
-      );
+      if ((typeof navigator !== 'undefined' && !navigator.onLine) || isNetworkDisconnectError(err)) {
+        notifyNetworkOffline();
+        setTutorialHintText('');
+      } else {
+        setTutorialHintText(
+          user.language === 'ru'
+            ? "💡 Подсказка: Развивайте фигуры ближе к центру!"
+            : "💡 Hint: Develop your pieces towards the center!"
+        );
+      }
     } finally {
       setTutorialHintLoading(false);
     }
@@ -5461,6 +4945,7 @@ const getTodayChallenge = () => {
   const [ishiharaInput, setIshiharaInput] = useState("");
   const [readingInput, setReadingInput] = useState("");
   const [roleplayInput, setRoleplayInput] = useState("");
+  const [roleplayTypingNonce, setRoleplayTypingNonce] = useState<number>(0);
 
   const [translatorInput, setTranslatorInput] = useState("");
   const [translatorOutput, setTranslatorOutput] = useState("");
@@ -5479,6 +4964,7 @@ const getTodayChallenge = () => {
   const [videoMicOn, setVideoMicOn] = useState(true);
   const [videoSmartMode, setVideoSmartMode] = useState(true);
   const [videoQuestion, setVideoQuestion] = useState("");
+  const [videoTypingNonce, setVideoTypingNonce] = useState<number>(0);
   const [videoHint, setVideoHint] = useState("");
   const [videoSelfViewOpen, setVideoSelfViewOpen] = useState(true);
   const [videoTopic, setVideoTopic] = useState<string>("Заказ в кафе");
@@ -5525,6 +5011,19 @@ const getTodayChallenge = () => {
   }, [isArabicCourse, isHebrewCourse]);
 
   const isKlingonCourse = currentCourse.id === 'tlh';
+  const isHighValyrianCourse = currentCourse.id === 'hv';
+  const isHighValyrianTextOrToken = useCallback((text: string) => {
+    if (!text || currentCourse.id !== 'hv') return false;
+    if (/[\u0400-\u04FF]/.test(text)) return false;
+    const norm = text.trim();
+    if (!norm) return false;
+    if (/[āēīōūȳĀĒĪŌŪȲ]/.test(norm)) return true;
+    const orig = currentExercise?.originalSentence || '';
+    const target = currentExercise?.targetTranslation || '';
+    if (/[\u0400-\u04FF]/.test(orig) && !/[\u0400-\u04FF]/.test(target)) return true;
+    if (orig.toLowerCase().includes(norm.toLowerCase()) && !/[\u0400-\u04FF]/.test(orig)) return true;
+    return false;
+  }, [currentCourse.id, currentExercise]);
   const isKlingonTextOrToken = useCallback((text: string) => {
     if (!text || currentCourse.id !== 'tlh') return false;
     if (isPIqaDText(text)) return true;
@@ -5767,6 +5266,42 @@ const getTodayChallenge = () => {
   useEffect(() => { localStorage.setItem('duo_course_id_6601', currentCourse.id); }, [currentCourse]);
   useEffect(() => { setTransTarget(currentCourse); }, [currentCourse]);
 
+  // Completely disable offline mode during lessons, writing, music studio, chess, and video call
+  useEffect(() => {
+    clearLessonCache();
+    const enforceOnlineLessonCleanup = () => {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch {}
+      }
+      setIsRecording(false);
+      setShowMusicStudioModal(false);
+      setShowLessonAiPartnerModal(false);
+      setShowExplanationModal(false);
+      if (
+        screen === AppScreen.LESSON ||
+        screen === AppScreen.VIDEO_CALL ||
+        screen === AppScreen.CHESS_MATCH ||
+        screen === AppScreen.CHESS_ANALYSIS
+      ) {
+        setLessonLoading(false);
+        setLoading(false);
+        setCurrentExercise(null);
+        setFeedback({ status: 'idle', message: '' });
+        setScreen(AppScreen.PATH);
+      }
+    };
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      enforceOnlineLessonCleanup();
+    }
+    if (typeof window === 'undefined') return;
+    window.addEventListener('offline', enforceOnlineLessonCleanup);
+    window.addEventListener('duowindo_network_offline', enforceOnlineLessonCleanup);
+    return () => {
+      window.removeEventListener('offline', enforceOnlineLessonCleanup);
+      window.removeEventListener('duowindo_network_offline', enforceOnlineLessonCleanup);
+    };
+  }, [screen]);
+
   // Handle Stripe Checkout Redirect Query Parameters on startup
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -5926,8 +5461,17 @@ const getTodayChallenge = () => {
 
   // ... (Video, Speech, Draw handlers same as before) ...
   const startVideoCall = async (topic: string = "Заказ в кафе", fromLesson: boolean = false) => {
+      if (currentCourse.id === 'tlh') {
+          playSound('wrong');
+          setToast(
+              user.language === 'ru'
+                  ? '🔒 Для Бета-курса клингонского языка ВидеоЗвонок и Roleplays ограничены!'
+                  : '🔒 Video Call and Roleplays are restricted for Beta Klingon!'
+          );
+          return;
+      }
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
-          setOfflineMode(true);
+          notifyNetworkOffline();
           setToast(
               user.language === 'ru'
                   ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
@@ -5959,9 +5503,11 @@ const getTodayChallenge = () => {
 
       const speechLangId = NON_LANGUAGE_IDS.includes(currentCourse.id) ? (user.language === 'ru' ? 'ru' : 'en') : currentCourse.id;
       try {
-          const greetingRes = await generateVideoCallRoleplayResponse(topic, [], '__START_VIDEO_CALL__', currentCourse.localName, user.language);
+          const activeDifficulty: 'easy' | 'hard' = user.difficultyLevel === 'easy' ? 'easy' : 'hard';
+          const greetingRes = await generateVideoCallRoleplayResponse(topic, [], '__START_VIDEO_CALL__', currentCourse.localName, user.language, activeDifficulty);
           const initialGreeting = greetingRes.text;
           setVideoQuestion(initialGreeting);
+          setVideoTypingNonce(n => n + 1);
           setVideoCallHistory([{ role: 'model', text: initialGreeting }]);
           speakText(initialGreeting, speechLangId, false, user.preferredVoice, user.voiceProvider);
 
@@ -5973,7 +5519,11 @@ const getTodayChallenge = () => {
           }
       } catch (e: any) {
           console.error(e);
-          const isOfflineErr = (typeof navigator !== 'undefined' && !navigator.onLine) || String(e?.message || '').includes('Нет подключения к интернету');
+          const isOfflineErr = (typeof navigator !== 'undefined' && !navigator.onLine) || isNetworkDisconnectError(e) || String(e?.message || '').includes('Нет подключения к интернету');
+          if (isOfflineErr) {
+              notifyNetworkOffline();
+              setScreen(AppScreen.PATH);
+          }
           setToast(
               isOfflineErr
                   ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
@@ -5987,7 +5537,7 @@ const getTodayChallenge = () => {
   const handleVideoCallSend = async (text: string) => {
       if (!text.trim() || loading) return;
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
-          setOfflineMode(true);
+          notifyNetworkOffline();
           setToast(
               user.language === 'ru'
                   ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
@@ -6005,11 +5555,13 @@ const getTodayChallenge = () => {
       const speechLangId = NON_LANGUAGE_IDS.includes(currentCourse.id) ? (user.language === 'ru' ? 'ru' : 'en') : currentCourse.id;
 
       try {
-          const res = await generateVideoCallRoleplayResponse(videoTopic, updatedHistory, text, currentCourse.localName, user.language);
+          const activeDifficulty: 'easy' | 'hard' = user.difficultyLevel === 'easy' ? 'easy' : 'hard';
+          const res = await generateVideoCallRoleplayResponse(videoTopic, updatedHistory, text, currentCourse.localName, user.language, activeDifficulty);
           const aiMsg: RoleplayMessage = { role: 'model', text: res.text, correction: res.correction };
           const finalHistory = [...updatedHistory, aiMsg];
           setVideoCallHistory(finalHistory);
           setVideoQuestion(res.text);
+          setVideoTypingNonce(n => n + 1);
 
           speakText(res.text, speechLangId, false, user.preferredVoice, user.voiceProvider);
           setUser(u => ({ ...u, xp: u.xp + 15 }));
@@ -6020,7 +5572,8 @@ const getTodayChallenge = () => {
           }
       } catch (e: any) {
           console.error(e);
-          const isOfflineErr = (typeof navigator !== 'undefined' && !navigator.onLine) || String(e?.message || '').includes('Нет подключения к интернету');
+          const isOfflineErr = (typeof navigator !== 'undefined' && !navigator.onLine) || isNetworkDisconnectError(e) || String(e?.message || '').includes('Нет подключения к интернету');
+          if (isOfflineErr) notifyNetworkOffline();
           setToast(
               isOfflineErr
                   ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
@@ -6136,7 +5689,7 @@ const getTodayChallenge = () => {
   // ... (API and Logic handlers) ...
   const checkApiStatus = async () => { 
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      setOfflineMode(true);
+      notifyNetworkOffline();
       setToast(
         user.language === 'ru'
           ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
@@ -6149,16 +5702,14 @@ const getTodayChallenge = () => {
     try { 
       const res = await pingGeminiApi(); 
       if (res.ok) { 
-        setOfflineMode(false); 
         setToast(user.language === 'ru' ? "⚡ Gemini API онлайн! Работает без VPN и использует VPN." : "⚡ Gemini API is Online (Works with & without VPN)!"); 
         playSound('success'); 
       } else { 
-        setOfflineMode(false); 
         setToast(user.language === 'ru' ? `⚠️ ${res.message}` : `⚠️ ${res.message}`); 
         playSound('wrong'); 
       } 
     } catch (e: any) { 
-      setOfflineMode(typeof navigator !== 'undefined' ? !navigator.onLine : false);
+      if (typeof navigator !== 'undefined' && !navigator.onLine) notifyNetworkOffline();
       setToast(
         typeof navigator !== 'undefined' && !navigator.onLine
           ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
@@ -6171,14 +5722,29 @@ const getTodayChallenge = () => {
   };
   const handleTranslator = async (targetLangOverride?: string) => {
     if (!translatorInput.trim()) return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      playSound('wrong');
+      notifyNetworkOffline();
+      setTranslatorOutput(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+      setToast(`📡 ${OFFLINE_INTERNET_REQUIRED_MESSAGE}`);
+      return;
+    }
     setLoading(true);
     try {
       const targetLangName = targetLangOverride || (user.language === 'en' ? transTarget.name : (user.language === 'ru' ? (transTarget.localName || transTarget.name) : transTarget.name));
       const result = await translateText(translatorInput, targetLangName);
       setTranslatorOutput(result);
       playSound('success');
-    } catch (e) {
-      setTranslatorOutput(user.language === 'ru' ? "Ошибка перевода. Пожалуйста, повторите попытку." : "Translation error. Please try again.");
+    } catch (e: any) {
+      const isOfflineErr = (typeof navigator !== 'undefined' && !navigator.onLine) || isNetworkDisconnectError(e) || String(e?.message || '').includes('Нет подключения к интернету');
+      if (isOfflineErr) {
+        notifyNetworkOffline();
+        setTranslatorOutput(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+        setToast(`📡 ${OFFLINE_INTERNET_REQUIRED_MESSAGE}`);
+      } else {
+        setTranslatorOutput(user.language === 'ru' ? "Ошибка онлайн-перевода. Пожалуйста, повторите попытку." : "Online translation error. Please try again.");
+      }
+      playSound('wrong');
     } finally {
       setLoading(false);
     }
@@ -6243,6 +5809,7 @@ const getTodayChallenge = () => {
     setChessValidMoves([]);
     setChessStatus('active');
     setChessLastMove(null);
+    setTutorialHintText("");
     setChessTimerSeconds((user.chessTimeControl || 20) * 60);
     setChessChat([{
       role: 'model',
@@ -6254,6 +5821,12 @@ const getTodayChallenge = () => {
   };
 
   const handleStartPvpChess = (opponent: ChessOpponent) => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      playSound('wrong');
+      notifyNetworkOffline();
+      setToast(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+      return;
+    }
     playSound('select');
     const opp = {
       name: opponent.name,
@@ -6316,7 +5889,7 @@ const getTodayChallenge = () => {
     }
     handleChessHubCopyLink();
   };
-  const handleChessChatSend = async () => { if (!chessInput.trim()) return; const userText = chessInput; setChessInput(""); const newHistory = [...chessChat, { role: 'user', text: userText } as RoleplayMessage]; setChessChat(newHistory); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); const reply = await getChessChatReply(chessFen, chessHistory, newHistory, userText); setChessChat([...newHistory, { role: 'model', text: reply }]); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); }
+  const handleChessChatSend = async () => { if (!chessInput.trim()) return; if (typeof navigator !== 'undefined' && !navigator.onLine) { playSound('wrong'); notifyNetworkOffline(); setToast(OFFLINE_INTERNET_REQUIRED_MESSAGE); return; } const userText = chessInput; setChessInput(""); const newHistory = [...chessChat, { role: 'user', text: userText } as RoleplayMessage]; setChessChat(newHistory); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); try { const reply = await getChessChatReply(chessFen, chessHistory, newHistory, userText); setChessChat([...newHistory, { role: 'model', text: reply }]); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); } catch (err) { if ((typeof navigator !== 'undefined' && !navigator.onLine) || isNetworkDisconnectError(err)) notifyNetworkOffline(); } }
   const getPieceTutorial = (piece: ChessPiece, lang: string) => {
       const isRu = lang === 'ru';
       switch(piece.piece.toLowerCase()) {
@@ -6331,6 +5904,7 @@ const getTodayChallenge = () => {
   };
 
   const onChessSquareClick = async (r: number, c: number) => { 
+      if (typeof navigator !== 'undefined' && !navigator.onLine) { playSound('wrong'); notifyNetworkOffline(); setToast(OFFLINE_INTERNET_REQUIRED_MESSAGE); return; }
       if (chessStatus === 'mate') return; 
       if ((chessMode === 'pve' || chessMode === 'tutorial' || chessMode === 'pvp') && chessTurn !== 'w') return; // In PvE/Tutorial, player is only white
       
@@ -6381,6 +5955,7 @@ const getTodayChallenge = () => {
       setChessLastMove({from, to});
       setChessHistory(chess.history());
       setChessTurn(chess.turn());
+      setTutorialHintText("");
       
       if (chessMode === 'tutorial') {
           setTutorialMessage(user.language === 'ru' ? "Отличный ход! Посмотрим, как ответит соперник." : "Great move! Let's see how the opponent responds.");
@@ -6430,6 +6005,11 @@ const getTodayChallenge = () => {
           }
       } catch (e) {
           console.error("AI Move logic error/fallback", e); 
+          if ((typeof navigator !== 'undefined' && !navigator.onLine) || isNetworkDisconnectError(e)) {
+              notifyNetworkOffline();
+              setToast(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+              return;
+          }
           const chessForFallback = new Chess(currentFen);
           const legalMoves = chessForFallback.moves();
           if (legalMoves.length > 0) {
@@ -6546,7 +6126,7 @@ const getTodayChallenge = () => {
   const handleExplainMistake = async () => {
     playSound('click');
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      setOfflineMode(true);
+      notifyNetworkOffline();
       setToast(
         user.language === 'ru'
           ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
@@ -6592,12 +6172,17 @@ const getTodayChallenge = () => {
       const explanationText = await getMistakeExplanation(original, userAnswer, correctAnswer, userLang, isCorrect, currentExercise.type, false);
       setExplanation(explanationText);
     } catch (e: any) {
-      const isOfflineErr = (typeof navigator !== 'undefined' && !navigator.onLine) || String(e?.message || '').includes('Нет подключения к интернету');
+      const isOfflineErr = (typeof navigator !== 'undefined' && !navigator.onLine) || isNetworkDisconnectError(e) || String(e?.message || '').includes('Нет подключения к интернету');
       if (isOfflineErr) {
+        notifyNetworkOffline();
         setShowExplanationModal(false);
-        setToast('📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова');
+        setToast(`📡 ${OFFLINE_INTERNET_REQUIRED_MESSAGE}`);
       } else {
-        setExplanation(generateLocalMistakeExplanation(original, userAnswer, correctAnswer, userLang, isCorrect, currentExercise.type));
+        setExplanation(
+          user.language === 'ru'
+            ? '⚠️ Не удалось получить объяснение от сервера Gemini AI. Пожалуйста, повторите попытку.'
+            : '⚠️ Failed to retrieve explanation from Gemini AI server. Please try again.'
+        );
       }
     } finally {
       setExplanationLoading(false);
@@ -6605,8 +6190,36 @@ const getTodayChallenge = () => {
   };
   const startTraining = async (type: Exercise['type'] = 'translation', topicOverride?: string) => {
     playSound('click');
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      playSound('wrong');
+      notifyNetworkOffline();
+      setToast(
+        user.language === 'ru'
+          ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
+          : '📡 No internet connection. DuoWindo6601 requires internet. Turn on Wi-Fi or mobile data and try again.'
+      );
+      return;
+    }
+    if (currentCourse.id === 'tlh' && type === 'roleplay') {
+      playSound('wrong');
+      setToast(
+        user.language === 'ru'
+          ? '🔒 Для Бета-курса клингонского языка ВидеоЗвонок и Roleplays ограничены!'
+          : '🔒 Video Call and Roleplays are restricted for Beta Klingon!'
+      );
+      return;
+    }
     if (currentCourse.id === 'tlh' && type === 'speech') {
       type = 'listening';
+    }
+    if (type === 'drawing' && isSpecialNonLanguage(currentCourse.id)) {
+      playSound('wrong');
+      setToast(
+        user.language === 'ru' 
+          ? `🔒 Раздел «Письмо» доступен только для языковых курсов. Курс «${currentCourse.localName || currentCourse.name}» относится к разделу «Предметы & Игры» (не языковой курс). В данном предмете нет алфавита или букв.`
+          : `🔒 Writing section is only available for language courses. Course "${currentCourse.name}" has no alphabet or letters.`
+      );
+      return;
     }
     if (user.subscription === 'free' && user.energy <= 0) {
       setToast(t('t_energy_low'));
@@ -6629,7 +6242,7 @@ const getTodayChallenge = () => {
     }
 
     if (currentCourse.id === 'math' && type === 'translation') {
-      startMathTraining(mathGrade, mathTopic);
+      startMathTraining(mathGrade, mathTopic, mathDifficulty);
       return;
     }
 
@@ -6652,20 +6265,6 @@ const getTodayChallenge = () => {
     setIshiharaInput("");
     setReadingInput("");
 
-    const isPhysicalOffline = typeof navigator !== 'undefined' && !navigator.onLine;
-    if (isPhysicalOffline) {
-      setOfflineMode(true);
-      setLessonLoading(false);
-      setLoading(false);
-      setScreen(AppScreen.PATH);
-      setToast(
-        user.language === 'ru'
-          ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
-          : '📡 No internet connection. DuoWindo6601 requires internet. Turn on Wi-Fi or mobile data and try again.'
-      );
-      return;
-    }
-
     const speechLangId = NON_LANGUAGE_IDS.includes(currentCourse.id) ? (user.language === 'ru' ? 'ru' : 'en') : currentCourse.id;
     const toWordTokens = (bank: any) =>
       (Array.isArray(bank) ? bank : [])
@@ -6673,6 +6272,7 @@ const getTodayChallenge = () => {
         .filter(Boolean)
         .map(w => ({ id: crypto.randomUUID(), text: w }));
 
+    const activeDifficulty: 'easy' | 'hard' = user.difficultyLevel === 'easy' ? 'easy' : 'hard';
     try {
       if (type === 'roleplay') {
         if (user.subscription !== 'max') {
@@ -6686,8 +6286,9 @@ const getTodayChallenge = () => {
           return;
         }
         setRoleplayInput("");
-        const ex = await startRoleplay(currentCourse.localName, currentCourse.id, user.language);
+        const ex = await startRoleplay(currentCourse.localName, currentCourse.id, user.language, activeDifficulty);
         setCurrentExercise(ex);
+        setRoleplayTypingNonce(n => n + 1);
         if (ex.roleplayData?.messages[0]) speakText(ex.roleplayData.messages[0].text, speechLangId, false, user.preferredVoice, user.voiceProvider);
       } else if (type === 'illusion') {
         const ex = await generateIllusion(currentCourse.localName, currentCourse.id);
@@ -6704,7 +6305,7 @@ const getTodayChallenge = () => {
         setCurrentExercise(ex);
         setIshiharaInput("");
       } else if (type === 'reading') {
-        const ex = await generateReading(currentCourse.localName, currentCourse.id, user.language);
+        const ex = await generateReading(currentCourse.localName, currentCourse.id, user.language, activeDifficulty);
         setCurrentExercise(ex);
         setReadingInput("");
         if (ex.readingData?.mode === 'fill-blanks') {
@@ -6712,7 +6313,6 @@ const getTodayChallenge = () => {
           setSelectedWordIds([]);
         }
       } else {
-        const activeDifficulty: 'easy' | 'hard' = user.difficultyLevel === 'hard' ? 'hard' : 'easy';
         const ex = await generateExercise(currentCourse.localName, currentCourse.id, isLanguageCourse, type, user.subscription === 'max', topicOverride, user.language, activeDifficulty);
         setAvailableTokens(toWordTokens(ex.wordBank));
         setSelectedWordIds([]);
@@ -6722,25 +6322,18 @@ const getTodayChallenge = () => {
       }
     } catch (e: any) {
       console.warn("API exercise generation failed:", e);
-      const isOfflineErr = (typeof navigator !== 'undefined' && !navigator.onLine) || String(e?.message || '').includes('Нет подключения к интернету');
-      if (isOfflineErr || type === 'roleplay') {
-        if (isOfflineErr) setOfflineMode(true);
-        setScreen(AppScreen.PATH);
-        setToast(
-          isOfflineErr
-            ? (user.language === 'ru'
-                ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
-                : '📡 No internet connection. DuoWindo6601 requires internet. Turn on Wi-Fi or mobile data and try again.')
-            : (e?.message || (user.language === 'ru' ? '⚠️ Не удалось подключиться к AI-диалогу. Попробуйте снова.' : '⚠️ Failed to start AI conversation.'))
-        );
-      } else {
-        const activeDifficulty: 'easy' | 'hard' = user.difficultyLevel === 'hard' ? 'hard' : 'easy';
-        const ex = { ...getFallbackExercise(currentCourse.id, type, currentCourse.localName, user.language, topicOverride, activeDifficulty), difficultyLevel: activeDifficulty };
-        setAvailableTokens(toWordTokens(ex.wordBank));
-        setSelectedWordIds([]);
-        setCurrentExercise(ex);
-        if (type === 'listening' && ex.originalSentence) speakText(ex.originalSentence, speechLangId, false, user.preferredVoice, user.voiceProvider);
+      const isOfflineErr = (typeof navigator !== 'undefined' && !navigator.onLine) || isNetworkDisconnectError(e) || String(e?.message || '').includes('Нет подключения к интернету');
+      if (isOfflineErr) {
+        notifyNetworkOffline();
       }
+      setScreen(AppScreen.PATH);
+      setToast(
+        isOfflineErr
+          ? (user.language === 'ru'
+              ? `📡 ${OFFLINE_INTERNET_REQUIRED_MESSAGE}`
+              : '📡 No internet connection. DuoWindo6601 requires internet. Turn on Wi-Fi or mobile data and try again.')
+          : (e?.message || (user.language === 'ru' ? '⚠️ Не удалось загрузить онлайн-упражнение. Попробуйте снова.' : '⚠️ Failed to load online exercise. Please try again.'))
+      );
     } finally {
       setLessonLoading(false);
       setLoading(false);
@@ -6763,12 +6356,18 @@ const getTodayChallenge = () => {
     }
   };
 
-  const handleRoleplaySend = async (text: string) => { if (!currentExercise || !currentExercise.roleplayData || !text.trim()) return; if (typeof navigator !== 'undefined' && !navigator.onLine) { setOfflineMode(true); setToast(user.language === 'ru' ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова' : '📡 No internet connection. DuoWindo6601 requires internet.'); return; } const newMessage: RoleplayMessage = { role: 'user', text: text }; const updatedMessages = [...currentExercise.roleplayData.messages, newMessage]; setCurrentExercise({ ...currentExercise, roleplayData: { ...currentExercise.roleplayData, messages: updatedMessages, userTurn: false } }); setRoleplayInput(""); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); setLoading(true); const speechLangId = NON_LANGUAGE_IDS.includes(currentCourse.id) ? (user.language === 'ru' ? 'ru' : 'en') : currentCourse.id; try { const reply = await replyToRoleplay(updatedMessages, text, currentCourse.localName, user.subscription === 'max', user.language, currentCourse.id); if (reply.isFallback && !offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); setCurrentExercise(prev => { if (!prev || !prev.roleplayData) return prev; return { ...prev, roleplayData: { ...prev.roleplayData, messages: [...updatedMessages, reply], userTurn: true } } }); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); speakText(reply.text, speechLangId, false, user.preferredVoice, user.voiceProvider); setUser(u => ({ ...u, xp: u.xp + 10 })); checkAndAwardDailyChallenge('roleplay'); awardLessonStreak(); } catch (e: any) { console.error(e); const isOfflineErr = (typeof navigator !== 'undefined' && !navigator.onLine) || String(e?.message || '').includes('Нет подключения к интернету'); setCurrentExercise(prev => { if (!prev || !prev.roleplayData) return prev; return { ...prev, roleplayData: { ...prev.roleplayData, userTurn: true } }; }); setToast(isOfflineErr ? (user.language === 'ru' ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова' : '📡 Network error. Check your internet connection.') : (user.language === 'ru' ? '⚠️ Ошибка ответа AI. Попробуйте ещё раз.' : '⚠️ AI reply error. Please try again.')); } finally { setLoading(false); } };
-  const checkIllusionAnswer = async (selectedOption: 'A' | 'B') => { if (!currentExercise || !currentExercise.illusionData) return; setLoading(true); try { const isCorrect = currentExercise.illusionData.correctOption === selectedOption; const isHardMode = (currentExercise?.difficultyLevel || user.difficultyLevel) === 'hard'; if (isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: currentExercise.illusionData.explanation }); setUser(u => ({ ...u, xp: u.xp + (isHardMode ? 35 : 20) })); checkAndAwardDailyChallenge('illusion'); awardLessonStreak(); } else { playSound('wrong'); const correctText = currentExercise.illusionData.correctOption === 'A' ? currentExercise.illusionData.optionA : currentExercise.illusionData.optionB; setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${correctText}. ${currentExercise.illusionData.explanation}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } finally { setLoading(false); } };
-  const checkDrawingAnswer = async () => { if (!currentExercise || !currentExercise.drawingData || !canvasRef.current) return; playSound('click'); setLoading(true); try { const imageBase64 = canvasRef.current.toDataURL('image/png').split(',')[1]; const result = await checkDrawing(imageBase64, currentExercise.drawingData.character); const isHardMode = (currentExercise?.difficultyLevel || user.difficultyLevel) === 'hard'; if (result.isFallback && !offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); if (result.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: result.feedback }); setUser(u => ({ ...u, xp: u.xp + (isHardMode ? 35 : 20) })); checkAndAwardDailyChallenge('drawing'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: result.feedback }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } catch (e) { console.error(e); } finally { setLoading(false); } };
-  const checkAnswer = async (spokenText?: string) => { if (!currentExercise) return; const isHardMode = (currentExercise?.difficultyLevel || user.difficultyLevel) === 'hard'; if (isRecording) { setIsRecording(false); if (recognitionRef.current) recognitionRef.current.stop(); if (timerRef.current) clearTimeout(timerRef.current); } if (!spokenText && currentExercise.type !== 'ishihara') playSound('click'); if (currentExercise.type === 'ishihara') { const correct = currentExercise.targetTranslation; const userAnswer = ishiharaInput.trim(); if (userAnswer === correct) { playSound('correct'); setFeedback({ status: 'correct', message: "Correct! You have good color vision for this plate." }); setUser(u => ({ ...u, xp: u.xp + (isHardMode ? 30 : 15) })); checkAndAwardDailyChallenge('ishihara'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `Incorrect. The number was ${correct}.` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } return; } if (currentExercise.type === 'reading') { setLoading(true); try { if (currentExercise.readingData?.mode === 'write') { const ans = readingInput; if (!ans.trim()) { setToast(user.language === 'ru' ? 'Введите текст ответа!' : 'Please write an answer!'); return; } const res = await checkAnswerWithAI(currentCourse.localName, ans, currentExercise.readingData.prompt || "Write something relevant", user.subscription === 'max'); if (res.isFallback && !offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + (isHardMode ? 35 : 20), gems: u.gems + (isHardMode ? 10 : 5) })); checkAndAwardDailyChallenge('reading'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: res.feedback }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } return; } else { const tempText = currentExercise.readingData?.text || ''; const blanksCount = (tempText.match(/___/g) || []).length; if (selectedWordIds.length !== blanksCount) { setToast(user.language === 'ru' ? 'Заполните все пропуски!' : 'Fill all blanks!'); return; } const correctWords = (currentExercise.readingData?.blanks || []).map(b => String(b?.word || '')); const userWords = selectedWordIds.map(id => String(availableTokens.find(t => t.id === id)?.text || '')); const isCorrect = correctWords.length > 0 && correctWords.every((w, i) => w.toLowerCase() === (userWords[i] || '').toLowerCase()); if (isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: user.language === 'ru' ? 'Отлично!' : 'Perfect!' }); setUser(u => ({ ...u, xp: u.xp + (isHardMode ? 35 : 20) })); checkAndAwardDailyChallenge('reading'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${currentExercise.targetTranslation || correctWords.join(', ')}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } return; } } catch (e) { console.error(e); setToast(user.language === 'ru' ? 'Ошибка проверки чтения' : 'Reading check error'); return; } finally { setLoading(false);  } } setLoading(true); try { const effectiveSpeechMode = currentExercise.type === 'speech' && currentCourse.id !== 'tlh'; let ans = ""; if (typeof spokenText === 'string') ans = spokenText; else if (effectiveSpeechMode) { if (transcriptRef.current.trim()) ans = transcriptRef.current; else if (!recognitionRef.current) ans = currentExercise.originalSentence; else { setLoading(false); setToast(t('t_speech_empty')); return; } } else ans = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text).join(' '); const correctAnswer = effectiveSpeechMode ? currentExercise.originalSentence : currentExercise.targetTranslation; const res = await checkAnswerWithAI(currentCourse.localName, ans, correctAnswer, user.subscription === 'max'); if (res.isFallback && !offlineMode && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + (isHardMode ? 35 : 20), gems: u.gems + (isHardMode ? 10 : 5) })); checkAndAwardDailyChallenge(currentExercise.type); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${correctAnswer}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } catch (e) { console.error(e); setToast("Ошибка проверки"); } finally { setLoading(false); } };
+  const handleRoleplaySend = async (text: string) => { if (!currentExercise || !currentExercise.roleplayData || !text.trim()) return; if (typeof navigator !== 'undefined' && !navigator.onLine) { notifyNetworkOffline(); setToast(user.language === 'ru' ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова' : '📡 No internet connection. DuoWindo6601 requires internet.'); return; } const newMessage: RoleplayMessage = { role: 'user', text: text }; const updatedMessages = [...currentExercise.roleplayData.messages, newMessage]; setCurrentExercise({ ...currentExercise, roleplayData: { ...currentExercise.roleplayData, messages: updatedMessages, userTurn: false } }); setRoleplayInput(""); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); setLoading(true); const speechLangId = NON_LANGUAGE_IDS.includes(currentCourse.id) ? (user.language === 'ru' ? 'ru' : 'en') : currentCourse.id; const activeDifficulty: 'easy' | 'hard' = user.difficultyLevel === 'easy' ? 'easy' : 'hard'; try { const reply = await replyToRoleplay(updatedMessages, text, currentCourse.localName, user.subscription === 'max', user.language, currentCourse.id, activeDifficulty); if (reply.isFallback && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); setCurrentExercise(prev => { if (!prev || !prev.roleplayData) return prev; return { ...prev, roleplayData: { ...prev.roleplayData, messages: [...updatedMessages, reply], userTurn: true } } }); setRoleplayTypingNonce(n => n + 1); setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); speakText(reply.text, speechLangId, false, user.preferredVoice, user.voiceProvider); setUser(u => ({ ...u, xp: u.xp + 10 })); checkAndAwardDailyChallenge('roleplay'); awardLessonStreak(); } catch (e: any) { console.error(e); const isOfflineErr = (typeof navigator !== 'undefined' && !navigator.onLine) || isNetworkDisconnectError(e) || String(e?.message || '').includes('Нет подключения к интернету'); if (isOfflineErr) notifyNetworkOffline(); setCurrentExercise(prev => { if (!prev || !prev.roleplayData) return prev; return { ...prev, roleplayData: { ...prev.roleplayData, userTurn: true } }; }); setToast(isOfflineErr ? (user.language === 'ru' ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова' : '📡 Network error. Check your internet connection.') : (user.language === 'ru' ? '⚠️ Ошибка ответа AI. Попробуйте ещё раз.' : '⚠️ AI reply error. Please try again.')); } finally { setLoading(false); } };
+  const checkIllusionAnswer = async (selectedOption: 'A' | 'B') => { if (!currentExercise || !currentExercise.illusionData) return; if (typeof navigator !== 'undefined' && !navigator.onLine) { playSound('wrong'); notifyNetworkOffline(); setToast(user.language === 'ru' ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова' : '📡 No internet connection. DuoWindo6601 requires internet.'); return; } setLoading(true); try { const isCorrect = currentExercise.illusionData.correctOption === selectedOption; const isHardMode = (currentExercise?.difficultyLevel || user.difficultyLevel || 'hard') === 'hard'; if (isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: currentExercise.illusionData.explanation }); setUser(u => ({ ...u, xp: u.xp + (isHardMode ? 35 : 20) })); checkAndAwardDailyChallenge('illusion'); awardLessonStreak(); } else { playSound('wrong'); const correctText = currentExercise.illusionData.correctOption === 'A' ? currentExercise.illusionData.optionA : currentExercise.illusionData.optionB; setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${correctText}. ${currentExercise.illusionData.explanation}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } finally { setLoading(false); } };
+  const checkDrawingAnswer = async () => { if (!currentExercise || !currentExercise.drawingData || !canvasRef.current) return; if (typeof navigator !== 'undefined' && !navigator.onLine) { playSound('wrong'); notifyNetworkOffline(); setToast(user.language === 'ru' ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова' : '📡 No internet connection. DuoWindo6601 requires internet.'); return; } playSound('click'); setLoading(true); try { const imageBase64 = canvasRef.current.toDataURL('image/png').split(',')[1]; const result = await checkDrawing(imageBase64, currentExercise.drawingData.character); const isHardMode = (currentExercise?.difficultyLevel || user.difficultyLevel || 'hard') === 'hard'; if (result.isFallback && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); if (result.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: result.feedback }); setUser(u => ({ ...u, xp: u.xp + (isHardMode ? 35 : 20) })); checkAndAwardDailyChallenge('drawing'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: result.feedback }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } catch (e: any) { console.error(e); const isOfflineErr = (typeof navigator !== 'undefined' && !navigator.onLine) || isNetworkDisconnectError(e) || String(e?.message || '').includes('Нет подключения к интернету'); if (isOfflineErr) { notifyNetworkOffline(); setToast(OFFLINE_INTERNET_REQUIRED_MESSAGE); } else { setToast(user.language === 'ru' ? 'Ошибка проверки рисунка' : 'Drawing check error'); } } finally { setLoading(false); } };
+  const checkAnswer = async (spokenText?: string) => { if (!currentExercise) return; if (typeof navigator !== 'undefined' && !navigator.onLine) { playSound('wrong'); notifyNetworkOffline(); setToast(user.language === 'ru' ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова' : '📡 No internet connection. DuoWindo6601 requires internet.'); return; } const effectiveDifficulty = currentExercise?.difficultyLevel || user.difficultyLevel || 'hard'; const isHardMode = effectiveDifficulty === 'hard'; const isMediumMode = effectiveDifficulty === 'medium'; const xpGain = isHardMode ? 35 : isMediumMode ? 28 : 20; const gemGain = isHardMode ? 10 : isMediumMode ? 7 : 5; if (isRecording) { setIsRecording(false); if (recognitionRef.current) recognitionRef.current.stop(); if (timerRef.current) clearTimeout(timerRef.current); } if (!spokenText && currentExercise.type !== 'ishihara') playSound('click'); if (currentExercise.type === 'ishihara') { const correct = currentExercise.targetTranslation; const userAnswer = ishiharaInput.trim(); if (userAnswer === correct) { playSound('correct'); setFeedback({ status: 'correct', message: "Correct! You have good color vision for this plate." }); setUser(u => ({ ...u, xp: u.xp + (isHardMode ? 30 : 15) })); checkAndAwardDailyChallenge('ishihara'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `Incorrect. The number was ${correct}.` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } return; } if (currentExercise.type === 'reading') { setLoading(true); try { if (currentExercise.readingData?.mode === 'write') { const ans = readingInput; if (!ans.trim()) { setToast(user.language === 'ru' ? 'Введите текст ответа!' : 'Please write an answer!'); return; } const res = await checkAnswerWithAI(currentCourse.localName, ans, currentExercise.readingData.prompt || "Write something relevant", user.subscription === 'max'); if (res.isFallback && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + xpGain, gems: u.gems + gemGain })); checkAndAwardDailyChallenge('reading'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: res.feedback }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } return; } else { const tempText = currentExercise.readingData?.text || ''; const blanksCount = (tempText.match(/___/g) || []).length; if (selectedWordIds.length !== blanksCount) { setToast(user.language === 'ru' ? 'Заполните все пропуски!' : 'Fill all blanks!'); return; } const correctWords = (currentExercise.readingData?.blanks || []).map(b => String(b?.word || '')); const userWords = selectedWordIds.map(id => String(availableTokens.find(t => t.id === id)?.text || '')); const isCorrect = correctWords.length > 0 && correctWords.every((w, i) => w.toLowerCase() === (userWords[i] || '').toLowerCase()); if (isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: user.language === 'ru' ? 'Отлично!' : 'Perfect!' }); setUser(u => ({ ...u, xp: u.xp + xpGain })); checkAndAwardDailyChallenge('reading'); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${currentExercise.targetTranslation || correctWords.join(', ')}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } return; } } catch (e: any) { console.error(e); const isOfflineErr = (typeof navigator !== 'undefined' && !navigator.onLine) || isNetworkDisconnectError(e) || String(e?.message || '').includes('Нет подключения к интернету'); if (isOfflineErr) { notifyNetworkOffline(); setToast(OFFLINE_INTERNET_REQUIRED_MESSAGE); } else { setToast(user.language === 'ru' ? 'Ошибка проверки чтения' : 'Reading check error'); } return; } finally { setLoading(false);  } } setLoading(true); try { const effectiveSpeechMode = currentExercise.type === 'speech' && currentCourse.id !== 'tlh'; let ans = ""; if (typeof spokenText === 'string') ans = spokenText; else if (effectiveSpeechMode) { if (transcriptRef.current.trim()) ans = transcriptRef.current; else if (!recognitionRef.current) ans = currentExercise.originalSentence; else { setLoading(false); setToast(t('t_speech_empty')); return; } } else ans = selectedWordIds.map(id => availableTokens.find(t => t.id === id)?.text).join(' '); const correctAnswer = effectiveSpeechMode ? currentExercise.originalSentence : currentExercise.targetTranslation; const res = await checkAnswerWithAI(currentCourse.localName, ans, correctAnswer, user.subscription === 'max'); if (res.isFallback && !isCustomApiKeySkipped() && user.subscription !== 'super' && user.subscription !== 'max') setShowLimitModal(true); if (res.isCorrect) { playSound('correct'); setFeedback({ status: 'correct', message: res.feedback }); setUser(u => ({ ...u, xp: u.xp + xpGain, gems: u.gems + gemGain })); checkAndAwardDailyChallenge(currentExercise.type); awardLessonStreak(); } else { playSound('wrong'); setFeedback({ status: 'wrong', message: `${t('correctAnswer')} ${correctAnswer}` }); if (user.subscription === 'free') setUser(u => ({ ...u, energy: Math.max(0, u.energy - 1) })); } } catch (e: any) { console.error(e); const isOfflineErr = (typeof navigator !== 'undefined' && !navigator.onLine) || isNetworkDisconnectError(e) || String(e?.message || '').includes('Нет подключения к интернету'); if (isOfflineErr) { notifyNetworkOffline(); setToast(OFFLINE_INTERNET_REQUIRED_MESSAGE); } else { setToast("Ошибка проверки"); } } finally { setLoading(false); } };
   const handleContinueAfterLesson = () => { playSound('click'); if (user.subscription === 'free' && Math.random() > 0.5) setShowAd(true); else setScreen(AppScreen.PATH); setFeedback({ status: 'idle', message: '' }); setCurrentExercise(null); setExplanation(null); setShowExplanationModal(false); }
   const openLettersSubTab = (tab: 'letters' | 'words' | 'illusion' | 'audio') => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      playSound('wrong');
+      notifyNetworkOffline();
+      setToast(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+      return;
+    }
     playSound('click');
     setFeedback({ status: 'idle', message: '' });
     setCurrentExercise(null);
@@ -6802,8 +6401,8 @@ const getTodayChallenge = () => {
     try {
       const todayStr = new Date().toISOString().split('T')[0];
       const rawChallenge = getTodayChallenge();
-      const todayChallenge = (currentCourse.id === 'tlh' && rawChallenge.type === 'speech')
-        ? (DAILY_CHALLENGES.find(c => c.type === 'listening') || rawChallenge)
+      const todayChallenge = (currentCourse.id === 'tlh' && (rawChallenge.type === 'speech' || rawChallenge.type === 'roleplay'))
+        ? (DAILY_CHALLENGES.find(c => c.type === (rawChallenge.type === 'roleplay' ? 'translation' : 'listening')) || rawChallenge)
         : rawChallenge;
       if (exType === todayChallenge.type && user.dailyChallengeCompletedDate !== todayStr) {
         setUser(u => ({
@@ -6829,14 +6428,35 @@ const getTodayChallenge = () => {
   };
 
   const handleNavigation = (s: AppScreen) => { 
+    if (
+      typeof navigator !== 'undefined' &&
+      !navigator.onLine &&
+      (s === AppScreen.ALPHABET ||
+        s === AppScreen.CHESS_MATCH ||
+        s === AppScreen.CHESS_ANALYSIS ||
+        s === AppScreen.VIDEO_CALL ||
+        s === AppScreen.LESSON)
+    ) {
+      playSound('wrong');
+      notifyNetworkOffline();
+      setToast(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+      return;
+    }
+    if (s === AppScreen.VIDEO_CALL && currentCourse.id === 'tlh') {
+      playSound('wrong');
+      setToast(
+        user.language === 'ru'
+          ? '🔒 Для Бета-курса клингонского языка ВидеоЗвонок и Roleplays ограничены!'
+          : '🔒 Video Call and Roleplays are restricted for Beta Klingon!'
+      );
+      return;
+    }
     if (s === AppScreen.ALPHABET && isSpecialNonLanguage(currentCourse.id)) {
       playSound('wrong');
       setToast(user.language === 'ru' 
-        ? `🔒 Раздел «Письма» доступен только для языковых курсов. Курс «${currentCourse.localName}» относится к разделу «Предметы & Игры» (не языковой курс). В данном предмете нет алфавита или букв.`
+        ? `🔒 Раздел «Письмо» доступен только для языковых курсов. Курс «${currentCourse.localName}» относится к разделу «Предметы & Игры» (не языковой курс). В данном предмете нет алфавита или букв.`
         : `🔒 The Letters section is only available for language courses. The course "${currentCourse.name}" belongs to "Subjects & Games" (non-language course). There is no alphabet or letters in this subject.`
       );
-      setLettersTabRequest({ tab: 'letters', nonce: Date.now() });
-      setScreen(AppScreen.ALPHABET);
       return;
     }
     if (s === AppScreen.ALPHABET) {
@@ -6867,7 +6487,7 @@ const getTodayChallenge = () => {
     { screen: AppScreen.CHESS_MATCH, icon: ChessNavIcon, label: t('playChess') },
     { screen: AppScreen.PRACTICE, icon: DumbbellIcon, label: t('practice') },
     { screen: AppScreen.VOCABULARY, icon: NewWordIcon, label: t('wordsTitle') || (user.language === 'ru' ? 'Банк слов' : 'Vocabulary') },
-    { screen: AppScreen.VIDEO_CALL, icon: CameraIcon, label: t('videoCall') },
+    { screen: AppScreen.VIDEO_CALL, icon: CameraIcon, label: currentCourse.id === 'tlh' ? (t('videoCall') + ' 🔒') : t('videoCall') },
     { screen: AppScreen.LEADERBOARD, icon: ShieldIcon, label: t('leaderboard') },
     { screen: AppScreen.SHOP, icon: ChestIcon, label: t('shop') },
     { screen: AppScreen.SUBSCRIPTION, icon: SparklesIcon, label: t('subscription') || (user.language === 'ru' ? 'Лимит & Подписка' : 'Limit & Subscription') },
@@ -7402,6 +7022,7 @@ const getTodayChallenge = () => {
                       onOpenSystemChecker={() => setShowSystemInfoModal(true)}
                       onOpenBetaCenter={() => setShowBetaModal(true)}
                       onToggleBetaTesting={handleToggleBetaTesting}
+                      onInstallChannel={handleInstallAppChannel}
                     />
                     
                                         {/* SYSTEM COMPATIBILITY & DUOWINDO6601 SYSTEM CHECKER CARD */}
@@ -7473,6 +7094,7 @@ const getTodayChallenge = () => {
                       onOpenSystemChecker={() => setShowSystemInfoModal(true)} 
                       lang={user.language} 
                       isBetaTester={Boolean(user.isBetaTester)}
+                      installedChannel={user.installedAppChannel || 'stable'}
                     />
 
 {/* PROFILE SUMMARY & EDIT TRIGGER */}
@@ -7589,7 +7211,7 @@ const getTodayChallenge = () => {
                                 </p>
                                 <p className="font-black text-gray-200 text-sm flex items-center gap-1.5">
                                     <span>💾</span>
-                                    <span>{firebaseUser ? ("Firestore UID: " + firebaseUser.uid.slice(0, 8) + "...") : (user.language === "ru" ? "Offline IndexedDB / Storage" : "Offline Storage")}</span>
+                                    <span>{firebaseUser ? ("Firestore UID: " + firebaseUser.uid.slice(0, 8) + "...") : (user.language === "ru" ? "Local IndexedDB / Storage" : "Local Storage")}</span>
                                 </p>
                             </div>
                         </div>
@@ -7631,7 +7253,7 @@ const getTodayChallenge = () => {
                                 </div>
                             </div>
                             <span className="px-3 py-1 bg-black/40 border border-gray-700 rounded-xl text-xs font-mono text-amber-300">
-                                {firebaseUser ? `Auth: ${firebaseUser.email || firebaseUser.uid.slice(0, 8)}` : (user.language === 'ru' ? 'Локальный / Offline' : 'Local / Offline')}
+                                {firebaseUser ? `Auth: ${firebaseUser.email || firebaseUser.uid.slice(0, 8)}` : (user.language === 'ru' ? 'Локальное хранилище' : 'Local Storage')}
                             </span>
                         </div>
 
@@ -10195,7 +9817,7 @@ const getTodayChallenge = () => {
             </div>
         )}
 
-        {/* TRANSLATOR SCREEN DUOWINDO6601 WITH COUNTRY SWITCHER & OFFLINE DICTIONARIES */}
+        {/* TRANSLATOR SCREEN DUOWINDO6601 (SEPARATED STANDARD + BETA ONLINE TRANSLATOR) */}
         {screen === AppScreen.TRANSLATOR && (
             <TranslatorScreen
               userLanguage={user.language}
@@ -10209,7 +9831,7 @@ const getTodayChallenge = () => {
         )}
 
         {/* --- VIDEO CALL SCREEN DUOWINDO6601 --- */}
-        {screen === AppScreen.VIDEO_CALL && (
+        {screen === AppScreen.VIDEO_CALL && currentCourse.id !== 'tlh' && (
             <div className="fixed inset-0 z-[100] bg-[#121212] flex flex-col animate-in fade-in select-none">
                 {/* Header Bar */}
                 <div className="flex items-center justify-between p-4 bg-black/60 backdrop-blur-xl absolute top-0 w-full z-20 border-b border-white/10">
@@ -10217,12 +9839,13 @@ const getTodayChallenge = () => {
                         <button 
                             onClick={() => { 
                                 playSound('click'); 
-                                if (lessonBackupExercise) {
+                                if (lessonBackupExercise && (typeof navigator === 'undefined' || navigator.onLine)) {
                                     setCurrentExercise(lessonBackupExercise);
                                     setScreen(AppScreen.LESSON);
                                     setLessonBackupExercise(null);
                                 } else {
-                                    setScreen(AppScreen.PRACTICE); 
+                                    setLessonBackupExercise(null);
+                                    setScreen(typeof navigator !== 'undefined' && !navigator.onLine ? AppScreen.PATH : AppScreen.PRACTICE); 
                                 }
                             }}
                             className="p-2 bg-white/10 hover:bg-white/20 rounded-xl text-white transition-all active:scale-95"
@@ -10317,10 +9940,19 @@ const getTodayChallenge = () => {
                                 )}
                             </p>
                             <h4 
-                                className={`text-white text-base md:text-xl font-bold leading-relaxed ${isArabicText(videoQuestion) ? 'font-arabic text-right' : ''}`}
+                                className={`text-white text-base md:text-xl font-bold leading-relaxed ${isArabicText(videoQuestion) ? 'font-arabic text-right' : isHighValyrianCourse ? 'font-valyrian text-lg md:text-2xl' : ''}`}
                                 dir="auto"
                             >
-                                {videoQuestion ? formatRTLOverride(videoQuestion) : "Начните разговор! Нажмите микрофон или напишите сообщение."}
+                                {videoQuestion ? (
+                                    <TypewriterText
+                                        text={videoQuestion}
+                                        animate={true}
+                                        animateKey={videoTypingNonce}
+                                        speedMs={16}
+                                        formatFn={formatRTLOverride}
+                                        cursorClassName="inline-block w-[2.5px] h-[1em] align-middle ml-1 bg-purple-400 animate-pulse"
+                                    />
+                                ) : "Начните разговор! Нажмите микрофон или напишите сообщение."}
                             </h4>
 
                             {loading && (
@@ -10445,12 +10077,13 @@ const getTodayChallenge = () => {
                     <button 
                         onClick={() => { 
                             playSound('click'); 
-                            if (lessonBackupExercise) {
+                            if (lessonBackupExercise && (typeof navigator === 'undefined' || navigator.onLine)) {
                                 setCurrentExercise(lessonBackupExercise);
                                 setScreen(AppScreen.LESSON);
                                 setLessonBackupExercise(null);
                             } else {
-                                setScreen(AppScreen.PRACTICE); 
+                                setLessonBackupExercise(null);
+                                setScreen(typeof navigator !== 'undefined' && !navigator.onLine ? AppScreen.PATH : AppScreen.PRACTICE); 
                             }
                         }} 
                         className="p-4 rounded-2xl bg-red-600 hover:bg-red-500 text-white transition-all transform hover:scale-105 active:scale-95 shadow-lg flex items-center justify-center cursor-pointer"
@@ -10473,11 +10106,11 @@ const getTodayChallenge = () => {
                     {user.language === 'ru' ? 'Уровень сложности уроков:' : 'Lesson Difficulty Level:'}
                   </span>
                   <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                    user.difficultyLevel === 'hard'
+                    (user.difficultyLevel || 'hard') === 'hard'
                       ? 'bg-red-500/20 text-red-300 border border-red-500/40'
                       : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                   }`}>
-                    {user.difficultyLevel === 'hard'
+                    {(user.difficultyLevel || 'hard') === 'hard'
                       ? (user.language === 'ru' ? '🔥 +35 XP / +10💎' : '🔥 +35 XP / +10💎')
                       : (user.language === 'ru' ? '🌱 +20 XP / +5💎' : '🌱 +20 XP / +5💎')}
                   </span>
@@ -10491,7 +10124,7 @@ const getTodayChallenge = () => {
                       setToast(user.language === 'ru' ? '🌱 Выбран Лёгкий уровень (базовые фразы и задания)' : '🌱 Easy level selected');
                     }}
                     className={`py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                      (user.difficultyLevel || 'easy') === 'easy'
+                      user.difficultyLevel === 'easy'
                         ? 'bg-emerald-500 text-slate-950 shadow-md border-b-2 border-emerald-700'
                         : 'bg-gray-800 text-gray-300 hover:text-white hover:bg-gray-700'
                     }`}
@@ -10507,7 +10140,7 @@ const getTodayChallenge = () => {
                       setToast(user.language === 'ru' ? '🔥 Выбран Сложный уровень (повышенная сложность и +35 XP)' : '🔥 Hard level selected (+35 XP)');
                     }}
                     className={`py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                      user.difficultyLevel === 'hard'
+                      (user.difficultyLevel || 'hard') === 'hard'
                         ? 'bg-gradient-to-r from-red-600 to-amber-500 text-white shadow-md border-b-2 border-red-800'
                         : 'bg-gray-800 text-gray-300 hover:text-white hover:bg-gray-700'
                     }`}
@@ -10523,8 +10156,8 @@ const getTodayChallenge = () => {
                 const todayStr = new Date().toISOString().split('T')[0];
                 if (dailyChallengeDismissedDate === todayStr) return null;
                 const rawChallenge = getTodayChallenge();
-                const todayChallenge = (currentCourse.id === 'tlh' && rawChallenge.type === 'speech')
-                  ? (DAILY_CHALLENGES.find(c => c.type === 'listening') || rawChallenge)
+                const todayChallenge = (currentCourse.id === 'tlh' && (rawChallenge.type === 'speech' || rawChallenge.type === 'roleplay'))
+                  ? (DAILY_CHALLENGES.find(c => c.type === (rawChallenge.type === 'roleplay' ? 'translation' : 'listening')) || rawChallenge)
                   : rawChallenge;
                 const isChallengeDone = user.dailyChallengeCompletedDate === todayStr;
                 const challengeTitle = user.language === 'ru' ? todayChallenge.titleRu : todayChallenge.titleEn;
@@ -10945,8 +10578,14 @@ const getTodayChallenge = () => {
                           <button
                               type="button"
                               onClick={() => {
+                                  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+                                      playSound('wrong');
+                                      notifyNetworkOffline();
+                                      setToast(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+                                      return;
+                                  }
                                   playSound('select');
-                                  setScreen(AppScreen.CHESS_MATCH);
+                                  handleNavigation(AppScreen.CHESS_MATCH);
                                   setToast(user.language === 'ru' ? '♟️ Ежедневное повторение шахмат: решите партию дня (+25 XP)!' : '♟️ Daily chess review (+25 XP)!');
                               }}
                               className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs uppercase tracking-wider shadow-lg active:scale-95 transition-all whitespace-nowrap shrink-0 cursor-pointer text-center"
@@ -10957,16 +10596,16 @@ const getTodayChallenge = () => {
                       
                       {/* CHESS PATH INTERACTIVE BUTTONS */}
                       <div className="flex flex-col items-center space-y-8 relative w-full">
-                          <button onClick={() => setScreen(AppScreen.CHESS_MATCH)} className="w-20 h-20 rounded-full bg-duo-green border-b-8 border-duo-greenDark active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center shadow-2xl hover:brightness-110 z-10">
+                          <button onClick={() => handleNavigation(AppScreen.CHESS_MATCH)} className="w-20 h-20 rounded-full bg-duo-green border-b-8 border-duo-greenDark active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center shadow-2xl hover:brightness-110 z-10">
                               <StarIcon className="w-10 h-10 text-white" />
                           </button>
                           
-                          <button onClick={() => setScreen(AppScreen.CHESS_MATCH)} className="w-20 h-20 rounded-full bg-duo-green border-b-8 border-duo-greenDark active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center shadow-2xl hover:brightness-110 z-10 -ml-16">
+                          <button onClick={() => handleNavigation(AppScreen.CHESS_MATCH)} className="w-20 h-20 rounded-full bg-duo-green border-b-8 border-duo-greenDark active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center shadow-2xl hover:brightness-110 z-10 -ml-16">
                               <StarIcon className="w-10 h-10 text-white" />
                           </button>
                           
                           <div className="relative w-full flex justify-center">
-                              <button onClick={() => setScreen(AppScreen.CHESS_MATCH)} className="w-20 h-20 rounded-full bg-duo-green border-b-8 border-duo-greenDark active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center shadow-2xl hover:brightness-110 z-10 -ml-32">
+                              <button onClick={() => handleNavigation(AppScreen.CHESS_MATCH)} className="w-20 h-20 rounded-full bg-duo-green border-b-8 border-duo-greenDark active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center shadow-2xl hover:brightness-110 z-10 -ml-32">
                                   <DumbbellIcon className="w-10 h-10 text-white" />
                               </button>
                               <div className="absolute right-4 top-0">
@@ -10974,7 +10613,7 @@ const getTodayChallenge = () => {
                               </div>
                           </div>
                           
-                          <button onClick={() => setScreen(AppScreen.CHESS_MATCH)} className="w-24 h-24 rounded-2xl bg-yellow-400 border-b-8 border-yellow-600 active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center shadow-2xl hover:brightness-110 z-10">
+                          <button onClick={() => handleNavigation(AppScreen.CHESS_MATCH)} className="w-24 h-24 rounded-2xl bg-yellow-400 border-b-8 border-yellow-600 active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center shadow-2xl hover:brightness-110 z-10">
                               <ChestIcon className="w-12 h-12 text-white" />
                           </button>
                       </div>
@@ -11082,6 +10721,12 @@ const getTodayChallenge = () => {
                           <button
                               type="button"
                               onClick={() => {
+                                  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+                                      playSound('wrong');
+                                      notifyNetworkOffline();
+                                      setToast(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+                                      return;
+                                  }
                                   playSound('select');
                                   setMusicStudioTab('repeat');
                                   setShowMusicStudioModal(true);
@@ -11096,7 +10741,7 @@ const getTodayChallenge = () => {
                       {/* 4 CORE MUSIC ACTIONS */}
                       <div className="flex flex-col space-y-4 w-full">
                           <div 
-                              onClick={() => { playSound('select'); setMusicStudioTab('notes'); setShowMusicStudioModal(true); }}
+                              onClick={() => { if (typeof navigator !== 'undefined' && !navigator.onLine) { playSound('wrong'); notifyNetworkOffline(); setToast(OFFLINE_INTERNET_REQUIRED_MESSAGE); return; } playSound('select'); setMusicStudioTab('notes'); setShowMusicStudioModal(true); }}
                               className="bg-gray-800 border-2 border-b-6 border-pink-600 p-5 rounded-3xl cursor-pointer hover:scale-[1.02] active:scale-95 transition-all flex items-center space-x-4 shadow-xl group"
                           >
                               <div className="w-14 h-14 rounded-2xl bg-red-600 flex items-center justify-center text-2xl text-white shadow-md group-hover:scale-110 transition-transform shrink-0">
@@ -11110,7 +10755,7 @@ const getTodayChallenge = () => {
                           </div>
 
                           <div 
-                              onClick={() => { playSound('select'); setMusicStudioTab('learn'); setShowMusicStudioModal(true); }}
+                              onClick={() => { if (typeof navigator !== 'undefined' && !navigator.onLine) { playSound('wrong'); notifyNetworkOffline(); setToast(OFFLINE_INTERNET_REQUIRED_MESSAGE); return; } playSound('select'); setMusicStudioTab('learn'); setShowMusicStudioModal(true); }}
                               className="bg-gray-800 border-2 border-b-6 border-pink-600 p-5 rounded-3xl cursor-pointer hover:scale-[1.02] active:scale-95 transition-all flex items-center space-x-4 shadow-xl group"
                           >
                               <div className="w-14 h-14 rounded-2xl bg-pink-600 flex items-center justify-center text-2xl text-white shadow-md group-hover:scale-110 transition-transform shrink-0">
@@ -11124,7 +10769,7 @@ const getTodayChallenge = () => {
                           </div>
 
                           <div 
-                              onClick={() => { playSound('select'); setMusicStudioTab('tempo'); setShowMusicStudioModal(true); }}
+                              onClick={() => { if (typeof navigator !== 'undefined' && !navigator.onLine) { playSound('wrong'); notifyNetworkOffline(); setToast(OFFLINE_INTERNET_REQUIRED_MESSAGE); return; } playSound('select'); setMusicStudioTab('tempo'); setShowMusicStudioModal(true); }}
                               className="bg-gray-800 border-2 border-b-6 border-pink-600 p-5 rounded-3xl cursor-pointer hover:scale-[1.02] active:scale-95 transition-all flex items-center space-x-4 shadow-xl group"
                           >
                               <div className="w-14 h-14 rounded-2xl bg-purple-600 flex items-center justify-center text-2xl text-white shadow-md group-hover:scale-110 transition-transform shrink-0">
@@ -11138,7 +10783,7 @@ const getTodayChallenge = () => {
                           </div>
 
                           <div 
-                              onClick={() => { playSound('select'); setMusicStudioTab('repeat'); setShowMusicStudioModal(true); }}
+                              onClick={() => { if (typeof navigator !== 'undefined' && !navigator.onLine) { playSound('wrong'); notifyNetworkOffline(); setToast(OFFLINE_INTERNET_REQUIRED_MESSAGE); return; } playSound('select'); setMusicStudioTab('repeat'); setShowMusicStudioModal(true); }}
                               className="bg-gray-800 border-2 border-b-6 border-pink-600 p-5 rounded-3xl cursor-pointer hover:scale-[1.02] active:scale-95 transition-all flex items-center space-x-4 shadow-xl group"
                           >
                               <div className="w-14 h-14 rounded-2xl bg-amber-600 flex items-center justify-center text-2xl text-white shadow-md group-hover:scale-110 transition-transform shrink-0">
@@ -11288,6 +10933,61 @@ const getTodayChallenge = () => {
                           </button>
                       </div>
 
+                      {/* DIFFICULTY SELECTOR: EASY / MEDIUM / HARD */}
+                      <div className="w-full bg-gray-900/90 border border-gray-800 p-3.5 rounded-2xl mb-4 shadow-inner">
+                          <div className="flex items-center justify-between mb-2.5 px-1">
+                              <span className="text-xs font-black uppercase tracking-wider text-gray-200 flex items-center space-x-1.5">
+                                  <span>🎚️</span>
+                                  <span>{user.language === 'ru' ? 'Уровень сложности:' : 'Difficulty level:'}</span>
+                              </span>
+                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
+                                  mathDifficulty === 'hard'
+                                      ? 'bg-red-950/80 text-red-300 border-red-500/40'
+                                      : mathDifficulty === 'medium'
+                                      ? 'bg-amber-950/80 text-amber-300 border-amber-500/40'
+                                      : 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40'
+                              }`}>
+                                  +{getMathDifficultyMeta(mathDifficulty, user.language).xpReward} XP
+                              </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                              {(['easy', 'medium', 'hard'] as MathDifficulty[]).map(level => {
+                                  const meta = getMathDifficultyMeta(level, user.language);
+                                  const isSel = mathDifficulty === level;
+                                  const activeStyle =
+                                      level === 'hard'
+                                          ? 'bg-red-600 text-white border-b-4 border-red-800 shadow-lg'
+                                          : level === 'medium'
+                                          ? 'bg-amber-500 text-slate-950 border-b-4 border-amber-700 shadow-lg'
+                                          : 'bg-emerald-600 text-white border-b-4 border-emerald-800 shadow-lg';
+                                  return (
+                                      <button
+                                          key={level}
+                                          type="button"
+                                          onClick={() => {
+                                              playSound('click');
+                                              setMathDifficulty(level);
+                                              localStorage.setItem('duo_math_difficulty_6601', level);
+                                              setToast(
+                                                  user.language === 'ru'
+                                                      ? `Сложность математики: ${meta.label}`
+                                                      : `Math difficulty: ${meta.label}`
+                                              );
+                                          }}
+                                          className={`py-2 px-2 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                                              isSel ? activeStyle : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-750'
+                                          }`}
+                                      >
+                                          <span>{meta.badge}</span>
+                                      </button>
+                                  );
+                              })}
+                          </div>
+                          <p className="text-[11px] text-gray-400 font-bold mt-2 px-1">
+                              {getMathDifficultyMeta(mathDifficulty, user.language).desc}
+                          </p>
+                      </div>
+
                       {/* ACTIVE MATH TOPIC & GRADE CARD */}
                       <div className="w-full bg-gray-800/90 border border-blue-500/30 p-4 rounded-2xl mb-6 shadow-md text-left">
                           <div className="flex items-center space-x-2 mb-1.5">
@@ -11375,20 +11075,21 @@ const getTodayChallenge = () => {
                               type="button"
                               onClick={() => {
                                   playSound('select');
-                                  startMathTraining(mathGrade, mathTopic);
+                                  startMathTraining(mathGrade, mathTopic, mathDifficulty);
                                   const topicName = mathTopic === 'arithmetic' ? 'Арифметика' : mathTopic === 'algebra' ? 'Алгебра' : mathTopic === 'geometry' ? 'Геометрия' : 'Анализ';
-                                  setToast(user.language === 'ru' ? `📐 Разминка: ${mathGrade} класс (${topicName}) (+20 XP)!` : `📐 Workout: Grade ${mathGrade} (+20 XP)!`);
+                                  const xpVal = getMathDifficultyMeta(mathDifficulty, user.language).xpReward;
+                                  setToast(user.language === 'ru' ? `📐 Разминка: ${mathGrade} класс (${topicName}) (+${xpVal} XP)!` : `📐 Workout: Grade ${mathGrade} (+${xpVal} XP)!`);
                               }}
                               className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-blue-500 hover:bg-blue-400 text-black font-black text-xs uppercase tracking-wider shadow-lg active:scale-95 transition-all whitespace-nowrap shrink-0 cursor-pointer text-center"
                           >
-                              {user.language === 'ru' ? 'Повторить сегодня (+20 XP)' : 'Review Today (+20 XP)'}
+                              {user.language === 'ru' ? `Повторить сегодня (+${getMathDifficultyMeta(mathDifficulty, user.language).xpReward} XP)` : `Review Today (+${getMathDifficultyMeta(mathDifficulty, user.language).xpReward} XP)`}
                           </button>
                       </div>
 
                       {/* MATH INTERACTIVE BUTTONS */}
                       <div className="flex flex-col items-center space-y-8 relative w-full">
                           <button 
-                              onClick={() => startMathTraining(mathGrade, mathTopic)} 
+                              onClick={() => startMathTraining(mathGrade, mathTopic, mathDifficulty)} 
                               className={`w-28 h-28 rounded-full border-b-8 active:translate-y-2 active:border-b-0 transition-all flex items-center justify-center shadow-2xl hover:brightness-110 group cursor-pointer ${
                                   mathTopic === 'arithmetic'
                                       ? 'bg-blue-600 border-blue-800'
@@ -11411,12 +11112,14 @@ const getTodayChallenge = () => {
                                       {user.language === 'ru' ? `Урок: ${mathTopic === 'arithmetic' ? 'Арифметика' : mathTopic === 'algebra' ? 'Алгебра' : mathTopic === 'geometry' ? 'Геометрия' : 'Анализ'}` : `Lesson: ${mathTopic === 'arithmetic' ? 'Arithmetic' : mathTopic === 'algebra' ? 'Algebra' : mathTopic === 'geometry' ? 'Geometry' : 'Analysis'}`}
                                   </h4>
                                   <p className="text-xs text-blue-200 font-bold">
-                                      {user.language === 'ru' ? `Задачи по стандартам ${mathGrade} класса • +20 XP` : `Grade ${mathGrade} curriculum practice • +20 XP`}
+                                      {user.language === 'ru'
+                                          ? `${mathGrade} класс • ${getMathDifficultyMeta(mathDifficulty, user.language).label} • +${getMathDifficultyMeta(mathDifficulty, user.language).xpReward} XP`
+                                          : `Grade ${mathGrade} • ${getMathDifficultyMeta(mathDifficulty, user.language).label} • +${getMathDifficultyMeta(mathDifficulty, user.language).xpReward} XP`}
                                   </p>
                               </div>
                               <button
                                   type="button"
-                                  onClick={() => startMathTraining(mathGrade, mathTopic)}
+                                  onClick={() => startMathTraining(mathGrade, mathTopic, mathDifficulty)}
                                   className="px-5 py-2.5 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-black font-black text-xs uppercase tracking-wider shadow-md active:scale-95 transition-all whitespace-nowrap cursor-pointer"
                               >
                                   {user.language === 'ru' ? 'Начать' : 'Start'} →
@@ -11429,7 +11132,7 @@ const getTodayChallenge = () => {
               ) : currentCourse.id === 'coding' ? (
                   <ProgrammingCourseHub
                     language={user.language}
-                    difficultyLevel={user.difficultyLevel === 'hard' ? 'hard' : 'easy'}
+                    difficultyLevel={user.difficultyLevel === 'easy' ? 'easy' : 'hard'}
                     onChangeDifficulty={(level) => setUser((u) => ({ ...u, difficultyLevel: level }))}
                     onStartLesson={(topic) => { void startTraining('translation', topic); }}
                     playSound={playSound}
@@ -11931,8 +11634,7 @@ const getTodayChallenge = () => {
 
                             <button 
                               onClick={() => { 
-                                playSound('click'); 
-                                setScreen(AppScreen.CHESS_ANALYSIS); 
+                                handleNavigation(AppScreen.CHESS_ANALYSIS); 
                               }} 
                               className="w-full py-3.5 px-4 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-slate-950 rounded-2xl font-black uppercase tracking-wider border-b-4 border-amber-900 active:border-b-0 active:translate-y-1 transition-all shadow-lg hover:brightness-105 flex items-center justify-between text-xs sm:text-sm cursor-pointer"
                             >
@@ -12235,8 +11937,7 @@ const getTodayChallenge = () => {
 
                           <button 
                             onClick={() => { 
-                              playSound('click'); 
-                              setScreen(AppScreen.CHESS_ANALYSIS); 
+                              handleNavigation(AppScreen.CHESS_ANALYSIS); 
                             }} 
                             className="w-full py-4 px-5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-slate-950 rounded-2xl font-black uppercase tracking-wider border-b-4 border-amber-900 active:border-b-0 active:translate-y-1 transition-all shadow-lg hover:brightness-105 flex items-center justify-between text-sm cursor-pointer"
                           >
@@ -12298,6 +11999,7 @@ const getTodayChallenge = () => {
               <ChessAnalysisScreen
                 initialMoves={chessHistory}
                 initialFen={chessFen}
+                userLanguage={user.language}
                 gameResult={
                   chessStatus === 'mate'
                     ? (feedback.status === 'correct' ? (user.language === 'ru' ? 'Победа белых' : 'White wins') : (user.language === 'ru' ? 'Победа черных' : 'Black wins'))
@@ -12306,8 +12008,14 @@ const getTodayChallenge = () => {
                     : (chessHistory.length > 0 ? (user.language === 'ru' ? 'Текущая партия' : 'Active game') : undefined)
                 }
                 playerColor="w"
-                onBack={() => setScreen(AppScreen.CHESS_MATCH)}
+                onBack={() => handleNavigation(AppScreen.CHESS_MATCH)}
                 onNewGame={() => {
+                  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+                    playSound('wrong');
+                    notifyNetworkOffline();
+                    setToast(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+                    return;
+                  }
                   playSound('select');
                   setChessMode('pve');
                   const botOpp = { name: 'DuoWindo6601', elo: 1500, avatar: '🦉', isBot: true };
@@ -12328,6 +12036,12 @@ const getTodayChallenge = () => {
                   setScreen(AppScreen.LESSON);
                 }}
                 onPlayAgainstBot={(startFen?: string, startMoves?: string[]) => {
+                  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+                    playSound('wrong');
+                    notifyNetworkOffline();
+                    setToast(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+                    return;
+                  }
                   playSound('select');
                   setChessMode('pve');
                   const botOpp = { name: 'DuoWindo6601', elo: 1500, avatar: '🦉', isBot: true };
@@ -13572,6 +13286,8 @@ const getTodayChallenge = () => {
                 systemInfo={detectSystemCompatibility()} 
                 onOpenSystemChecker={() => setShowSystemInfoModal(true)} 
                 lang={user.language} 
+                isBetaTester={Boolean(user.isBetaTester)}
+                installedChannel={user.installedAppChannel || 'stable'}
               />
 
               <div className="bg-duo-card border-2 border-amber-500/80 rounded-[2.5rem] p-6 md:p-10 shadow-2xl space-y-6">
@@ -14490,12 +14206,16 @@ const getTodayChallenge = () => {
                {currentExercise.type !== 'chess' ? (
                    <div className="flex items-center space-x-2">
                        <span className={`hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-black uppercase tracking-wider border ${
-                         (currentExercise.difficultyLevel || user.difficultyLevel) === 'hard'
+                         (currentExercise.difficultyLevel || user.difficultyLevel || 'hard') === 'hard'
                            ? 'bg-red-500/20 text-red-300 border-red-500/40'
+                           : (currentExercise.difficultyLevel || user.difficultyLevel || 'hard') === 'medium'
+                           ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                            : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
                        }`}>
-                         {(currentExercise.difficultyLevel || user.difficultyLevel) === 'hard'
+                         {(currentExercise.difficultyLevel || user.difficultyLevel || 'hard') === 'hard'
                            ? (user.language === 'ru' ? '🔥 Сложный' : '🔥 Hard')
+                           : (currentExercise.difficultyLevel || user.difficultyLevel || 'hard') === 'medium'
+                           ? (user.language === 'ru' ? '⚡ Средний' : '⚡ Medium')
                            : (user.language === 'ru' ? '🌱 Лёгкий' : '🌱 Easy')}
                        </span>
                        {/* Live AI Partner (Video Call & Roleplays Max) Button during Lesson — hidden for Klingon tlh */}
@@ -14547,6 +14267,18 @@ const getTodayChallenge = () => {
                </div>
              )}
 
+             {isHighValyrianCourse && currentExercise.type !== 'chess' && currentExercise.type !== 'ishihara' && (
+               <div className="mb-3 flex flex-wrap items-center justify-between gap-2 bg-stone-900/90 border border-amber-500/40 rounded-2xl px-3.5 py-2 flex-shrink-0">
+                 <div className="flex items-center gap-2 min-w-0">
+                   <span className="text-base">🐉</span>
+                   <span className="font-valyrian text-sm md:text-base font-bold text-amber-300 truncate">Valyrio • Высокий валирийский шрифт</span>
+                 </div>
+                 <span className="text-[11px] font-bold text-amber-200/80">
+                   Cormorant Garamond / Cinzel • {user.language === 'ru' ? 'Курс язык Бета' : 'Beta Course'}
+                 </span>
+               </div>
+             )}
+
              {isKlingonCourse && currentExercise.type !== 'chess' && currentExercise.type !== 'ishihara' && (
                <div className="mb-3 flex flex-wrap items-center justify-between gap-2 bg-stone-900/90 border border-stone-700/80 rounded-2xl px-3 py-2 flex-shrink-0">
                  <div className="flex items-center gap-2 min-w-0">
@@ -14592,9 +14324,21 @@ const getTodayChallenge = () => {
                        <>
                          <button
                            type="button"
+                           onClick={() => handleSwitchKlingonSpeechMode('hol', activeAudioText)}
+                           className={`px-2.5 py-1 rounded-xl text-[11px] font-black border transition-all cursor-pointer ${
+                             klingonSpeechMode !== 'client'
+                               ? 'bg-indigo-600/85 border-indigo-400 text-white shadow'
+                               : 'bg-indigo-600/20 hover:bg-indigo-600/40 border-indigo-500/40 text-indigo-200'
+                           }`}
+                           title="hol.kag.org (https://hol.kag.org/sentence/nuqneH)"
+                         >
+                           🎧 hol.kag.org
+                         </button>
+                         <button
+                           type="button"
                            onClick={() => handleSwitchKlingonSpeechMode('client', activeAudioText)}
                            className={`px-2.5 py-1 rounded-xl text-[11px] font-black border transition-all cursor-pointer ${
-                             klingonSpeechMode !== 'hol'
+                             klingonSpeechMode === 'client'
                                ? 'bg-sky-600/80 border-sky-400 text-white shadow'
                                : 'bg-sky-600/20 hover:bg-sky-600/40 border-sky-500/40 text-sky-200'
                            }`}
@@ -14602,24 +14346,12 @@ const getTodayChallenge = () => {
                          >
                            🔊 SAM Speech
                          </button>
-                         <button
-                           type="button"
-                           onClick={() => handleSwitchKlingonSpeechMode('hol', activeAudioText)}
-                           className={`px-2.5 py-1 rounded-xl text-[11px] font-black border transition-all cursor-pointer ${
-                             klingonSpeechMode === 'hol'
-                               ? 'bg-indigo-600/85 border-indigo-400 text-white shadow'
-                               : 'bg-indigo-600/20 hover:bg-indigo-600/40 border-indigo-500/40 text-indigo-200'
-                           }`}
-                           title="hol.kag.org → SAM Software Automatic Mouth (https://hol.kag.org/sentence/Hello)"
-                         >
-                           🎧 hol.kag.org (SAM)
-                         </button>
                          <a
-                           href={getKlingonSentencePlayerUrl(activeAudioText) || KLINGON_HOL_HELLO_URL}
+                           href={getKlingonSentencePlayerUrl(activeAudioText) || KLINGON_HOL_NUQNEH_URL}
                            target="_blank"
                            rel="noopener noreferrer"
                            className="px-2 py-1 rounded-xl text-[10px] font-black bg-indigo-950/60 hover:bg-indigo-800/70 border border-indigo-500/40 text-indigo-300 hover:text-white transition-all"
-                           title="https://hol.kag.org/sentence/Hello"
+                           title="https://hol.kag.org/sentence/nuqneH"
                          >
                            hol.kag.org ↗
                          </a>
@@ -14635,10 +14367,18 @@ const getTodayChallenge = () => {
                          <button
                            type="button"
                            onClick={() => {
+                             if (typeof navigator !== 'undefined' && !navigator.onLine) {
+                               playSound('wrong');
+                               notifyNetworkOffline();
+                               setToast(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+                               return;
+                             }
                              playSound('click');
-                             void downloadKlingonAudioFile(activeAudioText, false, klingonSpeechMode).then(info => {
-                               setToast(user.language === 'ru' ? `💾 Аудио-файл сохранён: ${info.filename}` : `💾 Audio saved: ${info.filename}`);
-                             });
+                             void downloadKlingonAudioFile(activeAudioText, false, klingonSpeechMode)
+                               .then(info => {
+                                 setToast(user.language === 'ru' ? `💾 Аудио-файл сохранён: ${info.filename}` : `💾 Audio saved: ${info.filename}`);
+                               })
+                               .catch(() => {});
                            }}
                            className="px-2.5 py-1 rounded-xl text-[11px] font-black bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-400/50 text-emerald-200 transition-all cursor-pointer"
                          >
@@ -14730,7 +14470,7 @@ const getTodayChallenge = () => {
                              <div className="absolute -left-2 bottom-0 w-4 h-4 bg-gray-800 border-l-2 border-b-2 border-gray-700 transform rotate-45 translate-y-1/2"></div>
                          </div>
                      </div>
-                     {chessMode === 'tutorial' && (
+                     {(chessMode === 'tutorial' || chessMode === 'study') && (
                          <div 
                              id="chess-tutorial-message" 
                              className="w-full bg-duo-blue/15 border-2 border-duo-blue text-duo-blue p-4 rounded-2xl mb-4 text-sm font-bold shadow-md flex flex-col space-y-3"
@@ -14738,7 +14478,9 @@ const getTodayChallenge = () => {
                              <div className="flex items-start justify-between gap-3 w-full">
                                  <div className="flex items-start space-x-3 flex-1 min-w-0">
                                      <span className="text-2xl flex-shrink-0 animate-pulse">💡</span>
-                                     <p className="leading-snug text-white font-extrabold text-sm sm:text-base">{tutorialMessage}</p>
+                                     <p className="leading-snug text-white font-extrabold text-sm sm:text-base">
+                                         {tutorialMessage || (user.language === 'ru' ? 'Нажмите на подсказку, чтобы узнать лучший следующий ход и идею позиции.' : 'Tap Hint to get the best next move and concept explanation.')}
+                                     </p>
                                  </div>
 
                                  <button
@@ -14746,7 +14488,7 @@ const getTodayChallenge = () => {
                                      onClick={handleFetchChessTutorialHint}
                                      disabled={tutorialHintLoading}
                                      className="shrink-0 bg-duo-blue hover:bg-sky-400 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow-md active:scale-95 transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
-                                     title="Запросить подсказку Gemini"
+                                     title={user.language === 'ru' ? 'Подсказка ИИ: лучший следующий ход и объяснение' : 'AI Hint: suggest best next move & concept'}
                                  >
                                      {tutorialHintLoading ? (
                                          <>
@@ -14755,8 +14497,8 @@ const getTodayChallenge = () => {
                                          </>
                                      ) : (
                                          <>
-                                             <span className="text-sm">🤖</span>
-                                             <span>{user.language === 'ru' ? 'Подсказка Gemini' : 'Gemini Hint'}</span>
+                                             <span className="text-sm">💡</span>
+                                             <span>{user.language === 'ru' ? 'Подсказка' : 'Hint'}</span>
                                          </>
                                      )}
                                  </button>
@@ -14835,8 +14577,7 @@ const getTodayChallenge = () => {
                                  <button
                                      type="button"
                                      onClick={() => {
-                                         playSound("click");
-                                         setScreen(AppScreen.CHESS_ANALYSIS);
+                                         handleNavigation(AppScreen.CHESS_ANALYSIS);
                                      }}
                                      className="px-2.5 py-0.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-[10px] rounded-lg uppercase tracking-wider transition-all flex items-center gap-1 shadow-sm active:scale-95 cursor-pointer"
                                  >
@@ -14912,22 +14653,22 @@ const getTodayChallenge = () => {
                     
                     {currentExercise.readingData.mode === 'write' ? (
                         <div className="w-full max-w-2xl">
-                            <p className={`text-lg mb-4 text-gray-300 italic ${isKlingonCourse && showKlingonFont ? 'font-klingon not-italic text-white' : ''}`} dir="auto">"{currentExercise.readingData.text}"</p>
+                            <p className={`text-base md:text-lg leading-relaxed whitespace-pre-line mb-4 text-gray-200 ${isKlingonCourse && showKlingonFont ? 'font-klingon not-italic text-white' : isHighValyrianCourse ? 'font-valyrian not-italic text-xl text-white' : ''}`} dir="auto">{currentExercise.readingData.text}</p>
                             {isKlingonCourse && showKlingonPIqaD && (
-                              <p className="font-piqad text-base text-purple-300 mb-3" dir="auto">{tlhToPIqaD(currentExercise.readingData.text)}</p>
+                              <p className="font-piqad text-base text-purple-300 whitespace-pre-line mb-3" dir="auto">{tlhToPIqaD(currentExercise.readingData.text)}</p>
                             )}
-                            <p className="text-white font-bold mb-4 uppercase tracking-widest text-sm" dir="auto">{currentExercise.readingData.prompt}</p>
+                            <p className="text-white font-bold mb-4 tracking-wide text-sm md:text-base whitespace-pre-line" dir="auto">{currentExercise.readingData.prompt}</p>
                             <textarea 
                                 value={readingInput}
                                 onChange={(e) => setReadingInput(e.target.value)}
-                                className="w-full h-40 bg-duo-card border-2 border-gray-700 rounded-2xl p-4 text-white focus:border-duo-blue focus:outline-none resize-none placeholder-gray-600 font-bold"
-                                placeholder="Write your answer here..."
+                                className="w-full h-52 bg-duo-card border-2 border-gray-700 rounded-2xl p-4 text-white focus:border-duo-blue focus:outline-none resize-y placeholder-gray-600 font-bold"
+                                placeholder="Write your detailed answer here..."
                                 disabled={feedback.status !== 'idle'}
                                 dir="auto"
                             />
                         </div>
                     ) : (
-                        <div className={`w-full max-w-2xl text-xl leading-relaxed text-center font-bold text-gray-300 ${isKlingonCourse && showKlingonFont ? 'font-klingon text-white' : ''}`} dir="auto">
+                        <div className={`w-full max-w-2xl text-lg md:text-xl leading-relaxed text-left whitespace-pre-line font-bold text-gray-200 ${isKlingonCourse && showKlingonFont ? 'font-klingon text-white' : isHighValyrianCourse ? 'font-valyrian text-2xl text-white' : ''}`} dir="auto">
                             {currentExercise.readingData.text.split("___").map((part, i, arr) => (
                                 <React.Fragment key={i}>
                                     <span>{part}</span>
@@ -14959,7 +14700,7 @@ const getTodayChallenge = () => {
                                             setSelectedWordIds([...selectedWordIds, token.id]);
                                         }
                                     }}
-                                    className={`p-3 px-6 rounded-xl border-b-4 font-bold text-lg transition-all ${showKlingonFont && isKlingonTextOrToken(token.text) ? 'font-klingon' : ''} ${selectedWordIds.includes(token.id) ? 'opacity-0 pointer-events-none scale-90' : 'bg-duo-card border-gray-700 hover:border-duo-blue hover:text-duo-blue active:translate-y-1 active:border-b-0'}`}
+                                    className={`p-3 px-6 rounded-xl border-b-4 font-bold text-lg transition-all ${showKlingonFont && isKlingonTextOrToken(token.text) ? 'font-klingon' : isHighValyrianTextOrToken(token.text) ? 'font-valyrian text-xl' : ''} ${selectedWordIds.includes(token.id) ? 'opacity-0 pointer-events-none scale-90' : 'bg-duo-card border-gray-700 hover:border-duo-blue hover:text-duo-blue active:translate-y-1 active:border-b-0'}`}
                                     dir="auto"
                                 >
                                     <span>{token.text}</span>
@@ -14987,13 +14728,13 @@ const getTodayChallenge = () => {
                     </p>
                     <button onClick={() => speakText(currentExercise.illusionData!.soundText, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} className="w-32 h-32 md:w-48 md:h-48 rounded-[2rem] md:rounded-[3rem] bg-indigo-600 border-b-8 border-indigo-800 shadow-2xl flex items-center justify-center mb-10 md:mb-16 hover:brightness-110 active:translate-y-2 active:border-b-0 transition-all group"><VolumeIcon className="w-16 h-16 md:w-24 md:h-24 text-white group-hover:scale-110 transition-transform" /></button>
                     <div className="grid grid-cols-2 gap-4 md:gap-6 w-full max-w-lg px-4">
-                        <button disabled={feedback.status !== 'idle'} onClick={() => checkIllusionAnswer('A')} className={`bg-duo-card border-2 border-b-4 border-gray-700 p-4 md:p-8 rounded-3xl font-bold text-xl md:text-2xl hover:bg-gray-700 active:border-b-0 active:translate-y-1 transition-all ${isKlingonCourse && showKlingonFont ? 'font-klingon' : ''}`}>
+                        <button disabled={feedback.status !== 'idle'} onClick={() => checkIllusionAnswer('A')} className={`bg-duo-card border-2 border-b-4 border-gray-700 p-4 md:p-8 rounded-3xl font-bold text-xl md:text-2xl hover:bg-gray-700 active:border-b-0 active:translate-y-1 transition-all ${isKlingonCourse && showKlingonFont ? 'font-klingon' : isHighValyrianCourse ? 'font-valyrian text-2xl md:text-3xl' : ''}`}>
                           <span>{currentExercise.illusionData.optionA}</span>
                           {isKlingonCourse && showKlingonPIqaD && (
                             <span className="font-piqad text-sm text-purple-300 block mt-1">{tlhToPIqaD(currentExercise.illusionData.optionA)}</span>
                           )}
                         </button>
-                        <button disabled={feedback.status !== 'idle'} onClick={() => checkIllusionAnswer('B')} className={`bg-duo-card border-2 border-b-4 border-gray-700 p-4 md:p-8 rounded-3xl font-bold text-xl md:text-2xl hover:bg-gray-700 active:border-b-0 active:translate-y-1 transition-all ${isKlingonCourse && showKlingonFont ? 'font-klingon' : ''}`}>
+                        <button disabled={feedback.status !== 'idle'} onClick={() => checkIllusionAnswer('B')} className={`bg-duo-card border-2 border-b-4 border-gray-700 p-4 md:p-8 rounded-3xl font-bold text-xl md:text-2xl hover:bg-gray-700 active:border-b-0 active:translate-y-1 transition-all ${isKlingonCourse && showKlingonFont ? 'font-klingon' : isHighValyrianCourse ? 'font-valyrian text-2xl md:text-3xl' : ''}`}>
                           <span>{currentExercise.illusionData.optionB}</span>
                           {isKlingonCourse && showKlingonPIqaD && (
                             <span className="font-piqad text-sm text-purple-300 block mt-1">{tlhToPIqaD(currentExercise.illusionData.optionB)}</span>
@@ -15003,86 +14744,136 @@ const getTodayChallenge = () => {
                  </div>
              ) : currentExercise.type === 'roleplay' && currentExercise.roleplayData ? (
                  <div className="flex-1 flex flex-col relative overflow-hidden min-h-0">
-                     {/* Video Call Quick Switch Banner */}
-                     <div className="bg-gradient-to-r from-purple-900/80 via-indigo-900/80 to-blue-900/80 border border-purple-500/30 p-3 rounded-2xl mb-3 flex items-center justify-between shadow-lg">
-                         <div className="flex items-center space-x-3">
-                             <div className="p-2 bg-purple-600 rounded-xl">
-                                 <VideoIcon className="w-5 h-5 text-white animate-pulse" />
-                             </div>
-                             <div>
-                                 <h4 className="text-white text-xs md:text-sm font-black">Переключиться на видеозвонок?</h4>
-                                 <p className="text-[11px] text-purple-200">Живой разговор с AI партнером DuoWindo6601</p>
-                             </div>
-                         </div>
-                         <div className="flex items-center space-x-2">
-                             {lessonBackupExercise && (
-                                 <button
-                                     type="button"
-                                     onClick={() => {
-                                         playSound('click');
-                                         setCurrentExercise(lessonBackupExercise);
-                                         setLessonBackupExercise(null);
-                                     }}
-                                     className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold text-xs uppercase tracking-wider rounded-xl transition-all border border-gray-600 cursor-pointer"
-                                 >
-                                     <span>К уроку</span>
-                                 </button>
-                             )}
-                             <button 
-                                 onClick={() => startVideoCall(currentCourse.localName || "Ролевой диалог", true)}
-                                 className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center space-x-1 cursor-pointer"
-                             >
-                                 <span>Начать звонок</span>
-                             </button>
-                         </div>
-                     </div>
+                     {/* Video Call Quick Switch Banner — hidden on Klingon tlh */}
+                     {!isKlingonCourse && (
+                       <div className="bg-gradient-to-r from-purple-900/80 via-indigo-900/80 to-blue-900/80 border border-purple-500/30 p-3 rounded-2xl mb-3 flex items-center justify-between shadow-lg">
+                           <div className="flex items-center space-x-3">
+                               <div className="p-2 bg-purple-600 rounded-xl">
+                                   <VideoIcon className="w-5 h-5 text-white animate-pulse" />
+                               </div>
+                               <div>
+                                   <h4 className="text-white text-xs md:text-sm font-black">Переключиться на видеозвонок?</h4>
+                                   <p className="text-[11px] text-purple-200">Живой разговор с AI партнером DuoWindo6601</p>
+                               </div>
+                           </div>
+                           <div className="flex items-center space-x-2">
+                               {lessonBackupExercise && (
+                                   <button
+                                       type="button"
+                                       onClick={() => {
+                                           playSound('click');
+                                           setCurrentExercise(lessonBackupExercise);
+                                           setLessonBackupExercise(null);
+                                       }}
+                                       className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold text-xs uppercase tracking-wider rounded-xl transition-all border border-gray-600 cursor-pointer"
+                                   >
+                                       <span>К уроку</span>
+                                   </button>
+                               )}
+                               <button 
+                                   onClick={() => startVideoCall(currentCourse.localName || "Ролевой диалог", true)}
+                                   className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center space-x-1 cursor-pointer"
+                               >
+                                   <span>Начать звонок</span>
+                               </button>
+                           </div>
+                       </div>
+                     )}
 
                      <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 md:space-y-6 pb-24 px-2" dir="auto">
-                        {currentExercise.roleplayData.messages.map((msg, i) => {
-                           const isAr = isArabicText(msg.text);
-                           const textFormatted = formatRTLOverride(msg.text);
-                           const isUser = msg.role === 'user';
-                           return (
-                             <div key={i} className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2`}>
-                                 {!isUser && (
-                                   <div 
-                                     onClick={() => speakText(msg.text, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} 
-                                     className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-duo-blue flex-shrink-0 mr-3 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
-                                   >
-                                     <VolumeIcon className="w-4 h-4 md:w-5 md:h-5 text-white" />
-                                   </div>
-                                 )}
-                                 <div className="max-w-[85%] flex flex-col">
-                                   <div 
-                                     className={`p-3 md:p-4 rounded-2xl text-sm md:text-lg font-bold ${isAr ? 'font-arabic text-right' : isKlingonCourse && isKlingonTextOrToken(textFormatted) ? 'font-klingon' : ''} ${isUser ? 'bg-duo-blue text-white rounded-br-none' : 'bg-gray-800 text-white rounded-bl-none border-2 border-gray-700'}`}
-                                     dir="auto"
-                                   >
-                                     {textFormatted}
-                                     {isKlingonCourse && showKlingonPIqaD && isKlingonTextOrToken(textFormatted) && (
-                                       <span className="font-piqad text-xs text-purple-200/90 block mt-1">{tlhToPIqaD(textFormatted)}</span>
-                                     )}
-                                   </div>
-                                   {msg.correction && (
-                                     <div className="mt-2 bg-black border border-duo-blue/50 p-2 md:p-3 rounded-xl text-xs md:text-sm flex items-start space-x-2 animate-in fade-in" dir="auto">
-                                       <MaxIcon className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
-                                       <div className="text-gray-300">
-                                         <span className="text-duo-blue font-black uppercase text-[10px]">Correction: </span>
-                                         {formatRTLOverride(msg.correction)}
-                                       </div>
+                        {(() => {
+                           const messages = currentExercise.roleplayData.messages;
+                           let lastModelIdx = -1;
+                           for (let idx = messages.length - 1; idx >= 0; idx--) {
+                             if (messages[idx].role === 'model') {
+                               lastModelIdx = idx;
+                               break;
+                             }
+                           }
+                           return messages.map((msg, i) => {
+                             const isAr = isArabicText(msg.text);
+                             const textFormatted = formatRTLOverride(msg.text);
+                             const isUser = msg.role === 'user';
+                             const shouldAnimateModel = !isUser && i === lastModelIdx && roleplayTypingNonce > 0;
+                             return (
+                               <div key={`${i}-${msg.role}`} className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2`}>
+                                   {!isUser && (
+                                     <div 
+                                       onClick={() => speakText(msg.text, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} 
+                                       className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-duo-blue flex-shrink-0 mr-3 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
+                                     >
+                                       <VolumeIcon className="w-4 h-4 md:w-5 md:h-5 text-white" />
                                      </div>
                                    )}
-                                 </div>
-                                 {isUser && (
-                                   <div 
-                                     onClick={() => speakText(msg.text, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} 
-                                     className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-purple-600 flex-shrink-0 ml-3 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
-                                   >
-                                     <VolumeIcon className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                                   <div className="max-w-[85%] flex flex-col">
+                                     <div 
+                                       className={`p-3 md:p-4 rounded-2xl text-sm md:text-lg font-bold whitespace-pre-line ${isAr ? 'font-arabic text-right' : isKlingonCourse && isKlingonTextOrToken(textFormatted) ? 'font-klingon' : isHighValyrianCourse ? 'font-valyrian text-base md:text-xl' : ''} ${isUser ? 'bg-duo-blue text-white rounded-br-none' : 'bg-gray-800 text-white rounded-bl-none border-2 border-gray-700'}`}
+                                       dir="auto"
+                                     >
+                                       {shouldAnimateModel ? (
+                                         <TypewriterText
+                                           text={msg.text}
+                                           animate={true}
+                                           animateKey={`${currentExercise.id}-${i}-${roleplayTypingNonce}`}
+                                           speedMs={16}
+                                           cursorClassName="inline-block w-[2px] h-[1em] align-middle ml-1 bg-sky-400 animate-pulse"
+                                           onProgress={() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
+                                         >
+                                           {(visibleRaw) => {
+                                             const sliceFormatted = formatRTLOverride(visibleRaw);
+                                             return (
+                                               <>
+                                                 {sliceFormatted}
+                                                 {isKlingonCourse && showKlingonPIqaD && isKlingonTextOrToken(sliceFormatted) && (
+                                                   <span className="font-piqad text-xs text-purple-200/90 block mt-1">{tlhToPIqaD(sliceFormatted)}</span>
+                                                 )}
+                                               </>
+                                             );
+                                           }}
+                                         </TypewriterText>
+                                       ) : (
+                                         <>
+                                           {textFormatted}
+                                           {isKlingonCourse && showKlingonPIqaD && isKlingonTextOrToken(textFormatted) && (
+                                             <span className="font-piqad text-xs text-purple-200/90 block mt-1">{tlhToPIqaD(textFormatted)}</span>
+                                           )}
+                                         </>
+                                       )}
+                                     </div>
+                                     {msg.correction && (
+                                       <div className="mt-2 bg-black border border-duo-blue/50 p-2 md:p-3 rounded-xl text-xs md:text-sm flex items-start space-x-2 animate-in fade-in" dir="auto">
+                                         <MaxIcon className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                                         <div className="text-gray-300">
+                                           <span className="text-duo-blue font-black uppercase text-[10px]">Correction: </span>
+                                           {formatRTLOverride(msg.correction)}
+                                         </div>
+                                       </div>
+                                     )}
                                    </div>
-                                 )}
-                             </div>
-                           );
-                        })}
+                                   {isUser && (
+                                     <div 
+                                       onClick={() => speakText(msg.text, currentCourse.id, false, user.preferredVoice, user.voiceProvider)} 
+                                       className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-purple-600 flex-shrink-0 ml-3 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
+                                     >
+                                       <VolumeIcon className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                                     </div>
+                                   )}
+                               </div>
+                             );
+                           });
+                        })()}
+                        {loading && (
+                          <div className="flex justify-start animate-in fade-in">
+                            <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-duo-blue/60 flex-shrink-0 mr-3 flex items-center justify-center">
+                              <span className="text-sm animate-pulse">🦉</span>
+                            </div>
+                            <div className="bg-gray-800/80 border-2 border-gray-700 rounded-2xl rounded-bl-none px-4 py-3 flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-sky-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                              <span className="w-2 h-2 rounded-full bg-sky-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                              <span className="w-2 h-2 rounded-full bg-sky-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                            </div>
+                          </div>
+                        )}
                         <div ref={chatBottomRef} />
                      </div>
                       <div className="w-full bg-duo-card border-t-2 border-gray-800 p-2 md:p-3 mt-auto">
@@ -15161,9 +14952,21 @@ const getTodayChallenge = () => {
                               <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
                                 <button
                                   type="button"
+                                  onClick={() => handleSwitchKlingonSpeechMode('hol', currentExercise.originalSentence)}
+                                  className={`px-3 py-1.5 rounded-xl text-xs font-black border transition-all cursor-pointer ${
+                                    klingonSpeechMode !== 'client'
+                                      ? 'bg-indigo-600/85 border-indigo-400 text-white shadow'
+                                      : 'bg-indigo-600/20 hover:bg-indigo-600/40 border-indigo-500/40 text-indigo-200'
+                                  }`}
+                                  title="hol.kag.org (https://hol.kag.org/sentence/nuqneH)"
+                                >
+                                  🎧 hol.kag.org
+                                </button>
+                                <button
+                                  type="button"
                                   onClick={() => handleSwitchKlingonSpeechMode('client', currentExercise.originalSentence)}
                                   className={`px-3 py-1.5 rounded-xl text-xs font-black border transition-all cursor-pointer ${
-                                    klingonSpeechMode !== 'hol'
+                                    klingonSpeechMode === 'client'
                                       ? 'bg-sky-600/80 border-sky-400 text-white shadow'
                                       : 'bg-sky-600/20 hover:bg-sky-600/40 border-sky-500/40 text-sky-200'
                                   }`}
@@ -15171,34 +14974,30 @@ const getTodayChallenge = () => {
                                 >
                                   🔊 SAM Speech
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleSwitchKlingonSpeechMode('hol', currentExercise.originalSentence)}
-                                  className={`px-3 py-1.5 rounded-xl text-xs font-black border transition-all cursor-pointer ${
-                                    klingonSpeechMode === 'hol'
-                                      ? 'bg-indigo-600/85 border-indigo-400 text-white shadow'
-                                      : 'bg-indigo-600/20 hover:bg-indigo-600/40 border-indigo-500/40 text-indigo-200'
-                                  }`}
-                                  title="hol.kag.org → SAM Software Automatic Mouth (https://hol.kag.org/sentence/Hello)"
-                                >
-                                  🎧 hol.kag.org (SAM)
-                                </button>
                                 <a
                                   href={getKlingonSentencePlayerUrl(currentExercise.originalSentence)}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="px-2.5 py-1.5 rounded-xl text-xs font-black bg-indigo-950/60 hover:bg-indigo-800/70 border border-indigo-500/40 text-indigo-300 hover:text-white transition-all"
-                                  title="https://hol.kag.org/sentence/Hello"
+                                  title="https://hol.kag.org/sentence/nuqneH"
                                 >
                                   hol.kag.org ↗
                                 </a>
                                 <button
                                   type="button"
                                   onClick={() => {
+                                    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+                                      playSound('wrong');
+                                      notifyNetworkOffline();
+                                      setToast(OFFLINE_INTERNET_REQUIRED_MESSAGE);
+                                      return;
+                                    }
                                     playSound('click');
-                                    void downloadKlingonAudioFile(currentExercise.originalSentence, false, klingonSpeechMode).then(info => {
-                                      setToast(user.language === 'ru' ? `💾 Аудио-файл сохранён: ${info.filename}` : `💾 Audio saved: ${info.filename}`);
-                                    });
+                                    void downloadKlingonAudioFile(currentExercise.originalSentence, false, klingonSpeechMode)
+                                      .then(info => {
+                                        setToast(user.language === 'ru' ? `💾 Аудио-файл сохранён: ${info.filename}` : `💾 Audio saved: ${info.filename}`);
+                                      })
+                                      .catch(() => {});
                                   }}
                                   className="px-3 py-1.5 rounded-xl text-xs font-black bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-400/50 text-emerald-200 transition-all cursor-pointer"
                                 >
@@ -15218,7 +15017,7 @@ const getTodayChallenge = () => {
                         ) : currentExercise.type === 'speech' && !isKlingonCourse ? (
                             <div className="w-full flex justify-center py-2"><button onClick={toggleRecording} className={`w-28 h-28 md:w-36 md:h-36 rounded-[2.5rem] md:rounded-[3rem] flex items-center justify-center transition-all shadow-2xl ${isRecording ? 'bg-red-500 scale-110 animate-pulse' : 'bg-duo-blue hover:brightness-110'}`}><MicIcon className="w-12 h-12 md:w-16 md:h-16 text-white" />{isRecording && <span className="absolute mt-20 md:mt-24 text-xs md:text-sm font-bold animate-bounce">Слушаю...</span>}</button></div>
                         ) : (
-                          <div className={`bg-duo-card border-2 border-gray-700 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 pb-16 md:pb-10 text-xl md:text-3xl font-bold relative shadow-xl text-center md:text-left break-words ${isArabicText(currentExercise.originalSentence) ? 'font-arabic text-right' : isKlingonCourse && showKlingonFont ? 'font-klingon' : ''}`} dir="auto">
+                          <div className={`bg-duo-card border-2 border-gray-700 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 pb-16 md:pb-10 text-xl md:text-2xl font-bold relative shadow-xl text-center md:text-left break-words whitespace-pre-line ${isArabicText(currentExercise.originalSentence) ? 'font-arabic text-right' : isKlingonCourse && showKlingonFont ? 'font-klingon' : isHighValyrianCourse ? 'font-valyrian text-2xl md:text-4xl' : ''}`} dir="auto">
                             <div>{formatRTLOverride(currentExercise.originalSentence)}</div>
                             {isKlingonCourse && showKlingonPIqaD && (
                               <div className="font-piqad text-base md:text-xl text-purple-300 mt-2 tracking-wide">
@@ -15241,8 +15040,9 @@ const getTodayChallenge = () => {
                             const isArTok = isArabicText(tokText);
                             const isKlingonTok = isKlingonTextOrToken(tokText);
                             const isTlhTok = isKlingonCourse && showKlingonFont && isKlingonTok;
+                            const isHvTok = isHighValyrianTextOrToken(tokText);
                             return (
-                              <button key={id} onClick={() => { playSound('click'); setSelectedWordIds(p => p.filter(x => x !== id)); }} className={`bg-duo-card border-2 border-b-4 border-gray-700 p-2 px-4 md:p-4 md:px-8 rounded-xl md:rounded-2xl font-bold text-lg md:text-2xl hover:bg-gray-700 transition-all animate-in slide-in-from-bottom-2 ${isArTok ? 'font-arabic' : isTlhTok ? 'font-klingon' : ''}`}>
+                              <button key={id} onClick={() => { playSound('click'); setSelectedWordIds(p => p.filter(x => x !== id)); }} className={`bg-duo-card border-2 border-b-4 border-gray-700 p-2 px-4 md:p-4 md:px-8 rounded-xl md:rounded-2xl font-bold text-lg md:text-2xl hover:bg-gray-700 transition-all animate-in slide-in-from-bottom-2 ${isArTok ? 'font-arabic' : isTlhTok ? 'font-klingon' : isHvTok ? 'font-valyrian text-xl md:text-3xl' : ''}`}>
                                 <span>{formatRTLOverride(tokText)}</span>
                                 {isKlingonCourse && showKlingonPIqaD && isKlingonTok && !isPIqaDText(tokText) && (
                                   <span className="font-piqad text-[11px] text-purple-300 block leading-tight mt-0.5">{tlhToPIqaD(tokText)}</span>
@@ -15256,8 +15056,9 @@ const getTodayChallenge = () => {
                             const isArTok = isArabicText(token.text);
                             const isKlingonTok = isKlingonTextOrToken(token.text);
                             const isTlhTok = isKlingonCourse && showKlingonFont && isKlingonTok;
+                            const isHvTok = isHighValyrianTextOrToken(token.text);
                             return (
-                              <button key={token.id} disabled={selectedWordIds.includes(token.id) || feedback.status !== 'idle'} onClick={() => { playSound('click'); setSelectedWordIds(p => [...p, token.id]); }} className={`bg-duo-card border-2 border-b-4 border-gray-700 p-2 px-4 md:p-4 md:px-8 rounded-xl md:rounded-2xl font-bold text-lg md:text-2xl hover:bg-gray-700 transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none ${isArTok ? 'font-arabic' : isTlhTok ? 'font-klingon' : ''}`}>
+                              <button key={token.id} disabled={selectedWordIds.includes(token.id) || feedback.status !== 'idle'} onClick={() => { playSound('click'); setSelectedWordIds(p => [...p, token.id]); }} className={`bg-duo-card border-2 border-b-4 border-gray-700 p-2 px-4 md:p-4 md:px-8 rounded-xl md:rounded-2xl font-bold text-lg md:text-2xl hover:bg-gray-700 transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none ${isArTok ? 'font-arabic' : isTlhTok ? 'font-klingon' : isHvTok ? 'font-valyrian text-xl md:text-3xl' : ''}`}>
                                 <span>{formatRTLOverride(token.text)}</span>
                                 {isKlingonCourse && showKlingonPIqaD && isKlingonTok && !isPIqaDText(token.text) && (
                                   <span className="font-piqad text-[11px] text-purple-300 block leading-tight mt-0.5">{tlhToPIqaD(token.text)}</span>
@@ -15343,8 +15144,7 @@ const getTodayChallenge = () => {
                           <button
                             type="button"
                             onClick={() => {
-                              playSound("click");
-                              setScreen(AppScreen.CHESS_ANALYSIS);
+                              handleNavigation(AppScreen.CHESS_ANALYSIS);
                             }}
                             className="p-3 md:p-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black rounded-2xl border-2 border-amber-600 flex items-center space-x-2 transition-all active:scale-95 shadow-md text-xs md:text-sm uppercase tracking-wide cursor-pointer"
                           >
@@ -15499,52 +15299,65 @@ const getTodayChallenge = () => {
                   </button>
                 )}
 
-                {/* Option 2: Roleplays Max */}
-                <button
-                  type="button"
-                  onClick={async () => {
-                    playSound('click');
-                    setShowLessonAiPartnerModal(false);
-                    if (currentExercise) {
-                      setLessonBackupExercise(currentExercise);
-                    }
-                    try {
-                      setLessonLoading(true);
-                      const speechLangId = NON_LANGUAGE_IDS.includes(currentCourse.id) ? (user.language === 'ru' ? 'ru' : 'en') : currentCourse.id;
-                      const ex = await startRoleplay(currentCourse.localName, currentCourse.id, user.language);
-                      setCurrentExercise(ex);
-                      if (ex.roleplayData?.messages[0]) {
-                        speakText(ex.roleplayData.messages[0].text, speechLangId, false, user.preferredVoice, user.voiceProvider);
+                {/* Option 2: Roleplays Max (скрыто для Бета Клингонского tlh) */}
+                {!isKlingonCourse && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (currentCourse.id === 'tlh') {
+                        playSound('wrong');
+                        setToast(
+                          user.language === 'ru'
+                            ? '🔒 Для Бета-курса клингонского языка ВидеоЗвонок и Roleplays ограничены!'
+                            : '🔒 Video Call and Roleplays are restricted for Beta Klingon!'
+                        );
+                        return;
                       }
-                    } catch (e: any) {
-                      console.error("Roleplay start error:", e);
-                      const isOfflineErr = (typeof navigator !== 'undefined' && !navigator.onLine) || String(e?.message || '').includes('Нет подключения к интернету');
-                      setToast(
-                        isOfflineErr
-                          ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
-                          : (e?.message || (user.language === 'ru' ? '⚠️ Ошибка запуска Roleplay' : '⚠️ Roleplay start error'))
-                      );
-                    } finally {
-                      setLessonLoading(false);
-                    }
-                  }}
-                  className="w-full p-4 rounded-2xl bg-gradient-to-r from-pink-700/80 to-purple-700/80 hover:from-pink-600 hover:to-purple-600 border border-pink-400/40 text-left transition-all active:scale-98 shadow-md flex items-center justify-between group cursor-pointer"
-                >
-                  <div className="flex items-center space-x-3.5">
-                    <div className="p-3 bg-white/20 rounded-xl group-hover:scale-105 transition-transform">
-                      <ChatBubbleIcon className="w-6 h-6 text-white" />
+                      playSound('click');
+                      setShowLessonAiPartnerModal(false);
+                      if (currentExercise) {
+                        setLessonBackupExercise(currentExercise);
+                      }
+                      try {
+                        setLessonLoading(true);
+                        const speechLangId = NON_LANGUAGE_IDS.includes(currentCourse.id) ? (user.language === 'ru' ? 'ru' : 'en') : currentCourse.id;
+                        const activeDifficulty: 'easy' | 'hard' = user.difficultyLevel === 'easy' ? 'easy' : 'hard';
+                        const ex = await startRoleplay(currentCourse.localName, currentCourse.id, user.language, activeDifficulty);
+                        setCurrentExercise(ex);
+                        if (ex.roleplayData?.messages[0]) {
+                          speakText(ex.roleplayData.messages[0].text, speechLangId, false, user.preferredVoice, user.voiceProvider);
+                        }
+                      } catch (e: any) {
+                        console.error("Roleplay start error:", e);
+                        const isOfflineErr = (typeof navigator !== 'undefined' && !navigator.onLine) || isNetworkDisconnectError(e) || String(e?.message || '').includes('Нет подключения к интернету');
+                        if (isOfflineErr) notifyNetworkOffline();
+                        setToast(
+                          isOfflineErr
+                            ? '📡 Нет подключения к интернету. Для работы DuoWindo6601 нужен интернет. Включите Wi-Fi или мобильные данные и попробуйте снова'
+                            : (e?.message || (user.language === 'ru' ? '⚠️ Ошибка запуска Roleplay' : '⚠️ Roleplay start error'))
+                        );
+                      } finally {
+                        setLessonLoading(false);
+                      }
+                    }}
+                    className="w-full p-4 rounded-2xl bg-gradient-to-r from-pink-700/80 to-purple-700/80 hover:from-pink-600 hover:to-purple-600 border border-pink-400/40 text-left transition-all active:scale-98 shadow-md flex items-center justify-between group cursor-pointer"
+                  >
+                    <div className="flex items-center space-x-3.5">
+                      <div className="p-3 bg-white/20 rounded-xl group-hover:scale-105 transition-transform">
+                        <ChatBubbleIcon className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h4 className="font-black text-sm text-white">
+                          {user.language === 'ru' ? 'Roleplays Max («Начни говорить →»)' : 'Roleplays Max (Start Speaking →)'}
+                        </h4>
+                        <p className="text-xs text-pink-200 font-bold">
+                          {user.language === 'ru' ? 'Интерактивный ролевой диалог с разбором ошибок' : 'Interactive roleplay with mistake breakdown'}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-black text-sm text-white">
-                        {user.language === 'ru' ? 'Roleplays Max («Начни говорить →»)' : 'Roleplays Max (Start Speaking →)'}
-                      </h4>
-                      <p className="text-xs text-pink-200 font-bold">
-                        {user.language === 'ru' ? 'Интерактивный ролевой диалог с разбором ошибок' : 'Interactive roleplay with mistake breakdown'}
-                      </p>
-                    </div>
-                  </div>
                   <span className="text-white text-lg font-bold group-hover:translate-x-1 transition-transform">→</span>
-                </button>
+                  </button>
+                )}
               </div>
             ) : (
               <div className="my-5 bg-gradient-to-b from-purple-950/60 to-gray-900/90 border border-purple-500/30 rounded-2xl p-4 text-center">
@@ -15904,10 +15717,16 @@ const getTodayChallenge = () => {
       {pendingPwaUpdate && (
         <PwaUpdateProcessOverlay
           lang={pendingPwaUpdate.lang || user.language}
+          channel={pendingPwaUpdate.channel || 'stable'}
           onComplete={(patchInfo?: InstalledPwaPatchInfo) => {
             clearPendingPwaUpdate();
             setPendingPwaUpdateState(null);
             if (patchInfo) {
+              if (patchInfo.channel === 'beta' && user.isBetaTester) {
+                handleInstallAppChannel('beta');
+              } else if (patchInfo.channel === 'stable') {
+                handleInstallAppChannel('stable');
+              }
               setToast(
                 user.language === 'en'
                   ? `✅ DuoWindo6601 PWA v${patchInfo.version} & Security Patch (${patchInfo.signatureShort}) installed!`

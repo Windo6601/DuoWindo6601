@@ -643,36 +643,21 @@ const PROGRAMMING_EXERCISES: CodingExerciseSeed[] = [
   }
 ];
 
-export function getRandomProgrammingFallbackExercise(
-  topicHint?: string,
+export const getRandomProgrammingFallbackExercise = (
+  topic: string,
   difficultyLevel: 'easy' | 'hard' = 'easy'
-): Exercise {
-  const hint = (topicHint || '').toLowerCase();
-  let matchedModule: ProgrammingModuleId | null = null;
-  if (hint.includes('lua')) matchedModule = 'lua';
-  else if (hint.includes('swift') || hint.includes('xcode') || hint.includes('apple') || hint.includes('uikit') || hint.includes('appkit')) matchedModule = 'swift';
-  else if (hint.includes('apk') || hint.includes('gradle') || hint.includes('jks') || hint.includes('andromo')) matchedModule = 'apk';
-  else if (hint.includes('этап') || hint.includes('aab') || hint.includes('lifecycle')) matchedModule = 'lifecycle';
-  else if (hint.includes('kotlin') || hint.includes('android') || hint.includes('ndk') || hint.includes('flutter') || hint.includes('compose')) matchedModule = 'android';
-
-  let pool = matchedModule
-    ? PROGRAMMING_EXERCISES.filter((e) => e.moduleId === matchedModule)
-    : PROGRAMMING_EXERCISES;
-
-  const diffPool = pool.filter((e) => e.difficulty === difficultyLevel);
-  if (diffPool.length > 0) {
-    pool = diffPool;
-  }
-
-  const picked = pool[Math.floor(Math.random() * pool.length)] || PROGRAMMING_EXERCISES[0];
-
+): Exercise => {
+  const filtered = PROGRAMMING_EXERCISES.filter(ex => ex.difficulty === difficultyLevel);
+  const pool = filtered.length > 0 ? filtered : PROGRAMMING_EXERCISES;
+  const seed = pool[Math.floor(Math.random() * pool.length)] || PROGRAMMING_EXERCISES[0];
+  const bank = [...seed.bankRu].sort(() => Math.random() - 0.5);
   return {
     id: crypto.randomUUID(),
     type: 'translation',
-    difficultyLevel,
-    originalSentence: picked.origRu,
-    targetTranslation: picked.transRu,
-    wordBank: [...picked.bankRu].sort(() => Math.random() - 0.5),
+    originalSentence: seed.origRu,
+    targetTranslation: seed.transRu,
+    wordBank: bank,
     isFallback: true,
+    difficultyLevel
   };
-}
+};

@@ -169,9 +169,11 @@ export async function collectAppDiagnostics(
     activeCourseId = 'en';
   }
 
+  const isBetaBuildActive = Boolean(user.isBetaTester && user.installedAppChannel === 'beta');
+
   return {
     checkedAt: new Date().toLocaleTimeString(),
-    appVersion: APP_VERSION,
+    appVersion: isBetaBuildActive ? APP_BETA_VERSION : APP_VERSION,
     pwaCoreVersion: APP_PWA_CORE_VERSION,
     buildCode: APP_BUILD_CODE,
     displayMode,

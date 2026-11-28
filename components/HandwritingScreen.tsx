@@ -131,7 +131,7 @@ export const HandwritingScreen: React.FC<HandwritingScreenProps> = ({
     setSelectedItem(item);
     resetCanvasForNewItem(item);
     if (item.soundText || item.title) {
-      speakText(item.soundText || item.title, item.language || 'ru', false, user.preferredVoice, user.voiceProvider);
+      speakText(item.soundText || item.title || '', item.language || 'ru', false, user.preferredVoice, user.voiceProvider);
     }
   };
 
@@ -139,6 +139,7 @@ export const HandwritingScreen: React.FC<HandwritingScreenProps> = ({
   const getStrokePoints = useCallback((stroke: StrokeGuide, count: number = 50): Point[] => {
     // Generate approximate sampled points between start and end
     const pts: Point[] = [];
+    if (!stroke.start || !stroke.end) return pts;
     const sx = (stroke.start.x / 100) * canvasSize;
     const sy = (stroke.start.y / 100) * canvasSize;
     const ex = (stroke.end.x / 100) * canvasSize;
@@ -208,7 +209,7 @@ export const HandwritingScreen: React.FC<HandwritingScreenProps> = ({
   // Stroke Distance & Direction Checking
   const checkStrokePoint = (pt: Point) => {
     const activeStroke = selectedItem.strokes[currentStrokeIndex];
-    if (!activeStroke) return;
+    if (!activeStroke || !activeStroke.start || !activeStroke.end) return;
 
     const startX = (activeStroke.start.x / 100) * canvasSize;
     const startY = (activeStroke.start.y / 100) * canvasSize;
@@ -257,7 +258,7 @@ export const HandwritingScreen: React.FC<HandwritingScreenProps> = ({
     if (!pt) return;
 
     const activeStroke = selectedItem.strokes[currentStrokeIndex];
-    if (activeStroke) {
+    if (activeStroke && activeStroke.start) {
       const startX = (activeStroke.start.x / 100) * canvasSize;
       const startY = (activeStroke.start.y / 100) * canvasSize;
       const distFromStart = Math.hypot(pt.x - startX, pt.y - startY);
@@ -375,10 +376,12 @@ export const HandwritingScreen: React.FC<HandwritingScreenProps> = ({
     });
 
     // Update Daily Habit Tracker
+    const prevCompleted = habit.completedCount ?? 0;
+    const targetCount = habit.targetCount ?? 5;
     const updatedHabit: DailyHandwritingHabit = {
       ...habit,
-      completedCount: habit.completedCount + 1,
-      isCompleted: (habit.completedCount + 1) >= habit.targetCount,
+      completedCount: prevCompleted + 1,
+      isCompleted: (prevCompleted + 1) >= targetCount,
       lastPracticedTitle: selectedItem.title
     };
     setHabit(updatedHabit);
@@ -398,7 +401,7 @@ export const HandwritingScreen: React.FC<HandwritingScreenProps> = ({
     playSound('click');
 
     const activeStroke = selectedItem.strokes[currentStrokeIndex];
-    if (!activeStroke) {
+    if (!activeStroke || !activeStroke.start || !activeStroke.end) {
       setIsDemoPlaying(false);
       return;
     }
@@ -501,7 +504,7 @@ export const HandwritingScreen: React.FC<HandwritingScreenProps> = ({
             onClick={() => {
               if (selectedItem.soundText || selectedItem.title) {
                 playSound('click');
-                speakText(selectedItem.soundText || selectedItem.title, selectedItem.language || 'ru', false, user.preferredVoice, user.voiceProvider);
+                speakText(selectedItem.soundText || selectedItem.title || '', selectedItem.language || 'ru', false, user.preferredVoice, user.voiceProvider);
               }
             }}
             className="p-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 rounded-xl border border-emerald-500/40 transition-transform active:scale-95"
@@ -684,13 +687,13 @@ export const HandwritingScreen: React.FC<HandwritingScreenProps> = ({
               <div className="w-full bg-gray-700 h-3 rounded-full overflow-hidden">
                 <div 
                   className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full transition-all duration-500"
-                  style={{ width: `${Math.min(100, (habit.completedCount / habit.targetCount) * 100)}%` }}
+                  style={{ width: `${Math.min(100, ((habit.completedCount ?? 0) / Math.max(1, habit.targetCount ?? 1)) * 100)}%` }}
                 />
               </div>
               <p className="text-[11px] text-gray-400">
                 {habit.isCompleted
                   ? 'Отличная работа! Вы закрепили навык чистописания на сегодня.'
-                  : `Осталось написать ${Math.max(0, habit.targetCount - habit.completedCount)} элемент(а) для поддержания серии.`}
+                  : `Осталось написать ${Math.max(0, (habit.targetCount ?? 0) - (habit.completedCount ?? 0))} элемент(а) для поддержания серии.`}
               </p>
             </div>
 
@@ -795,7 +798,7 @@ export const HandwritingScreen: React.FC<HandwritingScreenProps> = ({
                 })}
 
                 {/* CURRENT ACTIVE STROKE START BEACON (PULSING GREEN DOT WITH NUMBER) */}
-                {activeStroke && (
+                {activeStroke?.start && (
                   <g className="animate-pulse">
                     <circle
                       cx={activeStroke.start.x}

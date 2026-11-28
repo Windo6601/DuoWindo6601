@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { SystemCompatibilityResult } from '../services/systemCompatibilityService';
 import { playSound } from '../services/audioService';
-import { APP_VERSION, APP_PWA_CORE_VERSION } from '../services/appVersionService';
+import { APP_VERSION, APP_BETA_VERSION, APP_PWA_CORE_VERSION } from '../services/appVersionService';
 import {
   getLastInstalledPwaPatch,
   InstalledPwaPatchInfo,
   preparePwaCachesAndWorker,
   setPendingPwaUpdate,
+  AppReleaseChannel,
 } from '../services/pwaUpdateService';
 import { CheckCircleIcon } from './Icons';
 
@@ -15,14 +16,18 @@ interface PwaUpdateSecuritySectionProps {
   onOpenSystemChecker: () => void;
   lang?: string;
   isBetaTester?: boolean;
+  installedChannel?: 'stable' | 'beta';
 }
 
 export const PwaUpdateSecuritySection: React.FC<PwaUpdateSecuritySectionProps> = ({
   systemInfo,
   onOpenSystemChecker,
   lang = 'ru',
-  isBetaTester = false
+  isBetaTester = false,
+  installedChannel = 'stable'
 }) => {
+  const activeChannel: AppReleaseChannel = isBetaTester && installedChannel === 'beta' ? 'beta' : 'stable';
+  const activeDisplayVersion = activeChannel === 'beta' ? APP_BETA_VERSION : APP_VERSION;
   const isRu = lang !== 'en'; // Multi-lang support enabled
   const isModern = systemInfo.pwaUpdateSupported;
 
@@ -46,8 +51,16 @@ export const PwaUpdateSecuritySection: React.FC<PwaUpdateSecuritySectionProps> =
   }, []);
 
   // Interactive Downloader for Full PWA Update & Security Patch -> Reloads page into Process Screen
-  const handleDownloadFullUpdate = () => {
+  const handleDownloadFullUpdate = (targetChannel: AppReleaseChannel = activeChannel) => {
     playSound('click');
+    if (targetChannel === 'beta' && !isBetaTester) {
+      setAppUpdateStatus(
+        isRu
+          ? `🔒 Вы не присоединились к бета-тестированию: ранние обновления PWA Бета-канала (${APP_BETA_VERSION}) недоступны!`
+          : `🔒 Not joined to Beta Testing: early Beta Channel (${APP_BETA_VERSION}) PWA updates are locked!`
+      );
+      return;
+    }
     if (!isModern) {
       setAppUpdateStatus(
         isRu 
@@ -70,7 +83,11 @@ export const PwaUpdateSecuritySection: React.FC<PwaUpdateSecuritySectionProps> =
     setIsReloading(false);
     setAppUpdateStatus(null);
     setDownloadProgress(0);
-    setDownloadStep(isRu ? 'Инициализация загрузки DuoWindo6601 PWA...' : 'Initializing DuoWindo6601 PWA update...');
+    setDownloadStep(
+      targetChannel === 'beta'
+        ? (isRu ? `Инициализация ранней PWA-сборки ${APP_BETA_VERSION}...` : `Initializing early Beta PWA build ${APP_BETA_VERSION}...`)
+        : (isRu ? 'Инициализация загрузки DuoWindo6601 PWA...' : 'Initializing DuoWindo6601 PWA update...')
+    );
 
     void preparePwaCachesAndWorker();
 
@@ -89,7 +106,7 @@ export const PwaUpdateSecuritySection: React.FC<PwaUpdateSecuritySectionProps> =
         setIsReloading(true);
 
         // Save pending post-reload installation state and reload the page
-        setPendingPwaUpdate(lang);
+        setPendingPwaUpdate(lang, targetChannel);
 
         setTimeout(() => {
           window.location.reload();
@@ -139,8 +156,8 @@ export const PwaUpdateSecuritySection: React.FC<PwaUpdateSecuritySectionProps> =
       setIsCheckingAppUpdate(false);
       setAppUpdateStatus(
         isRu
-          ? `✅ Приложение DuoWindo6601 Progressive Web App (PWA) актуально (версия v${APP_VERSION} • ${APP_PWA_CORE_VERSION} PWA Core). Все модули, аудио-курсы и маскот обновлены!`
-          : `✅ DuoWindo6601 Progressive Web App (PWA) is up to date (v${APP_VERSION} • ${APP_PWA_CORE_VERSION} PWA Core). All assets cached!`
+          ? `✅ Приложение DuoWindo6601 Progressive Web App (PWA) актуально (версия v${activeDisplayVersion} • ${APP_PWA_CORE_VERSION} PWA Core). Все модули, аудио-курсы и маскот обновлены!`
+          : `✅ DuoWindo6601 Progressive Web App (PWA) is up to date (v${activeDisplayVersion} • ${APP_PWA_CORE_VERSION} PWA Core). All assets cached!`
       );
     }, 900);
   };
@@ -294,7 +311,7 @@ export const PwaUpdateSecuritySection: React.FC<PwaUpdateSecuritySectionProps> =
             </div>
 
             <span className="text-xs font-mono font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-3 py-1 rounded-xl">
-              12.4 MB • v{APP_VERSION} ({APP_PWA_CORE_VERSION})
+              12.4 MB • v{activeDisplayVersion} ({APP_PWA_CORE_VERSION})
             </span>
           </div>
 
@@ -332,18 +349,37 @@ export const PwaUpdateSecuritySection: React.FC<PwaUpdateSecuritySectionProps> =
 
           {/* Download Action Button */}
           {!isDownloading && (
-            <button
-              type="button"
-              onClick={handleDownloadFullUpdate}
-              className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-black font-black text-xs uppercase tracking-wider rounded-2xl shadow-xl border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center space-x-2 cursor-pointer"
-            >
-              <span>🚀</span>
-              <span>
-                {lastInstalledPatch
-                  ? (isRu ? 'СКАЧАТЬ ПОЛНОЕ ОБНОВЛЕНИЕ PWA И ПАТЧ БЕЗОПАСНОСТИ ПОВТОРНО' : 'DOWNLOAD & REINSTALL FULL PWA & SECURITY PATCH')
-                  : (isRu ? 'СКАЧАТЬ ПОЛНОЕ ОБНОВЛЕНИЕ PWA И ПАТЧ БЕЗОПАСНОСТИ' : 'DOWNLOAD FULL PWA UPDATE & SECURITY PATCH')}
-              </span>
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => handleDownloadFullUpdate('stable')}
+                className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-black font-black text-xs uppercase tracking-wider rounded-2xl shadow-xl border-b-4 border-emerald-800 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center space-x-2 cursor-pointer"
+              >
+                <span>🚀</span>
+                <span>
+                  {lastInstalledPatch
+                    ? (isRu ? `ОБНОВИТЬ PWA (${APP_VERSION})` : `REINSTALL PWA (${APP_VERSION})`)
+                    : (isRu ? `СКАЧАТЬ PWA (${APP_VERSION})` : `DOWNLOAD PWA (${APP_VERSION})`)}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleDownloadFullUpdate('beta')}
+                className={`w-full py-3.5 px-4 font-black text-xs uppercase tracking-wider rounded-2xl shadow-xl transition-all flex items-center justify-center space-x-2 ${
+                  isBetaTester
+                    ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-fuchsia-600 hover:brightness-110 text-white border-b-4 border-purple-950 active:border-b-0 active:translate-y-1 cursor-pointer'
+                    : 'bg-gray-900/90 text-gray-400 border-2 border-gray-700 cursor-not-allowed'
+                }`}
+              >
+                <span>{isBetaTester ? '🧪' : '🔒'}</span>
+                <span>
+                  {isBetaTester
+                    ? (isRu ? `УСТАНОВИТЬ БЕТА (${APP_BETA_VERSION})` : `INSTALL BETA (${APP_BETA_VERSION})`)
+                    : (isRu ? `БЕТА ${APP_BETA_VERSION} (НЕДОСТУПНО)` : `BETA ${APP_BETA_VERSION} (LOCKED)`)}
+                </span>
+              </button>
+            </div>
           )}
 
           {lastInstalledPatch && !isDownloading && (
@@ -382,7 +418,7 @@ export const PwaUpdateSecuritySection: React.FC<PwaUpdateSecuritySectionProps> =
               </div>
             </div>
             <span className="text-xs font-mono font-bold bg-blue-950 text-blue-300 border border-blue-500/40 px-2 py-0.5 rounded-lg">
-              v{APP_VERSION} ({APP_PWA_CORE_VERSION})
+              v{activeDisplayVersion} ({APP_PWA_CORE_VERSION})
             </span>
           </div>
 
@@ -401,8 +437,10 @@ export const PwaUpdateSecuritySection: React.FC<PwaUpdateSecuritySectionProps> =
               <span className="text-gray-400">{isRu ? 'Канал обновлений PWA:' : 'PWA Update Channel:'}</span>
               <span className={`font-bold ${isBetaTester ? 'text-purple-300' : 'text-amber-300'}`}>
                 {isBetaTester
-                  ? (isRu ? '🧪 Beta Channel (Открыт)' : '🧪 Beta Channel (Joined)')
-                  : (isRu ? '🔒 Release (Бета недоступна)' : '🔒 Release (Beta Locked)')}
+                  ? (activeChannel === 'beta'
+                      ? (isRu ? `🧪 Бета-канал (${APP_BETA_VERSION} установлена)` : `🧪 Beta Channel (${APP_BETA_VERSION} active)`)
+                      : (isRu ? `🧪 Beta Channel (Открыт: ${APP_BETA_VERSION})` : `🧪 Beta Channel (Unlocked: ${APP_BETA_VERSION})`))
+                  : (isRu ? '🔒 Не присоединился (Бета недоступна)' : '🔒 Not Joined (Beta Locked)')}
               </span>
             </div>
             <div className="flex justify-between py-1">

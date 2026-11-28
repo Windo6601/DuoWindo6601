@@ -2,14 +2,16 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Chess, Square } from 'chess.js';
 import { ChessPieceIcon, ChessColor } from './ChessPieceIcon';
 import { playSound } from '../services/audioService';
-import { analyzeChessPosition, analyzeFullChessGameWithAI, ChessAiMoveAnalysis, getChessMove } from '../services/geminiService';
+import { analyzeChessPosition, analyzeFullChessGameWithAI, ChessAiMoveAnalysis, getChessMove, getChessTutorialHint, isNetworkDisconnectError, isRuntimeOnline, notifyNetworkOffline } from '../services/geminiService';
 import { ChessAutoTranslatorModal } from './ChessAutoTranslatorModal';
+import { useOnlineStatus } from './OfflineIndicator';
 
 export interface ChessAnalysisScreenProps {
   initialMoves?: string[];
   initialFen?: string;
   gameResult?: string;
   playerColor?: 'w' | 'b';
+  userLanguage?: string;
   onBack: () => void;
   onNewGame?: () => void;
   onPlayAgainstBot?: (fen?: string, moves?: string[]) => void;
@@ -168,10 +170,12 @@ export const ChessAnalysisScreen: React.FC<ChessAnalysisScreenProps> = ({
   initialFen,
   gameResult,
   playerColor = 'w',
+  userLanguage = 'ru',
   onBack,
   onNewGame,
   onPlayAgainstBot
 }) => {
+  const isOnline = useOnlineStatus();
   // Original preset moves (for resetting)
   const [originalPresetMoves, setOriginalPresetMoves] = useState<string[]>(() => {
     if (initialMoves && initialMoves.length > 0) return initialMoves;
@@ -216,6 +220,8 @@ export const ChessAnalysisScreen: React.FC<ChessAnalysisScreenProps> = ({
   const [isAiAnalyzingGame, setIsAiAnalyzingGame] = useState<boolean>(false);
   const [showFullReportModal, setShowFullReportModal] = useState<boolean>(false);
   const [showAutoTranslatorModal, setShowAutoTranslatorModal] = useState<boolean>(false);
+  const [tutorialHint, setTutorialHint] = useState<string | null>(null);
+  const [isHintLoading, setIsHintLoading] = useState<boolean>(false);
 
   // "What if" trial moves from current position
   const [trialMoveFens, setTrialMoveFens] = useState<string[]>([]);
@@ -370,6 +376,21 @@ export const ChessAnalysisScreen: React.FC<ChessAnalysisScreenProps> = ({
     }
   }, [currentFen]);
 
+  // Exit chess analysis cleanly if network goes offline
+  useEffect(() => {
+    if (!isOnline) {
+      if (autoPlayRef.current) clearInterval(autoPlayRef.current);
+      setIsPlaying(false);
+      setIsDuoBotActive(false);
+      setIsDuoThinking(false);
+      setIsAiAnalyzingMove(false);
+      setIsAiAnalyzingGame(false);
+      setIsHintLoading(false);
+      notifyNetworkOffline();
+      onBack();
+    }
+  }, [isOnline, onBack]);
+
   // Auto-play effect
   useEffect(() => {
     if (!isPlaying) {
@@ -402,11 +423,17 @@ export const ChessAnalysisScreen: React.FC<ChessAnalysisScreenProps> = ({
     }
   }, [currentPly]);
 
+  // Clear stale hint when board position changes
+  useEffect(() => {
+    setTutorialHint(null);
+  }, [currentFen]);
+
   // Clear trial moves when navigating
   const goToPly = (ply: number) => {
     setTrialMoveFens([]);
     setSelectedSquare(null);
     setLegalMovesForSquare([]);
+    setTutorialHint(null);
     const target = Math.max(0, Math.min(ply, analyzedGame.fens.length - 1));
     setCurrentPly(target);
     playSound('click');
@@ -434,6 +461,11 @@ export const ChessAnalysisScreen: React.FC<ChessAnalysisScreenProps> = ({
 
   // Trigger AI Move Analysis for current position
   const handleRequestAiAnalysis = async () => {
+    if (!isRuntimeOnline()) {
+      playSound('wrong');
+      notifyNetworkOffline();
+      return;
+    }
     if (isAiAnalyzingMove || aiAnalysisCache[currentPly]) return;
     setIsAiAnalyzingMove(true);
     try {
@@ -444,13 +476,58 @@ export const ChessAnalysisScreen: React.FC<ChessAnalysisScreenProps> = ({
       playSound('correct');
     } catch (e) {
       console.error(e);
+      if (!isRuntimeOnline() || isNetworkDisconnectError(e)) notifyNetworkOffline();
     } finally {
       setIsAiAnalyzingMove(false);
     }
   };
 
+  // Trigger AI Tutorial/Next-Move Hint for current position
+  const handleRequestTutorialHint = async () => {
+    if (!isRuntimeOnline()) {
+      playSound('wrong');
+      notifyNetworkOffline();
+      return;
+    }
+    if (isHintLoading) return;
+    playSound('click');
+    setIsHintLoading(true);
+    try {
+      const historySlice = trialMoveFens.length > 0 ? movesList : movesList.slice(0, currentPly);
+      const phase =
+        currentPly < 10
+          ? (userLanguage === 'ru' ? 'дебют' : 'opening')
+          : currentPly < 32
+          ? (userLanguage === 'ru' ? 'миттельшпиль' : 'middlegame')
+          : (userLanguage === 'ru' ? 'эндшпиль' : 'endgame');
+      const contextPrompt = currentMove
+        ? (userLanguage === 'ru'
+            ? `Последний ход: ${currentMove.san}. Фаза игры: ${phase}. Оценка позиции: ${evalLabel}. Подскажи лучший следующий ход или ключевую тактическую идею.`
+            : `Last move: ${currentMove.san}. Phase: ${phase}. Position eval: ${evalLabel}. Suggest the best next move or explain the tactical concept.`)
+        : (userLanguage === 'ru'
+            ? `Начальная позиция (${phase}). Подскажи лучший первый ход и объясни принцип дебюта.`
+            : `Starting position (${phase}). Suggest the best opening move and explain the principle.`);
+      const hint = await getChessTutorialHint(currentFen, historySlice, userLanguage, contextPrompt);
+      setTutorialHint(hint);
+      playSound('correct');
+    } catch (e) {
+      console.error(e);
+      if (!isRuntimeOnline() || isNetworkDisconnectError(e)) {
+        notifyNetworkOffline();
+      }
+      setTutorialHint('');
+    } finally {
+      setIsHintLoading(false);
+    }
+  };
+
   // Trigger Full AI Game Review
   const handleRequestFullGameReport = async () => {
+    if (!isRuntimeOnline()) {
+      playSound('wrong');
+      notifyNetworkOffline();
+      return;
+    }
     if (isAiAnalyzingGame) return;
     setIsAiAnalyzingGame(true);
     setShowFullReportModal(true);
@@ -460,6 +537,10 @@ export const ChessAnalysisScreen: React.FC<ChessAnalysisScreenProps> = ({
       playSound('correct');
     } catch (e) {
       console.error(e);
+      if (!isRuntimeOnline() || isNetworkDisconnectError(e)) {
+        setShowFullReportModal(false);
+        notifyNetworkOffline();
+      }
     } finally {
       setIsAiAnalyzingGame(false);
     }
@@ -467,6 +548,10 @@ export const ChessAnalysisScreen: React.FC<ChessAnalysisScreenProps> = ({
 
   // DuoWindo6601 bot automated reply on analysis board
   const triggerDuoBotReply = async (currentMoves: string[], fenAfterUserMove: string) => {
+    if (!isRuntimeOnline()) {
+      notifyNetworkOffline();
+      return;
+    }
     setIsDuoThinking(true);
     try {
       const chess = new Chess(fenAfterUserMove);
@@ -482,7 +567,7 @@ export const ChessAnalysisScreen: React.FC<ChessAnalysisScreenProps> = ({
         return;
       }
 
-      // 1. Try Gemini AI Bot Move
+      // 1. Fetch Gemini AI Bot Move online
       let botSan = '';
       try {
         const aiMove = await getChessMove(fenAfterUserMove, currentMoves);
@@ -498,27 +583,16 @@ export const ChessAnalysisScreen: React.FC<ChessAnalysisScreenProps> = ({
           }
         }
       } catch (err) {
-        console.warn("AI move fetch error, fallback to heuristic", err);
-      }
-
-      // 2. Fallback to heuristic move evaluation if AI took too long
-      if (!botSan) {
-        const moves = chess.moves({ verbose: true });
-        if (moves.length > 0) {
-          let bestMove = moves[0];
-          let bestVal = chess.turn() === 'w' ? -999 : 999;
-          for (const m of moves) {
-            chess.move(m);
-            const val = evaluatePositionHeuristic(chess);
-            chess.undo();
-            if (chess.turn() === 'w' ? val > bestVal : val < bestVal) {
-              bestVal = val;
-              bestMove = m;
-            }
-          }
-          const executed = chess.move(bestMove);
-          if (executed) botSan = executed.san;
+        if (!isRuntimeOnline() || isNetworkDisconnectError(err)) {
+          notifyNetworkOffline();
+          return;
         }
+        setDuoSpeech(
+          userLanguage === 'ru'
+            ? '⚠️ Не удалось получить ход AI. Проверьте подключение и попробуйте снова.'
+            : '⚠️ Failed to fetch AI move. Check connection and try again.'
+        );
+        return;
       }
 
       if (botSan) {
@@ -562,6 +636,11 @@ export const ChessAnalysisScreen: React.FC<ChessAnalysisScreenProps> = ({
 
   // Handle board square click for exploring variations or appending player's own moves
   const handleSquareClick = (square: Square) => {
+    if (!isRuntimeOnline()) {
+      playSound('wrong');
+      notifyNetworkOffline();
+      return;
+    }
     try {
       const chess = new Chess(currentFen);
       if (selectedSquare) {
@@ -1005,6 +1084,25 @@ export const ChessAnalysisScreen: React.FC<ChessAnalysisScreenProps> = ({
 
             <div className="flex items-center gap-2">
               <button
+                type="button"
+                onClick={handleRequestTutorialHint}
+                disabled={isHintLoading}
+                className="px-2.5 py-1 bg-sky-600/90 hover:bg-sky-500 disabled:opacity-50 text-white rounded-lg text-xs font-extrabold transition-colors flex items-center gap-1 border border-sky-400/50 shadow-sm cursor-pointer"
+                title={userLanguage === 'ru' ? 'Подсказка ИИ: лучший следующий ход и идея позиции' : 'AI Hint: suggest next best move and concept'}
+              >
+                {isHintLoading ? (
+                  <>
+                    <span className="animate-spin">⏳</span>
+                    <span>{userLanguage === 'ru' ? 'Думаю...' : 'Thinking...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>💡</span>
+                    <span>{userLanguage === 'ru' ? 'Подсказка' : 'Hint'}</span>
+                  </>
+                )}
+              </button>
+              <button
                 onClick={() => setIsFlipped(f => !f)}
                 className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 border border-slate-700"
                 title="Перевернуть доску"
@@ -1211,20 +1309,54 @@ export const ChessAnalysisScreen: React.FC<ChessAnalysisScreenProps> = ({
         <div className="lg:col-span-5 flex flex-col gap-4 w-full">
           {/* Active Move Intelligence Card */}
           <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 shadow-xl flex flex-col gap-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <span className="text-lg">🦉</span>
                 <h2 className="font-extrabold text-sm md:text-base text-white">Разбор текущего хода</h2>
               </div>
 
-              {currentMove && (
-                <span className={`px-2.5 py-1 rounded-xl text-xs font-black shadow-sm ${
-                  getClassificationMeta(currentMove.classification).color
-                }`}>
-                  {getClassificationMeta(currentMove.classification).badge}
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleRequestTutorialHint}
+                  disabled={isHintLoading}
+                  className="px-2.5 py-1 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white rounded-xl text-xs font-black shadow-sm transition-all flex items-center gap-1 cursor-pointer"
+                  title={userLanguage === 'ru' ? 'Подсказка тренера по текущему ходу' : 'AI Coach Hint for next move'}
+                >
+                  <span>{isHintLoading ? '⏳' : '💡'}</span>
+                  <span>{isHintLoading ? (userLanguage === 'ru' ? 'Анализ...' : 'Thinking...') : (userLanguage === 'ru' ? 'Подсказка' : 'Hint')}</span>
+                </button>
+                {currentMove && (
+                  <span className={`px-2.5 py-1 rounded-xl text-xs font-black shadow-sm ${
+                    getClassificationMeta(currentMove.classification).color
+                  }`}>
+                    {getClassificationMeta(currentMove.classification).badge}
+                  </span>
+                )}
+              </div>
             </div>
+
+            {tutorialHint && (
+              <div className="p-3 bg-sky-950/75 border border-sky-400/50 rounded-xl text-xs text-sky-100 leading-relaxed shadow-inner animate-in fade-in duration-200 flex items-start justify-between gap-2">
+                <div className="flex items-start gap-2">
+                  <span className="text-base shrink-0">💡</span>
+                  <div>
+                    <span className="block font-black text-sky-300 uppercase text-[10px] tracking-wider mb-0.5">
+                      {userLanguage === 'ru' ? 'Совет тренера (Gemini Hint)' : 'Coach Hint (Gemini)'}
+                    </span>
+                    <p className="font-medium text-slate-100">{tutorialHint}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setTutorialHint(null)}
+                  className="text-slate-400 hover:text-white text-xs p-0.5 shrink-0 cursor-pointer"
+                  aria-label="Close hint"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
 
             {currentMove ? (
               <div className="flex flex-col gap-2.5">
@@ -1292,7 +1424,7 @@ export const ChessAnalysisScreen: React.FC<ChessAnalysisScreenProps> = ({
               </div>
             ) : (
               <div className="p-4 bg-slate-800/40 rounded-xl text-center text-xs text-slate-400">
-                <span>Начальная расстановка фигур. Нажмите «▶» для перехода к первому ходу.</span>
+                <span>Начальная расстановка фигур. Нажмите «▶» для перехода к первому ходу или «💡 Подсказка» для совета дебюта.</span>
               </div>
             )}
           </div>

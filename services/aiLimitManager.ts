@@ -13,7 +13,7 @@ export const TIER_AI_CONFIG: Record<SubscriptionTier, AiTierInfo> = {
   free: {
     subscription: 'free',
     dailyLimit: 250,
-    modelName: 'gemini-3-flash-preview',
+    modelName: 'gemini-4-hydrogen',
     label: 'Бесплатный Тариф DuoWindo6601',
     badgeColor: 'bg-gray-700 text-gray-200 border-gray-600',
     features: [
@@ -25,7 +25,7 @@ export const TIER_AI_CONFIG: Record<SubscriptionTier, AiTierInfo> = {
   super: {
     subscription: 'super',
     dailyLimit: 1000,
-    modelName: 'gemini-3-flash-preview',
+    modelName: 'gemini-4-hydrogen',
     label: 'Платно DuoWindo6601 Super',
     badgeColor: 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-purple-400',
     features: [
@@ -38,7 +38,7 @@ export const TIER_AI_CONFIG: Record<SubscriptionTier, AiTierInfo> = {
   max: {
     subscription: 'max',
     dailyLimit: 5000,
-    modelName: 'gemini-3-pro-preview',
+    modelName: 'gemini-4-argon',
     label: 'Платно DuoWindo6601 Max',
     badgeColor: 'bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-600 text-white border-cyan-400 shadow-lg shadow-cyan-500/20',
     features: [
